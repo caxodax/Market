@@ -15,7 +15,7 @@
     "@marketos/types": "workspace:*",
     "@marketos/ui": "workspace:*",
     "@marketos/utils": "workspace:*",
-    "next": "15.2.1",
+    "next": "^16.3.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
