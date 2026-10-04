@@ -37,7 +37,7 @@ address
 ## exchange_rates
 
 Stores exchange rates per tenant or system-wide fallback.
-Primary automated source for USD/VES: `https://bcv.today/api/`
+Primary automated source for USD/VES: `https://bcv.today/api/` (Endpoint: `https://bcv.today/api/v1/rate.json`)
 
 Fields:
 

@@ -8,4 +8,7 @@ export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
 }
 
-export * from "lucide-react";
+export * from "./components/button";
+export * from "./components/badge";
+export * from "./components/input";
+export * from "./components/card";

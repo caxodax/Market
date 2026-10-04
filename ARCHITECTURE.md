@@ -32,6 +32,6 @@ Cloudflare R2
 
 ## External Services & APIs
 
-- **BCV Exchange Rate API**: `https://bcv.today/api/` (Cached in Upstash Redis, automated sync for USD/VES official rate)
+- **BCV Exchange Rate API**: Portal: `https://bcv.today/api/` | Endpoint: `https://bcv.today/api/v1/rate.json` (Cached in Upstash Redis, automated sync for USD/VES official rate)
 
 

@@ -1,22 +1,28 @@
-export default function AdminHomePage() {
+import React from "react";
+import { MarketOSRepository } from "@marketos/database";
+import { AdminDashboard } from "../components/admin-dashboard";
+
+const TENANT_ID = process.env.DEFAULT_TENANT_ID || "shop-market-ca";
+
+export const revalidate = 0; // Dynamic data for admin dashboard
+
+export default async function AdminHomePage() {
+  const [settings, products, orders, payments, exchangeRate] =
+    await Promise.all([
+      MarketOSRepository.getTenantSettings(TENANT_ID),
+      MarketOSRepository.getProducts(TENANT_ID),
+      MarketOSRepository.getTenantOrders(TENANT_ID),
+      MarketOSRepository.getTenantPayments(TENANT_ID),
+      MarketOSRepository.getExchangeRate(TENANT_ID),
+    ]);
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-6 text-center">
-      <div className="max-w-md w-full space-y-6 p-8 rounded-2xl border border-border bg-card shadow-sm">
-        <div className="inline-flex items-center justify-center px-4 py-1.5 rounded-full bg-secondary text-secondary-foreground text-xs font-semibold tracking-wide uppercase">
-          Tenant Admin Portal
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Panel de Administración
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Gestión de catálogo, inventario por sucursal, pedidos y validación de
-          pagos multimoneda con aislamiento estricto por{" "}
-          <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">
-            tenant_id
-          </code>
-          .
-        </p>
-      </div>
-    </main>
+    <AdminDashboard
+      settings={settings}
+      products={products}
+      orders={orders}
+      payments={payments}
+      exchangeRate={exchangeRate}
+    />
   );
 }

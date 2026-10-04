@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@marketos/types": "workspace:*",
+    "@marketos/utils": "workspace:*",
     "@supabase/supabase-js": "^2.49.1"
   },
   "devDependencies": {

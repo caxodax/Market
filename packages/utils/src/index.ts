@@ -39,9 +39,9 @@ export function convertUsdToVes(priceUsd: number, exchangeRate: number): number 
 }
 
 /**
- * Fetch official BCV Rate from https://bcv.today/api/
+ * Fetch official BCV Rate from https://bcv.today/api/ (Endpoint: /api/v1/rate.json)
  */
-export const BCV_API_URL = "https://bcv.today/api/";
+export const BCV_API_URL = "https://bcv.today/api/v1/rate.json";
 
 export async function fetchBcvRate(): Promise<{
   usdRate: number;
@@ -50,6 +50,9 @@ export async function fetchBcvRate(): Promise<{
 }> {
   try {
     const res = await fetch(BCV_API_URL, {
+      headers: {
+        Accept: "application/json",
+      },
       ...({ next: { revalidate: 3600 } } as RequestInit),
     });
 
@@ -57,8 +60,12 @@ export async function fetchBcvRate(): Promise<{
       throw new Error(`Failed to fetch BCV rates: HTTP ${res.status}`);
     }
 
-    const data: BcvApiResponse = await res.json();
-    const usdRate = data.usd?.rate ?? 0;
+    const data = await res.json();
+    // bcv.today returns { USD: 866.56, ... } or { usd: { rate: ... } }
+    const usdRate =
+      typeof data.USD === "number"
+        ? data.USD
+        : (data as BcvApiResponse).usd?.rate ?? 0;
 
     if (!usdRate || usdRate <= 0) {
       throw new Error("Invalid USD rate returned from BCV API");
@@ -66,8 +73,8 @@ export async function fetchBcvRate(): Promise<{
 
     return {
       usdRate,
-      source: "bcv.today",
-      timestamp: data.usd?.updated_at || new Date().toISOString(),
+      source: "https://bcv.today/api/",
+      timestamp: data.updated_at || new Date().toISOString(),
     };
   } catch (error) {
     console.error("[BCV_SYNC_ERROR] Error fetching rate from bcv.today:", error);
