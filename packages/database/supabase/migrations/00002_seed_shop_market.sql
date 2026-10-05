@@ -82,25 +82,25 @@ ON CONFLICT (tenant_id, slug) DO NOTHING;
 -- 6. Products
 INSERT INTO public.products (id, tenant_id, category_id, name, slug, description, sku, price_usd, is_active)
 VALUES
-    ('p1111111-1111-1111-1111-111111111111', 'shop-market-ca', 'c1111111-1111-1111-1111-111111111111', 'Harina PAN Blanca 1kg', 'harina-pan-blanca-1kg', 'Harina de maíz blanco precocida tradicional', 'PAN-001', 1.25, true),
-    ('p2222222-2222-2222-2222-222222222222', 'shop-market-ca', 'c1111111-1111-1111-1111-111111111111', 'Arroz Mary Tradicional 1kg', 'arroz-mary-1kg', 'Arroz blanco entero calidad superior', 'MARY-002', 1.40, true),
-    ('p3333333-3333-3333-3333-333333333333', 'shop-market-ca', 'c1111111-1111-1111-1111-111111111111', 'Aceite Vegetal Mazeite 1L', 'aceite-mazeite-1l', 'Aceite 100% puro de maíz', 'MAZ-003', 3.50, true),
-    ('p4444444-4444-4444-4444-444444444444', 'shop-market-ca', 'c1111111-1111-1111-1111-111111111111', 'Café Fama de América 250g', 'cafe-fama-de-america-250g', 'Café molido tostado oscuro venezolano', 'CAF-004', 2.80, true),
-    ('p5555555-5555-5555-5555-555555555555', 'shop-market-ca', 'c2222222-2222-2222-2222-222222222222', 'Queso Paisa Pasteurizado 500g', 'queso-paisa-500g', 'Queso blanco pasteurizado suave', 'QPA-005', 4.20, true),
-    ('p6666666-6666-6666-6666-666666666666', 'shop-market-ca', 'c2222222-2222-2222-2222-222222222222', 'Leche Completa La Campiña 1L', 'leche-campina-1l', 'Leche líquida pasteurizada entera', 'LEC-006', 2.10, true),
-    ('p7777777-7777-7777-7777-777777777777', 'shop-market-ca', 'c3333333-3333-3333-3333-333333333333', 'Coca-Cola Original 1.5L', 'coca-cola-1-5l', 'Bebida gaseosa refrescante', 'CC-007', 2.00, true),
-    ('p8888888-8888-8888-8888-888888888888', 'shop-market-ca', 'c3333333-3333-3333-3333-333333333333', 'Galletas Oreo Chocolate 108g', 'galletas-oreo-108g', 'Galletas rellenas de crema sabor a vainilla', 'ORE-008', 1.10, true)
+    ('d1111111-1111-1111-1111-111111111111', 'shop-market-ca', 'c1111111-1111-1111-1111-111111111111', 'Harina PAN Blanca 1kg', 'harina-pan-blanca-1kg', 'Harina de maíz blanco precocida tradicional', 'PAN-001', 1.25, true),
+    ('d2222222-2222-2222-2222-222222222222', 'shop-market-ca', 'c1111111-1111-1111-1111-111111111111', 'Arroz Mary Tradicional 1kg', 'arroz-mary-1kg', 'Arroz blanco entero calidad superior', 'MARY-002', 1.40, true),
+    ('d3333333-3333-3333-3333-333333333333', 'shop-market-ca', 'c1111111-1111-1111-1111-111111111111', 'Aceite Vegetal Mazeite 1L', 'aceite-mazeite-1l', 'Aceite 100% puro de maíz', 'MAZ-003', 3.50, true),
+    ('d4444444-4444-4444-4444-444444444444', 'shop-market-ca', 'c1111111-1111-1111-1111-111111111111', 'Café Fama de América 250g', 'cafe-fama-de-america-250g', 'Café molido tostado oscuro venezolano', 'CAF-004', 2.80, true),
+    ('d5555555-5555-5555-5555-555555555555', 'shop-market-ca', 'c2222222-2222-2222-2222-222222222222', 'Queso Paisa Pasteurizado 500g', 'queso-paisa-500g', 'Queso blanco pasteurizado suave', 'QPA-005', 4.20, true),
+    ('d6666666-6666-6666-6666-666666666666', 'shop-market-ca', 'c2222222-2222-2222-2222-222222222222', 'Leche Completa La Campiña 1L', 'leche-campina-1l', 'Leche líquida pasteurizada entera', 'LEC-006', 2.10, true),
+    ('d7777777-7777-7777-7777-777777777777', 'shop-market-ca', 'c3333333-3333-3333-3333-333333333333', 'Coca-Cola Original 1.5L', 'coca-cola-1-5l', 'Bebida gaseosa refrescante', 'CC-007', 2.00, true),
+    ('d8888888-8888-8888-8888-888888888888', 'shop-market-ca', 'c3333333-3333-3333-3333-333333333333', 'Galletas Oreo Chocolate 108g', 'galletas-oreo-108g', 'Galletas rellenas de crema sabor a vainilla', 'ORE-008', 1.10, true)
 ON CONFLICT (tenant_id, slug) DO NOTHING;
 
 -- 7. Inventory for Store Nueva Segovia
 INSERT INTO public.inventory (tenant_id, store_id, product_id, quantity, min_quantity)
 VALUES
-    ('shop-market-ca', 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d', 'p1111111-1111-1111-1111-111111111111', 50, 10),
-    ('shop-market-ca', 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d', 'p2222222-2222-2222-2222-222222222222', 40, 10),
-    ('shop-market-ca', 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d', 'p3333333-3333-3333-3333-333333333333', 25, 5),
-    ('shop-market-ca', 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d', 'p4444444-4444-4444-4444-444444444444', 30, 8),
-    ('shop-market-ca', 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d', 'p5555555-5555-5555-5555-555555555555', 18, 5),
-    ('shop-market-ca', 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d', 'p6666666-6666-6666-6666-666666666666', 22, 6),
-    ('shop-market-ca', 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d', 'p7777777-7777-7777-7777-777777777777', 35, 10),
-    ('shop-market-ca', 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d', 'p8888888-8888-8888-8888-888888888888', 45, 12)
+    ('shop-market-ca', 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d', 'd1111111-1111-1111-1111-111111111111', 50, 10),
+    ('shop-market-ca', 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d', 'd2222222-2222-2222-2222-222222222222', 40, 10),
+    ('shop-market-ca', 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d', 'd3333333-3333-3333-3333-333333333333', 25, 5),
+    ('shop-market-ca', 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d', 'd4444444-4444-4444-4444-444444444444', 30, 8),
+    ('shop-market-ca', 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d', 'd5555555-5555-5555-5555-555555555555', 18, 5),
+    ('shop-market-ca', 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d', 'd6666666-6666-6666-6666-666666666666', 22, 6),
+    ('shop-market-ca', 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d', 'd7777777-7777-7777-7777-777777777777', 35, 10),
+    ('shop-market-ca', 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d', 'd8888888-8888-8888-8888-888888888888', 45, 12)
 ON CONFLICT (store_id, product_id) DO NOTHING;
