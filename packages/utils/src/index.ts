@@ -1,4 +1,7 @@
 import { CurrencyCode, BcvApiResponse } from "@marketos/types";
+import { cacheGet, cacheSet } from "./redis";
+
+export * from "./redis";
 
 /**
  * Currency Formatting Utilities for MarketOS
@@ -40,6 +43,7 @@ export function convertUsdToVes(priceUsd: number, exchangeRate: number): number 
 
 /**
  * Fetch official BCV Rate from https://bcv.today/api/ (Endpoint: /api/v1/rate.json)
+ * Optimized with Upstash Redis cache (1 hour TTL)
  */
 export const BCV_API_URL = "https://bcv.today/api/v1/rate.json";
 
@@ -48,6 +52,24 @@ export async function fetchBcvRate(): Promise<{
   source: string;
   timestamp: string;
 }> {
+  const CACHE_KEY = "marketos:bcv:rate";
+
+  // 1. Try Upstash Redis cache first (sub-millisecond latency)
+  try {
+    const cached = await cacheGet<{
+      usdRate: number;
+      source: string;
+      timestamp: string;
+    }>(CACHE_KEY);
+
+    if (cached && typeof cached.usdRate === "number" && cached.usdRate > 0) {
+      return cached;
+    }
+  } catch (e) {
+    console.warn("[Redis Cache] Error checking BCV rate cache:", e);
+  }
+
+  // 2. Fetch from bcv.today API
   try {
     const res = await fetch(BCV_API_URL, {
       headers: {
@@ -61,7 +83,6 @@ export async function fetchBcvRate(): Promise<{
     }
 
     const data = await res.json();
-    // bcv.today returns { USD: 866.56, ... } or { usd: { rate: ... } }
     const usdRate =
       typeof data.USD === "number"
         ? data.USD
@@ -71,11 +92,20 @@ export async function fetchBcvRate(): Promise<{
       throw new Error("Invalid USD rate returned from BCV API");
     }
 
-    return {
+    const result = {
       usdRate,
-      source: "https://bcv.today/api/",
+      source: "https://bcv.today/api/v1/rate.json",
       timestamp: data.updated_at || new Date().toISOString(),
     };
+
+    // 3. Cache in Upstash Redis for 1 hour
+    try {
+      await cacheSet(CACHE_KEY, result, 3600);
+    } catch (e) {
+      console.warn("[Redis Cache] Error storing BCV rate:", e);
+    }
+
+    return result;
   } catch (error) {
     console.error("[BCV_SYNC_ERROR] Error fetching rate from bcv.today:", error);
     throw error;

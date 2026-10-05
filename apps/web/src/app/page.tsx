@@ -7,7 +7,7 @@ import { CatalogView } from "../components/catalog-view";
 // Tenant 1 ID
 const TENANT_ID = process.env.DEFAULT_TENANT_ID || "shop-market-ca";
 
-export const revalidate = 60; // ISR cache revalidation every minute
+export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   // Fetch tenant data concurrently

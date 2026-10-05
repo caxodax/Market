@@ -12,10 +12,12 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@marketos/types": "workspace:*"
+    "@marketos/types": "workspace:*",
+    "@upstash/redis": "^1.39.0"
   },
   "devDependencies": {
     "@marketos/typescript-config": "workspace:*",
+    "@types/node": "^22.13.10",
     "typescript": "^5.7.3"
   }
 }
