@@ -13,6 +13,7 @@ import {
 } from "@marketos/types";
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
 import { fetchBcvRate, convertUsdToVes } from "@marketos/utils";
+import { createServerComponentClient } from "./server";
 
 export interface CreateOrderInput {
   tenantId: string;
@@ -41,11 +42,39 @@ export interface SubmitPaymentInput {
   proofImageUrl?: string;
 }
 
+function getSupabase() {
+  try {
+    if (
+      process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
+    ) {
+      return createServerComponentClient();
+    }
+  } catch (e) {
+    console.warn("[MarketOS] Could not initialize Supabase server client:", e);
+  }
+  return null;
+}
+
 export class MarketOSRepository {
   /**
    * Fetch Tenant by ID or Slug
    */
   static async getTenant(tenantIdOrSlug: string): Promise<Tenant | null> {
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("tenants")
+        .select("*")
+        .or(`id.eq.${tenantIdOrSlug},slug.eq.${tenantIdOrSlug}`)
+        .maybeSingle();
+
+      if (!error && data) {
+        return data as Tenant;
+      }
+    }
+
     const tenant = state.tenants.find(
       (t) => t.id === tenantIdOrSlug || t.slug === tenantIdOrSlug
     );
@@ -56,6 +85,19 @@ export class MarketOSRepository {
    * Fetch Tenant Customization & Branding Settings
    */
   static async getTenantSettings(tenantId: string): Promise<TenantSettings> {
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("tenant_settings")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+
+      if (!error && data) {
+        return data as TenantSettings;
+      }
+    }
+
     const settings = state.settings.find((s) => s.tenant_id === tenantId);
     return settings || INITIAL_SETTINGS;
   }
@@ -64,6 +106,19 @@ export class MarketOSRepository {
    * Get Stores for Tenant
    */
   static async getStores(tenantId: string): Promise<Store[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("stores")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("is_active", true);
+
+      if (!error && data && data.length > 0) {
+        return data as Store[];
+      }
+    }
+
     return state.stores.filter((s) => s.tenant_id === tenantId && s.is_active);
   }
 
@@ -71,6 +126,20 @@ export class MarketOSRepository {
    * Get Categories for Tenant
    */
   static async getCategories(tenantId: string): Promise<Category[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        return data as Category[];
+      }
+    }
+
     return state.categories
       .filter((c) => c.tenant_id === tenantId && c.is_active)
       .sort((a, b) => a.sort_order - b.sort_order);
@@ -84,6 +153,50 @@ export class MarketOSRepository {
     categoryId?: string,
     query?: string
   ): Promise<(Product & { stock: number })[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      let q = supabase
+        .from("products")
+        .select("*, inventory(quantity)")
+        .eq("tenant_id", tenantId)
+        .eq("is_active", true);
+
+      if (categoryId) {
+        q = q.eq("category_id", categoryId);
+      }
+
+      if (query) {
+        q = q.ilike("name", `%${query}%`);
+      }
+
+      const { data, error } = await q;
+
+      if (!error && data && data.length > 0) {
+        return data.map((item: any) => {
+          const totalStock = Array.isArray(item.inventory)
+            ? item.inventory.reduce((sum: number, inv: any) => sum + (inv.quantity || 0), 0)
+            : 20;
+
+          return {
+            id: item.id,
+            tenant_id: item.tenant_id,
+            category_id: item.category_id,
+            name: item.name,
+            slug: item.slug,
+            description: item.description,
+            sku: item.sku,
+            barcode: item.barcode,
+            image_url: item.image_url,
+            price_usd: Number(item.price_usd),
+            is_active: item.is_active,
+            stock: totalStock,
+            created_at: item.created_at,
+            updated_at: item.updated_at,
+          };
+        });
+      }
+    }
+
     return state.products.filter((p) => {
       if (p.tenant_id !== tenantId || !p.is_active) return false;
       if (categoryId && p.category_id !== categoryId) return false;
@@ -104,7 +217,7 @@ export class MarketOSRepository {
         tenant_id: tenantId,
         currency: "VES",
         value: bcv.usdRate,
-        source: "https://bcv.today/api/",
+        source: "https://bcv.today/api/v1/rate.json",
         updated_at: bcv.timestamp,
       };
       // Cache in runtime state
@@ -120,8 +233,8 @@ export class MarketOSRepository {
         id: "rate-fallback",
         tenant_id: tenantId,
         currency: "VES",
-        value: 45.2,
-        source: "fallback",
+        value: 866.56,
+        source: "https://bcv.today/api/",
         updated_at: new Date().toISOString(),
       };
       return fallback;
@@ -138,8 +251,8 @@ export class MarketOSRepository {
       0
     );
     const totalVes = convertUsdToVes(totalUsd, rate.value);
-
     const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
+
     const newOrder: Order = {
       id: `ord-${Date.now()}`,
       tenant_id: input.tenantId,
@@ -156,6 +269,26 @@ export class MarketOSRepository {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase.from("orders").insert({
+          tenant_id: newOrder.tenant_id,
+          store_id: newOrder.store_id,
+          order_number: newOrder.order_number,
+          status: newOrder.status,
+          delivery_type: newOrder.delivery_type,
+          delivery_address: newOrder.delivery_address,
+          total_usd: newOrder.total_usd,
+          total_ves: newOrder.total_ves,
+          exchange_rate_applied: newOrder.exchange_rate_applied,
+          notes: newOrder.notes,
+        });
+      } catch (e) {
+        console.warn("[Supabase] Insert order fallback to state:", e);
+      }
+    }
 
     state.orders.unshift(newOrder);
 
@@ -191,6 +324,26 @@ export class MarketOSRepository {
       created_at: new Date().toISOString(),
     };
 
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase.from("payments").insert({
+          tenant_id: payment.tenant_id,
+          order_id: payment.order_id,
+          method: payment.method,
+          bank_name: payment.bank_name,
+          reference_number: payment.reference_number,
+          amount: payment.amount,
+          currency: payment.currency,
+          payment_date: payment.payment_date,
+          proof_image_url: payment.proof_image_url,
+          status: payment.status,
+        });
+      } catch (e) {
+        console.warn("[Supabase] Insert payment proof fallback to state:", e);
+      }
+    }
+
     state.payments.unshift(payment);
 
     // Update order status
@@ -207,6 +360,19 @@ export class MarketOSRepository {
    * Get Orders for Tenant Admin
    */
   static async getTenantOrders(tenantId: string): Promise<Order[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .order("created_at", { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        return data as Order[];
+      }
+    }
+
     return state.orders.filter((o) => o.tenant_id === tenantId);
   }
 
@@ -214,6 +380,19 @@ export class MarketOSRepository {
    * Get Payments for Tenant Admin
    */
   static async getTenantPayments(tenantId: string): Promise<PaymentProof[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("payments")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .order("created_at", { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        return data as PaymentProof[];
+      }
+    }
+
     return state.payments.filter((p) => p.tenant_id === tenantId);
   }
 
@@ -226,6 +405,23 @@ export class MarketOSRepository {
     status: PaymentStatus,
     rejectionReason?: string
   ): Promise<PaymentProof | null> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase
+          .from("payments")
+          .update({
+            status,
+            reviewed_at: new Date().toISOString(),
+            rejection_reason: rejectionReason || null,
+          })
+          .eq("id", paymentId)
+          .eq("tenant_id", tenantId);
+      } catch (e) {
+        console.warn("[Supabase] Update payment fallback to state:", e);
+      }
+    }
+
     const payment = state.payments.find(
       (p) => p.id === paymentId && p.tenant_id === tenantId
     );

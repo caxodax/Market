@@ -13,7 +13,8 @@
   },
   "dependencies": {
     "@marketos/database": "workspace:*",
-    "@marketos/types": "workspace:*"
+    "@marketos/types": "workspace:*",
+    "@supabase/ssr": "^0.12.7"
   },
   "devDependencies": {
     "@marketos/typescript-config": "workspace:*",
