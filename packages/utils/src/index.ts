@@ -2,6 +2,7 @@ import { CurrencyCode, BcvApiResponse } from "@marketos/types";
 import { cacheGet, cacheSet } from "./redis";
 
 export * from "./redis";
+export * from "./storage";
 
 /**
  * Currency Formatting Utilities for MarketOS

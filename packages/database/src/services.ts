@@ -207,38 +207,85 @@ export class MarketOSRepository {
   }
 
   /**
-   * Get Real-time BCV Exchange Rate for Tenant (from bcv.today or cache/fallback)
+   * Get Exchange Rate for Tenant - Reads strictly from Database / Redis
+   * Zero external API calls during customer navigation!
    */
   static async getExchangeRate(tenantId: string): Promise<ExchangeRate> {
-    try {
-      const bcv = await fetchBcvRate();
-      const updatedRate: ExchangeRate = {
-        id: `rate-${tenantId}-${Date.now()}`,
-        tenant_id: tenantId,
-        currency: "VES",
-        value: bcv.usdRate,
-        source: "https://bcv.today/api/v1/rate.json",
-        updated_at: bcv.timestamp,
-      };
-      // Cache in runtime state
-      const existingIdx = state.rates.findIndex((r) => r.tenant_id === tenantId);
-      if (existingIdx >= 0) {
-        state.rates[existingIdx] = updatedRate;
-      } else {
-        state.rates.push(updatedRate);
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("exchange_rates")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+
+      if (!error && data) {
+        return {
+          id: data.id,
+          tenant_id: data.tenant_id,
+          currency: data.currency,
+          value: Number(data.value),
+          source: data.source,
+          updated_at: data.updated_at,
+        };
       }
-      return updatedRate;
-    } catch {
-      const fallback = state.rates.find((r) => r.tenant_id === tenantId) || {
-        id: "rate-fallback",
-        tenant_id: tenantId,
-        currency: "VES",
-        value: 866.56,
-        source: "https://bcv.today/api/",
-        updated_at: new Date().toISOString(),
-      };
-      return fallback;
     }
+
+    const fallback = state.rates.find((r) => r.tenant_id === tenantId) || {
+      id: "rate-fallback",
+      tenant_id: tenantId,
+      currency: "VES",
+      value: 866.56,
+      source: "database",
+      updated_at: new Date().toISOString(),
+    };
+    return fallback;
+  }
+
+  /**
+   * Synchronize Official BCV Rate from API into Supabase Database
+   * Executed via scheduled cron (e.g. daily at 5:00 PM) or manual Admin trigger
+   */
+  static async syncBcvRateFromApi(tenantId: string): Promise<ExchangeRate> {
+    const bcv = await fetchBcvRate();
+    const supabase = getSupabase();
+
+    if (supabase) {
+      try {
+        await supabase
+          .from("exchange_rates")
+          .upsert(
+            {
+              tenant_id: tenantId,
+              currency: "VES",
+              value: bcv.usdRate,
+              source: bcv.source,
+              updated_at: bcv.timestamp,
+            },
+            { onConflict: "tenant_id" }
+          );
+      } catch (e) {
+        console.warn("[MarketOS] Error updating exchange rate in Supabase:", e);
+      }
+    }
+
+    const updatedRate: ExchangeRate = {
+      id: `rate-${tenantId}`,
+      tenant_id: tenantId,
+      currency: "VES",
+      value: bcv.usdRate,
+      source: bcv.source,
+      updated_at: bcv.timestamp,
+    };
+
+    const existingIdx = state.rates.findIndex((r) => r.tenant_id === tenantId);
+    if (existingIdx >= 0) {
+      state.rates[existingIdx] = updatedRate;
+    } else {
+      state.rates.push(updatedRate);
+    }
+
+    return updatedRate;
   }
 
   /**
