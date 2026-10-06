@@ -151,5 +151,14 @@ ON CONFLICT (id) DO NOTHING;
 -- Seed Initial Driver
 INSERT INTO public.drivers (id, tenant_id, store_id, name, phone, vehicle_type, plate_number, is_active)
 VALUES
-    ('a1111111-1111-1111-1111-111111111111', 'shop-market-ca', 'b1111111-1111-1111-1111-111111111111', 'Carlos Mendoza (Repartidor Oficial)', '+58 412-1234567', 'MOTO', 'AD3X91', true)
+    (
+        'a1111111-1111-1111-1111-111111111111',
+        'shop-market-ca',
+        (SELECT id FROM public.stores WHERE tenant_id = 'shop-market-ca' LIMIT 1),
+        'Carlos Mendoza (Repartidor Oficial)',
+        '+58 412-1234567',
+        'MOTO',
+        'AD3X91',
+        true
+    )
 ON CONFLICT (id) DO NOTHING;
