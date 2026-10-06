@@ -4,14 +4,19 @@ import React from "react";
 import { TenantSettings, ExchangeRate } from "@marketos/types";
 import { formatCurrency } from "@marketos/utils";
 import { useCart } from "../context/cart-context";
-import { ShoppingBag, MapPin, TrendingUp } from "lucide-react";
+import { ShoppingBag, MapPin, TrendingUp, Package } from "lucide-react";
 
 interface StoreHeaderProps {
   settings: TenantSettings;
   exchangeRate: ExchangeRate;
+  onOpenTracker?: () => void;
 }
 
-export function StoreHeader({ settings, exchangeRate }: StoreHeaderProps) {
+export function StoreHeader({
+  settings,
+  exchangeRate,
+  onOpenTracker,
+}: StoreHeaderProps) {
   const { totalItems, setIsOpen } = useCart();
 
   return (
@@ -53,19 +58,32 @@ export function StoreHeader({ settings, exchangeRate }: StoreHeaderProps) {
           </div>
         </div>
 
-        {/* Cart Trigger */}
-        <button
-          onClick={() => setIsOpen(true)}
-          className="relative inline-flex items-center justify-center p-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 shadow-sm"
-          aria-label="Abrir carrito de compras"
-        >
-          <ShoppingBag className="w-5 h-5" />
-          {totalItems > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 bg-secondary text-secondary-foreground text-[11px] font-bold h-5 min-w-5 px-1.5 rounded-full flex items-center justify-center border-2 border-background">
-              {totalItems}
-            </span>
+        {/* Actions: Tracker & Cart */}
+        <div className="flex items-center gap-2">
+          {onOpenTracker && (
+            <button
+              onClick={onOpenTracker}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-foreground hover:bg-muted text-xs font-semibold transition-colors"
+            >
+              <Package className="w-4 h-4 text-primary" />
+              <span className="hidden sm:inline">Rastrear Pedido</span>
+            </button>
           )}
-        </button>
+
+          {/* Cart Trigger */}
+          <button
+            onClick={() => setIsOpen(true)}
+            className="relative inline-flex items-center justify-center p-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 shadow-sm"
+            aria-label="Abrir carrito de compras"
+          >
+            <ShoppingBag className="w-5 h-5" />
+            {totalItems > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-secondary text-secondary-foreground text-[11px] font-bold h-5 min-w-5 px-1.5 rounded-full flex items-center justify-center border-2 border-background">
+                {totalItems}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
     </header>
   );

@@ -1,19 +1,31 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Category, Product, TenantSettings, Store, ExchangeRate, Order } from "@marketos/types";
+import {
+  Category,
+  Product,
+  TenantSettings,
+  Store,
+  ExchangeRate,
+  Order,
+  DeliveryZone,
+} from "@marketos/types";
 import { ProductCard } from "./product-card";
 import { CartDrawer } from "./cart-drawer";
 import { CheckoutDialog } from "./checkout-dialog";
 import { OrderSuccessModal } from "./order-success-modal";
-import { Search, SlidersHorizontal, Sparkles } from "lucide-react";
+import { OrderTrackerModal } from "./order-tracker-modal";
+import { Search, SlidersHorizontal, Sparkles, Tag, Truck } from "lucide-react";
 
 interface CatalogViewProps {
   categories: Category[];
   products: (Product & { stock: number })[];
   settings: TenantSettings;
   stores: Store[];
+  deliveryZones: DeliveryZone[];
   exchangeRate: ExchangeRate;
+  isTrackerOpen: boolean;
+  setIsTrackerOpen: (open: boolean) => void;
 }
 
 export function CatalogView({
@@ -21,7 +33,10 @@ export function CatalogView({
   products,
   settings,
   stores,
+  deliveryZones,
   exchangeRate,
+  isTrackerOpen,
+  setIsTrackerOpen,
 }: CatalogViewProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -100,7 +115,29 @@ export function CatalogView({
       </div>
 
       {/* Main Catalog Grid */}
-      <main className="max-w-7xl mx-auto px-4 pt-6">
+      <main className="max-w-7xl mx-auto px-4 pt-4">
+        {/* Promotional Banner */}
+        <div className="mb-5 p-3.5 rounded-2xl bg-gradient-to-r from-primary/10 via-amber-500/10 to-primary/5 border border-primary/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0">
+              <Tag className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs font-black text-foreground">
+                🎉 Promociones Activas en Shop Market
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Usa <span className="font-mono font-bold text-primary">BIENVENIDO</span> para <strong>$2 OFF</strong> (&gt;$10) o <span className="font-mono font-bold text-primary">SHOP10</span> para <strong>10% OFF</strong> (&gt;$20).
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground/80 self-end sm:self-auto bg-background/80 px-2.5 py-1 rounded-lg border border-border">
+            <Truck className="w-3.5 h-3.5 text-primary shrink-0" />
+            <span>Delivery gratis en Nueva Segovia</span>
+          </div>
+        </div>
+
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-bold tracking-tight text-foreground flex items-center gap-1.5">
             <Sparkles className="w-4 h-4 text-primary" />
@@ -150,6 +187,7 @@ export function CatalogView({
         onClose={() => setIsCheckoutOpen(false)}
         settings={settings}
         stores={stores}
+        deliveryZones={deliveryZones}
         exchangeRate={exchangeRate.value}
         onOrderCompleted={(order) => setCompletedOrder(order)}
       />
@@ -159,6 +197,13 @@ export function CatalogView({
         order={completedOrder}
         settings={settings}
         onClose={() => setCompletedOrder(null)}
+      />
+
+      {/* Customer Order Tracker Modal */}
+      <OrderTrackerModal
+        isOpen={isTrackerOpen}
+        onClose={() => setIsTrackerOpen(false)}
+        settings={settings}
       />
     </div>
   );

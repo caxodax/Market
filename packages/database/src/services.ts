@@ -10,6 +10,11 @@ import {
   DeliveryType,
   PaymentMethodType,
   PaymentStatus,
+  DeliveryZone,
+  Coupon,
+  Driver,
+  Customer,
+  CustomerAddress,
 } from "@marketos/types";
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
 import { fetchBcvRate, convertUsdToVes } from "@marketos/utils";
@@ -20,8 +25,13 @@ export interface CreateOrderInput {
   storeId: string;
   customerName: string;
   customerPhone: string;
+  customerEmail?: string;
   deliveryType: DeliveryType;
+  deliveryZoneId?: string;
   deliveryAddress?: string;
+  deliveryFeeUsd?: number;
+  couponCode?: string;
+  discountUsd?: number;
   items: {
     productId: string;
     productName: string;
@@ -289,15 +299,168 @@ export class MarketOSRepository {
   }
 
   /**
-   * Create an Order with Multi-Tenant isolation
+   * Get Active Delivery Zones for Tenant
+   */
+  static async getDeliveryZones(tenantId: string): Promise<DeliveryZone[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("delivery_zones")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        return data as DeliveryZone[];
+      }
+    }
+
+    return state.deliveryZones
+      .filter((z) => z.tenant_id === tenantId && z.is_active)
+      .sort((a, b) => a.sort_order - b.sort_order);
+  }
+
+  /**
+   * Validate Coupon for a Cart / Order
+   */
+  static async validateCoupon(
+    tenantId: string,
+    rawCode: string,
+    orderAmountUsd: number
+  ): Promise<{
+    valid: boolean;
+    coupon?: Coupon;
+    discountUsd: number;
+    message?: string;
+  }> {
+    const code = rawCode.trim().toUpperCase();
+    let coupon: Coupon | undefined;
+
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data } = await supabase
+        .from("coupons")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .ilike("code", code)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (data) {
+        coupon = data as Coupon;
+      }
+    }
+
+    if (!coupon) {
+      coupon = state.coupons.find(
+        (c) =>
+          c.tenant_id === tenantId &&
+          c.code.toUpperCase() === code &&
+          c.is_active
+      );
+    }
+
+    if (!coupon) {
+      return { valid: false, discountUsd: 0, message: "Cupón no encontrado o inválido" };
+    }
+
+    if (orderAmountUsd < coupon.min_order_amount_usd) {
+      return {
+        valid: false,
+        coupon,
+        discountUsd: 0,
+        message: `Monto mínimo de compra para este cupón: $${coupon.min_order_amount_usd.toFixed(2)}`,
+      };
+    }
+
+    if (coupon.usage_limit && coupon.usage_count >= coupon.usage_limit) {
+      return {
+        valid: false,
+        coupon,
+        discountUsd: 0,
+        message: "Este cupón ha alcanzado su límite de usos",
+      };
+    }
+
+    let discount = 0;
+    if (coupon.discount_type === "FIXED_USD") {
+      discount = Math.min(orderAmountUsd, coupon.discount_value);
+    } else if (coupon.discount_type === "PERCENTAGE") {
+      discount = (orderAmountUsd * coupon.discount_value) / 100;
+      if (coupon.max_discount_usd && discount > coupon.max_discount_usd) {
+        discount = coupon.max_discount_usd;
+      }
+    }
+
+    discount = Number(discount.toFixed(2));
+
+    return {
+      valid: true,
+      coupon,
+      discountUsd: discount,
+      message: `¡Cupón aplicado con éxito! -$${discount.toFixed(2)}`,
+    };
+  }
+
+  /**
+   * Get Drivers for Tenant
+   */
+  static async getDrivers(tenantId: string): Promise<Driver[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("drivers")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("is_active", true);
+
+      if (!error && data && data.length > 0) {
+        return data as Driver[];
+      }
+    }
+
+    return state.drivers.filter((d) => d.tenant_id === tenantId && d.is_active);
+  }
+
+  /**
+   * Create an Order with Multi-Tenant isolation and Phase 2 Operational features
    */
   static async createOrder(input: CreateOrderInput): Promise<Order> {
     const rate = await this.getExchangeRate(input.tenantId);
-    const totalUsd = input.items.reduce(
+    
+    // 1. Calculate items subtotal
+    const subtotalUsd = input.items.reduce(
       (acc, item) => acc + item.unitPriceUsd * item.quantity,
       0
     );
-    const totalVes = convertUsdToVes(totalUsd, rate.value);
+
+    // 2. Validate and apply coupon discount if present
+    let discountUsd = 0;
+    let couponId: string | null = null;
+    if (input.couponCode) {
+      const couponRes = await this.validateCoupon(
+        input.tenantId,
+        input.couponCode,
+        subtotalUsd
+      );
+      if (couponRes.valid) {
+        discountUsd = couponRes.discountUsd;
+        couponId = couponRes.coupon?.id || null;
+      }
+    } else if (input.discountUsd) {
+      discountUsd = input.discountUsd;
+    }
+
+    // 3. Apply delivery fee if delivery selected
+    const deliveryFeeUsd =
+      input.deliveryType === "DELIVERY" ? input.deliveryFeeUsd || 0 : 0;
+
+    // 4. Compute final totals
+    const finalTotalUsd = Number(
+      Math.max(0, subtotalUsd - discountUsd + deliveryFeeUsd).toFixed(2)
+    );
+    const totalVes = convertUsdToVes(finalTotalUsd, rate.value);
     const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
 
     const newOrder: Order = {
@@ -308,8 +471,12 @@ export class MarketOSRepository {
       order_number: orderNumber,
       status: "PAYMENT_PENDING",
       delivery_type: input.deliveryType,
+      delivery_zone_id: input.deliveryZoneId || null,
       delivery_address: input.deliveryAddress || null,
-      total_usd: Number(totalUsd.toFixed(2)),
+      delivery_fee_usd: deliveryFeeUsd,
+      coupon_id: couponId,
+      discount_usd: discountUsd,
+      total_usd: finalTotalUsd,
       total_ves: totalVes,
       exchange_rate_applied: rate.value,
       notes: input.notes || null,
@@ -326,7 +493,11 @@ export class MarketOSRepository {
           order_number: newOrder.order_number,
           status: newOrder.status,
           delivery_type: newOrder.delivery_type,
+          delivery_zone_id: newOrder.delivery_zone_id,
           delivery_address: newOrder.delivery_address,
+          delivery_fee_usd: newOrder.delivery_fee_usd,
+          coupon_id: newOrder.coupon_id,
+          discount_usd: newOrder.discount_usd,
           total_usd: newOrder.total_usd,
           total_ves: newOrder.total_ves,
           exchange_rate_applied: newOrder.exchange_rate_applied,
@@ -490,5 +661,34 @@ export class MarketOSRepository {
     }
 
     return payment;
+  }
+
+  /**
+   * Get Orders for a specific customer by phone or ID
+   */
+  static async getCustomerOrders(
+    tenantId: string,
+    phoneOrId: string
+  ): Promise<Order[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .or(`customer_id.eq.${phoneOrId},delivery_address.ilike.%${phoneOrId}%`)
+        .order("created_at", { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        return data as Order[];
+      }
+    }
+
+    return state.orders.filter(
+      (o) =>
+        o.tenant_id === tenantId &&
+        (o.customer_id === phoneOrId ||
+          o.order_number.toLowerCase().includes(phoneOrId.toLowerCase()))
+    );
   }
 }

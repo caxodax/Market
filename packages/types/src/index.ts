@@ -100,9 +100,22 @@ export interface Customer {
   phone: string;
   email: string | null;
   is_guest: boolean;
+  loyalty_points?: number;
   addresses?: CustomerAddress[];
   created_at: string;
   updated_at: string;
+}
+
+export interface DeliveryZone {
+  id: string;
+  tenant_id: string;
+  name: string;
+  price_usd: number;
+  estimated_time: string;
+  coverage_description?: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
 }
 
 export interface CustomerAddress {
@@ -110,10 +123,51 @@ export interface CustomerAddress {
   customer_id: string;
   tenant_id: string;
   label: string; // "Casa", "Trabajo", etc.
+  zone_id?: string | null;
   address_line: string;
-  city: string;
-  state: string;
-  reference_point?: string;
+  reference_point?: string | null;
+  is_default: boolean;
+  created_at?: string;
+}
+
+export type DiscountType = "PERCENTAGE" | "FIXED_USD";
+
+export interface Coupon {
+  id: string;
+  tenant_id: string;
+  code: string;
+  description?: string | null;
+  discount_type: DiscountType;
+  discount_value: number;
+  min_order_amount_usd: number;
+  max_discount_usd?: number | null;
+  usage_limit?: number | null;
+  usage_count: number;
+  is_active: boolean;
+  expires_at?: string | null;
+  created_at?: string;
+}
+
+export interface Driver {
+  id: string;
+  tenant_id: string;
+  store_id?: string | null;
+  name: string;
+  phone: string;
+  vehicle_type: "MOTO" | "CARRO" | "BICICLETA";
+  plate_number?: string | null;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface LoyaltyTransaction {
+  id: string;
+  tenant_id: string;
+  customer_id: string;
+  order_id?: string | null;
+  points_change: number;
+  reason: string;
+  created_at: string;
 }
 
 export interface Category {
@@ -197,6 +251,10 @@ export interface Order {
   delivery_type: DeliveryType;
   delivery_zone_id?: string | null;
   delivery_address?: string | null;
+  delivery_fee_usd?: number;
+  coupon_id?: string | null;
+  discount_usd?: number;
+  driver_id?: string | null;
   total_usd: number;
   total_ves: number;
   exchange_rate_applied: number;

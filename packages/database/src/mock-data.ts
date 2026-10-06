@@ -8,6 +8,10 @@ import {
   ExchangeRate,
   Order,
   PaymentProof,
+  DeliveryZone,
+  Coupon,
+  Driver,
+  Customer,
 } from "@marketos/types";
 
 export const INITIAL_TENANT: Tenant = {
@@ -233,6 +237,98 @@ export const INITIAL_EXCHANGE_RATE: ExchangeRate = {
   updated_at: new Date().toISOString(),
 };
 
+export const INITIAL_DELIVERY_ZONES: DeliveryZone[] = [
+  {
+    id: "e1111111-1111-1111-1111-111111111111",
+    tenant_id: "shop-market-ca",
+    name: "Nueva Segovia (Zona Local)",
+    price_usd: 0.0,
+    estimated_time: "20-35 min",
+    coverage_description: "Entrega gratuita en toda la Urb. Nueva Segovia",
+    is_active: true,
+    sort_order: 1,
+  },
+  {
+    id: "e2222222-2222-2222-2222-222222222222",
+    tenant_id: "shop-market-ca",
+    name: "Este de Barquisimeto / Santa Rosa",
+    price_usd: 2.0,
+    estimated_time: "30-45 min",
+    coverage_description: "Av. Lara, Los Leones, Turbio, Santa Rosa",
+    is_active: true,
+    sort_order: 2,
+  },
+  {
+    id: "e3333333-3333-3333-3333-333333333333",
+    tenant_id: "shop-market-ca",
+    name: "Centro de Barquisimeto",
+    price_usd: 3.0,
+    estimated_time: "35-50 min",
+    coverage_description: "Carreras 19 a 24, Av. Vargas, Av. Venezuela",
+    is_active: true,
+    sort_order: 3,
+  },
+  {
+    id: "e4444444-4444-4444-4444-444444444444",
+    tenant_id: "shop-market-ca",
+    name: "Cabudare Centro / La Mora",
+    price_usd: 4.5,
+    estimated_time: "45-60 min",
+    coverage_description: "Intercomunal Barquisimeto - Cabudare, La Mora",
+    is_active: true,
+    sort_order: 4,
+  },
+  {
+    id: "e5555555-5555-5555-5555-555555555555",
+    tenant_id: "shop-market-ca",
+    name: "Oeste de Barquisimeto",
+    price_usd: 3.5,
+    estimated_time: "40-60 min",
+    coverage_description: "Av. Pedro León Torres, Obelisco, Metrópolis",
+    is_active: true,
+    sort_order: 5,
+  },
+];
+
+export const INITIAL_COUPONS: Coupon[] = [
+  {
+    id: "f1111111-1111-1111-1111-111111111111",
+    tenant_id: "shop-market-ca",
+    code: "BIENVENIDO",
+    description: "Descuento de bienvenida de $2 en pedidos superiores a $10",
+    discount_type: "FIXED_USD",
+    discount_value: 2.0,
+    min_order_amount_usd: 10.0,
+    usage_limit: 500,
+    usage_count: 0,
+    is_active: true,
+  },
+  {
+    id: "f2222222-2222-2222-2222-222222222222",
+    tenant_id: "shop-market-ca",
+    code: "SHOP10",
+    description: "10% de descuento en compras mayores a $20",
+    discount_type: "PERCENTAGE",
+    discount_value: 10.0,
+    min_order_amount_usd: 20.0,
+    usage_limit: 1000,
+    usage_count: 0,
+    is_active: true,
+  },
+];
+
+export const INITIAL_DRIVERS: Driver[] = [
+  {
+    id: "a1111111-1111-1111-1111-111111111111",
+    tenant_id: "shop-market-ca",
+    name: "Carlos Mendoza",
+    phone: "+58 412-1234567",
+    vehicle_type: "MOTO",
+    plate_number: "AD3X91",
+    is_active: true,
+  },
+];
+
 // In-memory runtime state for fast MVP simulation if no live Supabase DB is connected
 export const state = {
   tenants: [INITIAL_TENANT],
@@ -241,6 +337,9 @@ export const state = {
   categories: INITIAL_CATEGORIES,
   products: INITIAL_PRODUCTS,
   rates: [INITIAL_EXCHANGE_RATE],
+  deliveryZones: INITIAL_DELIVERY_ZONES,
+  coupons: INITIAL_COUPONS,
+  drivers: INITIAL_DRIVERS,
   orders: [] as Order[],
   payments: [] as PaymentProof[],
 };

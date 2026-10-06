@@ -50,3 +50,48 @@ export async function adjustStockAction(
     };
   }
 }
+
+/**
+ * Synchronize BCV official exchange rate from API into Database
+ */
+export async function syncBcvRateAction(tenantId: string) {
+  try {
+    const updatedRate = await MarketOSRepository.syncBcvRateFromApi(tenantId);
+    revalidatePath("/");
+    return { success: true, rate: updatedRate };
+  } catch (error) {
+    console.error("Error syncing BCV rate:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al sincronizar tasa BCV",
+    };
+  }
+}
+
+/**
+ * Update Order delivery/preparation status and assign driver
+ */
+export async function updateOrderStatusAction(
+  tenantId: string,
+  orderId: string,
+  status: any,
+  driverId?: string
+) {
+  try {
+    const order = state.orders.find((o) => o.id === orderId && o.tenant_id === tenantId);
+    if (!order) throw new Error("Orden no encontrada");
+
+    order.status = status;
+    if (driverId) order.driver_id = driverId;
+    order.updated_at = new Date().toISOString();
+
+    revalidatePath("/");
+    return { success: true, order };
+  } catch (error) {
+    console.error("Error updating order status:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al actualizar estado del pedido",
+    };
+  }
+}
