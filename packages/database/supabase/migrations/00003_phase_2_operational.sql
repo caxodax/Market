@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS public.customer_addresses (
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
--- 5. LOYALTY TRANSACTIONS TABLE
+-- 5. LOYALTY & CUSTOMER UPDATES
 ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS loyalty_points INT NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS public.loyalty_transactions (
@@ -71,11 +71,11 @@ CREATE TABLE IF NOT EXISTS public.loyalty_transactions (
     customer_id UUID NOT NULL REFERENCES public.customers(id) ON DELETE CASCADE,
     order_id UUID REFERENCES public.orders(id) ON DELETE SET NULL,
     points_change INT NOT NULL,
-    reason TEXT NOT NULL, -- 'PURCHASE_EARNED', 'DISCOUNT_REDEEMED', 'MANUAL_ADJUSTMENT'
+    reason TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
--- 6. ADD PHASE 2 FIELDS TO ORDERS
+-- 6. ORDER ENHANCEMENTS
 ALTER TABLE public.orders 
     ADD COLUMN IF NOT EXISTS delivery_zone_id UUID REFERENCES public.delivery_zones(id) ON DELETE SET NULL,
     ADD COLUMN IF NOT EXISTS delivery_fee_usd NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
@@ -83,55 +83,30 @@ ALTER TABLE public.orders
     ADD COLUMN IF NOT EXISTS discount_usd NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
     ADD COLUMN IF NOT EXISTS driver_id UUID REFERENCES public.drivers(id) ON DELETE SET NULL;
 
--- 7. ENABLE ROW LEVEL SECURITY (RLS)
+-- 7. ENABLE ROW LEVEL SECURITY
 ALTER TABLE public.delivery_zones ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.coupons ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.drivers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.customer_addresses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.loyalty_transactions ENABLE ROW LEVEL SECURITY;
 
--- 8. POLICIES: DELIVERY ZONES
-CREATE POLICY "Public can view active delivery zones"
-ON public.delivery_zones FOR SELECT
-USING (is_active = true);
+-- 8. POLICIES
+DROP POLICY IF EXISTS "Public can view active delivery zones" ON public.delivery_zones;
+CREATE POLICY "Public can view active delivery zones" ON public.delivery_zones FOR SELECT USING (is_active = true);
 
-CREATE POLICY "Tenant admin manage delivery zones"
-ON public.delivery_zones FOR ALL
-USING (tenant_id = public.current_user_tenant_id() OR public.is_super_admin());
+DROP POLICY IF EXISTS "Public can validate active coupons" ON public.coupons;
+CREATE POLICY "Public can validate active coupons" ON public.coupons FOR SELECT USING (is_active = true);
 
--- 9. POLICIES: COUPONS
-CREATE POLICY "Public can validate active coupons"
-ON public.coupons FOR SELECT
-USING (is_active = true);
+DROP POLICY IF EXISTS "Public can view active drivers" ON public.drivers;
+CREATE POLICY "Public can view active drivers" ON public.drivers FOR SELECT USING (is_active = true);
 
-CREATE POLICY "Tenant admin manage coupons"
-ON public.coupons FOR ALL
-USING (tenant_id = public.current_user_tenant_id() OR public.is_super_admin());
+DROP POLICY IF EXISTS "Customers view their addresses" ON public.customer_addresses;
+CREATE POLICY "Customers view their addresses" ON public.customer_addresses FOR ALL USING (true);
 
--- 10. POLICIES: DRIVERS
-CREATE POLICY "Tenant staff can view drivers"
-ON public.drivers FOR SELECT
-USING (tenant_id = public.current_user_tenant_id() OR public.is_super_admin());
+DROP POLICY IF EXISTS "Customers view loyalty transactions" ON public.loyalty_transactions;
+CREATE POLICY "Customers view loyalty transactions" ON public.loyalty_transactions FOR SELECT USING (true);
 
-CREATE POLICY "Tenant admin manage drivers"
-ON public.drivers FOR ALL
-USING (tenant_id = public.current_user_tenant_id() OR public.is_super_admin());
-
--- 11. POLICIES: CUSTOMER ADDRESSES
-CREATE POLICY "Customers view their addresses"
-ON public.customer_addresses FOR ALL
-USING (tenant_id = public.current_user_tenant_id() OR true);
-
--- 12. POLICIES: LOYALTY TRANSACTIONS
-CREATE POLICY "Customers view loyalty transactions"
-ON public.loyalty_transactions FOR SELECT
-USING (tenant_id = public.current_user_tenant_id() OR true);
-
--- ---------------------------------------------------------------------
--- SEED DATA: SHOP MARKET C.A. (PHASE 2)
--- ---------------------------------------------------------------------
-
--- Seed Delivery Zones for Barquisimeto / Cabudare
+-- 9. SEED DATA SHOP MARKET C.A.
 INSERT INTO public.delivery_zones (id, tenant_id, name, price_usd, estimated_time, coverage_description, is_active, sort_order)
 VALUES
     ('e1111111-1111-1111-1111-111111111111', 'shop-market-ca', 'Nueva Segovia (Zona Local)', 0.00, '20-35 min', 'Entrega gratuita en toda la Urb. Nueva Segovia', true, 1),
@@ -141,14 +116,13 @@ VALUES
     ('e5555555-5555-5555-5555-555555555555', 'shop-market-ca', 'Oeste de Barquisimeto / Pedro León Torres', 3.50, '40-60 min', 'Av. Pedro León Torres, Obelisco, Metrópolis', true, 5)
 ON CONFLICT (id) DO NOTHING;
 
--- Seed Promotions & Coupons
 INSERT INTO public.coupons (id, tenant_id, code, description, discount_type, discount_value, min_order_amount_usd, usage_limit, is_active)
 VALUES
     ('f1111111-1111-1111-1111-111111111111', 'shop-market-ca', 'BIENVENIDO', 'Descuento de bienvenida de $2 en pedidos superiores a $10', 'FIXED_USD', 2.00, 10.00, 500, true),
     ('f2222222-2222-2222-2222-222222222222', 'shop-market-ca', 'SHOP10', '10% de descuento en compras mayores a $20', 'PERCENTAGE', 10.00, 20.00, 1000, true)
 ON CONFLICT (id) DO NOTHING;
 
--- Seed Initial Driver
+-- Enlace dinámico a la sucursal de Shop Market existente
 INSERT INTO public.drivers (id, tenant_id, store_id, name, phone, vehicle_type, plate_number, is_active)
 VALUES
     (
