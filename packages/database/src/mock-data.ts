@@ -14,6 +14,7 @@ import {
   Customer,
   SubscriptionPlan,
   TenantSubscription,
+  AuditLog,
 } from "@marketos/types";
 
 export const INITIAL_TENANT: Tenant = {
@@ -234,8 +235,8 @@ export const INITIAL_EXCHANGE_RATE: ExchangeRate = {
   id: "rate-bcv-1",
   tenant_id: "shop-market-ca",
   currency: "VES",
-  value: 45.20,
-  source: "https://bcv.today/api/",
+  value: 872.39,
+  source: "BCV_OFICIAL",
   updated_at: new Date().toISOString(),
 };
 
@@ -421,4 +422,6 @@ export const state = {
   subscriptions: INITIAL_TENANT_SUBSCRIPTIONS,
   orders: [] as Order[],
   payments: [] as PaymentProof[],
+  auditLogs: [] as AuditLog[],
+  customers: [] as Customer[],
 };

@@ -21,6 +21,10 @@ import {
   PlatformMetrics,
   OnboardTenantInput,
   SubscriptionPlanTier,
+  AuditLog,
+  InventoryMovement,
+  CustomerAccountSummary,
+  OrderStatus,
 } from "@marketos/types";
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
 import { fetchBcvRate, convertUsdToVes } from "@marketos/utils";
@@ -223,8 +227,8 @@ export class MarketOSRepository {
   }
 
   /**
-   * Get Exchange Rate for Tenant - Reads strictly from Database / Redis
-   * Zero external API calls during customer navigation!
+   * Get Exchange Rate for Tenant - Reads from Database / Redis
+   * Auto-refreshes if older than 2 hours or missing!
    */
   static async getExchangeRate(tenantId: string): Promise<ExchangeRate> {
     const supabase = getSupabase();
@@ -236,6 +240,15 @@ export class MarketOSRepository {
         .maybeSingle();
 
       if (!error && data) {
+        const lastUpdated = new Date(data.updated_at).getTime();
+        const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
+        const isStale = isNaN(lastUpdated) || lastUpdated < twoHoursAgo;
+
+        if (isStale) {
+          // Asynchronously trigger refresh to keep Supabase DB current
+          MarketOSRepository.syncBcvRateFromApi(tenantId).catch(console.warn);
+        }
+
         return {
           id: data.id,
           tenant_id: data.tenant_id,
@@ -244,6 +257,13 @@ export class MarketOSRepository {
           source: data.source,
           updated_at: data.updated_at,
         };
+      } else if (!data) {
+        // If no rate exists yet for this tenant in database, fetch and persist immediately
+        try {
+          return await MarketOSRepository.syncBcvRateFromApi(tenantId);
+        } catch (e) {
+          console.warn("[MarketOS] Initial BCV rate sync error:", e);
+        }
       }
     }
 
@@ -251,8 +271,8 @@ export class MarketOSRepository {
       id: "rate-fallback",
       tenant_id: tenantId,
       currency: "VES",
-      value: 866.56,
-      source: "database",
+      value: 872.39,
+      source: "BCV_OFICIAL",
       updated_at: new Date().toISOString(),
     };
     return fallback;
@@ -268,18 +288,38 @@ export class MarketOSRepository {
 
     if (supabase) {
       try {
-        await supabase
+        const { data: existing } = await supabase
           .from("exchange_rates")
-          .upsert(
-            {
-              tenant_id: tenantId,
-              currency: "VES",
+          .select("id")
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase
+            .from("exchange_rates")
+            .update({
               value: bcv.usdRate,
               source: bcv.source,
               updated_at: bcv.timestamp,
-            },
-            { onConflict: "tenant_id" }
-          );
+            })
+            .eq("id", existing.id);
+        } else {
+          await supabase.from("exchange_rates").insert({
+            tenant_id: tenantId,
+            currency: "VES",
+            value: bcv.usdRate,
+            source: bcv.source,
+            updated_at: bcv.timestamp,
+          });
+        }
+
+        await MarketOSRepository.recordAuditLog({
+          tenantId,
+          action: "BCV_RATE_SYNCED",
+          entity: "exchange_rates",
+          entityId: tenantId,
+          newData: { value: bcv.usdRate, timestamp: bcv.timestamp },
+        });
       } catch (e) {
         console.warn("[MarketOS] Error updating exchange rate in Supabase:", e);
       }
@@ -468,12 +508,59 @@ export class MarketOSRepository {
     );
     const totalVes = convertUsdToVes(finalTotalUsd, rate.value);
     const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
+    const supabase = getSupabase();
+
+    let customerId = `cust-${Date.now()}`;
+    const earnedPoints = Math.floor(finalTotalUsd);
+
+    // 5. Look up or register customer in Supabase / State with loyalty points
+    if (supabase) {
+      try {
+        const cleanPhone = input.customerPhone.replace(/\D/g, "");
+        const { data: existingCustomer } = await supabase
+          .from("customers")
+          .select("id, loyalty_points")
+          .eq("tenant_id", input.tenantId)
+          .eq("phone", input.customerPhone)
+          .maybeSingle();
+
+        if (existingCustomer) {
+          customerId = existingCustomer.id;
+          await supabase
+            .from("customers")
+            .update({
+              loyalty_points: (existingCustomer.loyalty_points || 0) + earnedPoints,
+              name: input.customerName,
+              email: input.customerEmail || null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", customerId);
+        } else {
+          const { data: newCust } = await supabase
+            .from("customers")
+            .insert({
+              tenant_id: input.tenantId,
+              name: input.customerName,
+              phone: input.customerPhone,
+              email: input.customerEmail || null,
+              loyalty_points: earnedPoints,
+              is_guest: true,
+            })
+            .select("id")
+            .single();
+
+          if (newCust) customerId = newCust.id;
+        }
+      } catch (e) {
+        console.warn("[MarketOS] Customer persistence warning:", e);
+      }
+    }
 
     const newOrder: Order = {
       id: `ord-${Date.now()}`,
       tenant_id: input.tenantId,
       store_id: input.storeId,
-      customer_id: `cust-${Date.now()}`,
+      customer_id: customerId,
       order_number: orderNumber,
       status: "PAYMENT_PENDING",
       delivery_type: input.deliveryType,
@@ -490,25 +577,75 @@ export class MarketOSRepository {
       updated_at: new Date().toISOString(),
     };
 
-    const supabase = getSupabase();
+    // 6. Insert Order into Supabase
     if (supabase) {
       try {
-        await supabase.from("orders").insert({
-          tenant_id: newOrder.tenant_id,
-          store_id: newOrder.store_id,
-          order_number: newOrder.order_number,
-          status: newOrder.status,
-          delivery_type: newOrder.delivery_type,
-          delivery_zone_id: newOrder.delivery_zone_id,
-          delivery_address: newOrder.delivery_address,
-          delivery_fee_usd: newOrder.delivery_fee_usd,
-          coupon_id: newOrder.coupon_id,
-          discount_usd: newOrder.discount_usd,
-          total_usd: newOrder.total_usd,
-          total_ves: newOrder.total_ves,
-          exchange_rate_applied: newOrder.exchange_rate_applied,
-          notes: newOrder.notes,
-        });
+        const { data: insertedOrder } = await supabase
+          .from("orders")
+          .insert({
+            tenant_id: newOrder.tenant_id,
+            store_id: newOrder.store_id,
+            customer_id: customerId,
+            order_number: newOrder.order_number,
+            status: newOrder.status,
+            delivery_type: newOrder.delivery_type,
+            delivery_zone_id: newOrder.delivery_zone_id,
+            delivery_address: newOrder.delivery_address,
+            delivery_fee_usd: newOrder.delivery_fee_usd,
+            coupon_id: newOrder.coupon_id,
+            discount_usd: newOrder.discount_usd,
+            total_usd: newOrder.total_usd,
+            total_ves: newOrder.total_ves,
+            exchange_rate_applied: newOrder.exchange_rate_applied,
+            notes: newOrder.notes,
+          })
+          .select("id")
+          .single();
+
+        if (insertedOrder) {
+          newOrder.id = insertedOrder.id;
+
+          // Insert order items
+          const itemsPayload = input.items.map((it) => ({
+            tenant_id: input.tenantId,
+            order_id: insertedOrder.id,
+            product_id: it.productId,
+            product_name: it.productName,
+            quantity: it.quantity,
+            unit_price_usd: it.unitPriceUsd,
+            total_price_usd: it.quantity * it.unitPriceUsd,
+          }));
+
+          await supabase.from("order_items").insert(itemsPayload);
+
+          // Decrement inventory stock & record inventory movements in Supabase
+          for (const item of input.items) {
+            const { data: inv } = await supabase
+              .from("inventory")
+              .select("id, quantity")
+              .eq("store_id", input.storeId)
+              .eq("product_id", item.productId)
+              .maybeSingle();
+
+            if (inv) {
+              const newQty = Math.max(0, inv.quantity - item.quantity);
+              await supabase
+                .from("inventory")
+                .update({ quantity: newQty, updated_at: new Date().toISOString() })
+                .eq("id", inv.id);
+
+              await supabase.from("inventory_movements").insert({
+                tenant_id: input.tenantId,
+                store_id: input.storeId,
+                product_id: item.productId,
+                quantity_change: -item.quantity,
+                previous_quantity: inv.quantity,
+                new_quantity: newQty,
+                reason: "SALE",
+              });
+            }
+          }
+        }
       } catch (e) {
         console.warn("[Supabase] Insert order fallback to state:", e);
       }
@@ -516,13 +653,27 @@ export class MarketOSRepository {
 
     state.orders.unshift(newOrder);
 
-    // Decrement stock in memory
+    // Decrement stock in memory state
     for (const item of input.items) {
       const prod = state.products.find((p) => p.id === item.productId);
       if (prod && prod.stock >= item.quantity) {
         prod.stock -= item.quantity;
       }
     }
+
+    // Record audit log for new order
+    await MarketOSRepository.recordAuditLog({
+      tenantId: input.tenantId,
+      action: "ORDER_CREATED",
+      entity: "orders",
+      entityId: newOrder.id,
+      newData: {
+        order_number: newOrder.order_number,
+        total_usd: newOrder.total_usd,
+        total_ves: newOrder.total_ves,
+        customer_phone: input.customerPhone,
+      },
+    });
 
     return newOrder;
   }
@@ -563,6 +714,16 @@ export class MarketOSRepository {
           proof_image_url: payment.proof_image_url,
           status: payment.status,
         });
+
+        // Update order status in Supabase
+        await supabase
+          .from("orders")
+          .update({
+            status: "PAYMENT_PENDING",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", input.orderId)
+          .eq("tenant_id", input.tenantId);
       } catch (e) {
         console.warn("[Supabase] Insert payment proof fallback to state:", e);
       }
@@ -570,12 +731,25 @@ export class MarketOSRepository {
 
     state.payments.unshift(payment);
 
-    // Update order status
+    // Update order status in memory
     const order = state.orders.find((o) => o.id === input.orderId);
     if (order) {
       order.status = "PAYMENT_PENDING";
       order.updated_at = new Date().toISOString();
     }
+
+    await MarketOSRepository.recordAuditLog({
+      tenantId: input.tenantId,
+      action: "PAYMENT_PROOF_SUBMITTED",
+      entity: "payments",
+      entityId: payment.id,
+      newData: {
+        orderId: input.orderId,
+        method: input.method,
+        reference: input.referenceNumber,
+        amount: input.amount,
+      },
+    });
 
     return payment;
   }
@@ -627,11 +801,23 @@ export class MarketOSRepository {
     tenantId: string,
     paymentId: string,
     status: PaymentStatus,
-    rejectionReason?: string
+    rejectionReason?: string,
+    actorId?: string
   ): Promise<PaymentProof | null> {
     const supabase = getSupabase();
+    let orderIdToUpdate: string | null = null;
+
     if (supabase) {
       try {
+        const { data: paymentRow } = await supabase
+          .from("payments")
+          .select("order_id")
+          .eq("id", paymentId)
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
+
+        orderIdToUpdate = paymentRow?.order_id || null;
+
         await supabase
           .from("payments")
           .update({
@@ -641,6 +827,19 @@ export class MarketOSRepository {
           })
           .eq("id", paymentId)
           .eq("tenant_id", tenantId);
+
+        if (orderIdToUpdate) {
+          const newOrderStatus: OrderStatus =
+            status === "APPROVED" ? "PREPARING" : "CANCELLED";
+          await supabase
+            .from("orders")
+            .update({
+              status: newOrderStatus,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", orderIdToUpdate)
+            .eq("tenant_id", tenantId);
+        }
       } catch (e) {
         console.warn("[Supabase] Update payment fallback to state:", e);
       }
@@ -649,24 +848,325 @@ export class MarketOSRepository {
     const payment = state.payments.find(
       (p) => p.id === paymentId && p.tenant_id === tenantId
     );
-    if (!payment) return null;
+    if (payment) {
+      payment.status = status;
+      payment.reviewed_at = new Date().toISOString();
+      if (rejectionReason) payment.rejection_reason = rejectionReason;
 
-    payment.status = status;
-    payment.reviewed_at = new Date().toISOString();
-    if (rejectionReason) payment.rejection_reason = rejectionReason;
-
-    // Update associated order status
-    const order = state.orders.find((o) => o.id === payment.order_id);
-    if (order) {
-      if (status === "APPROVED") {
-        order.status = "PREPARING";
-      } else if (status === "REJECTED") {
-        order.status = "CANCELLED";
+      const order = state.orders.find((o) => o.id === payment.order_id);
+      if (order) {
+        if (status === "APPROVED") {
+          order.status = "PREPARING";
+        } else if (status === "REJECTED") {
+          order.status = "CANCELLED";
+        }
+        order.updated_at = new Date().toISOString();
       }
-      order.updated_at = new Date().toISOString();
     }
 
-    return payment;
+    await MarketOSRepository.recordAuditLog({
+      tenantId,
+      actorId,
+      action: status === "APPROVED" ? "PAYMENT_APPROVED" : "PAYMENT_REJECTED",
+      entity: "payments",
+      entityId: paymentId,
+      newData: {
+        status,
+        rejectionReason: rejectionReason || null,
+        orderId: orderIdToUpdate || payment?.order_id,
+      },
+    });
+
+    return payment || null;
+  }
+
+  /**
+   * Update Order delivery/preparation status and assign driver
+   */
+  static async updateOrderStatus(
+    tenantId: string,
+    orderId: string,
+    status: OrderStatus,
+    driverId?: string,
+    actorId?: string
+  ): Promise<Order | null> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const updateData: Record<string, unknown> = {
+          status,
+          updated_at: new Date().toISOString(),
+        };
+        if (driverId) updateData.driver_id = driverId;
+
+        await supabase
+          .from("orders")
+          .update(updateData)
+          .eq("id", orderId)
+          .eq("tenant_id", tenantId);
+      } catch (e) {
+        console.warn("[MarketOS] Update order status in Supabase error:", e);
+      }
+    }
+
+    const order = state.orders.find(
+      (o) => o.id === orderId && o.tenant_id === tenantId
+    );
+    if (order) {
+      const oldStatus = order.status;
+      order.status = status;
+      if (driverId) order.driver_id = driverId;
+      order.updated_at = new Date().toISOString();
+
+      await MarketOSRepository.recordAuditLog({
+        tenantId,
+        actorId,
+        action: "ORDER_STATUS_CHANGED",
+        entity: "orders",
+        entityId: orderId,
+        oldData: { status: oldStatus },
+        newData: { status, driver_id: driverId },
+      });
+      return order;
+    }
+
+    return null;
+  }
+
+  /**
+   * Adjust product stock in Supabase inventory & record inventory movement
+   */
+  static async adjustStock(
+    tenantId: string,
+    productId: string,
+    delta: number,
+    storeId?: string,
+    actorId?: string
+  ): Promise<number> {
+    const targetStoreId =
+      storeId || state.stores.find((s) => s.tenant_id === tenantId)?.id;
+    const supabase = getSupabase();
+
+    if (supabase && targetStoreId) {
+      try {
+        const { data: inv } = await supabase
+          .from("inventory")
+          .select("id, quantity")
+          .eq("store_id", targetStoreId)
+          .eq("product_id", productId)
+          .maybeSingle();
+
+        if (inv) {
+          const newQty = Math.max(0, inv.quantity + delta);
+          await supabase
+            .from("inventory")
+            .update({ quantity: newQty, updated_at: new Date().toISOString() })
+            .eq("id", inv.id);
+
+          await supabase.from("inventory_movements").insert({
+            tenant_id: tenantId,
+            store_id: targetStoreId,
+            product_id: productId,
+            quantity_change: delta,
+            previous_quantity: inv.quantity,
+            new_quantity: newQty,
+            reason: delta > 0 ? "RESTOCK" : "ADJUSTMENT",
+          });
+
+          await MarketOSRepository.recordAuditLog({
+            tenantId,
+            actorId,
+            action: "STOCK_ADJUSTED",
+            entity: "inventory",
+            entityId: productId,
+            oldData: { quantity: inv.quantity },
+            newData: { quantity: newQty, delta },
+          });
+
+          return newQty;
+        }
+      } catch (e) {
+        console.warn("[MarketOS] Adjust stock in Supabase error:", e);
+      }
+    }
+
+    const prod = state.products.find(
+      (p) => p.id === productId && p.tenant_id === tenantId
+    );
+    if (prod) {
+      const oldStock = prod.stock;
+      prod.stock = Math.max(0, prod.stock + delta);
+
+      await MarketOSRepository.recordAuditLog({
+        tenantId,
+        actorId,
+        action: "STOCK_ADJUSTED",
+        entity: "inventory",
+        entityId: productId,
+        oldData: { quantity: oldStock },
+        newData: { quantity: prod.stock, delta },
+      });
+
+      return prod.stock;
+    }
+    return 0;
+  }
+
+  /**
+   * Record Audit Log in Supabase & memory state
+   */
+  static async recordAuditLog(input: {
+    tenantId: string;
+    actorId?: string | null;
+    actorName?: string | null;
+    action: string;
+    entity: string;
+    entityId: string;
+    oldData?: Record<string, unknown> | null;
+    newData?: Record<string, unknown> | null;
+  }): Promise<AuditLog> {
+    const auditLog: AuditLog = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      tenant_id: input.tenantId,
+      actor_id: input.actorId || null,
+      actor_name: input.actorName || "Admin Operativo",
+      action: input.action,
+      entity: input.entity,
+      entity_id: input.entityId,
+      old_data: input.oldData || null,
+      new_data: input.newData || null,
+      created_at: new Date().toISOString(),
+    };
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase.from("audit_logs").insert({
+          tenant_id: auditLog.tenant_id,
+          action: auditLog.action,
+          entity: auditLog.entity,
+          entity_id: auditLog.entity_id,
+          old_data: auditLog.old_data,
+          new_data: auditLog.new_data,
+        });
+      } catch (e) {
+        console.warn("[MarketOS] Error recording audit log in Supabase:", e);
+      }
+    }
+
+    state.auditLogs.unshift(auditLog);
+    return auditLog;
+  }
+
+  /**
+   * Get Audit Logs for Tenant Admin
+   */
+  static async getAuditLogs(tenantId: string, limit = 50): Promise<AuditLog[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("audit_logs")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .order("created_at", { ascending: false })
+          .limit(limit);
+
+        if (!error && data && data.length > 0) {
+          return data.map((d: any) => ({
+            id: d.id,
+            tenant_id: d.tenant_id,
+            actor_id: d.actor_id,
+            actor_name: d.actor_name || "Admin Operativo",
+            action: d.action,
+            entity: d.entity,
+            entity_id: d.entity_id,
+            old_data: d.old_data,
+            new_data: d.new_data,
+            created_at: d.created_at,
+          }));
+        }
+      } catch (e) {
+        console.warn("[MarketOS] Error fetching audit logs from Supabase:", e);
+      }
+    }
+
+    return state.auditLogs
+      .filter((l) => l.tenant_id === tenantId)
+      .slice(0, limit);
+  }
+
+  /**
+   * Get Customer Profile, Order History and Loyalty Points
+   */
+  static async getCustomerOrdersAndPoints(
+    tenantId: string,
+    phoneOrEmail: string
+  ): Promise<CustomerAccountSummary | null> {
+    const cleanPhone = phoneOrEmail.replace(/\D/g, "");
+    const supabase = getSupabase();
+
+    if (supabase) {
+      try {
+        let query = supabase
+          .from("customers")
+          .select("*")
+          .eq("tenant_id", tenantId);
+
+        if (cleanPhone.length >= 7) {
+          query = query.ilike("phone", `%${cleanPhone.slice(-7)}%`);
+        } else {
+          query = query.eq("email", phoneOrEmail.trim().toLowerCase());
+        }
+
+        const { data: customer } = await query.maybeSingle();
+
+        if (customer) {
+          const { data: orders } = await supabase
+            .from("orders")
+            .select("*")
+            .eq("tenant_id", tenantId)
+            .eq("customer_id", customer.id)
+            .order("created_at", { ascending: false });
+
+          const customerOrders = (orders as Order[]) || [];
+          const totalSpentUsd = customerOrders.reduce(
+            (sum, o) => sum + Number(o.total_usd),
+            0
+          );
+
+          return {
+            customer: customer as Customer,
+            orders: customerOrders,
+            totalSpentUsd: Number(totalSpentUsd.toFixed(2)),
+            loyaltyPoints: customer.loyalty_points || 0,
+          };
+        }
+      } catch (e) {
+        console.warn("[MarketOS] Error fetching customer in Supabase:", e);
+      }
+    }
+
+    const memoryCustomer = state.customers.find(
+      (c) =>
+        c.tenant_id === tenantId &&
+        (c.phone.includes(cleanPhone) || c.email === phoneOrEmail)
+    );
+
+    if (memoryCustomer) {
+      const orders = state.orders.filter(
+        (o) => o.tenant_id === tenantId && o.customer_id === memoryCustomer.id
+      );
+      const totalSpentUsd = orders.reduce((sum, o) => sum + o.total_usd, 0);
+      return {
+        customer: memoryCustomer,
+        orders,
+        totalSpentUsd,
+        loyaltyPoints: memoryCustomer.loyalty_points || 0,
+      };
+    }
+
+    return null;
   }
 
   /**

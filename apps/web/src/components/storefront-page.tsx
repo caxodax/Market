@@ -12,6 +12,7 @@ import {
 import { CartProvider } from "../context/cart-context";
 import { StoreHeader } from "./store-header";
 import { CatalogView } from "./catalog-view";
+import { CustomerLookupModal } from "./customer-lookup-modal";
 
 interface StorefrontPageProps {
   settings: TenantSettings;
@@ -31,6 +32,7 @@ export function StorefrontPage({
   exchangeRate,
 }: StorefrontPageProps) {
   const [isTrackerOpen, setIsTrackerOpen] = useState(false);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
 
   return (
     <CartProvider>
@@ -40,6 +42,7 @@ export function StorefrontPage({
           settings={settings}
           exchangeRate={exchangeRate}
           onOpenTracker={() => setIsTrackerOpen(true)}
+          onOpenAccount={() => setIsAccountOpen(true)}
         />
 
         {/* Dynamic Catalog with Search, Category Filter, Promo banner, Cart and Delivery Zones */}
@@ -52,6 +55,14 @@ export function StorefrontPage({
           exchangeRate={exchangeRate}
           isTrackerOpen={isTrackerOpen}
           setIsTrackerOpen={setIsTrackerOpen}
+        />
+
+        {/* Customer Profile & Loyalty Lookup Modal */}
+        <CustomerLookupModal
+          tenantId={settings.tenant_id}
+          settings={settings}
+          isOpen={isAccountOpen}
+          onClose={() => setIsAccountOpen(false)}
         />
       </div>
     </CartProvider>

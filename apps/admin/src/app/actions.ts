@@ -31,17 +31,18 @@ export async function reviewPaymentAction(
 export async function adjustStockAction(
   tenantId: string,
   productId: string,
-  delta: number
+  delta: number,
+  storeId?: string
 ) {
   try {
-    const prod = state.products.find(
-      (p) => p.id === productId && p.tenant_id === tenantId
+    const newStock = await MarketOSRepository.adjustStock(
+      tenantId,
+      productId,
+      delta,
+      storeId
     );
-    if (!prod) throw new Error("Producto no encontrado");
-
-    prod.stock = Math.max(0, prod.stock + delta);
     revalidatePath("/");
-    return { success: true, newStock: prod.stock };
+    return { success: true, newStock };
   } catch (error) {
     console.error("Error adjusting stock:", error);
     return {
@@ -78,12 +79,13 @@ export async function updateOrderStatusAction(
   driverId?: string
 ) {
   try {
-    const order = state.orders.find((o) => o.id === orderId && o.tenant_id === tenantId);
+    const order = await MarketOSRepository.updateOrderStatus(
+      tenantId,
+      orderId,
+      status,
+      driverId
+    );
     if (!order) throw new Error("Orden no encontrada");
-
-    order.status = status;
-    if (driverId) order.driver_id = driverId;
-    order.updated_at = new Date().toISOString();
 
     revalidatePath("/");
     return { success: true, order };

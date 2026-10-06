@@ -2,7 +2,10 @@
 
 import React from "react";
 import { Order, TenantSettings } from "@marketos/types";
-import { formatCurrency } from "@marketos/utils";
+import {
+  formatCurrency,
+  generateCustomerOrderWhatsAppLink,
+} from "@marketos/utils";
 import { CheckCircle2, MessageCircle, X, Clock } from "lucide-react";
 
 interface OrderSuccessModalProps {
@@ -18,16 +21,12 @@ export function OrderSuccessModal({
 }: OrderSuccessModalProps) {
   if (!order) return null;
 
-  // WhatsApp click-to-chat link
-  const message = encodeURIComponent(
-    `¡Hola ${settings.business_name}! 👋\n\nAcabo de realizar un pedido a través de su catálogo digital:\n` +
-      `📦 *Pedido:* ${order.order_number}\n` +
-      `💵 *Total:* $${order.total_usd.toFixed(2)} USD (Bs. ${order.total_ves.toFixed(2)})\n` +
-      `📍 *Entrega:* ${order.delivery_type === "PICKUP" ? "Retiro en Tienda" : "Delivery a Domicilio"}\n\n` +
-      `Adjunto mi comprobante para que puedan validarlo y comenzar a prepararlo. ¡Muchas gracias!`
-  );
-
-  const whatsappUrl = `https://wa.me/${settings.whatsapp_number}?text=${message}`;
+  // Formatted WhatsApp order link
+  const whatsappUrl = generateCustomerOrderWhatsAppLink({
+    tenantPhone: settings.whatsapp_number || settings.phone,
+    businessName: settings.business_name,
+    order,
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm">

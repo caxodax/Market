@@ -350,3 +350,41 @@ export interface OnboardTenantInput {
   firstStoreName: string;
   firstStoreCode: string;
 }
+
+// =====================================================================
+// PHASE 4: PRODUCTION HARDENING, AUDIT TRAILS & LOYALTY TYPES
+// =====================================================================
+
+export interface AuditLog {
+  id: string;
+  tenant_id: string;
+  actor_id?: string | null;
+  actor_name?: string | null;
+  action: string;
+  entity: string;
+  entity_id: string;
+  old_data?: Record<string, unknown> | null;
+  new_data?: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface InventoryMovement {
+  id: string;
+  tenant_id: string;
+  store_id: string;
+  product_id: string;
+  quantity_change: number;
+  previous_quantity: number;
+  new_quantity: number;
+  reason: "SALE" | "RESTOCK" | "ADJUSTMENT" | "DAMAGE";
+  created_by?: string | null;
+  created_at: string;
+}
+
+export interface CustomerAccountSummary {
+  customer: Customer;
+  orders: Order[];
+  totalSpentUsd: number;
+  loyaltyPoints: number;
+}
+

@@ -123,3 +123,22 @@ export async function trackOrderAction(tenantId: string, query: string) {
     return { success: false, orders: [] };
   }
 }
+
+/**
+ * Look up customer profile, orders and loyalty points
+ */
+export async function lookupCustomerAction(
+  tenantId: string,
+  phoneOrEmail: string
+) {
+  try {
+    const summary = await MarketOSRepository.getCustomerOrdersAndPoints(
+      tenantId,
+      phoneOrEmail
+    );
+    return { success: true, summary };
+  } catch (error) {
+    console.error("Error looking up customer:", error);
+    return { success: false, summary: null };
+  }
+}

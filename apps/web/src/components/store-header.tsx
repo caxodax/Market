@@ -4,18 +4,20 @@ import React from "react";
 import { TenantSettings, ExchangeRate } from "@marketos/types";
 import { formatCurrency } from "@marketos/utils";
 import { useCart } from "../context/cart-context";
-import { ShoppingBag, MapPin, TrendingUp, Package } from "lucide-react";
+import { ShoppingBag, MapPin, TrendingUp, Package, Award } from "lucide-react";
 
 interface StoreHeaderProps {
   settings: TenantSettings;
   exchangeRate: ExchangeRate;
   onOpenTracker?: () => void;
+  onOpenAccount?: () => void;
 }
 
 export function StoreHeader({
   settings,
   exchangeRate,
   onOpenTracker,
+  onOpenAccount,
 }: StoreHeaderProps) {
   const { totalItems, setIsOpen } = useCart();
 
@@ -58,8 +60,19 @@ export function StoreHeader({
           </div>
         </div>
 
-        {/* Actions: Tracker & Cart */}
+        {/* Actions: Account & Tracker & Cart */}
         <div className="flex items-center gap-2">
+          {onOpenAccount && (
+            <button
+              onClick={onOpenAccount}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-foreground hover:bg-muted text-xs font-semibold transition-colors"
+              title="Consultar puntos de fidelidad y compras"
+            >
+              <Award className="w-4 h-4 text-amber-500" />
+              <span className="hidden sm:inline">Mis Puntos</span>
+            </button>
+          )}
+
           {onOpenTracker && (
             <button
               onClick={onOpenTracker}

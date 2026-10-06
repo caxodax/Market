@@ -10,8 +10,12 @@ import {
   DeliveryZone,
   Driver,
   OrderStatus,
+  AuditLog,
 } from "@marketos/types";
-import { formatCurrency } from "@marketos/utils";
+import {
+  formatCurrency,
+  generateOrderStatusNotificationWhatsAppLink,
+} from "@marketos/utils";
 import {
   reviewPaymentAction,
   adjustStockAction,
@@ -37,6 +41,11 @@ import {
   MapPin,
   ExternalLink,
   UserCheck,
+  History,
+  Volume2,
+  VolumeX,
+  MessageCircle,
+  ShieldCheck,
 } from "lucide-react";
 
 interface AdminDashboardProps {
@@ -47,6 +56,7 @@ interface AdminDashboardProps {
   exchangeRate: ExchangeRate;
   deliveryZones: DeliveryZone[];
   drivers: Driver[];
+  auditLogs?: AuditLog[];
 }
 
 export function AdminDashboard({
@@ -57,22 +67,50 @@ export function AdminDashboard({
   exchangeRate: initialRate,
   deliveryZones,
   drivers,
+  auditLogs: initialAuditLogs = [],
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<
-    "PAYMENTS" | "ORDERS" | "INVENTORY" | "DELIVERY"
+    "PAYMENTS" | "ORDERS" | "INVENTORY" | "DELIVERY" | "AUDIT"
   >("PAYMENTS");
   const [products, setProducts] = useState(initialProducts);
   const [orders, setOrders] = useState(initialOrders);
   const [payments, setPayments] = useState(initialPayments);
   const [rate, setRate] = useState(initialRate);
+  const [auditLogs, setAuditLogs] = useState(initialAuditLogs);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [auditFilter, setAuditFilter] = useState<string>("ALL");
 
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [syncingBcv, setSyncingBcv] = useState(false);
   const [bcvMessage, setBcvMessage] = useState<string | null>(null);
 
+  // Play audio alert chime
+  const playChime = () => {
+    if (!soundEnabled || typeof window === "undefined") return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.35);
+    } catch (e) {
+      // Audio context blocked
+    }
+  };
+
   // Review Payment Handler
   const handleReview = async (paymentId: string, status: "APPROVED" | "REJECTED") => {
     setProcessingId(paymentId);
+    playChime();
     try {
       const res = await reviewPaymentAction(settings.tenant_id, paymentId, status);
       if (res.success && res.payment) {
@@ -191,6 +229,32 @@ export function AdminDashboard({
                 Bs. {rate.value.toFixed(2)}/USD
               </strong>
             </div>
+
+            <button
+              onClick={() => {
+                const next = !soundEnabled;
+                setSoundEnabled(next);
+                if (next) playChime();
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${
+                soundEnabled
+                  ? "bg-primary/10 border-primary/30 text-primary"
+                  : "bg-muted border-border text-muted-foreground"
+              }`}
+              title={soundEnabled ? "Audio de alertas activo (clic para silenciar)" : "Audio de alertas silenciado (clic para activar)"}
+            >
+              {soundEnabled ? (
+                <>
+                  <Volume2 className="w-3.5 h-3.5 text-primary" />
+                  <span className="hidden sm:inline">Sonido Activo</span>
+                </>
+              ) : (
+                <>
+                  <VolumeX className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Silenciado</span>
+                </>
+              )}
+            </button>
 
             <button
               onClick={handleSyncBcv}
@@ -325,6 +389,18 @@ export function AdminDashboard({
           >
             <Truck className="w-4 h-4" />
             <span>Delivery y Repartidores</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("AUDIT")}
+            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === "AUDIT"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <History className="w-4 h-4" />
+            <span>Auditoría & Trazabilidad ({auditLogs.length})</span>
           </button>
         </div>
 
@@ -494,7 +570,27 @@ export function AdminDashboard({
                           <span>Repartidor asignado: <strong>{driver ? driver.name : "Por asignar"}</strong></span>
                         </div>
 
-                        <div className="flex gap-1.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <a
+                            href={generateOrderStatusNotificationWhatsAppLink({
+                              customerName: "Cliente",
+                              customerPhone: settings.whatsapp_number || settings.phone,
+                              businessName: settings.business_name,
+                              orderNumber: order.order_number,
+                              status: order.status,
+                              deliveryType: order.delivery_type,
+                              driverName: driver?.name,
+                              driverPhone: driver?.phone,
+                            })}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-xs font-bold border border-emerald-500/20 transition-colors"
+                            title="Abrir WhatsApp para enviar estado al cliente"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            <span>WhatsApp</span>
+                          </a>
+
                           {order.status === "PREPARING" && (
                             <button
                               onClick={() => handleUpdateOrderStatus(order.id, "READY")}
@@ -640,6 +736,124 @@ export function AdminDashboard({
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* TAB 5: AUDIT LOGS & TRACEABILITY */}
+        {activeTab === "AUDIT" && (
+          <div className="space-y-4 animate-in fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-bold text-foreground">
+                  Registro de Auditoría y Trazabilidad Operativa
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Historial inmutable de cambios de inventario, aprobación de pagos, estados de pedidos y tasa BCV.
+                </p>
+              </div>
+
+              {/* Filter pills */}
+              <div className="flex flex-wrap gap-1.5">
+                {["ALL", "PAYMENT", "ORDER", "STOCK", "BCV"].map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setAuditFilter(f)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
+                      auditFilter === f
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-card text-muted-foreground border-border hover:bg-muted"
+                    }`}
+                  >
+                    {f === "ALL"
+                      ? "Todos"
+                      : f === "PAYMENT"
+                      ? "Pagos"
+                      : f === "ORDER"
+                      ? "Pedidos"
+                      : f === "STOCK"
+                      ? "Inventario"
+                      : "Tasa BCV"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {auditLogs.length === 0 ? (
+              <div className="p-8 text-center rounded-2xl border border-dashed border-border bg-card">
+                <ShieldCheck className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-50" />
+                <p className="text-xs text-muted-foreground">
+                  Aún no se han registrado eventos de auditoría en la plataforma.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {auditLogs
+                  .filter((log) => {
+                    if (auditFilter === "ALL") return true;
+                    if (auditFilter === "PAYMENT") return log.action.includes("PAYMENT");
+                    if (auditFilter === "ORDER") return log.action.includes("ORDER");
+                    if (auditFilter === "STOCK") return log.action.includes("STOCK");
+                    if (auditFilter === "BCV") return log.action.includes("BCV");
+                    return true;
+                  })
+                  .map((log) => {
+                    const getBadgeColor = (action: string) => {
+                      if (action.includes("APPROVED"))
+                        return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
+                      if (action.includes("REJECTED"))
+                        return "bg-destructive/10 text-destructive border-destructive/20";
+                      if (action.includes("STOCK"))
+                        return "bg-amber-500/10 text-amber-600 border-amber-500/20";
+                      if (action.includes("BCV"))
+                        return "bg-purple-500/10 text-purple-600 border-purple-500/20";
+                      return "bg-blue-500/10 text-blue-600 border-blue-500/20";
+                    };
+
+                    return (
+                      <div
+                        key={log.id}
+                        className="p-3.5 rounded-xl border border-border bg-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`px-2 py-0.5 rounded-md font-mono text-[10px] font-black border ${getBadgeColor(
+                                log.action
+                              )}`}
+                            >
+                              {log.action}
+                            </span>
+                            <span className="font-semibold text-foreground">
+                              {log.entity} •{" "}
+                              <span className="font-mono text-muted-foreground">
+                                {log.entity_id}
+                              </span>
+                            </span>
+                          </div>
+
+                          <div className="text-[11px] text-muted-foreground">
+                            <span>
+                              Actor: <strong>{log.actor_name || "Admin Operativo"}</strong>
+                            </span>
+                            {log.new_data && (
+                              <span className="ml-2 font-mono text-[10px] text-foreground/80 bg-muted px-1.5 py-0.5 rounded">
+                                {JSON.stringify(log.new_data)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="text-[11px] text-muted-foreground sm:text-right shrink-0">
+                          <Clock className="w-3 h-3 inline mr-1 text-muted-foreground/70" />
+                          <span>
+                            {new Date(log.created_at).toLocaleString("es-VE")}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
           </div>
         )}
       </main>
