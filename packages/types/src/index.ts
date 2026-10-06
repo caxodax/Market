@@ -388,3 +388,40 @@ export interface CustomerAccountSummary {
   loyaltyPoints: number;
 }
 
+export interface CreateProductInput {
+  tenantId: string;
+  categoryId: string;
+  name: string;
+  description?: string;
+  priceUsd: number;
+  sku?: string;
+  barcode?: string;
+  imageUrl?: string;
+  initialStock?: number;
+  storeId?: string;
+}
+
+export interface UpdateProductInput {
+  tenantId: string;
+  productId: string;
+  name?: string;
+  categoryId?: string;
+  description?: string;
+  priceUsd?: number;
+  sku?: string;
+  barcode?: string;
+  imageUrl?: string;
+  stock?: number;
+  isActive?: boolean;
+  storeId?: string;
+}
+
+export interface InviteStaffInput {
+  tenantId: string;
+  email: string;
+  fullName: string;
+  role: UserRole;
+  phone?: string;
+}
+
+

@@ -4,6 +4,7 @@ import { cacheGet, cacheSet } from "./redis";
 export * from "./redis";
 export * from "./storage";
 export * from "./whatsapp";
+export * from "./image-compressor";
 
 /**
  * Currency Formatting Utilities for MarketOS

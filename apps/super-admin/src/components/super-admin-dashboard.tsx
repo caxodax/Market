@@ -33,21 +33,32 @@ import {
   Cloud,
   Server,
   Users,
+  LogOut,
 } from "lucide-react";
+import { UserProfile } from "@marketos/types";
+import { logoutSuperAdminAction } from "../app/login/actions";
 
 interface SuperAdminDashboardProps {
   metrics: PlatformMetrics;
   tenants: TenantWithDetails[];
   plans: SubscriptionPlan[];
+  currentUser?: UserProfile;
 }
 
 export function SuperAdminDashboard({
   metrics: initialMetrics,
   tenants: initialTenants,
   plans,
+  currentUser,
 }: SuperAdminDashboardProps) {
   const [tenants, setTenants] = useState<TenantWithDetails[]>(initialTenants);
   const [metrics, setMetrics] = useState<PlatformMetrics>(initialMetrics);
+
+  const handleLogout = async () => {
+    await logoutSuperAdminAction();
+    window.location.href = "/login";
+  };
+
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
@@ -216,6 +227,27 @@ export function SuperAdminDashboard({
               <Plus className="w-4 h-4" />
               <span>Nuevo Comercio</span>
             </button>
+
+            {currentUser && (
+              <div className="flex items-center gap-2 pl-2 border-l border-border">
+                <div className="hidden lg:flex flex-col text-right">
+                  <span className="text-xs font-bold text-foreground">
+                    {currentUser.full_name}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-mono">
+                    PLATFORM_SUPER_ADMIN
+                  </span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive text-xs font-semibold hover:bg-destructive/20 transition-all cursor-pointer"
+                  title="Cerrar sesión"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Salir</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>

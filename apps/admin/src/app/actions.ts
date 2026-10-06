@@ -97,3 +97,111 @@ export async function updateOrderStatusAction(
     };
   }
 }
+
+/**
+ * Upload product image to Cloudflare R2
+ */
+export async function uploadProductImageAction(formData: FormData) {
+  try {
+    const file = formData.get("file") as File | null;
+    const tenantId = (formData.get("tenantId") as string) || "shop-market-ca";
+
+    if (!file || file.size === 0) {
+      return { success: false, error: "No se seleccionó ninguna imagen" };
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const { uploadToR2 } = await import("@marketos/utils");
+    const res = await uploadToR2({
+      tenantId,
+      folder: "products",
+      fileName: file.name || "producto.webp",
+      body: buffer,
+      contentType: file.type || "image/webp",
+    });
+
+    return { success: true, url: res.url, key: res.key };
+  } catch (error) {
+    console.error("Error uploading product image to R2:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al subir imagen a Cloudflare R2",
+    };
+  }
+}
+
+export async function createProductAction(input: any) {
+  try {
+    const product = await MarketOSRepository.createProduct(input);
+    revalidatePath("/");
+    return { success: true, product };
+  } catch (error) {
+    console.error("Error creating product:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al crear producto",
+    };
+  }
+}
+
+export async function updateProductAction(input: any) {
+  try {
+    const product = await MarketOSRepository.updateProduct(input);
+    revalidatePath("/");
+    return { success: true, product };
+  } catch (error) {
+    console.error("Error updating product:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al actualizar producto",
+    };
+  }
+}
+
+export async function deleteProductAction(tenantId: string, productId: string) {
+  try {
+    const ok = await MarketOSRepository.deleteProduct(tenantId, productId);
+    revalidatePath("/");
+    return { success: ok };
+  } catch (error) {
+    console.error("Error deleting product:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al eliminar producto",
+    };
+  }
+}
+
+export async function inviteStaffMemberAction(input: any) {
+  try {
+    const profile = await MarketOSRepository.inviteStaffMember(input);
+    revalidatePath("/");
+    return { success: true, profile };
+  } catch (error) {
+    console.error("Error inviting staff:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al asignar colaborador",
+    };
+  }
+}
+
+export async function updateStaffRoleAction(
+  tenantId: string,
+  profileId: string,
+  role: any
+) {
+  try {
+    const profile = await MarketOSRepository.updateStaffRole(tenantId, profileId, role);
+    revalidatePath("/");
+    return { success: true, profile };
+  } catch (error) {
+    console.error("Error updating staff role:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al actualizar rol",
+    };
+  }
+}

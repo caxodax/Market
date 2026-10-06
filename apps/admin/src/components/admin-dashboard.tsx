@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import {
   TenantSettings,
   Product,
+  Category,
   Order,
   PaymentProof,
   ExchangeRate,
@@ -11,6 +12,8 @@ import {
   Driver,
   OrderStatus,
   AuditLog,
+  UserProfile,
+  UserRole,
 } from "@marketos/types";
 import {
   formatCurrency,
@@ -21,7 +24,11 @@ import {
   adjustStockAction,
   syncBcvRateAction,
   updateOrderStatusAction,
+  updateStaffRoleAction,
 } from "../app/actions";
+import { logoutAdminAction } from "../app/login/actions";
+import { ProductModal } from "./product-modal";
+import { StaffModal, ROLE_LABELS } from "./staff-modal";
 import {
   PackageCheck,
   Boxes,
@@ -46,43 +53,116 @@ import {
   VolumeX,
   MessageCircle,
   ShieldCheck,
+  Users,
+  LogOut,
+  User,
+  Pencil,
+  Image as ImageIcon,
+  Sparkles,
 } from "lucide-react";
 
 interface AdminDashboardProps {
   settings: TenantSettings;
   products: (Product & { stock: number })[];
+  categories?: Category[];
   orders: Order[];
   payments: PaymentProof[];
   exchangeRate: ExchangeRate;
   deliveryZones: DeliveryZone[];
   drivers: Driver[];
   auditLogs?: AuditLog[];
+  currentUser?: UserProfile;
+  staffMembers?: UserProfile[];
 }
 
 export function AdminDashboard({
   settings,
   products: initialProducts,
+  categories = [],
   orders: initialOrders,
   payments: initialPayments,
   exchangeRate: initialRate,
   deliveryZones,
   drivers,
   auditLogs: initialAuditLogs = [],
+  currentUser,
+  staffMembers: initialStaffMembers = [],
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<
-    "PAYMENTS" | "ORDERS" | "INVENTORY" | "DELIVERY" | "AUDIT"
+    "PAYMENTS" | "ORDERS" | "INVENTORY" | "DELIVERY" | "AUDIT" | "STAFF"
   >("PAYMENTS");
   const [products, setProducts] = useState(initialProducts);
   const [orders, setOrders] = useState(initialOrders);
   const [payments, setPayments] = useState(initialPayments);
   const [rate, setRate] = useState(initialRate);
   const [auditLogs, setAuditLogs] = useState(initialAuditLogs);
+  const [staff, setStaff] = useState<UserProfile[]>(initialStaffMembers);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [auditFilter, setAuditFilter] = useState<string>("ALL");
 
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [syncingBcv, setSyncingBcv] = useState(false);
   const [bcvMessage, setBcvMessage] = useState<string | null>(null);
+
+  // Modals state
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<(Product & { stock: number }) | null>(null);
+  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
+  const [updatingStaffId, setUpdatingStaffId] = useState<string | null>(null);
+
+  const handleLogout = async () => {
+    await logoutAdminAction();
+    window.location.href = "/login";
+  };
+
+  const handleRoleChange = async (profileId: string, newRole: UserRole) => {
+    setUpdatingStaffId(profileId);
+    try {
+      const res = await updateStaffRoleAction(settings.tenant_id, profileId, newRole);
+      if (res.success && res.profile) {
+        setStaff((prev) =>
+          prev.map((s) => (s.id === profileId ? res.profile! : s))
+        );
+      }
+    } catch (err) {
+      console.error("Error updating role:", err);
+    } finally {
+      setUpdatingStaffId(null);
+    }
+  };
+
+  const handleProductSaved = (savedProduct: Product & { stock: number }) => {
+    setProducts((prev) => {
+      const exists = prev.some((p) => p.id === savedProduct.id);
+      if (exists) {
+        return prev.map((p) => (p.id === savedProduct.id ? savedProduct : p));
+      }
+      return [savedProduct, ...prev];
+    });
+    setIsProductModalOpen(false);
+    setEditingProduct(null);
+  };
+
+  const handleProductDeleted = (productId: string) => {
+    setProducts((prev) => prev.filter((p) => p.id !== productId));
+    setIsProductModalOpen(false);
+    setEditingProduct(null);
+  };
+
+  const handleStaffAdded = (newStaff: UserProfile) => {
+    setStaff((prev) => {
+      const exists = prev.some((s) => s.id === newStaff.id || s.email === newStaff.email);
+      if (exists) {
+        return prev.map((s) =>
+          s.id === newStaff.id || s.email === newStaff.email ? newStaff : s
+        );
+      }
+      return [newStaff, ...prev];
+    });
+    setIsStaffModalOpen(false);
+  };
+
+
 
   // Play audio alert chime
   const playChime = () => {
@@ -269,6 +349,27 @@ export function AdminDashboard({
                 {syncingBcv ? "Sincronizando..." : "Sincronizar BCV"}
               </span>
             </button>
+
+            {currentUser && (
+              <div className="flex items-center gap-2 pl-3 border-l border-border">
+                <div className="hidden lg:flex flex-col text-right">
+                  <span className="text-xs font-bold text-foreground truncate max-w-[140px]">
+                    {currentUser.full_name}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-mono">
+                    {ROLE_LABELS[currentUser.role]?.label || currentUser.role}
+                  </span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive text-xs font-semibold hover:bg-destructive/20 transition-all cursor-pointer"
+                  title="Cerrar sesión"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Salir</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -401,6 +502,18 @@ export function AdminDashboard({
           >
             <History className="w-4 h-4" />
             <span>Auditoría & Trazabilidad ({auditLogs.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("STAFF")}
+            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === "STAFF"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Equipo y Roles ({staff.length})</span>
           </button>
         </div>
 
@@ -630,46 +743,137 @@ export function AdminDashboard({
         {/* TAB 3: INVENTORY */}
         {activeTab === "INVENTORY" && (
           <div className="space-y-4 animate-in fade-in">
-            <h2 className="text-sm font-bold text-foreground">
-              Control de Stock en Sucursal Nueva Segovia
-            </h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card p-4 rounded-2xl border border-border">
+              <div>
+                <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <Boxes className="w-4 h-4 text-primary" />
+                  Catálogo & Control de Inventario
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Subida directa a Cloudflare R2 con compresión WebP sin pérdida visual.
+                </p>
+              </div>
 
-            <div className="grid gap-2">
-              {products.map((prod) => (
-                <div
-                  key={prod.id}
-                  className="p-3.5 rounded-2xl border border-border bg-card flex items-center justify-between gap-4"
-                >
-                  <div className="space-y-0.5">
-                    <h3 className="text-xs font-bold text-foreground">
-                      {prod.name}
-                    </h3>
-                    <p className="text-[11px] text-muted-foreground">
-                      SKU: {prod.sku || "N/A"} • Precio: {formatCurrency(prod.price_usd, "USD")}
-                    </p>
+              <button
+                onClick={() => {
+                  setEditingProduct(null);
+                  setIsProductModalOpen(true);
+                }}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-sm cursor-pointer transition-all shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Nuevo Producto</span>
+              </button>
+            </div>
+
+            <div className="grid gap-3">
+              {products.map((prod) => {
+                const categoryName =
+                  categories.find((c) => c.id === prod.category_id)?.name ||
+                  "General";
+                const priceVes = prod.price_usd * rate.value;
+
+                return (
+                  <div
+                    key={prod.id}
+                    className="p-3.5 rounded-2xl border border-border bg-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all hover:border-border/80"
+                  >
+                    <div className="flex items-center gap-3">
+                      {prod.image_url ? (
+                        <img
+                          src={prod.image_url}
+                          alt={prod.name}
+                          className="w-14 h-14 object-cover rounded-xl border border-border shrink-0 bg-muted"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-14 h-14 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground shrink-0">
+                          <ImageIcon className="w-6 h-6 opacity-40" />
+                        </div>
+                      )}
+
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-xs font-bold text-foreground">
+                            {prod.name}
+                          </h3>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-semibold">
+                            {categoryName}
+                          </span>
+                          {!prod.is_active && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-500 font-semibold">
+                              Inactivo
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-[11px] text-muted-foreground flex items-center gap-2">
+                          <span>SKU: <strong className="text-foreground/80">{prod.sku || "N/A"}</strong></span>
+                          {prod.barcode && (
+                            <span>• Barra: <strong className="text-foreground/80">{prod.barcode}</strong></span>
+                          )}
+                        </p>
+
+                        <p className="text-xs font-mono font-bold text-primary">
+                          {formatCurrency(prod.price_usd, "USD")}{" "}
+                          <span className="text-[11px] text-muted-foreground font-normal">
+                            (Bs. {priceVes.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-border">
+                      {/* Edit Button */}
+                      <button
+                        onClick={() => {
+                          setEditingProduct(prod);
+                          setIsProductModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-muted/40 hover:bg-muted text-xs font-semibold text-foreground transition-all cursor-pointer"
+                        title="Editar detalles y fotos del producto"
+                      >
+                        <Pencil className="w-3.5 h-3.5 text-primary" />
+                        <span>Editar</span>
+                      </button>
+
+                      {/* Stock controls */}
+                      <div className="flex items-center gap-1.5 bg-muted/40 p-1 rounded-xl border border-border">
+                        <button
+                          onClick={() => handleStockChange(prod.id, -1)}
+                          className="w-7 h-7 rounded-lg border border-border bg-card flex items-center justify-center hover:bg-muted text-foreground transition-all cursor-pointer"
+                          title="Restar 1 unidad"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+
+                        <div className="w-12 text-center">
+                          <span
+                            className={`font-mono font-black text-xs block ${
+                              prod.stock <= 5
+                                ? "text-amber-500"
+                                : "text-foreground"
+                            }`}
+                          >
+                            {prod.stock}
+                          </span>
+                          <span className="text-[9px] text-muted-foreground block -mt-0.5">
+                            unid.
+                          </span>
+                        </div>
+
+                        <button
+                          onClick={() => handleStockChange(prod.id, 1)}
+                          className="w-7 h-7 rounded-lg border border-border bg-card flex items-center justify-center hover:bg-muted text-foreground transition-all cursor-pointer"
+                          title="Sumar 1 unidad"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleStockChange(prod.id, -1)}
-                      className="w-7 h-7 rounded-lg border border-border flex items-center justify-center hover:bg-muted"
-                    >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-
-                    <span className="w-10 text-center font-mono font-black text-xs">
-                      {prod.stock}
-                    </span>
-
-                    <button
-                      onClick={() => handleStockChange(prod.id, 1)}
-                      className="w-7 h-7 rounded-lg border border-border flex items-center justify-center hover:bg-muted"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -856,7 +1060,182 @@ export function AdminDashboard({
             )}
           </div>
         )}
+
+        {/* TAB 6: STAFF & RBAC ROLES */}
+        {activeTab === "STAFF" && (
+          <div className="space-y-6 animate-in fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card p-4 rounded-2xl border border-border">
+              <div>
+                <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                  Equipo de Trabajo & Permisos (RBAC)
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Gestiona colaboradores, asigna roles jerárquicos y audita permisos en tiempo real.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setIsStaffModalOpen(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-sm cursor-pointer transition-all shrink-0"
+              >
+                <Users className="w-4 h-4" />
+                <span>+ Asignar Colaborador</span>
+              </button>
+            </div>
+
+            {/* Staff list */}
+            <div className="grid gap-3">
+              {staff.map((member) => {
+                const roleInfo = ROLE_LABELS[member.role] || {
+                  label: member.role,
+                  desc: "Sin descripción",
+                };
+
+                const getBadgeClass = (r: UserRole) => {
+                  switch (r) {
+                    case "PLATFORM_SUPER_ADMIN":
+                      return "bg-rose-500/10 text-rose-500 border-rose-500/20";
+                    case "TENANT_OWNER":
+                      return "bg-amber-500/10 text-amber-500 border-amber-500/20";
+                    case "TENANT_MANAGER":
+                      return "bg-teal-500/10 text-teal-500 border-teal-500/20";
+                    case "TENANT_CASHIER":
+                      return "bg-blue-500/10 text-blue-500 border-blue-500/20";
+                    case "TENANT_INVENTORY":
+                      return "bg-purple-500/10 text-purple-500 border-purple-500/20";
+                    case "TENANT_DELIVERY":
+                      return "bg-orange-500/10 text-orange-500 border-orange-500/20";
+                    default:
+                      return "bg-muted text-muted-foreground border-border";
+                  }
+                };
+
+                return (
+                  <div
+                    key={member.id}
+                    className="p-4 rounded-2xl border border-border bg-card flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-600/20 to-teal-600/20 border border-emerald-500/30 flex items-center justify-center font-bold text-emerald-500 text-sm shrink-0">
+                        {member.full_name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .slice(0, 2)
+                          .join("")
+                          .toUpperCase()}
+                      </div>
+
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-sm font-bold text-foreground">
+                            {member.full_name}
+                          </h3>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getBadgeClass(
+                              member.role
+                            )}`}
+                          >
+                            {roleInfo.label}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {member.email} {member.phone && `• ${member.phone}`}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground/80">
+                          {roleInfo.desc}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-border">
+                      <div className="flex items-center gap-2">
+                        <label className="text-[11px] text-muted-foreground font-semibold">
+                          Cambiar Rol:
+                        </label>
+                        <select
+                          value={member.role}
+                          disabled={updatingStaffId === member.id}
+                          onChange={(e) =>
+                            handleRoleChange(member.id, e.target.value as UserRole)
+                          }
+                          className="bg-muted border border-border text-foreground text-xs rounded-xl px-3 py-1.5 font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50 cursor-pointer"
+                        >
+                          <option value="TENANT_OWNER">Dueño del Comercio</option>
+                          <option value="TENANT_MANAGER">Encargada de Sucursal</option>
+                          <option value="TENANT_CASHIER">Cajero / Operador</option>
+                          <option value="TENANT_INVENTORY">Control de Inventario</option>
+                          <option value="TENANT_DELIVERY">Repartidor / Delivery</option>
+                        </select>
+                      </div>
+
+                      {updatingStaffId === member.id && (
+                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Roles explanation card */}
+            <div className="p-4 rounded-2xl bg-muted/40 border border-border space-y-2">
+              <h3 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                Matriz de Control de Acceso Basado en Roles (RBAC):
+              </h3>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-1 text-[11px] text-muted-foreground">
+                <div className="p-2.5 rounded-xl bg-card border border-border">
+                  <strong className="text-foreground block">👑 Dueño (TENANT_OWNER)</strong>
+                  Acceso financiero irrestricto, auditoría, configuración y gestión de usuarios.
+                </div>
+                <div className="p-2.5 rounded-xl bg-card border border-border">
+                  <strong className="text-foreground block">🏢 Encargada (TENANT_MANAGER)</strong>
+                  Gestión total de catálogo, ajustes de inventario, aprobación de comprobantes y órdenes.
+                </div>
+                <div className="p-2.5 rounded-xl bg-card border border-border">
+                  <strong className="text-foreground block">💳 Cajero (TENANT_CASHIER)</strong>
+                  Validación y rechazo de comprobantes Pago Móvil/Zelle y avance de pedidos.
+                </div>
+                <div className="p-2.5 rounded-xl bg-card border border-border">
+                  <strong className="text-foreground block">📦 Inventario (TENANT_INVENTORY)</strong>
+                  Recepción de mercancía, ajuste de existencias y control de faltantes.
+                </div>
+                <div className="p-2.5 rounded-xl bg-card border border-border">
+                  <strong className="text-foreground block">🛵 Delivery (TENANT_DELIVERY)</strong>
+                  Rutas de despacho, confirmación de entregas y contacto directo vía WhatsApp.
+                </div>
+                <div className="p-2.5 rounded-xl bg-card border border-border">
+                  <strong className="text-foreground block">🛡️ Super Admin (PLATFORM)</strong>
+                  Control global de la infraestructura Multi-Tenant de MarketOS.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
+
+      {/* Product Creation & Editing Modal with WebP Compression */}
+      <ProductModal
+        tenantId={settings.tenant_id}
+        categories={categories}
+        product={editingProduct}
+        isOpen={isProductModalOpen}
+        onClose={() => {
+          setIsProductModalOpen(false);
+          setEditingProduct(null);
+        }}
+        onSaved={handleProductSaved}
+        onDeleted={handleProductDeleted}
+      />
+
+      {/* Staff Invitation & Role Assignment Modal */}
+      <StaffModal
+        tenantId={settings.tenant_id}
+        isOpen={isStaffModalOpen}
+        onClose={() => setIsStaffModalOpen(false)}
+        onStaffAdded={handleStaffAdded}
+      />
     </div>
   );
 }

@@ -25,6 +25,11 @@ import {
   InventoryMovement,
   CustomerAccountSummary,
   OrderStatus,
+  CreateProductInput,
+  UpdateProductInput,
+  InviteStaffInput,
+  UserProfile,
+  UserRole,
 } from "@marketos/types";
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
 import { fetchBcvRate, convertUsdToVes } from "@marketos/utils";
@@ -1466,5 +1471,381 @@ export class MarketOSRepository {
       return true;
     }
     return false;
+  }
+
+  // =====================================================================
+  // PRODUCT MANAGEMENT WITH CLOUDFLARE R2 IMAGES
+  // =====================================================================
+
+  /**
+   * Create a new product with stock and Cloudflare R2 image
+   */
+  static async createProduct(
+    input: CreateProductInput
+  ): Promise<Product & { stock: number }> {
+    const supabase = getSupabase();
+    const slug = `${input.name.toLowerCase().trim().replace(/[^a-z0-9]/g, "-")}-${Date.now().toString().slice(-4)}`;
+    const storeId =
+      input.storeId ||
+      state.stores.find((s) => s.tenant_id === input.tenantId)?.id ||
+      "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d";
+    const initialStock = input.initialStock !== undefined ? input.initialStock : 20;
+
+    let createdProduct: Product & { stock: number } = {
+      id: `prod-${Date.now()}`,
+      tenant_id: input.tenantId,
+      category_id: input.categoryId,
+      name: input.name,
+      slug,
+      description: input.description || null,
+      sku: input.sku || null,
+      barcode: input.barcode || null,
+      image_url: input.imageUrl || null,
+      price_usd: input.priceUsd,
+      is_active: true,
+      stock: initialStock,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (supabase) {
+      try {
+        const { data: prodData, error } = await supabase
+          .from("products")
+          .insert({
+            tenant_id: input.tenantId,
+            category_id: input.categoryId,
+            name: input.name,
+            slug,
+            description: input.description || null,
+            sku: input.sku || null,
+            barcode: input.barcode || null,
+            image_url: input.imageUrl || null,
+            price_usd: input.priceUsd,
+            is_active: true,
+          })
+          .select("id")
+          .single();
+
+        if (!error && prodData) {
+          createdProduct.id = prodData.id;
+
+          // Insert store inventory
+          await supabase.from("inventory").insert({
+            tenant_id: input.tenantId,
+            store_id: storeId,
+            product_id: prodData.id,
+            quantity: initialStock,
+            min_quantity: 5,
+          });
+
+          // Insert inventory movement
+          await supabase.from("inventory_movements").insert({
+            tenant_id: input.tenantId,
+            store_id: storeId,
+            product_id: prodData.id,
+            quantity_change: initialStock,
+            previous_quantity: 0,
+            new_quantity: initialStock,
+            reason: "RESTOCK",
+          });
+        }
+      } catch (e) {
+        console.warn("[Supabase] Create product fallback to state:", e);
+      }
+    }
+
+    state.products.unshift(createdProduct);
+
+    await MarketOSRepository.recordAuditLog({
+      tenantId: input.tenantId,
+      action: "PRODUCT_CREATED",
+      entity: "products",
+      entityId: createdProduct.id,
+      newData: {
+        name: createdProduct.name,
+        price_usd: createdProduct.price_usd,
+        stock: initialStock,
+        image_url: createdProduct.image_url,
+      },
+    });
+
+    return createdProduct;
+  }
+
+  /**
+   * Update an existing product
+   */
+  static async updateProduct(
+    input: UpdateProductInput
+  ): Promise<(Product & { stock: number }) | null> {
+    const supabase = getSupabase();
+    const storeId =
+      input.storeId ||
+      state.stores.find((s) => s.tenant_id === input.tenantId)?.id ||
+      "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d";
+
+    if (supabase) {
+      try {
+        const updatePayload: Record<string, unknown> = {
+          updated_at: new Date().toISOString(),
+        };
+        if (input.name !== undefined) updatePayload.name = input.name;
+        if (input.categoryId !== undefined) updatePayload.category_id = input.categoryId;
+        if (input.description !== undefined) updatePayload.description = input.description;
+        if (input.priceUsd !== undefined) updatePayload.price_usd = input.priceUsd;
+        if (input.sku !== undefined) updatePayload.sku = input.sku;
+        if (input.barcode !== undefined) updatePayload.barcode = input.barcode;
+        if (input.imageUrl !== undefined) updatePayload.image_url = input.imageUrl;
+        if (input.isActive !== undefined) updatePayload.is_active = input.isActive;
+
+        await supabase
+          .from("products")
+          .update(updatePayload)
+          .eq("id", input.productId)
+          .eq("tenant_id", input.tenantId);
+
+        if (input.stock !== undefined) {
+          const { data: inv } = await supabase
+            .from("inventory")
+            .select("id, quantity")
+            .eq("store_id", storeId)
+            .eq("product_id", input.productId)
+            .maybeSingle();
+
+          if (inv) {
+            await supabase
+              .from("inventory")
+              .update({ quantity: input.stock, updated_at: new Date().toISOString() })
+              .eq("id", inv.id);
+
+            await supabase.from("inventory_movements").insert({
+              tenant_id: input.tenantId,
+              store_id: storeId,
+              product_id: input.productId,
+              quantity_change: input.stock - inv.quantity,
+              previous_quantity: inv.quantity,
+              new_quantity: input.stock,
+              reason: "ADJUSTMENT",
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("[Supabase] Update product error:", e);
+      }
+    }
+
+    const prod = state.products.find(
+      (p) => p.id === input.productId && p.tenant_id === input.tenantId
+    );
+    if (prod) {
+      const oldData = { ...prod };
+      if (input.name !== undefined) prod.name = input.name;
+      if (input.categoryId !== undefined) prod.category_id = input.categoryId;
+      if (input.description !== undefined) prod.description = input.description;
+      if (input.priceUsd !== undefined) prod.price_usd = input.priceUsd;
+      if (input.sku !== undefined) prod.sku = input.sku;
+      if (input.barcode !== undefined) prod.barcode = input.barcode;
+      if (input.imageUrl !== undefined) prod.image_url = input.imageUrl;
+      if (input.isActive !== undefined) prod.is_active = input.isActive;
+      if (input.stock !== undefined) prod.stock = input.stock;
+      prod.updated_at = new Date().toISOString();
+
+      await MarketOSRepository.recordAuditLog({
+        tenantId: input.tenantId,
+        action: "PRODUCT_UPDATED",
+        entity: "products",
+        entityId: input.productId,
+        oldData: { price_usd: oldData.price_usd, stock: oldData.stock },
+        newData: { price_usd: prod.price_usd, stock: prod.stock, name: prod.name },
+      });
+
+      return prod;
+    }
+
+    return null;
+  }
+
+  /**
+   * Delete / Deactivate a product
+   */
+  static async deleteProduct(tenantId: string, productId: string): Promise<boolean> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase
+          .from("products")
+          .update({ is_active: false, updated_at: new Date().toISOString() })
+          .eq("id", productId)
+          .eq("tenant_id", tenantId);
+      } catch (e) {
+        console.warn("[Supabase] Delete product error:", e);
+      }
+    }
+
+    const prod = state.products.find(
+      (p) => p.id === productId && p.tenant_id === tenantId
+    );
+    if (prod) {
+      prod.is_active = false;
+      prod.updated_at = new Date().toISOString();
+
+      await MarketOSRepository.recordAuditLog({
+        tenantId,
+        action: "PRODUCT_DELETED",
+        entity: "products",
+        entityId: productId,
+        newData: { is_active: false },
+      });
+      return true;
+    }
+    return false;
+  }
+
+  // =====================================================================
+  // STAFF & ROLE ASSIGNMENT
+  // =====================================================================
+
+  /**
+   * Get all staff members and employees for a tenant
+   */
+  static async getTenantStaff(tenantId: string): Promise<UserProfile[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .order("created_at", { ascending: true });
+
+        if (!error && data && data.length > 0) {
+          return data as UserProfile[];
+        }
+      } catch (e) {
+        console.warn("[Supabase] Get tenant staff error:", e);
+      }
+    }
+
+    return state.profiles.filter((p) => p.tenant_id === tenantId);
+  }
+
+  /**
+   * Invite or assign a new staff member to a tenant
+   */
+  static async inviteStaffMember(input: InviteStaffInput): Promise<UserProfile> {
+    const newProfile: UserProfile = {
+      id: `usr-${Date.now()}`,
+      tenant_id: input.tenantId,
+      email: input.email.toLowerCase().trim(),
+      full_name: input.fullName,
+      phone: input.phone || null,
+      avatar_url: null,
+      role: input.role,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .insert({
+            tenant_id: input.tenantId,
+            email: newProfile.email,
+            full_name: newProfile.full_name,
+            phone: newProfile.phone,
+            role: newProfile.role,
+          })
+          .select("id")
+          .maybeSingle();
+
+        if (data) newProfile.id = data.id;
+      } catch (e) {
+        console.warn("[Supabase] Insert staff member fallback:", e);
+      }
+    }
+
+    state.profiles.push(newProfile);
+
+    await MarketOSRepository.recordAuditLog({
+      tenantId: input.tenantId,
+      action: "STAFF_INVITED",
+      entity: "profiles",
+      entityId: newProfile.id,
+      newData: { email: newProfile.email, role: newProfile.role, name: newProfile.full_name },
+    });
+
+    return newProfile;
+  }
+
+  /**
+   * Update a staff member's role
+   */
+  static async updateStaffRole(
+    tenantId: string,
+    profileId: string,
+    newRole: UserRole
+  ): Promise<UserProfile | null> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase
+          .from("profiles")
+          .update({ role: newRole, updated_at: new Date().toISOString() })
+          .eq("id", profileId)
+          .eq("tenant_id", tenantId);
+      } catch (e) {
+        console.warn("[Supabase] Update staff role error:", e);
+      }
+    }
+
+    const member = state.profiles.find(
+      (p) => p.id === profileId && p.tenant_id === tenantId
+    );
+    if (member) {
+      const oldRole = member.role;
+      member.role = newRole;
+      member.updated_at = new Date().toISOString();
+
+      await MarketOSRepository.recordAuditLog({
+        tenantId,
+        action: "ROLE_UPDATED",
+        entity: "profiles",
+        entityId: profileId,
+        oldData: { role: oldRole },
+        newData: { role: newRole },
+      });
+      return member;
+    }
+    return null;
+  }
+
+  /**
+   * Get user profile by ID or Email
+   */
+  static async getUserProfile(userIdOrEmail: string): Promise<UserProfile | null> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("*")
+          .or(`id.eq.${userIdOrEmail},email.eq.${userIdOrEmail.toLowerCase().trim()}`)
+          .maybeSingle();
+
+        if (data) return data as UserProfile;
+      } catch (e) {
+        console.warn("[Supabase] Get user profile error:", e);
+      }
+    }
+
+    const mem = state.profiles.find(
+      (p) =>
+        p.id === userIdOrEmail ||
+        p.email.toLowerCase() === userIdOrEmail.toLowerCase().trim()
+    );
+    return mem || null;
   }
 }

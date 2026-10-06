@@ -15,6 +15,7 @@ import {
   SubscriptionPlan,
   TenantSubscription,
   AuditLog,
+  UserProfile,
 } from "@marketos/types";
 
 export const INITIAL_TENANT: Tenant = {
@@ -407,6 +408,53 @@ export const INITIAL_TENANT_SUBSCRIPTIONS: TenantSubscription[] = [
   },
 ];
 
+export const INITIAL_PROFILES: UserProfile[] = [
+  {
+    id: "usr-super-admin-01",
+    tenant_id: null,
+    email: "admin@marketos.lat",
+    full_name: "Super Administrador MarketOS",
+    phone: "+58 412-0000000",
+    avatar_url: null,
+    role: "PLATFORM_SUPER_ADMIN",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "usr-owner-shop-market",
+    tenant_id: "shop-market-ca",
+    email: "owner@shopmarket.com",
+    full_name: "Luis Montes (Dueño)",
+    phone: "+58 424-5919577",
+    avatar_url: null,
+    role: "TENANT_OWNER",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "usr-manager-shop-market",
+    tenant_id: "shop-market-ca",
+    email: "gerente@shopmarket.com",
+    full_name: "María Gómez (Encargada)",
+    phone: "+58 414-9876543",
+    avatar_url: null,
+    role: "TENANT_MANAGER",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "usr-cashier-shop-market",
+    tenant_id: "shop-market-ca",
+    email: "caja@shopmarket.com",
+    full_name: "Pedro Pérez (Cajero)",
+    phone: "+58 412-5551234",
+    avatar_url: null,
+    role: "TENANT_CASHIER",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
+
 // In-memory runtime state for fast MVP simulation if no live Supabase DB is connected
 export const state = {
   tenants: [INITIAL_TENANT],
@@ -424,4 +472,5 @@ export const state = {
   payments: [] as PaymentProof[],
   auditLogs: [] as AuditLog[],
   customers: [] as Customer[],
+  profiles: INITIAL_PROFILES,
 };
