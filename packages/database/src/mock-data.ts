@@ -12,6 +12,8 @@ import {
   Coupon,
   Driver,
   Customer,
+  SubscriptionPlan,
+  TenantSubscription,
 } from "@marketos/types";
 
 export const INITIAL_TENANT: Tenant = {
@@ -329,6 +331,81 @@ export const INITIAL_DRIVERS: Driver[] = [
   },
 ];
 
+export const INITIAL_SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
+  {
+    id: "STARTER",
+    name: "MarketOS Starter",
+    description: "Ideal para bodegas, panaderías y pequeños minimarkets locales",
+    price_usd_monthly: 19.0,
+    price_usd_yearly: 190.0,
+    max_stores: 1,
+    max_products: 60,
+    custom_domain_allowed: false,
+    transaction_fee_percent: 0.0,
+    features: [
+      "1 Sucursal",
+      "Hasta 60 productos",
+      "Catálogo PWA móvil",
+      "Tasa BCV automatizada",
+      "Pagos por WhatsApp y Pago Móvil",
+    ],
+    is_active: true,
+  },
+  {
+    id: "GROWTH",
+    name: "MarketOS Growth",
+    description: "Para comercios consolidados con delivery propio y alto volumen de ventas",
+    price_usd_monthly: 49.0,
+    price_usd_yearly: 490.0,
+    max_stores: 3,
+    max_products: 300,
+    custom_domain_allowed: true,
+    transaction_fee_percent: 0.0,
+    features: [
+      "Hasta 3 Sucursales",
+      "Hasta 300 productos",
+      "Módulo de Repartidores y Zonas",
+      "Cupones y Promociones",
+      "Carga de comprobantes en Cloudflare R2",
+      "Dominio personalizado",
+    ],
+    is_active: true,
+  },
+  {
+    id: "ENTERPRISE",
+    name: "MarketOS Enterprise",
+    description: "Para cadenas de minimarkets, franquicias y supermercados multi-sucursal",
+    price_usd_monthly: 99.0,
+    price_usd_yearly: 990.0,
+    max_stores: 10,
+    max_products: 2000,
+    custom_domain_allowed: true,
+    transaction_fee_percent: 0.0,
+    features: [
+      "Hasta 10 Sucursales",
+      "Productos ilimitados",
+      "Multi-cajero y roles avanzados",
+      "Soporte prioritario 24/7",
+      "Integraciones ERP y Facturación Fiscal",
+    ],
+    is_active: true,
+  },
+];
+
+export const INITIAL_TENANT_SUBSCRIPTIONS: TenantSubscription[] = [
+  {
+    id: "sub-1",
+    tenant_id: "shop-market-ca",
+    plan_id: "GROWTH",
+    status: "active",
+    billing_cycle: "monthly",
+    current_period_start: new Date().toISOString(),
+    current_period_end: new Date(Date.now() + 30 * 86400000).toISOString(),
+    cancel_at_period_end: false,
+    created_at: new Date().toISOString(),
+  },
+];
+
 // In-memory runtime state for fast MVP simulation if no live Supabase DB is connected
 export const state = {
   tenants: [INITIAL_TENANT],
@@ -340,6 +417,8 @@ export const state = {
   deliveryZones: INITIAL_DELIVERY_ZONES,
   coupons: INITIAL_COUPONS,
   drivers: INITIAL_DRIVERS,
+  plans: INITIAL_SUBSCRIPTION_PLANS,
+  subscriptions: INITIAL_TENANT_SUBSCRIPTIONS,
   orders: [] as Order[],
   payments: [] as PaymentProof[],
 };

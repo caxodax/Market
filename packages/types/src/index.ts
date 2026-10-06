@@ -280,3 +280,73 @@ export interface PaymentProof {
   rejection_reason?: string | null;
   created_at: string;
 }
+
+// =====================================================================
+// PHASE 3: SAAS MULTI-TENANT & SUBSCRIPTION TYPES
+// =====================================================================
+
+export type SubscriptionPlanTier = "STARTER" | "GROWTH" | "ENTERPRISE";
+export type SubscriptionStatus = "active" | "trial" | "past_due" | "cancelled";
+
+export interface SubscriptionPlan {
+  id: SubscriptionPlanTier;
+  name: string;
+  description: string;
+  price_usd_monthly: number;
+  price_usd_yearly: number;
+  max_stores: number;
+  max_products: number;
+  custom_domain_allowed: boolean;
+  transaction_fee_percent: number;
+  features: string[];
+  is_active: boolean;
+}
+
+export interface TenantSubscription {
+  id: string;
+  tenant_id: string;
+  plan_id: SubscriptionPlanTier;
+  status: SubscriptionStatus;
+  billing_cycle: "monthly" | "yearly";
+  current_period_start: string;
+  current_period_end: string;
+  cancel_at_period_end: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface TenantWithDetails extends Tenant {
+  settings?: TenantSettings | null;
+  storesCount: number;
+  productsCount: number;
+  ordersCount: number;
+  totalRevenueUsd: number;
+  subscription?: TenantSubscription | null;
+  plan?: SubscriptionPlan | null;
+}
+
+export interface PlatformMetrics {
+  totalTenants: number;
+  activeTenants: number;
+  totalStores: number;
+  totalProducts: number;
+  totalOrders: number;
+  totalGmvUsd: number;
+  totalGmvVes: number;
+  mrrUsd: number;
+}
+
+export interface OnboardTenantInput {
+  name: string;
+  slug: string;
+  category: string;
+  ownerEmail: string;
+  phone: string;
+  whatsapp: string;
+  address: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  planId: SubscriptionPlanTier;
+  firstStoreName: string;
+  firstStoreCode: string;
+}

@@ -15,6 +15,12 @@ import {
   Driver,
   Customer,
   CustomerAddress,
+  SubscriptionPlan,
+  TenantSubscription,
+  TenantWithDetails,
+  PlatformMetrics,
+  OnboardTenantInput,
+  SubscriptionPlanTier,
 } from "@marketos/types";
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
 import { fetchBcvRate, convertUsdToVes } from "@marketos/utils";
@@ -690,5 +696,275 @@ export class MarketOSRepository {
         (o.customer_id === phoneOrId ||
           o.order_number.toLowerCase().includes(phoneOrId.toLowerCase()))
     );
+  }
+
+  // =====================================================================
+  // PHASE 3: PLATFORM SUPER-ADMIN & SAAS MULTI-TENANCY METHODS
+  // =====================================================================
+
+  /**
+   * Get all tenants with aggregated store, product, and revenue counts
+   */
+  static async getAllTenants(): Promise<TenantWithDetails[]> {
+    const supabase = getSupabase();
+    let tenantsList: Tenant[] = [];
+
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("tenants")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        tenantsList = data as Tenant[];
+      }
+    }
+
+    if (tenantsList.length === 0) {
+      tenantsList = state.tenants;
+    }
+
+    const plans = await this.getSubscriptionPlans();
+
+    return Promise.all(
+      tenantsList.map(async (t) => {
+        const settings = await this.getTenantSettings(t.id);
+        const stores = await this.getStores(t.id);
+        const products = await this.getProducts(t.id);
+        const orders = await this.getTenantOrders(t.id);
+
+        const totalRevenue = orders.reduce(
+          (acc, o) => (o.status !== "CANCELLED" ? acc + o.total_usd : acc),
+          0
+        );
+
+        let sub = state.subscriptions.find((s) => s.tenant_id === t.id);
+        if (supabase) {
+          const { data } = await supabase
+            .from("tenant_subscriptions")
+            .select("*")
+            .eq("tenant_id", t.id)
+            .maybeSingle();
+          if (data) sub = data as TenantSubscription;
+        }
+
+        const currentPlan =
+          plans.find((p) => p.id === (sub?.plan_id || "GROWTH")) || plans[1];
+
+        return {
+          ...t,
+          settings,
+          storesCount: stores.length,
+          productsCount: products.length,
+          ordersCount: orders.length,
+          totalRevenueUsd: Number(totalRevenue.toFixed(2)),
+          subscription: sub || null,
+          plan: currentPlan,
+        };
+      })
+    );
+  }
+
+  /**
+   * Get Platform Global KPIs across all tenants
+   */
+  static async getPlatformMetrics(): Promise<PlatformMetrics> {
+    const allTenants = await this.getAllTenants();
+    const rate = await this.getExchangeRate("shop-market-ca");
+
+    const totalStores = allTenants.reduce((acc, t) => acc + t.storesCount, 0);
+    const totalProducts = allTenants.reduce((acc, t) => acc + t.productsCount, 0);
+    const totalOrders = allTenants.reduce((acc, t) => acc + t.ordersCount, 0);
+    const totalGmvUsd = allTenants.reduce((acc, t) => acc + t.totalRevenueUsd, 0);
+    const totalGmvVes = convertUsdToVes(totalGmvUsd, rate.value);
+
+    const mrrUsd = allTenants.reduce((acc, t) => {
+      if (t.status === "active" && t.plan) {
+        return acc + t.plan.price_usd_monthly;
+      }
+      return acc;
+    }, 0);
+
+    return {
+      totalTenants: allTenants.length,
+      activeTenants: allTenants.filter((t) => t.status === "active").length,
+      totalStores,
+      totalProducts,
+      totalOrders,
+      totalGmvUsd: Number(totalGmvUsd.toFixed(2)),
+      totalGmvVes,
+      mrrUsd: Number(mrrUsd.toFixed(2)),
+    };
+  }
+
+  /**
+   * Get SaaS Subscription Plans
+   */
+  static async getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("subscription_plans")
+        .select("*")
+        .order("price_usd_monthly", { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        return data.map((d) => ({
+          ...d,
+          features: Array.isArray(d.features) ? d.features : JSON.parse(d.features || "[]"),
+        })) as SubscriptionPlan[];
+      }
+    }
+
+    return state.plans;
+  }
+
+  /**
+   * Onboard and auto-provision a new tenant into MarketOS SaaS
+   */
+  static async onboardTenant(
+    input: OnboardTenantInput
+  ): Promise<TenantWithDetails> {
+    const tenantId = input.slug.toLowerCase().trim();
+    const now = new Date().toISOString();
+
+    const newTenant: Tenant = {
+      id: tenantId,
+      name: input.name,
+      slug: input.slug,
+      logo_url: "/brand/logo.png",
+      status: "active",
+      created_at: now,
+      updated_at: now,
+    };
+
+    const newSettings: TenantSettings = {
+      tenant_id: tenantId,
+      business_name: input.name,
+      category: input.category,
+      primary_color: input.primaryColor || "#DC2626",
+      secondary_color: input.secondaryColor || "#09090B",
+      accent_color: "#FFFFFF",
+      logo_url: "/brand/logo.png",
+      banner_url: null,
+      phone: input.phone,
+      email: input.ownerEmail,
+      whatsapp_number: input.whatsapp.replace(/[^0-9]/g, ""),
+      address: input.address,
+      supported_currencies: ["USD", "VES"],
+      default_currency: "USD",
+      social_links: {},
+    };
+
+    const newStore: Store = {
+      id: `store-${Date.now()}`,
+      tenant_id: tenantId,
+      name: input.firstStoreName,
+      code: input.firstStoreCode,
+      address: input.address,
+      phone: input.phone,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+    };
+
+    const newSubscription: TenantSubscription = {
+      id: `sub-${Date.now()}`,
+      tenant_id: tenantId,
+      plan_id: input.planId,
+      status: "active",
+      billing_cycle: "monthly",
+      current_period_start: now,
+      current_period_end: new Date(Date.now() + 30 * 86400000).toISOString(),
+      cancel_at_period_end: false,
+      created_at: now,
+    };
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase.from("tenants").insert(newTenant);
+        await supabase.from("tenant_settings").insert(newSettings);
+        await supabase.from("stores").insert({
+          tenant_id: newStore.tenant_id,
+          name: newStore.name,
+          code: newStore.code,
+          address: newStore.address,
+          phone: newStore.phone,
+          is_active: true,
+        });
+        await supabase.from("tenant_subscriptions").insert({
+          tenant_id: newSubscription.tenant_id,
+          plan_id: newSubscription.plan_id,
+          status: newSubscription.status,
+          billing_cycle: newSubscription.billing_cycle,
+          current_period_start: newSubscription.current_period_start,
+          current_period_end: newSubscription.current_period_end,
+        });
+
+        // Initialize default delivery zone for tenant
+        await supabase.from("delivery_zones").insert({
+          tenant_id: tenantId,
+          name: "Zona Local (Inmediata)",
+          price_usd: 0.00,
+          estimated_time: "25-40 min",
+          coverage_description: "Entrega local en zona céntrica",
+          is_active: true,
+          sort_order: 1,
+        });
+
+        // Fetch official BCV rate for new tenant
+        await this.syncBcvRateFromApi(tenantId);
+      } catch (e) {
+        console.warn("[Supabase] Onboarding fallback to memory state:", e);
+      }
+    }
+
+    state.tenants.push(newTenant);
+    state.settings.push(newSettings);
+    state.stores.push(newStore);
+    state.subscriptions.push(newSubscription);
+
+    const plans = await this.getSubscriptionPlans();
+    const plan = plans.find((p) => p.id === input.planId) || plans[0];
+
+    return {
+      ...newTenant,
+      settings: newSettings,
+      storesCount: 1,
+      productsCount: 0,
+      ordersCount: 0,
+      totalRevenueUsd: 0,
+      subscription: newSubscription,
+      plan,
+    };
+  }
+
+  /**
+   * Update Tenant Status (Activate / Suspend / Trial)
+   */
+  static async updateTenantStatus(
+    tenantId: string,
+    status: "active" | "inactive" | "suspended" | "trial"
+  ): Promise<boolean> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase
+          .from("tenants")
+          .update({ status, updated_at: new Date().toISOString() })
+          .eq("id", tenantId);
+      } catch (e) {
+        console.warn("[Supabase] Update tenant status error:", e);
+      }
+    }
+
+    const t = state.tenants.find((item) => item.id === tenantId);
+    if (t) {
+      t.status = status;
+      t.updated_at = new Date().toISOString();
+      return true;
+    }
+    return false;
   }
 }
