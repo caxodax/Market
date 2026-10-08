@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { Product } from "@marketos/types";
 import { formatCurrency, convertUsdToVes } from "@marketos/utils";
 import { useCart } from "../context/cart-context";
-import { Plus, Check, ShoppingCart } from "lucide-react";
+import { Plus, Minus, ShoppingCart } from "lucide-react";
 
 interface ProductCardProps {
   product: Product & { stock: number };
@@ -12,21 +12,16 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, exchangeRate }: ProductCardProps) {
-  const { addItem } = useCart();
-  const [added, setAdded] = useState(false);
+  const { items, addItem, updateQuantity } = useCart();
+
+  const cartItem = items.find((i) => i.product.id === product.id);
+  const quantityInCart = cartItem ? cartItem.quantity : 0;
 
   const priceVes = convertUsdToVes(product.price_usd, exchangeRate);
   const isOutOfStock = product.stock <= 0;
 
-  const handleAdd = () => {
-    if (isOutOfStock) return;
-    addItem(product, 1);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1200);
-  };
-
   return (
-    <div className="group relative flex flex-col rounded-2xl border border-border bg-card overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
+    <div className="group relative flex flex-col rounded-2xl border border-border bg-card overflow-hidden shadow-xs hover:shadow-md transition-all duration-200">
       {/* Product Image */}
       <div className="relative aspect-square w-full overflow-hidden bg-muted/30">
         {product.image_url ? (
@@ -37,80 +32,115 @@ export function ProductCard({ product, exchangeRate }: ProductCardProps) {
             loading="lazy"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+          <div className="flex h-full w-full items-center justify-center text-muted-foreground/50">
             <ShoppingCart className="w-12 h-12 stroke-[1.2]" />
           </div>
         )}
 
-        {/* Stock Badge */}
-        <div className="absolute top-2.5 left-2.5">
+        {/* Stock & Cart Badges */}
+        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 items-start">
           {isOutOfStock ? (
-            <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold text-destructive-foreground">
+            <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold text-destructive-foreground shadow-xs">
               Agotado
             </span>
           ) : product.stock <= 5 ? (
-            <span className="rounded-full bg-amber-500/90 text-white px-2 py-0.5 text-[10px] font-bold shadow-sm">
+            <span className="rounded-full bg-amber-500 text-white px-2 py-0.5 text-[10px] font-bold shadow-xs">
               Últimas {product.stock} unid
             </span>
           ) : null}
+
+          {quantityInCart > 0 && (
+            <span className="rounded-full bg-primary text-primary-foreground px-2 py-0.5 text-[10px] font-bold shadow-xs animate-in zoom-in-75 duration-150">
+              {quantityInCart} en carrito
+            </span>
+          )}
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex flex-1 flex-col p-4">
+      <div className="flex flex-1 flex-col p-3.5 sm:p-4">
         {product.sku && (
           <span className="text-[10px] uppercase font-mono font-medium tracking-wider text-muted-foreground">
             {product.sku}
           </span>
         )}
 
-        <h3 className="mt-1 text-sm font-semibold text-foreground line-clamp-2 leading-snug">
+        <h3 className="mt-1 text-xs sm:text-sm font-bold text-foreground line-clamp-2 leading-snug">
           {product.name}
         </h3>
 
-        {/* Price block */}
-        <div className="mt-3 flex flex-col">
+        {/* Price block - High contrast WCAG AA Dual Currency */}
+        <div className="mt-auto pt-3 flex flex-col">
           <div className="flex items-baseline gap-1.5">
-            <span className="text-lg font-black text-primary tracking-tight">
+            <span className="text-base sm:text-lg font-black text-primary tracking-tight">
               {formatCurrency(product.price_usd, "USD")}
             </span>
-            <span className="text-xs text-muted-foreground font-semibold">
+            <span className="text-[11px] text-muted-foreground font-semibold">
               USD
             </span>
           </div>
 
-          <span className="text-xs font-medium text-muted-foreground">
-            Bs. {priceVes.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <span className="text-xs font-semibold text-foreground/80">
+            Bs.{" "}
+            {priceVes.toLocaleString("es-VE", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </span>
         </div>
 
-        {/* Action Button */}
-        <div className="mt-4 pt-2">
-          <button
-            onClick={handleAdd}
-            disabled={isOutOfStock}
-            className={`w-full h-10 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] ${
-              added
-                ? "bg-emerald-600 text-white"
-                : isOutOfStock
-                ? "bg-muted text-muted-foreground cursor-not-allowed"
-                : "bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground"
-            }`}
-          >
-            {added ? (
-              <>
-                <Check className="w-4 h-4" />
-                <span>Agregado</span>
-              </>
-            ) : isOutOfStock ? (
-              <span>Sin stock</span>
-            ) : (
-              <>
-                <Plus className="w-4 h-4" />
-                <span>Agregar</span>
-              </>
-            )}
-          </button>
+        {/* Interactive Action Button / Inline Stepper */}
+        <div className="mt-3 pt-1">
+          {quantityInCart > 0 ? (
+            <div className="flex items-center justify-between h-10 px-1.5 rounded-xl bg-primary/10 border border-primary/30 text-primary shadow-2xs">
+              <button
+                type="button"
+                onClick={() => updateQuantity(product.id, quantityInCart - 1)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary hover:text-primary-foreground transition-colors active:scale-95 cursor-pointer"
+                aria-label="Disminuir cantidad"
+              >
+                <Minus className="w-4 h-4 stroke-[2.5]" />
+              </button>
+
+              <div className="flex items-center gap-1">
+                <span className="font-black text-xs font-mono text-primary">
+                  {quantityInCart}
+                </span>
+                <span className="text-[10px] font-medium opacity-80 hidden sm:inline">
+                  unid
+                </span>
+              </div>
+
+              <button
+                type="button"
+                disabled={quantityInCart >= product.stock}
+                onClick={() => addItem(product, 1, false)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary hover:text-primary-foreground transition-colors active:scale-95 disabled:opacity-40 cursor-pointer"
+                aria-label="Aumentar cantidad"
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => addItem(product, 1, false)}
+              disabled={isOutOfStock}
+              className={`w-full h-10 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer ${
+                isOutOfStock
+                  ? "bg-muted text-muted-foreground cursor-not-allowed"
+                  : "bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground shadow-2xs"
+              }`}
+            >
+              {isOutOfStock ? (
+                <span>Sin stock</span>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                  <span>Agregar</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -24,6 +24,9 @@ import {
   Clock,
   MapPin,
   Check,
+  Copy,
+  Building2,
+  ArrowLeft,
 } from "lucide-react";
 
 interface CheckoutDialogProps {
@@ -125,6 +128,18 @@ export function CheckoutDialog({
     setAppliedCoupon(null);
     setCouponCode("");
     setCouponMessage(null);
+  };
+
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const handleCopy = (text: string, fieldId: string) => {
+    try {
+      navigator.clipboard.writeText(text);
+      setCopiedField(fieldId);
+      setTimeout(() => setCopiedField(null), 1800);
+    } catch (e) {
+      console.warn("Could not copy to clipboard", e);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -232,22 +247,54 @@ export function CheckoutDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
       <div className="bg-card w-full max-w-lg rounded-2xl border border-border shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
-        {/* Modal Header */}
+        {/* Modal Stepper Header */}
         <div className="p-4 border-b border-border flex items-center justify-between bg-muted/20">
-          <div>
-            <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-primary" />
-              Finalizar Pedido
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              {step === "DETAILS"
-                ? "Paso 1 de 2: Entrega y Promociones"
-                : "Paso 2 de 2: Pago y Comprobante"}
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span
+                className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                  step === "DETAILS"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "bg-emerald-600 text-white"
+                }`}
+              >
+                {step === "DETAILS" ? "1" : "✓"}
+              </span>
+              <span
+                className={`text-xs font-bold ${
+                  step === "DETAILS" ? "text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                Entrega
+              </span>
+            </div>
+
+            <span className="text-muted-foreground/30 text-xs select-none">─────</span>
+
+            <div className="flex items-center gap-2">
+              <span
+                className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                  step === "PAYMENT"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                2
+              </span>
+              <span
+                className={`text-xs font-bold ${
+                  step === "PAYMENT" ? "text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                Pago
+              </span>
+            </div>
           </div>
+
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
+            className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+            aria-label="Cerrar modal"
           >
             <X className="w-5 h-5" />
           </button>
@@ -506,44 +553,338 @@ export function CheckoutDialog({
                 </div>
               </div>
 
-              {/* Shop Market Account Instructions */}
-              <div className="p-3.5 rounded-xl bg-muted/50 border border-border text-xs space-y-1">
-                <div className="font-bold text-foreground flex items-center gap-1.5">
-                  <QrCode className="w-4 h-4 text-primary" />
-                  <span>Datos de Pago Shop Market C.A.</span>
+              {/* Shop Market Account Instructions with 1-Click Copy */}
+              <div className="p-4 rounded-2xl bg-muted/40 border border-border text-xs space-y-3">
+                <div className="font-bold text-foreground flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <QrCode className="w-4 h-4 text-primary" />
+                    <span>Datos de Pago {settings.business_name}</span>
+                  </div>
+                  <span className="text-[10px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full">
+                    {paymentMethod === "PAGO_MOVIL"
+                      ? "Bancamiga / Banesco"
+                      : paymentMethod === "BANK_TRANSFER"
+                      ? "Transferencia"
+                      : paymentMethod === "ZELLE"
+                      ? "Zelle USD"
+                      : "Efectivo"}
+                  </span>
                 </div>
+
                 {paymentMethod === "PAGO_MOVIL" && (
-                  <div className="text-muted-foreground leading-relaxed pt-1">
-                    <p><strong>Banco:</strong> Bancamiga (0172) o Banesco (0134)</p>
-                    <p><strong>Teléfono:</strong> 0424-5919577</p>
-                    <p><strong>RIF:</strong> J-50123456-7</p>
-                    <p className="text-primary font-bold mt-1">
-                      Monto exacto: Bs. {totalVes.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
-                    </p>
+                  <div className="space-y-2 pt-1">
+                    {/* Teléfono */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border">
+                      <div>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold block">
+                          Teléfono
+                        </span>
+                        <span className="font-mono font-bold text-xs text-foreground">
+                          0424-5919577
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy("04245919577", "phone")}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                          copiedField === "phone"
+                            ? "bg-emerald-600 text-white"
+                            : "bg-muted hover:bg-primary hover:text-primary-foreground text-foreground border border-border"
+                        }`}
+                      >
+                        {copiedField === "phone" ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>¡Copiado!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copiar</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* RIF */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border">
+                      <div>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold block">
+                          RIF / Cédula
+                        </span>
+                        <span className="font-mono font-bold text-xs text-foreground">
+                          J-50123456-7
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy("J501234567", "rif")}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                          copiedField === "rif"
+                            ? "bg-emerald-600 text-white"
+                            : "bg-muted hover:bg-primary hover:text-primary-foreground text-foreground border border-border"
+                        }`}
+                      >
+                        {copiedField === "rif" ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>¡Copiado!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copiar</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Monto exacto Bs */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-primary/10 border border-primary/30">
+                      <div>
+                        <span className="text-[10px] text-primary uppercase font-bold block">
+                          Monto exacto a transferir
+                        </span>
+                        <span className="font-mono font-black text-sm text-foreground">
+                          Bs.{" "}
+                          {totalVes.toLocaleString("es-VE", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleCopy(totalVes.toFixed(2), "amount_ves")
+                        }
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs ${
+                          copiedField === "amount_ves"
+                            ? "bg-emerald-600 text-white"
+                            : "bg-primary text-primary-foreground hover:bg-primary/90"
+                        }`}
+                      >
+                        {copiedField === "amount_ves" ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>¡Copiado!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copiar Monto</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 )}
+
                 {paymentMethod === "BANK_TRANSFER" && (
-                  <div className="text-muted-foreground leading-relaxed pt-1">
-                    <p><strong>Banco:</strong> Bancamiga Cta Corriente</p>
-                    <p><strong>N° Cuenta:</strong> 0172-0111-55-1100012345</p>
-                    <p><strong>Titular:</strong> Shop Market C.A.</p>
-                    <p className="text-primary font-bold mt-1">
-                      Monto: Bs. {totalVes.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
-                    </p>
+                  <div className="space-y-2 pt-1">
+                    {/* N° Cuenta */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border">
+                      <div>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold block">
+                          N° Cuenta Corriente (Bancamiga)
+                        </span>
+                        <span className="font-mono font-bold text-xs text-foreground">
+                          0172-0111-55-1100012345
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleCopy("01720111551100012345", "bank_account")
+                        }
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                          copiedField === "bank_account"
+                            ? "bg-emerald-600 text-white"
+                            : "bg-muted hover:bg-primary hover:text-primary-foreground text-foreground border border-border"
+                        }`}
+                      >
+                        {copiedField === "bank_account" ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>¡Copiado!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copiar</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* RIF */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border">
+                      <div>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold block">
+                          RIF / Titular
+                        </span>
+                        <span className="font-mono font-bold text-xs text-foreground">
+                          J-50123456-7 (Shop Market C.A.)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy("J501234567", "bank_rif")}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                          copiedField === "bank_rif"
+                            ? "bg-emerald-600 text-white"
+                            : "bg-muted hover:bg-primary hover:text-primary-foreground text-foreground border border-border"
+                        }`}
+                      >
+                        {copiedField === "bank_rif" ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>¡Copiado!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copiar</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Monto exacto Bs */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-primary/10 border border-primary/30">
+                      <div>
+                        <span className="text-[10px] text-primary uppercase font-bold block">
+                          Monto a transferir
+                        </span>
+                        <span className="font-mono font-black text-sm text-foreground">
+                          Bs.{" "}
+                          {totalVes.toLocaleString("es-VE", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleCopy(totalVes.toFixed(2), "bank_amount")
+                        }
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs ${
+                          copiedField === "bank_amount"
+                            ? "bg-emerald-600 text-white"
+                            : "bg-primary text-primary-foreground hover:bg-primary/90"
+                        }`}
+                      >
+                        {copiedField === "bank_amount" ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>¡Copiado!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copiar Monto</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 )}
+
                 {paymentMethod === "ZELLE" && (
-                  <div className="text-muted-foreground leading-relaxed pt-1">
-                    <p><strong>Zelle:</strong> shopmarketca@gmail.com</p>
-                    <p><strong>Titular:</strong> Shop Market C.A.</p>
-                    <p className="text-primary font-bold mt-1">
-                      Monto exacto: {formatCurrency(totalUsd, "USD")}
-                    </p>
+                  <div className="space-y-2 pt-1">
+                    {/* Correo Zelle */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border">
+                      <div>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold block">
+                          Correo Zelle
+                        </span>
+                        <span className="font-mono font-bold text-xs text-foreground">
+                          shopmarketca@gmail.com
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleCopy("shopmarketca@gmail.com", "zelle_email")
+                        }
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                          copiedField === "zelle_email"
+                            ? "bg-emerald-600 text-white"
+                            : "bg-muted hover:bg-primary hover:text-primary-foreground text-foreground border border-border"
+                        }`}
+                      >
+                        {copiedField === "zelle_email" ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>¡Copiado!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copiar</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Titular */}
+                    <div className="p-2.5 rounded-xl bg-background border border-border">
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">
+                        Titular de la Cuenta
+                      </span>
+                      <span className="font-bold text-xs text-foreground">
+                        Shop Market C.A.
+                      </span>
+                    </div>
+
+                    {/* Monto exacto USD */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-primary/10 border border-primary/30">
+                      <div>
+                        <span className="text-[10px] text-primary uppercase font-bold block">
+                          Monto exacto USD
+                        </span>
+                        <span className="font-mono font-black text-sm text-foreground">
+                          {formatCurrency(totalUsd, "USD")}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleCopy(totalUsd.toFixed(2), "zelle_amount")
+                        }
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs ${
+                          copiedField === "zelle_amount"
+                            ? "bg-emerald-600 text-white"
+                            : "bg-primary text-primary-foreground hover:bg-primary/90"
+                        }`}
+                      >
+                        {copiedField === "zelle_amount" ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>¡Copiado!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copiar Monto</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 )}
+
                 {paymentMethod === "CASH_USD" && (
-                  <div className="text-muted-foreground leading-relaxed pt-1">
-                    <p>Pagas en efectivo al momento del retiro en tienda o al repartidor del delivery.</p>
+                  <div className="text-muted-foreground leading-relaxed pt-1 p-3 rounded-xl bg-background border border-border">
+                    <p className="font-semibold text-foreground">
+                      💵 Pago contra entrega en efectivo:
+                    </p>
+                    <p className="mt-1 text-[11px]">
+                      Pagas el monto exacto en dólares o bolívares al momento de
+                      retirar tu pedido en tienda o cuando el repartidor llegue a
+                      tu domicilio.
+                    </p>
                   </div>
                 )}
               </div>
@@ -614,9 +955,10 @@ export function CheckoutDialog({
                 <button
                   type="button"
                   onClick={() => setStep("DETAILS")}
-                  className="w-1/3 h-11 rounded-xl border border-border text-foreground text-xs font-semibold hover:bg-muted"
+                  className="w-1/3 h-11 rounded-xl border border-border text-foreground text-xs font-bold hover:bg-muted flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  Atrás
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Atrás</span>
                 </button>
 
                 <button

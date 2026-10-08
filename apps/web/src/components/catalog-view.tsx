@@ -10,12 +10,23 @@ import {
   Order,
   DeliveryZone,
 } from "@marketos/types";
+import { formatCurrency, convertUsdToVes } from "@marketos/utils";
+import { useCart } from "../context/cart-context";
 import { ProductCard } from "./product-card";
 import { CartDrawer } from "./cart-drawer";
 import { CheckoutDialog } from "./checkout-dialog";
 import { OrderSuccessModal } from "./order-success-modal";
 import { OrderTrackerModal } from "./order-tracker-modal";
-import { Search, SlidersHorizontal, Sparkles, Tag, Truck } from "lucide-react";
+import {
+  Search,
+  SlidersHorizontal,
+  Sparkles,
+  Tag,
+  Truck,
+  ShoppingBag,
+  ArrowRight,
+  RotateCcw,
+} from "lucide-react";
 
 interface CatalogViewProps {
   categories: Category[];
@@ -38,6 +49,9 @@ export function CatalogView({
   isTrackerOpen,
   setIsTrackerOpen,
 }: CatalogViewProps) {
+  const { totalItems, totalUsd, setIsOpen } = useCart();
+  const totalVes = convertUsdToVes(totalUsd, exchangeRate.value);
+
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -51,65 +65,77 @@ export function CatalogView({
       const matchesSearch =
         !searchQuery.trim() ||
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (product.sku && product.sku.toLowerCase().includes(searchQuery.toLowerCase()));
+        (product.sku &&
+          product.sku.toLowerCase().includes(searchQuery.toLowerCase()));
       return matchesCategory && matchesSearch;
     });
   }, [products, selectedCategory, searchQuery]);
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* Search and Category Bar */}
-      <div className="bg-background border-b border-border sticky top-[97px] z-20 shadow-sm/50">
+    <div
+      className={`min-h-screen bg-background transition-all ${
+        totalItems > 0 ? "pb-32 sm:pb-24" : "pb-20"
+      }`}
+    >
+      {/* Search and Category Bar - Sticky under StoreHeader */}
+      <div className="bg-background/95 backdrop-blur border-b border-border sticky top-[97px] z-20 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 py-3 space-y-3">
           {/* Search Input */}
           <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <input
               type="text"
               placeholder="Buscar productos (ej. Harina, Queso, Café, Coca-Cola)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-11 pl-10 pr-4 rounded-xl border border-input bg-muted/40 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-colors"
+              className="w-full h-11 pl-10 pr-16 rounded-xl border border-input bg-muted/30 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground hover:text-foreground px-2 py-1 rounded-md hover:bg-muted transition-colors cursor-pointer"
               >
                 Limpiar
               </button>
             )}
           </div>
 
-          {/* Horizontal Category Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-            <button
-              onClick={() => setSelectedCategory(null)}
-              className={`h-9 px-4 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-                selectedCategory === null
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`}
-            >
-              Todos los productos ({products.length})
-            </button>
+          {/* Horizontal Category Pills with Edge Scroll Hint */}
+          <div className="relative">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none no-scrollbar pr-6">
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className={`h-9 px-4 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  selectedCategory === null
+                    ? "bg-primary text-primary-foreground shadow-xs ring-2 ring-primary/20"
+                    : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                Todos ({products.length})
+              </button>
 
-            {categories.map((cat) => {
-              const count = products.filter((p) => p.category_id === cat.id).length;
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`h-9 px-4 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-                    selectedCategory === cat.id
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  }`}
-                >
-                  {cat.name} ({count})
-                </button>
-              );
-            })}
+              {categories.map((cat) => {
+                const count = products.filter(
+                  (p) => p.category_id === cat.id
+                ).length;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`h-9 px-4 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                      selectedCategory === cat.id
+                        ? "bg-primary text-primary-foreground shadow-xs ring-2 ring-primary/20"
+                        : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    {cat.name} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Subtle right fade hint for horizontal scroll */}
+            <div className="pointer-events-none absolute right-0 top-0 bottom-1 w-8 bg-gradient-to-l from-background to-transparent" />
           </div>
         </div>
       </div>
@@ -119,12 +145,12 @@ export function CatalogView({
         {/* Promotional Banner */}
         <div className="mb-5 p-3.5 rounded-2xl bg-gradient-to-r from-primary/10 via-amber-500/10 to-primary/5 border border-primary/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-xs">
               <Tag className="w-5 h-5" />
             </div>
             <div>
               <p className="text-xs font-black text-foreground">
-                🎉 Promociones Activas en Shop Market
+                🎉 Promociones Activas en {settings.business_name}
               </p>
               <p className="text-[11px] text-muted-foreground mt-0.5">
                 Usa <span className="font-mono font-bold text-primary">BIENVENIDO</span> para <strong>$2 OFF</strong> (&gt;$10) o <span className="font-mono font-bold text-primary">SHOP10</span> para <strong>10% OFF</strong> (&gt;$20).
@@ -132,35 +158,47 @@ export function CatalogView({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground/80 self-end sm:self-auto bg-background/80 px-2.5 py-1 rounded-lg border border-border">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-foreground/90 self-end sm:self-auto bg-background/80 px-3 py-1.5 rounded-xl border border-border shadow-2xs">
             <Truck className="w-3.5 h-3.5 text-primary shrink-0" />
             <span>Delivery gratis en Nueva Segovia</span>
           </div>
         </div>
 
+        {/* Section Heading */}
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-bold tracking-tight text-foreground flex items-center gap-1.5">
+          <h2 className="text-sm font-black tracking-tight text-foreground flex items-center gap-1.5">
             <Sparkles className="w-4 h-4 text-primary" />
             <span>
               {selectedCategory
                 ? categories.find((c) => c.id === selectedCategory)?.name
                 : "Catálogo Disponible"}
             </span>
-            <span className="text-xs text-muted-foreground font-normal">
+            <span className="text-xs text-muted-foreground font-semibold">
               ({filteredProducts.length} productos)
             </span>
           </h2>
         </div>
 
+        {/* Products Grid or Empty State */}
         {filteredProducts.length === 0 ? (
-          <div className="p-12 text-center rounded-2xl border border-dashed border-border bg-card">
-            <SlidersHorizontal className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-50" />
-            <p className="font-semibold text-foreground text-sm">
+          <div className="p-12 text-center rounded-2xl border border-dashed border-border bg-card/60">
+            <SlidersHorizontal className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-40" />
+            <p className="font-bold text-foreground text-sm">
               No se encontraron productos
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
               Prueba con otro término de búsqueda o selecciona otra categoría.
             </p>
+            <button
+              onClick={() => {
+                setSearchQuery("");
+                setSelectedCategory(null);
+              }}
+              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-transform active:scale-95 cursor-pointer shadow-xs"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Ver todos los productos</span>
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
@@ -174,6 +212,43 @@ export function CatalogView({
           </div>
         )}
       </main>
+
+      {/* Sticky Mobile Bottom Cart Bar (Thumb-Zone Ergonomics) */}
+      {totalItems > 0 && (
+        <div className="fixed bottom-4 inset-x-4 z-40 sm:hidden animate-in slide-in-from-bottom-5 duration-200">
+          <button
+            type="button"
+            onClick={() => setIsOpen(true)}
+            className="w-full bg-primary text-primary-foreground p-3.5 rounded-2xl shadow-2xl flex items-center justify-between border border-primary/30 active:scale-[0.99] transition-transform cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center relative shadow-xs">
+                <ShoppingBag className="w-5 h-5 text-white" />
+                <span className="absolute -top-1 -right-1 bg-amber-500 text-white font-black text-[10px] w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
+                  {totalItems}
+                </span>
+              </div>
+              <div className="text-left">
+                <p className="text-xs font-black leading-tight text-white">
+                  {totalItems} {totalItems === 1 ? "producto" : "productos"} en carrito
+                </p>
+                <p className="text-[11px] font-bold text-white/90">
+                  {formatCurrency(totalUsd, "USD")} • Bs.{" "}
+                  {totalVes.toLocaleString("es-VE", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-white text-primary px-3 py-1.5 rounded-xl font-black text-xs shadow-xs">
+              <span>Ver Carrito</span>
+              <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+            </div>
+          </button>
+        </div>
+      )}
 
       {/* Persistent Cart Drawer */}
       <CartDrawer
