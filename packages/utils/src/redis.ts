@@ -24,18 +24,26 @@ export function getRedisClient(): Redis | null {
   }
 }
 
+async function runWithTimeout<T>(promise: Promise<T>, ms = 800): Promise<T> {
+  let timer: NodeJS.Timeout;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
+}
+
 /**
- * Get cached value from Upstash Redis
+ * Get cached value from Upstash Redis (with 800ms fail-fast protection)
  */
 export async function cacheGet<T>(key: string): Promise<T | null> {
   const redis = getRedisClient();
   if (!redis) return null;
 
   try {
-    const data = await redis.get<T>(key);
+    const data = await runWithTimeout(redis.get<T>(key), 800);
     return data;
   } catch (e) {
-    console.warn(`[Redis Cache] Error getting key ${key}:`, e);
+    console.warn(`[Redis Cache] Skipped key ${key} (${e instanceof Error ? e.message : e})`);
     return null;
   }
 }
@@ -52,8 +60,8 @@ export async function cacheSet(
   if (!redis) return;
 
   try {
-    await redis.set(key, value, { ex: ttlSeconds });
+    await runWithTimeout(redis.set(key, value, { ex: ttlSeconds }), 800);
   } catch (e) {
-    console.warn(`[Redis Cache] Error setting key ${key}:`, e);
+    console.warn(`[Redis Cache] Write skipped for ${key} (${e instanceof Error ? e.message : e})`);
   }
 }

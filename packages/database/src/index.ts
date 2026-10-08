@@ -38,6 +38,7 @@ export function createSupabaseAdminClient(
 
 export * from "./client";
 export * from "./server";
+export * from "./circuit-breaker";
 export * from "./services";
 export * from "./mock-data";
 export * from "@marketos/types";

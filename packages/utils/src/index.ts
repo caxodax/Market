@@ -72,14 +72,18 @@ export async function fetchBcvRate(): Promise<{
     console.warn("[Redis Cache] Error checking BCV rate cache:", e);
   }
 
-  // 2. Fetch from bcv.today API
+  // 2. Fetch from bcv.today API with 2.5s fast abort timeout
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+
     const res = await fetch(BCV_API_URL, {
+      signal: controller.signal,
       headers: {
         Accept: "application/json",
       },
       ...({ next: { revalidate: 3600 } } as RequestInit),
-    });
+    }).finally(() => clearTimeout(timeoutId));
 
     if (!res.ok) {
       throw new Error(`Failed to fetch BCV rates: HTTP ${res.status}`);
@@ -101,17 +105,22 @@ export async function fetchBcvRate(): Promise<{
       timestamp: data.updated_at || new Date().toISOString(),
     };
 
-    // 3. Cache in Upstash Redis for 1 hour
-    try {
-      await cacheSet(CACHE_KEY, result, 3600);
-    } catch (e) {
-      console.warn("[Redis Cache] Error storing BCV rate:", e);
-    }
+    // 3. Cache in Upstash Redis asynchronously
+    cacheSet(CACHE_KEY, result, 3600).catch((e) =>
+      console.warn("[Redis Cache] Error storing BCV rate:", e)
+    );
 
     return result;
   } catch (error) {
-    console.error("[BCV_SYNC_ERROR] Error fetching rate from bcv.today:", error);
-    throw error;
+    console.warn(
+      "[BCV_SYNC_FALLBACK] External BCV API unreachable or timed out, using fallback rate:",
+      error instanceof Error ? error.message : error
+    );
+    return {
+      usdRate: 872.39,
+      source: "BCV_FALLBACK_OFFLINE",
+      timestamp: new Date().toISOString(),
+    };
   }
 }
 
