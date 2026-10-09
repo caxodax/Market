@@ -205,6 +205,18 @@ export interface Coupon {
   created_at?: string;
 }
 
+export interface CreateCouponInput {
+  tenantId: string;
+  code: string;
+  description?: string;
+  discountType: DiscountType;
+  discountValue: number;
+  minOrderAmountUsd?: number;
+  maxDiscountUsd?: number;
+  usageLimit?: number;
+  expiresAt?: string | null;
+}
+
 export interface Driver {
   id: string;
   tenant_id: string;

@@ -12,6 +12,7 @@ import {
   PaymentStatus,
   DeliveryZone,
   Coupon,
+  CreateCouponInput,
   Driver,
   Customer,
   CustomerAddress,
@@ -774,6 +775,18 @@ export class MarketOSRepository {
       };
     }
 
+    if (coupon.expires_at) {
+      const expiry = new Date(coupon.expires_at).getTime();
+      if (!isNaN(expiry) && Date.now() > expiry) {
+        return {
+          valid: false,
+          coupon,
+          discountUsd: 0,
+          message: "Este cupón ha vencido",
+        };
+      }
+    }
+
     let discount = 0;
     if (coupon.discount_type === "FIXED_USD") {
       discount = Math.min(orderAmountUsd, coupon.discount_value);
@@ -792,6 +805,141 @@ export class MarketOSRepository {
       discountUsd: discount,
       message: `¡Cupón aplicado con éxito! -$${discount.toFixed(2)}`,
     };
+  }
+
+  /**
+   * Get all coupons for Tenant
+   */
+  static async getCoupons(tenantId: string): Promise<Coupon[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("coupons")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        return data as Coupon[];
+      }
+    }
+
+    return state.coupons
+      .filter((c) => c.tenant_id === tenantId)
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+  }
+
+  /**
+   * Create a new Coupon with discount amount & expiration date
+   */
+  static async createCoupon(input: CreateCouponInput): Promise<Coupon> {
+    const cleanCode = input.code.trim().toUpperCase();
+    const newCoupon: Coupon = {
+      id: `coupon-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      tenant_id: input.tenantId,
+      code: cleanCode,
+      description: input.description?.trim() || null,
+      discount_type: input.discountType,
+      discount_value: Number(input.discountValue),
+      min_order_amount_usd: Number(input.minOrderAmountUsd) || 0,
+      max_discount_usd: input.maxDiscountUsd ? Number(input.maxDiscountUsd) : null,
+      usage_limit: input.usageLimit ? Number(input.usageLimit) : null,
+      usage_count: 0,
+      is_active: true,
+      expires_at: input.expiresAt || null,
+      created_at: new Date().toISOString(),
+    };
+
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("coupons")
+        .insert({
+          tenant_id: newCoupon.tenant_id,
+          code: newCoupon.code,
+          description: newCoupon.description,
+          discount_type: newCoupon.discount_type,
+          discount_value: newCoupon.discount_value,
+          min_order_amount_usd: newCoupon.min_order_amount_usd,
+          max_discount_usd: newCoupon.max_discount_usd,
+          usage_limit: newCoupon.usage_limit,
+          usage_count: 0,
+          is_active: true,
+          expires_at: newCoupon.expires_at,
+        })
+        .select()
+        .single();
+
+      if (!error && data) {
+        newCoupon.id = data.id;
+      }
+    }
+
+    state.coupons.unshift(newCoupon);
+
+    try {
+      await MarketOSRepository.recordAuditLog({
+        tenantId: input.tenantId,
+        action: "CUPÓN_CREADO",
+        entity: "coupons",
+        entityId: newCoupon.id,
+        newData: {
+          code: newCoupon.code,
+          discount_type: newCoupon.discount_type,
+          discount_value: newCoupon.discount_value,
+          expires_at: newCoupon.expires_at,
+        },
+      });
+    } catch {}
+
+    return newCoupon;
+  }
+
+  /**
+   * Toggle Coupon active status
+   */
+  static async toggleCoupon(
+    tenantId: string,
+    couponId: string,
+    isActive: boolean
+  ): Promise<Coupon | null> {
+    const supabase = getSupabase();
+    if (supabase) {
+      await supabase
+        .from("coupons")
+        .update({ is_active: isActive })
+        .eq("id", couponId)
+        .eq("tenant_id", tenantId);
+    }
+
+    const c = state.coupons.find((cp) => cp.id === couponId && cp.tenant_id === tenantId);
+    if (c) {
+      c.is_active = isActive;
+      return c;
+    }
+    return null;
+  }
+
+  /**
+   * Delete Coupon
+   */
+  static async deleteCoupon(tenantId: string, couponId: string): Promise<boolean> {
+    const supabase = getSupabase();
+    if (supabase) {
+      await supabase
+        .from("coupons")
+        .delete()
+        .eq("id", couponId)
+        .eq("tenant_id", tenantId);
+    }
+
+    const idx = state.coupons.findIndex(
+      (cp) => cp.id === couponId && cp.tenant_id === tenantId
+    );
+    if (idx !== -1) {
+      state.coupons.splice(idx, 1);
+    }
+    return true;
   }
 
   /**

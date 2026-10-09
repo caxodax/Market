@@ -15,6 +15,7 @@ import {
   UserProfile,
   UserRole,
   RateHistoryItem,
+  Coupon,
 } from "@marketos/types";
 import {
   formatCurrency,
@@ -32,6 +33,7 @@ import { ProductModal } from "./product-modal";
 import { StaffModal, ROLE_LABELS } from "./staff-modal";
 import { ExchangeRateManager } from "./exchange-rate-manager";
 import { StoreSettingsTab } from "./store-settings-tab";
+import { CouponManager } from "./coupon-manager";
 import {
   PackageCheck,
   Boxes,
@@ -64,6 +66,9 @@ import {
   Sparkles,
   Landmark,
   Sliders,
+  Ticket,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 
 interface AdminDashboardProps {
@@ -79,6 +84,7 @@ interface AdminDashboardProps {
   auditLogs?: AuditLog[];
   currentUser?: UserProfile;
   staffMembers?: UserProfile[];
+  coupons?: Coupon[];
 }
 
 export function AdminDashboard({
@@ -94,9 +100,10 @@ export function AdminDashboard({
   auditLogs: initialAuditLogs = [],
   currentUser,
   staffMembers: initialStaffMembers = [],
+  coupons: initialCoupons = [],
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<
-    "PAYMENTS" | "ORDERS" | "INVENTORY" | "DELIVERY" | "RATES" | "AUDIT" | "STAFF" | "SETTINGS"
+    "PAYMENTS" | "ORDERS" | "INVENTORY" | "DELIVERY" | "COUPONS" | "RATES" | "AUDIT" | "STAFF" | "SETTINGS"
   >("PAYMENTS");
   const [settingsState, setSettingsState] = useState(settings);
   const [products, setProducts] = useState(initialProducts);
@@ -111,6 +118,7 @@ export function AdminDashboard({
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [syncingBcv, setSyncingBcv] = useState(false);
   const [bcvMessage, setBcvMessage] = useState<string | null>(null);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   // Modals state
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -285,6 +293,83 @@ export function AdminDashboard({
 
   const pendingPaymentsCount = payments.filter((p) => p.status === "PENDING").length;
 
+  const modulesList = [
+    {
+      id: "PAYMENTS" as const,
+      label: "Validación de Pagos",
+      description: "Pago Móvil, Zelle y transferencias",
+      icon: <FileCheck2 className="w-4 h-4" />,
+      badge: pendingPaymentsCount > 0 ? `${pendingPaymentsCount}` : null,
+      badgeClassName: "bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-black",
+    },
+    {
+      id: "ORDERS" as const,
+      label: `Gestión y Despacho (${orders.length})`,
+      description: "Estados, rutas y contacto WhatsApp",
+      icon: <PackageCheck className="w-4 h-4" />,
+      badge: orders.length > 0 ? `${orders.length}` : null,
+      badgeClassName: "bg-primary/10 text-primary text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+    },
+    {
+      id: "INVENTORY" as const,
+      label: `Inventario en Tienda (${products.length})`,
+      description: "Productos, precios y existencias",
+      icon: <Boxes className="w-4 h-4" />,
+      badge: `${products.length}`,
+      badgeClassName: "bg-muted text-muted-foreground text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+    },
+    {
+      id: "DELIVERY" as const,
+      label: "Delivery y Repartidores",
+      description: "Zonas, tarifas y motorizados",
+      icon: <Truck className="w-4 h-4" />,
+      badge: deliveryZones.length > 0 ? `${deliveryZones.length}` : null,
+      badgeClassName: "bg-blue-500/10 text-blue-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+    },
+    {
+      id: "COUPONS" as const,
+      label: `Cupones de Descuento (${initialCoupons.length})`,
+      description: "Descuentos en $ o % y fechas límite",
+      icon: <Ticket className="w-4 h-4" />,
+      badge: initialCoupons.length > 0 ? `${initialCoupons.length}` : null,
+      badgeClassName: "bg-purple-500/10 text-purple-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+    },
+    {
+      id: "RATES" as const,
+      label: `Tasas y Divisas (${ratesHistory.length})`,
+      description: "Monitor oficial BCV e histórico",
+      icon: <Landmark className="w-4 h-4" />,
+      badge: `Bs. ${rate.value.toFixed(2)}`,
+      badgeClassName: "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold",
+    },
+    {
+      id: "AUDIT" as const,
+      label: `Auditoría & Logs (${auditLogs.length})`,
+      description: "Registro cronológico inmutable",
+      icon: <History className="w-4 h-4" />,
+      badge: auditLogs.length > 0 ? `${auditLogs.length}` : null,
+      badgeClassName: "bg-muted text-muted-foreground text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+    },
+    {
+      id: "STAFF" as const,
+      label: `Equipo y Roles (${staff.length})`,
+      description: "Colaboradores y permisos RBAC",
+      icon: <ShieldCheck className="w-4 h-4" />,
+      badge: `${staff.length}`,
+      badgeClassName: "bg-emerald-500/10 text-emerald-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+    },
+    {
+      id: "SETTINGS" as const,
+      label: "Configuración & Marca",
+      description: "Dirección, cuentas, pagos y diseño",
+      icon: <Sliders className="w-4 h-4" />,
+      badge: "Tienda",
+      badgeClassName: "bg-primary/10 text-primary text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+    },
+  ];
+
+  const currentModule = modulesList.find((m) => m.id === activeTab) || modulesList[0];
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* Top Admin Header */}
@@ -457,108 +542,150 @@ export function AdminDashboard({
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex border-b border-border gap-2 overflow-x-auto pb-1">
+        {/* Mobile Navigation Selector (Zero horizontal scroll) */}
+        <div className="md:hidden relative">
           <button
-            onClick={() => setActiveTab("PAYMENTS")}
-            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === "PAYMENTS"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
+            type="button"
+            onClick={() => setIsMobileNavOpen((prev) => !prev)}
+            className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-primary/30 bg-primary/5 hover:bg-primary/10 active:scale-[0.99] transition-all text-left shadow-xs cursor-pointer"
           >
-            <FileCheck2 className="w-4 h-4" />
-            <span>Validación de Pagos</span>
-            {pendingPaymentsCount > 0 && (
-              <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-black">
-                {pendingPaymentsCount}
-              </span>
-            )}
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-xs">
+                {currentModule.icon}
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-primary">
+                  Módulo Activo
+                </div>
+                <div className="text-sm font-extrabold text-foreground truncate flex items-center gap-2">
+                  <span>{currentModule.label}</span>
+                  {currentModule.badge && (
+                    <span className={currentModule.badgeClassName}>
+                      {currentModule.badge}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0 pl-2">
+              <span className="text-xs font-bold text-primary">Cambiar</span>
+              <ChevronDown
+                className={`w-4 h-4 text-primary transition-transform duration-200 ${
+                  isMobileNavOpen ? "rotate-180" : ""
+                }`}
+              />
+            </div>
           </button>
 
-          <button
-            onClick={() => setActiveTab("ORDERS")}
-            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === "ORDERS"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <PackageCheck className="w-4 h-4" />
-            <span>Gestión y Despacho de Pedidos ({orders.length})</span>
-          </button>
+          {/* Mobile Dropdown Panel */}
+          {isMobileNavOpen && (
+            <>
+              <div
+                className="fixed inset-0 bg-black/40 z-40 backdrop-blur-xs"
+                onClick={() => setIsMobileNavOpen(false)}
+              />
+              <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-card border border-border rounded-2xl shadow-xl overflow-hidden divide-y divide-border/60 animate-in fade-in zoom-in-95 duration-150 max-h-[72vh] overflow-y-auto">
+                <div className="p-3 bg-muted/40 flex items-center justify-between sticky top-0 z-10 backdrop-blur">
+                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                    Selecciona un Módulo ({modulesList.length})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileNavOpen(false)}
+                    className="text-xs text-muted-foreground hover:text-foreground font-bold px-2 py-1 cursor-pointer"
+                  >
+                    Cerrar ✕
+                  </button>
+                </div>
 
-          <button
-            onClick={() => setActiveTab("INVENTORY")}
-            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === "INVENTORY"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Boxes className="w-4 h-4" />
-            <span>Inventario en Tienda ({products.length})</span>
-          </button>
+                <div className="p-1.5 space-y-1">
+                  {modulesList.map((mod) => (
+                    <button
+                      key={mod.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveTab(mod.id);
+                        setIsMobileNavOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between p-3 rounded-xl text-left transition-all cursor-pointer ${
+                        activeTab === mod.id
+                          ? "bg-primary text-primary-foreground font-bold shadow-xs"
+                          : "hover:bg-muted text-foreground"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                            activeTab === mod.id
+                              ? "bg-white/20 text-white"
+                              : "bg-muted text-foreground"
+                          }`}
+                        >
+                          {mod.icon}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold truncate">
+                            {mod.label}
+                          </div>
+                          <div
+                            className={`text-[11px] truncate ${
+                              activeTab === mod.id
+                                ? "text-primary-foreground/80"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {mod.description}
+                          </div>
+                        </div>
+                      </div>
 
-          <button
-            onClick={() => setActiveTab("DELIVERY")}
-            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === "DELIVERY"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Truck className="w-4 h-4" />
-            <span>Delivery y Repartidores</span>
-          </button>
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                        {mod.badge && (
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              activeTab === mod.id
+                                ? "bg-white text-primary"
+                                : mod.badgeClassName
+                            }`}
+                          >
+                            {mod.badge}
+                          </span>
+                        )}
+                        {activeTab === mod.id && (
+                          <Check className="w-4 h-4 text-white" />
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
 
-          <button
-            onClick={() => setActiveTab("RATES")}
-            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === "RATES"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Landmark className="w-4 h-4" />
-            <span>Tasas y Divisas ({ratesHistory.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("AUDIT")}
-            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === "AUDIT"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <History className="w-4 h-4" />
-            <span>Auditoría & Trazabilidad ({auditLogs.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("STAFF")}
-            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === "STAFF"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <ShieldCheck className="w-4 h-4" />
-            <span>Equipo y Roles ({staff.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("SETTINGS")}
-            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === "SETTINGS"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Sliders className="w-4 h-4" />
-            <span>Configuración & Marca</span>
-          </button>
+        {/* Desktop Navigation Tabs */}
+        <div className="hidden md:flex border-b border-border gap-1 overflow-x-auto pb-1">
+          {modulesList.map((mod) => (
+            <button
+              key={mod.id}
+              type="button"
+              onClick={() => setActiveTab(mod.id)}
+              className={`pb-3 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                activeTab === mod.id
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {mod.icon}
+              <span>{mod.label}</span>
+              {mod.badge && (
+                <span className={mod.badgeClassName}>
+                  {mod.badge}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
 
         {/* TAB 1: PAYMENTS VALIDATION */}
@@ -987,7 +1114,15 @@ export function AdminDashboard({
           </div>
         )}
 
-        {/* TAB 5: EXCHANGE RATES & HISTORICAL LOG */}
+        {/* TAB 5: DISCOUNT COUPONS */}
+        {activeTab === "COUPONS" && (
+          <CouponManager
+            tenantId={settings.tenant_id}
+            initialCoupons={initialCoupons}
+          />
+        )}
+
+        {/* TAB 6: EXCHANGE RATES & HISTORICAL LOG */}
         {activeTab === "RATES" && (
           <div className="space-y-4 animate-in fade-in">
             <ExchangeRateManager

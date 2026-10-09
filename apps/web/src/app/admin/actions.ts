@@ -1,7 +1,7 @@
 "use server";
 
 import { MarketOSRepository } from "@marketos/database";
-import { PaymentStatus, CreateProductInput, UpdateProductInput, InviteStaffInput, UserRole, TenantSettings } from "@marketos/types";
+import { PaymentStatus, CreateProductInput, UpdateProductInput, InviteStaffInput, UserRole, TenantSettings, CreateCouponInput, Coupon } from "@marketos/types";
 import { revalidatePath } from "next/cache";
 
 export async function reviewPaymentAction(
@@ -261,6 +261,64 @@ export async function updateTenantSettingsAction(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Error al guardar la configuración",
+    };
+  }
+}
+
+/**
+ * Create a new Discount Coupon with amount and expiration date
+ */
+export async function createCouponAction(input: CreateCouponInput) {
+  try {
+    const coupon = await MarketOSRepository.createCoupon(input);
+    revalidatePath("/admin");
+    revalidatePath("/");
+    return { success: true, coupon };
+  } catch (error) {
+    console.error("Error creating coupon:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al crear el cupón",
+    };
+  }
+}
+
+/**
+ * Toggle Coupon active/inactive
+ */
+export async function toggleCouponAction(
+  tenantId: string,
+  couponId: string,
+  isActive: boolean
+) {
+  try {
+    const updated = await MarketOSRepository.toggleCoupon(tenantId, couponId, isActive);
+    revalidatePath("/admin");
+    revalidatePath("/");
+    return { success: true, coupon: updated };
+  } catch (error) {
+    console.error("Error toggling coupon:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al actualizar estado del cupón",
+    };
+  }
+}
+
+/**
+ * Delete a Coupon
+ */
+export async function deleteCouponAction(tenantId: string, couponId: string) {
+  try {
+    await MarketOSRepository.deleteCoupon(tenantId, couponId);
+    revalidatePath("/admin");
+    revalidatePath("/");
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting coupon:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al eliminar el cupón",
     };
   }
 }

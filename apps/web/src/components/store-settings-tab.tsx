@@ -383,7 +383,7 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
         <button
           onClick={handleSaveAll}
           disabled={isSaving}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold shadow-md hover:bg-primary/90 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold shadow-md hover:bg-primary/90 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
         >
           {isSaving ? (
             <>
@@ -417,7 +417,7 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
       )}
 
       {/* Sub Navigation Tabs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 border-b border-border pb-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 border-b border-border pb-3">
         <button
           onClick={() => setActiveSubTab("GENERAL")}
           className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
