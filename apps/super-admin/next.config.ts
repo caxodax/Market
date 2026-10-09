@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
     "@marketos/types",
   ],
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",

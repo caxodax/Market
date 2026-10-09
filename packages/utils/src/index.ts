@@ -48,6 +48,7 @@ export function convertUsdToVes(priceUsd: number, exchangeRate: number): number 
  * Fetch official BCV Rate from https://bcv.today/api/ (Endpoint: /api/v1/rate.json)
  * Optimized with Upstash Redis cache (1 hour TTL)
  */
+export const ALCAMBIO_GRAPHQL_URL = "https://api.alcambio.app/graphql";
 export const BCV_API_URL = "https://bcv.today/api/v1/rate.json";
 
 export async function fetchBcvRate(): Promise<{
@@ -72,10 +73,76 @@ export async function fetchBcvRate(): Promise<{
     console.warn("[Redis Cache] Error checking BCV rate cache:", e);
   }
 
-  // 2. Fetch from bcv.today API with 2.5s fast abort timeout
+  // 2. Primary Source: AlCambio.app GraphQL API (Reliable & fast, same as KsaSport)
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+    const query = `
+      query getRates {
+        getCountryConversions(payload: { countryCode: "VE" }) {
+          dateBcv
+          conversionRates {
+            type
+            official
+            baseValue
+            rateCurrency {
+              code
+            }
+          }
+        }
+      }
+    `;
+
+    const res = await fetch(ALCAMBIO_GRAPHQL_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ query }),
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId));
+
+    if (res.ok) {
+      const json = await res.json();
+      const rates = json.data?.getCountryConversions?.conversionRates || [];
+      const officialUsd =
+        rates.find(
+          (r: any) =>
+            r.official === true &&
+            r.rateCurrency?.code === "USD" &&
+            (r.type === "SECONDARY" || r.type === "OTHER")
+        ) ||
+        rates.find(
+          (r: any) => r.official === true && r.rateCurrency?.code === "USD"
+        );
+
+      const usdRate = officialUsd ? Number(officialUsd.baseValue) : 0;
+      if (usdRate > 0) {
+        const result = {
+          usdRate: Number(usdRate.toFixed(4)),
+          source: "AlCambio (BCV Oficial)",
+          timestamp: new Date().toISOString(),
+        };
+
+        // Cache in Upstash Redis asynchronously
+        cacheSet(CACHE_KEY, result, 3600).catch(() => {});
+        return result;
+      }
+    }
+  } catch (err) {
+    console.warn(
+      "[AlCambio] Could not fetch rate, falling back to secondary source:",
+      err instanceof Error ? err.message : err
+    );
+  }
+
+  // 3. Secondary Backup: bcv.today API
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
 
     const res = await fetch(BCV_API_URL, {
       signal: controller.signal,
@@ -85,43 +152,33 @@ export async function fetchBcvRate(): Promise<{
       ...({ next: { revalidate: 3600 } } as RequestInit),
     }).finally(() => clearTimeout(timeoutId));
 
-    if (!res.ok) {
-      throw new Error(`Failed to fetch BCV rates: HTTP ${res.status}`);
+    if (res.ok) {
+      const data = await res.json();
+      const usdRate =
+        typeof data.USD === "number"
+          ? data.USD
+          : (data as BcvApiResponse).usd?.rate ?? 0;
+
+      if (usdRate > 0) {
+        const result = {
+          usdRate,
+          source: "bcv.today",
+          timestamp: data.updated_at || new Date().toISOString(),
+        };
+        cacheSet(CACHE_KEY, result, 3600).catch(() => {});
+        return result;
+      }
     }
-
-    const data = await res.json();
-    const usdRate =
-      typeof data.USD === "number"
-        ? data.USD
-        : (data as BcvApiResponse).usd?.rate ?? 0;
-
-    if (!usdRate || usdRate <= 0) {
-      throw new Error("Invalid USD rate returned from BCV API");
-    }
-
-    const result = {
-      usdRate,
-      source: "https://bcv.today/api/v1/rate.json",
-      timestamp: data.updated_at || new Date().toISOString(),
-    };
-
-    // 3. Cache in Upstash Redis asynchronously
-    cacheSet(CACHE_KEY, result, 3600).catch((e) =>
-      console.warn("[Redis Cache] Error storing BCV rate:", e)
-    );
-
-    return result;
-  } catch (error) {
-    console.warn(
-      "[BCV_SYNC_FALLBACK] External BCV API unreachable or timed out, using fallback rate:",
-      error instanceof Error ? error.message : error
-    );
-    return {
-      usdRate: 872.39,
-      source: "BCV_FALLBACK_OFFLINE",
-      timestamp: new Date().toISOString(),
-    };
+  } catch (err) {
+    // Silent fallback
   }
+
+  // 4. Safe Offline Fallback
+  return {
+    usdRate: 875.65,
+    source: "BCV_FALLBACK_OFFLINE",
+    timestamp: new Date().toISOString(),
+  };
 }
 
 /**

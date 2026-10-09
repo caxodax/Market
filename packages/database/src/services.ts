@@ -237,8 +237,8 @@ export class MarketOSRepository {
   }
 
   /**
-   * Get Exchange Rate for Tenant - Reads from Database / Redis
-   * Auto-refreshes if older than 2 hours or missing!
+   * Get Exchange Rate for Tenant - Reads strictly from Database / Local Seed
+   * Pure database read (0 network latency, 0 external API calls on user requests)
    */
   static async getExchangeRate(tenantId: string): Promise<ExchangeRate> {
     const supabase = getSupabase();
@@ -251,15 +251,6 @@ export class MarketOSRepository {
           .maybeSingle();
 
         if (!error && data) {
-          const lastUpdated = new Date(data.updated_at).getTime();
-          const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
-          const isStale = isNaN(lastUpdated) || lastUpdated < twoHoursAgo;
-
-          if (isStale) {
-            // Asynchronously trigger refresh to keep Supabase DB current (non-blocking)
-            MarketOSRepository.syncBcvRateFromApi(tenantId).catch(() => {});
-          }
-
           return {
             id: data.id,
             tenant_id: data.tenant_id,
@@ -268,9 +259,6 @@ export class MarketOSRepository {
             source: data.source,
             updated_at: data.updated_at,
           };
-        } else if (!data) {
-          // Asynchronously trigger refresh in background - NEVER block page render
-          MarketOSRepository.syncBcvRateFromApi(tenantId).catch(() => {});
         }
       } catch (err) {
         console.warn("[MarketOS] Exchange rate fetch error, using resilient fallback:", err);
@@ -281,7 +269,7 @@ export class MarketOSRepository {
       id: "rate-fallback",
       tenant_id: tenantId,
       currency: "VES",
-      value: 872.39,
+      value: 875.65,
       source: "BCV_OFICIAL",
       updated_at: new Date().toISOString(),
     };
