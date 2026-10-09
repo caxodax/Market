@@ -91,6 +91,10 @@ export async function fetchBcvRate(): Promise<{
             }
           }
         }
+        getBinanceP2PAverages {
+          sellAverage
+          buyAverage
+        }
       }
     `;
 
@@ -108,6 +112,8 @@ export async function fetchBcvRate(): Promise<{
     if (res.ok) {
       const json = await res.json();
       const rates = json.data?.getCountryConversions?.conversionRates || [];
+      const binance = json.data?.getBinanceP2PAverages;
+
       const officialUsd =
         rates.find(
           (r: any) =>
@@ -119,10 +125,34 @@ export async function fetchBcvRate(): Promise<{
           (r: any) => r.official === true && r.rateCurrency?.code === "USD"
         );
 
+      const officialEur =
+        rates.find(
+          (r: any) =>
+            r.official === true &&
+            r.rateCurrency?.code === "EUR" &&
+            (r.type === "SECONDARY" || r.type === "OTHER")
+        ) ||
+        rates.find(
+          (r: any) => r.rateCurrency?.code === "EUR"
+        );
+
+      let usdtRate: number | undefined = undefined;
+      if (binance?.buyAverage && binance?.sellAverage) {
+        const buy = Number(binance.buyAverage);
+        const sell = Number(binance.sellAverage);
+        if (!isNaN(buy) && !isNaN(sell) && buy > 0 && sell > 0) {
+          usdtRate = Number(((buy + sell) / 2).toFixed(4));
+        }
+      }
+
       const usdRate = officialUsd ? Number(officialUsd.baseValue) : 0;
+      const eurRate = officialEur ? Number(Number(officialEur.baseValue).toFixed(4)) : undefined;
+
       if (usdRate > 0) {
         const result = {
           usdRate: Number(usdRate.toFixed(4)),
+          eurRate,
+          usdtRate,
           source: "AlCambio (BCV Oficial)",
           timestamp: new Date().toISOString(),
         };

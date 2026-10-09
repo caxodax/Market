@@ -40,6 +40,7 @@ export default async function AdminPage() {
     drivers,
     auditLogs,
     staffMembers,
+    ratesHistory,
   ] = await Promise.all([
     MarketOSRepository.getTenantSettings(TENANT_ID),
     MarketOSRepository.getProducts(TENANT_ID),
@@ -51,6 +52,7 @@ export default async function AdminPage() {
     MarketOSRepository.getDrivers(TENANT_ID),
     MarketOSRepository.getAuditLogs(TENANT_ID),
     MarketOSRepository.getTenantStaff(TENANT_ID),
+    MarketOSRepository.getExchangeRateHistory(TENANT_ID, 40),
   ]);
 
   return (
@@ -61,6 +63,7 @@ export default async function AdminPage() {
       orders={orders}
       payments={payments}
       exchangeRate={exchangeRate}
+      ratesHistory={ratesHistory}
       deliveryZones={deliveryZones}
       drivers={drivers}
       auditLogs={auditLogs}

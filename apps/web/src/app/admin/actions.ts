@@ -210,3 +210,36 @@ export async function updateStaffRoleAction(
     };
   }
 }
+
+/**
+ * Save manual contingency exchange rate (USD, EUR, USDT)
+ */
+export async function saveManualRateAction(
+  tenantId: string,
+  data: {
+    date_rate: string;
+    usd_rate: number;
+    eur_rate?: number;
+    usdt_rate?: number;
+  }
+) {
+  try {
+    const updatedRate = await MarketOSRepository.saveManualExchangeRate(tenantId, {
+      date_rate: data.date_rate,
+      usd_rate: data.usd_rate,
+      eur_rate: data.eur_rate,
+      usdt_rate: data.usdt_rate,
+      source: "MANUAL",
+    });
+    revalidatePath("/admin");
+    revalidatePath("/platform");
+    revalidatePath("/");
+    return { success: true, rate: updatedRate };
+  } catch (error) {
+    console.error("Error saving manual rate:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al guardar tasa manual",
+    };
+  }
+}

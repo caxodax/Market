@@ -55,8 +55,22 @@ export interface ExchangeRate {
   tenant_id?: string | null; // null for system-wide fallback
   currency: CurrencyCode;
   value: number; // e.g. rate to USD (1 USD = X VES)
-  source: string; // e.g. "bcv.today" | "manual"
+  eur_value?: number;
+  usdt_value?: number;
+  source: string; // e.g. "bcv.today" | "alcambio" | "manual"
   updated_at: string;
+}
+
+export interface RateHistoryItem {
+  id?: string;
+  tenant_id?: string | null;
+  date_rate: string;
+  currency: string;
+  rate: number;
+  rate_eur?: number;
+  usdt_promedio?: number;
+  source: string;
+  created_at?: string;
 }
 
 export interface BcvApiResponse {

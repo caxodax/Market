@@ -6,6 +6,9 @@ import {
   TenantWithDetails,
   SubscriptionPlan,
   SubscriptionPlanTier,
+  ExchangeRate,
+  RateHistoryItem,
+  UserProfile,
 } from "@marketos/types";
 import { formatCurrency, slugify } from "@marketos/utils";
 import {
@@ -34,15 +37,18 @@ import {
   Server,
   Users,
   LogOut,
+  Landmark,
 } from "lucide-react";
-import { UserProfile } from "@marketos/types";
 import { logoutUserAction } from "../app/login/actions";
+import { ExchangeRateManager } from "./exchange-rate-manager";
 
 interface SuperAdminDashboardProps {
   metrics: PlatformMetrics;
   tenants: TenantWithDetails[];
   plans: SubscriptionPlan[];
   currentUser?: UserProfile;
+  exchangeRate?: ExchangeRate;
+  ratesHistory?: RateHistoryItem[];
 }
 
 export function SuperAdminDashboard({
@@ -50,7 +56,10 @@ export function SuperAdminDashboard({
   tenants: initialTenants,
   plans,
   currentUser,
+  exchangeRate,
+  ratesHistory = [],
 }: SuperAdminDashboardProps) {
+  const [activeTab, setActiveTab] = useState<"TENANTS" | "RATES">("TENANTS");
   const [tenants, setTenants] = useState<TenantWithDetails[]>(initialTenants);
   const [metrics, setMetrics] = useState<PlatformMetrics>(initialMetrics);
 
@@ -220,6 +229,20 @@ export function SuperAdminDashboard({
               </span>
             </div>
 
+            {exchangeRate && (
+              <button
+                onClick={() => setActiveTab("RATES")}
+                className="hidden sm:flex items-center gap-2 text-xs bg-muted/60 hover:bg-muted border border-border px-3 py-1.5 rounded-xl font-mono transition-colors cursor-pointer"
+                title="Monitor de tasas de cambio e histórico"
+              >
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                <span>BCV:</span>
+                <strong className="text-foreground">
+                  Bs. {exchangeRate.value.toFixed(2)}
+                </strong>
+              </button>
+            )}
+
             <button
               onClick={() => setIsOnboardingOpen(true)}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-transform active:scale-95 shadow-sm"
@@ -319,8 +342,38 @@ export function SuperAdminDashboard({
           </div>
         </div>
 
-        {/* Directory Controls */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card p-3 rounded-2xl border border-border">
+        {/* Navigation Tabs */}
+        <div className="flex border-b border-border gap-2 overflow-x-auto pb-1">
+          <button
+            onClick={() => setActiveTab("TENANTS")}
+            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === "TENANTS"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            <span>Comercios & Inquilinos ({tenants.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("RATES")}
+            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === "RATES"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Landmark className="w-4 h-4" />
+            <span>Tasas Globales e Histórico ({ratesHistory.length})</span>
+          </button>
+        </div>
+
+        {/* TAB 1: TENANTS DIRECTORY */}
+        {activeTab === "TENANTS" && (
+          <div className="space-y-6 animate-in fade-in">
+            {/* Directory Controls */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card p-3 rounded-2xl border border-border">
           {/* Search */}
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -560,7 +613,31 @@ export function SuperAdminDashboard({
             ))}
           </div>
         </div>
-      </main>
+      </div>
+    )}
+
+      {/* TAB 2: GLOBAL EXCHANGE RATES & AUDIT LEDGER */}
+      {activeTab === "RATES" && (
+        <div className="space-y-6 animate-in fade-in">
+          <ExchangeRateManager
+            tenantId="shop-market-ca"
+            initialRate={
+              exchangeRate || {
+                id: "rate-global",
+                currency: "VES",
+                value: 875.6505,
+                eur_value: 980.6147,
+                usdt_value: 1016.785,
+                source: "alcambio.app",
+                updated_at: new Date().toISOString(),
+              }
+            }
+            initialHistory={ratesHistory}
+            isSuperAdmin={true}
+          />
+        </div>
+      )}
+    </main>
 
       {/* Onboarding Wizard Modal */}
       {isOnboardingOpen && (

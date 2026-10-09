@@ -30,6 +30,7 @@ import {
   InviteStaffInput,
   UserProfile,
   UserRole,
+  RateHistoryItem,
 } from "@marketos/types";
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
 import { fetchBcvRate, convertUsdToVes } from "@marketos/utils";
@@ -256,6 +257,8 @@ export class MarketOSRepository {
             tenant_id: data.tenant_id,
             currency: data.currency,
             value: Number(data.value),
+            eur_value: data.eur_value ? Number(data.eur_value) : undefined,
+            usdt_value: data.usdt_value ? Number(data.usdt_value) : undefined,
             source: data.source,
             updated_at: data.updated_at,
           };
@@ -269,63 +272,147 @@ export class MarketOSRepository {
       id: "rate-fallback",
       tenant_id: tenantId,
       currency: "VES",
-      value: 875.65,
-      source: "BCV_OFICIAL",
+      value: 875.6505,
+      eur_value: 980.6147,
+      usdt_value: 1016.785,
+      source: "alcambio.app",
       updated_at: new Date().toISOString(),
     };
     return fallback;
   }
 
   /**
+   * Get Historical Exchange Rates (Daily ledger for accounting, audit and charts)
+   */
+  static async getExchangeRateHistory(
+    tenantId?: string,
+    limit: number = 30
+  ): Promise<RateHistoryItem[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        let query = supabase
+          .from("exchange_rate_history")
+          .select("*")
+          .order("date_rate", { ascending: false })
+          .limit(limit);
+
+        if (tenantId) {
+          query = query.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
+        }
+
+        const { data, error } = await query;
+        if (!error && data && data.length > 0) {
+          return data.map((item: any) => ({
+            id: item.id,
+            tenant_id: item.tenant_id,
+            date_rate: item.date_rate,
+            currency: item.currency || "USD",
+            rate: Number(item.rate),
+            rate_eur: item.rate_eur ? Number(item.rate_eur) : undefined,
+            usdt_promedio: item.usdt_promedio ? Number(item.usdt_promedio) : undefined,
+            source: item.source,
+            created_at: item.created_at,
+          }));
+        }
+      } catch (err) {
+        console.warn("[MarketOS] Error fetching exchange rate history from Supabase:", err);
+      }
+    }
+
+    // Fallback to in-memory history state
+    let history = [...state.rateHistory];
+    if (tenantId) {
+      history = history.filter((h) => !h.tenant_id || h.tenant_id === tenantId);
+    }
+    history.sort((a, b) => b.date_rate.localeCompare(a.date_rate));
+    return history.slice(0, limit);
+  }
+
+  /**
    * Synchronize Official BCV Rate from API into Supabase Database
-   * Executed via scheduled cron (e.g. daily at 5:00 PM) or manual Admin trigger
+   * Executed via scheduled cron (e.g. daily at 7:00 AM) or manual Admin trigger
    */
   static async syncBcvRateFromApi(tenantId: string): Promise<ExchangeRate> {
-    let bcv: { usdRate: number; source: string; timestamp: string };
+    let bcv: {
+      usdRate: number;
+      eurRate?: number;
+      usdtRate?: number;
+      source: string;
+      timestamp: string;
+    };
+
     try {
       bcv = await fetchBcvRate();
     } catch {
       bcv = {
-        usdRate: 872.39,
-        source: "BCV_OFICIAL",
+        usdRate: 875.6505,
+        eurRate: 980.6147,
+        usdtRate: 1016.785,
+        source: "alcambio.app",
         timestamp: new Date().toISOString(),
       };
     }
+
+    const todayDateStr = bcv.timestamp.split("T")[0];
     const supabase = getSupabase();
 
     if (supabase) {
       try {
+        // 1. Update active rate in exchange_rates
         const { data: existing } = await supabase
           .from("exchange_rates")
           .select("id")
           .eq("tenant_id", tenantId)
           .maybeSingle();
 
+        const ratePayload: any = {
+          value: bcv.usdRate,
+          source: bcv.source,
+          updated_at: bcv.timestamp,
+        };
+        if (bcv.eurRate) ratePayload.eur_value = bcv.eurRate;
+        if (bcv.usdtRate) ratePayload.usdt_value = bcv.usdtRate;
+
         if (existing) {
           await supabase
             .from("exchange_rates")
-            .update({
-              value: bcv.usdRate,
-              source: bcv.source,
-              updated_at: bcv.timestamp,
-            })
+            .update(ratePayload)
             .eq("id", existing.id);
         } else {
           await supabase.from("exchange_rates").insert({
             tenant_id: tenantId,
             currency: "VES",
-            value: bcv.usdRate,
-            source: bcv.source,
-            updated_at: bcv.timestamp,
+            ...ratePayload,
           });
         }
+
+        // 2. Upsert into exchange_rate_history
+        await supabase.from("exchange_rate_history").upsert(
+          {
+            tenant_id: tenantId,
+            date_rate: todayDateStr,
+            currency: "USD",
+            rate: bcv.usdRate,
+            rate_eur: bcv.eurRate,
+            usdt_promedio: bcv.usdtRate,
+            source: bcv.source,
+            created_at: bcv.timestamp,
+          },
+          { onConflict: "tenant_id,date_rate,currency" }
+        );
 
         await MarketOSRepository.recordAuditLog({
           tenantId,
           action: "BCV_RATE_SYNCED",
           entity: "exchange_rates",
           entityId: tenantId,
-          newData: { value: bcv.usdRate, timestamp: bcv.timestamp },
+          newData: {
+            value: bcv.usdRate,
+            eurRate: bcv.eurRate,
+            usdtRate: bcv.usdtRate,
+            timestamp: bcv.timestamp,
+          },
         });
       } catch (e) {
         console.warn("[MarketOS] Error updating exchange rate in Supabase:", e);
@@ -337,8 +424,132 @@ export class MarketOSRepository {
       tenant_id: tenantId,
       currency: "VES",
       value: bcv.usdRate,
+      eur_value: bcv.eurRate,
+      usdt_value: bcv.usdtRate,
       source: bcv.source,
       updated_at: bcv.timestamp,
+    };
+
+    // Update in-memory state
+    const existingIdx = state.rates.findIndex((r) => r.tenant_id === tenantId);
+    if (existingIdx >= 0) {
+      state.rates[existingIdx] = updatedRate;
+    } else {
+      state.rates.push(updatedRate);
+    }
+
+    // Update in-memory history
+    const existingHistIdx = state.rateHistory.findIndex(
+      (h) => h.tenant_id === tenantId && h.date_rate === todayDateStr
+    );
+    const historyItem: RateHistoryItem = {
+      id: `hist-${Date.now()}`,
+      tenant_id: tenantId,
+      date_rate: todayDateStr,
+      currency: "USD",
+      rate: bcv.usdRate,
+      rate_eur: bcv.eurRate,
+      usdt_promedio: bcv.usdtRate,
+      source: bcv.source,
+      created_at: bcv.timestamp,
+    };
+    if (existingHistIdx >= 0) {
+      state.rateHistory[existingHistIdx] = historyItem;
+    } else {
+      state.rateHistory.unshift(historyItem);
+    }
+
+    return updatedRate;
+  }
+
+  /**
+   * Save Manual Contingency Exchange Rate (Admin & Super Admin)
+   */
+  static async saveManualExchangeRate(
+    tenantId: string,
+    data: {
+      date_rate: string;
+      usd_rate: number;
+      eur_rate?: number;
+      usdt_rate?: number;
+      source?: string;
+    }
+  ): Promise<ExchangeRate> {
+    const source = data.source || "MANUAL";
+    const nowIso = new Date().toISOString();
+    const supabase = getSupabase();
+
+    if (supabase) {
+      try {
+        // 1. Update active rate in exchange_rates
+        const { data: existing } = await supabase
+          .from("exchange_rates")
+          .select("id")
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
+
+        const ratePayload: any = {
+          value: data.usd_rate,
+          source,
+          updated_at: nowIso,
+        };
+        if (data.eur_rate) ratePayload.eur_value = data.eur_rate;
+        if (data.usdt_rate) ratePayload.usdt_value = data.usdt_rate;
+
+        if (existing) {
+          await supabase
+            .from("exchange_rates")
+            .update(ratePayload)
+            .eq("id", existing.id);
+        } else {
+          await supabase.from("exchange_rates").insert({
+            tenant_id: tenantId,
+            currency: "VES",
+            ...ratePayload,
+          });
+        }
+
+        // 2. Upsert in exchange_rate_history
+        await supabase.from("exchange_rate_history").upsert(
+          {
+            tenant_id: tenantId,
+            date_rate: data.date_rate,
+            currency: "USD",
+            rate: data.usd_rate,
+            rate_eur: data.eur_rate,
+            usdt_promedio: data.usdt_rate,
+            source,
+            created_at: nowIso,
+          },
+          { onConflict: "tenant_id,date_rate,currency" }
+        );
+
+        await MarketOSRepository.recordAuditLog({
+          tenantId,
+          action: "MANUAL_RATE_SAVED",
+          entity: "exchange_rates",
+          entityId: tenantId,
+          newData: {
+            usd: data.usd_rate,
+            eur: data.eur_rate,
+            usdt: data.usdt_rate,
+            date: data.date_rate,
+          },
+        });
+      } catch (e) {
+        console.warn("[MarketOS] Error saving manual rate to Supabase:", e);
+      }
+    }
+
+    const updatedRate: ExchangeRate = {
+      id: `rate-${tenantId}`,
+      tenant_id: tenantId,
+      currency: "VES",
+      value: data.usd_rate,
+      eur_value: data.eur_rate,
+      usdt_value: data.usdt_rate,
+      source,
+      updated_at: nowIso,
     };
 
     const existingIdx = state.rates.findIndex((r) => r.tenant_id === tenantId);
@@ -346,6 +557,27 @@ export class MarketOSRepository {
       state.rates[existingIdx] = updatedRate;
     } else {
       state.rates.push(updatedRate);
+    }
+
+    // Add to history
+    const existingHistIdx = state.rateHistory.findIndex(
+      (h) => h.tenant_id === tenantId && h.date_rate === data.date_rate
+    );
+    const historyItem: RateHistoryItem = {
+      id: `hist-${Date.now()}`,
+      tenant_id: tenantId,
+      date_rate: data.date_rate,
+      currency: "USD",
+      rate: data.usd_rate,
+      rate_eur: data.eur_rate,
+      usdt_promedio: data.usdt_rate,
+      source,
+      created_at: nowIso,
+    };
+    if (existingHistIdx >= 0) {
+      state.rateHistory[existingHistIdx] = historyItem;
+    } else {
+      state.rateHistory.unshift(historyItem);
     }
 
     return updatedRate;

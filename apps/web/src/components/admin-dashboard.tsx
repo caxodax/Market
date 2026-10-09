@@ -14,6 +14,7 @@ import {
   AuditLog,
   UserProfile,
   UserRole,
+  RateHistoryItem,
 } from "@marketos/types";
 import {
   formatCurrency,
@@ -29,6 +30,7 @@ import {
 import { logoutUserAction } from "../app/login/actions";
 import { ProductModal } from "./product-modal";
 import { StaffModal, ROLE_LABELS } from "./staff-modal";
+import { ExchangeRateManager } from "./exchange-rate-manager";
 import {
   PackageCheck,
   Boxes,
@@ -59,6 +61,7 @@ import {
   Pencil,
   Image as ImageIcon,
   Sparkles,
+  Landmark,
 } from "lucide-react";
 
 interface AdminDashboardProps {
@@ -68,6 +71,7 @@ interface AdminDashboardProps {
   orders: Order[];
   payments: PaymentProof[];
   exchangeRate: ExchangeRate;
+  ratesHistory?: RateHistoryItem[];
   deliveryZones: DeliveryZone[];
   drivers: Driver[];
   auditLogs?: AuditLog[];
@@ -82,6 +86,7 @@ export function AdminDashboard({
   orders: initialOrders,
   payments: initialPayments,
   exchangeRate: initialRate,
+  ratesHistory = [],
   deliveryZones,
   drivers,
   auditLogs: initialAuditLogs = [],
@@ -89,7 +94,7 @@ export function AdminDashboard({
   staffMembers: initialStaffMembers = [],
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<
-    "PAYMENTS" | "ORDERS" | "INVENTORY" | "DELIVERY" | "AUDIT" | "STAFF"
+    "PAYMENTS" | "ORDERS" | "INVENTORY" | "DELIVERY" | "RATES" | "AUDIT" | "STAFF"
   >("PAYMENTS");
   const [products, setProducts] = useState(initialProducts);
   const [orders, setOrders] = useState(initialOrders);
@@ -302,13 +307,17 @@ export function AdminDashboard({
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 text-xs bg-muted/60 border border-border px-3 py-1.5 rounded-xl font-mono">
+            <button
+              onClick={() => setActiveTab("RATES")}
+              className="hidden sm:flex items-center gap-2 text-xs bg-muted/60 hover:bg-muted border border-border px-3 py-1.5 rounded-xl font-mono transition-colors cursor-pointer"
+              title="Clic para ver monitor de tasas e histórico"
+            >
               <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
               <span>BCV BD:</span>
               <strong className="text-foreground">
                 Bs. {rate.value.toFixed(2)}/USD
               </strong>
-            </div>
+            </button>
 
             <button
               onClick={() => {
@@ -490,6 +499,18 @@ export function AdminDashboard({
           >
             <Truck className="w-4 h-4" />
             <span>Delivery y Repartidores</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("RATES")}
+            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === "RATES"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Landmark className="w-4 h-4" />
+            <span>Tasas y Divisas ({ratesHistory.length})</span>
           </button>
 
           <button
@@ -943,7 +964,18 @@ export function AdminDashboard({
           </div>
         )}
 
-        {/* TAB 5: AUDIT LOGS & TRACEABILITY */}
+        {/* TAB 5: EXCHANGE RATES & HISTORICAL LOG */}
+        {activeTab === "RATES" && (
+          <div className="space-y-4 animate-in fade-in">
+            <ExchangeRateManager
+              tenantId={settings.tenant_id}
+              initialRate={rate}
+              initialHistory={ratesHistory}
+            />
+          </div>
+        )}
+
+        {/* TAB 6: AUDIT LOGS & TRACEABILITY */}
         {activeTab === "AUDIT" && (
           <div className="space-y-4 animate-in fade-in">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
