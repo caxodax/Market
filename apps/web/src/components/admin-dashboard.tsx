@@ -297,6 +297,7 @@ export function AdminDashboard({
     {
       id: "PAYMENTS" as const,
       label: "Validación de Pagos",
+      shortLabel: "Pagos",
       description: "Pago Móvil, Zelle y transferencias",
       icon: <FileCheck2 className="w-4 h-4" />,
       badge: pendingPaymentsCount > 0 ? `${pendingPaymentsCount}` : null,
@@ -305,6 +306,7 @@ export function AdminDashboard({
     {
       id: "ORDERS" as const,
       label: `Gestión y Despacho (${orders.length})`,
+      shortLabel: `Pedidos (${orders.length})`,
       description: "Estados, rutas y contacto WhatsApp",
       icon: <PackageCheck className="w-4 h-4" />,
       badge: orders.length > 0 ? `${orders.length}` : null,
@@ -313,6 +315,7 @@ export function AdminDashboard({
     {
       id: "INVENTORY" as const,
       label: `Inventario en Tienda (${products.length})`,
+      shortLabel: `Inventario (${products.length})`,
       description: "Productos, precios y existencias",
       icon: <Boxes className="w-4 h-4" />,
       badge: `${products.length}`,
@@ -321,6 +324,7 @@ export function AdminDashboard({
     {
       id: "DELIVERY" as const,
       label: "Delivery y Repartidores",
+      shortLabel: "Delivery",
       description: "Zonas, tarifas y motorizados",
       icon: <Truck className="w-4 h-4" />,
       badge: deliveryZones.length > 0 ? `${deliveryZones.length}` : null,
@@ -329,6 +333,7 @@ export function AdminDashboard({
     {
       id: "COUPONS" as const,
       label: `Cupones de Descuento (${initialCoupons.length})`,
+      shortLabel: `Cupones (${initialCoupons.length})`,
       description: "Descuentos en $ o % y fechas límite",
       icon: <Ticket className="w-4 h-4" />,
       badge: initialCoupons.length > 0 ? `${initialCoupons.length}` : null,
@@ -337,6 +342,7 @@ export function AdminDashboard({
     {
       id: "RATES" as const,
       label: `Tasas y Divisas (${ratesHistory.length})`,
+      shortLabel: "Tasas & BCV",
       description: "Monitor oficial BCV e histórico",
       icon: <Landmark className="w-4 h-4" />,
       badge: `Bs. ${rate.value.toFixed(2)}`,
@@ -345,6 +351,7 @@ export function AdminDashboard({
     {
       id: "AUDIT" as const,
       label: `Auditoría & Logs (${auditLogs.length})`,
+      shortLabel: `Auditoría (${auditLogs.length})`,
       description: "Registro cronológico inmutable",
       icon: <History className="w-4 h-4" />,
       badge: auditLogs.length > 0 ? `${auditLogs.length}` : null,
@@ -353,6 +360,7 @@ export function AdminDashboard({
     {
       id: "STAFF" as const,
       label: `Equipo y Roles (${staff.length})`,
+      shortLabel: `Equipo (${staff.length})`,
       description: "Colaboradores y permisos RBAC",
       icon: <ShieldCheck className="w-4 h-4" />,
       badge: `${staff.length}`,
@@ -361,6 +369,7 @@ export function AdminDashboard({
     {
       id: "SETTINGS" as const,
       label: "Configuración & Marca",
+      shortLabel: "Ajustes",
       description: "Dirección, cuentas, pagos y diseño",
       icon: <Sliders className="w-4 h-4" />,
       badge: "Tienda",
@@ -371,47 +380,47 @@ export function AdminDashboard({
   const currentModule = modulesList.find((m) => m.id === activeTab) || modulesList[0];
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="min-h-screen bg-background text-foreground flex flex-col w-full max-w-full overflow-x-hidden">
       {/* Top Admin Header */}
-      <header className="border-b border-border bg-card/60 backdrop-blur sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <header className="border-b border-border bg-card/60 backdrop-blur sticky top-0 z-30 w-full overflow-x-hidden">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 h-16 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             {settingsState.logo_url ? (
               <img
                 src={settingsState.logo_url}
                 alt={settingsState.business_name}
-                className="h-10 w-10 object-contain rounded-xl bg-card border border-border p-0.5 shadow-xs"
+                className="h-9 w-9 sm:h-10 sm:w-10 object-contain rounded-xl bg-card border border-border p-0.5 shadow-xs shrink-0"
               />
             ) : (
-              <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-black text-xl shadow-sm tracking-tighter">
+              <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-black text-lg sm:text-xl shadow-sm tracking-tighter shrink-0">
                 {settingsState.business_name ? settingsState.business_name.substring(0, 2).toUpperCase() : "SM"}
               </div>
             )}
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-extrabold text-base tracking-tight text-foreground">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h1 className="font-extrabold text-sm sm:text-base tracking-tight text-foreground truncate">
                   {settingsState.business_name}
                 </h1>
-                <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                  Tenant Admin
+                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded-full shrink-0">
+                  Tenant
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground truncate max-w-[280px]">
+              <p className="text-[11px] sm:text-xs text-muted-foreground truncate max-w-[150px] sm:max-w-[260px] md:max-w-[340px]">
                 {settingsState.address || "Sucursal Nueva Segovia • Barquisimeto"}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             <button
               onClick={() => setActiveTab("RATES")}
-              className="hidden sm:flex items-center gap-2 text-xs bg-muted/60 hover:bg-muted border border-border px-3 py-1.5 rounded-xl font-mono transition-colors cursor-pointer"
+              className="hidden lg:flex items-center gap-1.5 text-xs bg-muted/60 hover:bg-muted border border-border px-2.5 py-1.5 rounded-xl font-mono transition-colors cursor-pointer"
               title="Clic para ver monitor de tasas e histórico"
             >
               <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
-              <span>BCV BD:</span>
+              <span>BCV:</span>
               <strong className="text-foreground">
-                Bs. {rate.value.toFixed(2)}/USD
+                Bs. {rate.value.toFixed(2)}
               </strong>
             </button>
 
@@ -421,7 +430,7 @@ export function AdminDashboard({
                 setSoundEnabled(next);
                 if (next) playChime();
               }}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${
                 soundEnabled
                   ? "bg-primary/10 border-primary/30 text-primary"
                   : "bg-muted border-border text-muted-foreground"
@@ -431,12 +440,12 @@ export function AdminDashboard({
               {soundEnabled ? (
                 <>
                   <Volume2 className="w-3.5 h-3.5 text-primary" />
-                  <span className="hidden sm:inline">Sonido Activo</span>
+                  <span className="hidden xl:inline">Sonido</span>
                 </>
               ) : (
                 <>
                   <VolumeX className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Silenciado</span>
+                  <span className="hidden xl:inline">Silenciado</span>
                 </>
               )}
             </button>
@@ -444,21 +453,21 @@ export function AdminDashboard({
             <button
               onClick={handleSyncBcv}
               disabled={syncingBcv}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary text-secondary-foreground text-xs font-semibold hover:bg-secondary/80 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-secondary text-secondary-foreground text-xs font-semibold hover:bg-secondary/80 transition-colors disabled:opacity-50"
               title="Sincronizar tasa oficial del BCV desde la API a la base de datos"
             >
               <RefreshCw
                 className={`w-3.5 h-3.5 ${syncingBcv ? "animate-spin" : ""}`}
               />
-              <span className="hidden sm:inline">
-                {syncingBcv ? "Sincronizando..." : "Sincronizar BCV"}
+              <span className="hidden xl:inline">
+                {syncingBcv ? "Sincronizando..." : "Sincronizar"}
               </span>
             </button>
 
             {currentUser && (
-              <div className="flex items-center gap-2 pl-3 border-l border-border">
-                <div className="hidden lg:flex flex-col text-right">
-                  <span className="text-xs font-bold text-foreground truncate max-w-[140px]">
+              <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-border">
+                <div className="hidden 2xl:flex flex-col text-right">
+                  <span className="text-xs font-bold text-foreground truncate max-w-[120px]">
                     {currentUser.full_name}
                   </span>
                   <span className="text-[10px] text-muted-foreground font-mono">
@@ -467,7 +476,7 @@ export function AdminDashboard({
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive text-xs font-semibold hover:bg-destructive/20 transition-all cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive text-xs font-semibold hover:bg-destructive/20 transition-all cursor-pointer"
                   title="Cerrar sesión"
                 >
                   <LogOut className="w-3.5 h-3.5" />
@@ -479,16 +488,16 @@ export function AdminDashboard({
         </div>
 
         {bcvMessage && (
-          <div className="bg-emerald-500/10 border-t border-emerald-500/20 py-1 text-center text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+          <div className="bg-emerald-500/10 border-t border-emerald-500/20 py-1 text-center text-xs text-emerald-600 dark:text-emerald-400 font-medium px-4">
             {bcvMessage}
           </div>
         )}
       </header>
 
       {/* Main Body */}
-      <main className="max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-6">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 flex-1 w-full space-y-5 overflow-x-hidden">
         {/* KPI Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 w-full">
           <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">
             <div className="flex items-center justify-between text-muted-foreground mb-1">
               <span className="text-xs font-semibold">Validaciones Pendientes</span>
@@ -542,8 +551,8 @@ export function AdminDashboard({
           </div>
         </div>
 
-        {/* Mobile Navigation Selector (Zero horizontal scroll) */}
-        <div className="md:hidden relative">
+        {/* Mobile & Tablet Navigation Selector (Zero horizontal scroll) */}
+        <div className="xl:hidden relative w-full">
           <button
             type="button"
             onClick={() => setIsMobileNavOpen((prev) => !prev)}
@@ -664,21 +673,22 @@ export function AdminDashboard({
           )}
         </div>
 
-        {/* Desktop Navigation Tabs */}
-        <div className="hidden md:flex border-b border-border gap-1 overflow-x-auto pb-1">
+        {/* Wide Desktop Navigation Tabs (Wraps naturally, ZERO horizontal scroll) */}
+        <div className="hidden xl:flex border-b border-border gap-1 flex-wrap pb-1 w-full">
           {modulesList.map((mod) => (
             <button
               key={mod.id}
               type="button"
               onClick={() => setActiveTab(mod.id)}
-              className={`pb-3 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              title={mod.label}
+              className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 activeTab === mod.id
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
               {mod.icon}
-              <span>{mod.label}</span>
+              <span>{mod.shortLabel}</span>
               {mod.badge && (
                 <span className={mod.badgeClassName}>
                   {mod.badge}

@@ -13,6 +13,7 @@ import {
   DeliveryZone,
   Coupon,
   CreateCouponInput,
+  UpdateCouponInput,
   Driver,
   Customer,
   CustomerAddress,
@@ -775,6 +776,18 @@ export class MarketOSRepository {
       };
     }
 
+    if (coupon.starts_at) {
+      const starts = new Date(coupon.starts_at).getTime();
+      if (!isNaN(starts) && Date.now() < starts) {
+        return {
+          valid: false,
+          coupon,
+          discountUsd: 0,
+          message: `Este cupón aún no está activo. Estará disponible a partir del ${new Date(coupon.starts_at).toLocaleDateString("es-VE")}`,
+        };
+      }
+    }
+
     if (coupon.expires_at) {
       const expiry = new Date(coupon.expires_at).getTime();
       if (!isNaN(expiry) && Date.now() > expiry) {
@@ -830,7 +843,7 @@ export class MarketOSRepository {
   }
 
   /**
-   * Create a new Coupon with discount amount & expiration date
+   * Create a new Coupon with discount amount, start date & expiration date
    */
   static async createCoupon(input: CreateCouponInput): Promise<Coupon> {
     const cleanCode = input.code.trim().toUpperCase();
@@ -846,6 +859,7 @@ export class MarketOSRepository {
       usage_limit: input.usageLimit ? Number(input.usageLimit) : null,
       usage_count: 0,
       is_active: true,
+      starts_at: input.startsAt || null,
       expires_at: input.expiresAt || null,
       created_at: new Date().toISOString(),
     };
@@ -865,6 +879,7 @@ export class MarketOSRepository {
           usage_limit: newCoupon.usage_limit,
           usage_count: 0,
           is_active: true,
+          starts_at: newCoupon.starts_at,
           expires_at: newCoupon.expires_at,
         })
         .select()
@@ -893,6 +908,64 @@ export class MarketOSRepository {
     } catch {}
 
     return newCoupon;
+  }
+
+  /**
+   * Update an existing Coupon
+   */
+  static async updateCoupon(input: UpdateCouponInput): Promise<Coupon | null> {
+    const supabase = getSupabase();
+    const updatePayload: Record<string, any> = {};
+
+    if (input.code !== undefined) updatePayload.code = input.code.trim().toUpperCase();
+    if (input.description !== undefined) updatePayload.description = input.description?.trim() || null;
+    if (input.discountType !== undefined) updatePayload.discount_type = input.discountType;
+    if (input.discountValue !== undefined) updatePayload.discount_value = Number(input.discountValue);
+    if (input.minOrderAmountUsd !== undefined) updatePayload.min_order_amount_usd = Number(input.minOrderAmountUsd);
+    if (input.maxDiscountUsd !== undefined) updatePayload.max_discount_usd = input.maxDiscountUsd ? Number(input.maxDiscountUsd) : null;
+    if (input.usageLimit !== undefined) updatePayload.usage_limit = input.usageLimit ? Number(input.usageLimit) : null;
+    if (input.startsAt !== undefined) updatePayload.starts_at = input.startsAt || null;
+    if (input.expiresAt !== undefined) updatePayload.expires_at = input.expiresAt || null;
+    if (input.isActive !== undefined) updatePayload.is_active = input.isActive;
+
+    if (supabase) {
+      try {
+        await supabase
+          .from("coupons")
+          .update(updatePayload)
+          .eq("id", input.couponId)
+          .eq("tenant_id", input.tenantId);
+      } catch (err) {
+        console.warn("[MarketOS] Update coupon Supabase error:", err);
+      }
+    }
+
+    const c = state.coupons.find((cp) => cp.id === input.couponId && cp.tenant_id === input.tenantId);
+    if (c) {
+      if (input.code !== undefined) c.code = input.code.trim().toUpperCase();
+      if (input.description !== undefined) c.description = input.description?.trim() || null;
+      if (input.discountType !== undefined) c.discount_type = input.discountType;
+      if (input.discountValue !== undefined) c.discount_value = Number(input.discountValue);
+      if (input.minOrderAmountUsd !== undefined) c.min_order_amount_usd = Number(input.minOrderAmountUsd);
+      if (input.maxDiscountUsd !== undefined) c.max_discount_usd = input.maxDiscountUsd ? Number(input.maxDiscountUsd) : null;
+      if (input.usageLimit !== undefined) c.usage_limit = input.usageLimit ? Number(input.usageLimit) : null;
+      if (input.startsAt !== undefined) c.starts_at = input.startsAt || null;
+      if (input.expiresAt !== undefined) c.expires_at = input.expiresAt || null;
+      if (input.isActive !== undefined) c.is_active = input.isActive;
+
+      try {
+        await MarketOSRepository.recordAuditLog({
+          tenantId: input.tenantId,
+          action: "CUPÓN_ACTUALIZADO",
+          entity: "coupons",
+          entityId: input.couponId,
+          newData: updatePayload,
+        });
+      } catch {}
+
+      return c;
+    }
+    return null;
   }
 
   /**

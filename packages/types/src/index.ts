@@ -201,6 +201,7 @@ export interface Coupon {
   usage_limit?: number | null;
   usage_count: number;
   is_active: boolean;
+  starts_at?: string | null;
   expires_at?: string | null;
   created_at?: string;
 }
@@ -214,7 +215,23 @@ export interface CreateCouponInput {
   minOrderAmountUsd?: number;
   maxDiscountUsd?: number;
   usageLimit?: number;
+  startsAt?: string | null;
   expiresAt?: string | null;
+}
+
+export interface UpdateCouponInput {
+  tenantId: string;
+  couponId: string;
+  code?: string;
+  description?: string;
+  discountType?: DiscountType;
+  discountValue?: number;
+  minOrderAmountUsd?: number;
+  maxDiscountUsd?: number;
+  usageLimit?: number | null;
+  startsAt?: string | null;
+  expiresAt?: string | null;
+  isActive?: boolean;
 }
 
 export interface Driver {

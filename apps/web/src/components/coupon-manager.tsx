@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { Coupon, CreateCouponInput, DiscountType } from "@marketos/types";
+import { Coupon, CreateCouponInput, UpdateCouponInput, DiscountType } from "@marketos/types";
 import {
   createCouponAction,
+  updateCouponAction,
   toggleCouponAction,
   deleteCouponAction,
 } from "../app/admin/actions";
@@ -14,17 +15,15 @@ import {
   Calendar,
   DollarSign,
   Percent,
-  Clock,
   Trash2,
-  CheckCircle,
   AlertTriangle,
   X,
   Loader2,
-  Tag,
   Copy,
   Check,
   Power,
   Sparkles,
+  Pencil,
 } from "lucide-react";
 
 interface CouponManagerProps {
@@ -35,6 +34,7 @@ interface CouponManagerProps {
 export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) {
   const [coupons, setCoupons] = useState<Coupon[]>(initialCoupons);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   // Form State
@@ -45,6 +45,7 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
   const [minOrderAmount, setMinOrderAmount] = useState<number | "">("");
   const [maxDiscountUsd, setMaxDiscountUsd] = useState<number | "">("");
   const [usageLimit, setUsageLimit] = useState<number | "">("");
+  const [startsAt, setStartsAt] = useState<string>("");
   const [expiresAt, setExpiresAt] = useState<string>("");
 
   const [loading, setLoading] = useState(false);
@@ -62,7 +63,37 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
     }
   };
 
-  const handleCreateCoupon = async (e: React.FormEvent) => {
+  const handleOpenCreate = () => {
+    setEditingCoupon(null);
+    setCode("");
+    setDescription("");
+    setDiscountType("FIXED_USD");
+    setDiscountValue("");
+    setMinOrderAmount("");
+    setMaxDiscountUsd("");
+    setUsageLimit("");
+    setStartsAt("");
+    setExpiresAt("");
+    setError(null);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (coupon: Coupon) => {
+    setEditingCoupon(coupon);
+    setCode(coupon.code);
+    setDescription(coupon.description || "");
+    setDiscountType(coupon.discount_type);
+    setDiscountValue(coupon.discount_value);
+    setMinOrderAmount(coupon.min_order_amount_usd || "");
+    setMaxDiscountUsd(coupon.max_discount_usd || "");
+    setUsageLimit(coupon.usage_limit || "");
+    setStartsAt(coupon.starts_at ? coupon.starts_at.slice(0, 10) : "");
+    setExpiresAt(coupon.expires_at ? coupon.expires_at.slice(0, 10) : "");
+    setError(null);
+    setIsModalOpen(true);
+  };
+
+  const handleSubmitCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!code.trim()) {
       setError("Indica el código del cupón");
@@ -73,38 +104,67 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
       return;
     }
 
+    if (startsAt && expiresAt && new Date(startsAt) > new Date(expiresAt)) {
+      setError("La fecha de inicio no puede ser posterior a la fecha de vencimiento");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
-    const input: CreateCouponInput = {
-      tenantId,
-      code: code.trim().toUpperCase(),
-      description: description.trim() || undefined,
-      discountType,
-      discountValue: Number(discountValue),
-      minOrderAmountUsd: minOrderAmount ? Number(minOrderAmount) : 0,
-      maxDiscountUsd: maxDiscountUsd ? Number(maxDiscountUsd) : undefined,
-      usageLimit: usageLimit ? Number(usageLimit) : undefined,
-      expiresAt: expiresAt ? new Date(expiresAt + "T23:59:59").toISOString() : null,
-    };
+    const cleanCode = code.trim().toUpperCase();
+    const isoStarts = startsAt ? new Date(startsAt + "T00:00:00").toISOString() : null;
+    const isoExpires = expiresAt ? new Date(expiresAt + "T23:59:59").toISOString() : null;
 
-    const res = await createCouponAction(input);
-    setLoading(false);
+    if (editingCoupon) {
+      const input: UpdateCouponInput = {
+        tenantId,
+        couponId: editingCoupon.id,
+        code: cleanCode,
+        description: description.trim() || undefined,
+        discountType,
+        discountValue: Number(discountValue),
+        minOrderAmountUsd: minOrderAmount ? Number(minOrderAmount) : 0,
+        maxDiscountUsd: maxDiscountUsd ? Number(maxDiscountUsd) : undefined,
+        usageLimit: usageLimit ? Number(usageLimit) : null,
+        startsAt: isoStarts,
+        expiresAt: isoExpires,
+      };
 
-    if (res.success && res.coupon) {
-      setCoupons((prev) => [res.coupon!, ...prev]);
-      setIsModalOpen(false);
-      // Reset form
-      setCode("");
-      setDescription("");
-      setDiscountType("FIXED_USD");
-      setDiscountValue("");
-      setMinOrderAmount("");
-      setMaxDiscountUsd("");
-      setUsageLimit("");
-      setExpiresAt("");
+      const res = await updateCouponAction(input);
+      setLoading(false);
+
+      if (res.success && res.coupon) {
+        setCoupons((prev) =>
+          prev.map((c) => (c.id === editingCoupon.id ? res.coupon! : c))
+        );
+        setIsModalOpen(false);
+      } else {
+        setError(res.error || "Error al actualizar el cupón");
+      }
     } else {
-      setError(res.error || "Error al crear el cupón");
+      const input: CreateCouponInput = {
+        tenantId,
+        code: cleanCode,
+        description: description.trim() || undefined,
+        discountType,
+        discountValue: Number(discountValue),
+        minOrderAmountUsd: minOrderAmount ? Number(minOrderAmount) : 0,
+        maxDiscountUsd: maxDiscountUsd ? Number(maxDiscountUsd) : undefined,
+        usageLimit: usageLimit ? Number(usageLimit) : undefined,
+        startsAt: isoStarts,
+        expiresAt: isoExpires,
+      };
+
+      const res = await createCouponAction(input);
+      setLoading(false);
+
+      if (res.success && res.coupon) {
+        setCoupons((prev) => [res.coupon!, ...prev]);
+        setIsModalOpen(false);
+      } else {
+        setError(res.error || "Error al crear el cupón");
+      }
     }
   };
 
@@ -141,31 +201,34 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
     return !isNaN(expiry) && Date.now() > expiry;
   };
 
+  const isScheduled = (startsAtStr?: string | null) => {
+    if (!startsAtStr) return false;
+    const starts = new Date(startsAtStr).getTime();
+    return !isNaN(starts) && Date.now() < starts;
+  };
+
   return (
-    <div className="space-y-6 animate-in fade-in">
+    <div className="space-y-5 animate-in fade-in w-full max-w-full">
       {/* Top Action Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl bg-card border border-border shadow-xs">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl bg-card border border-border shadow-xs w-full">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-black text-foreground tracking-tight flex items-center gap-2">
-              <Ticket className="w-5 h-5 text-primary" />
+            <h2 className="text-base sm:text-lg font-black text-foreground tracking-tight flex items-center gap-2">
+              <Ticket className="w-5 h-5 text-primary shrink-0" />
               <span>Gestión de Cupones & Descuentos</span>
             </h2>
-            <span className="text-[10px] font-bold bg-primary/10 text-primary px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+            <span className="text-[10px] font-bold bg-primary/10 text-primary px-2.5 py-0.5 rounded-full uppercase tracking-wider shrink-0">
               {coupons.length} Registrados
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Crea códigos promocionales con cantidad de descuento en dólares o porcentaje y define su fecha de vencimiento.
+            Crea códigos promocionales con fecha de inicio, fecha de vencimiento y edición libre.
           </p>
         </div>
 
         <button
-          onClick={() => {
-            setError(null);
-            setIsModalOpen(true);
-          }}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold shadow-md hover:bg-primary/90 transition-all active:scale-[0.98] cursor-pointer"
+          onClick={handleOpenCreate}
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold shadow-md hover:bg-primary/90 transition-all active:scale-[0.98] cursor-pointer shrink-0"
         >
           <Plus className="w-4 h-4 stroke-[2.5]" />
           <span>Crear Nuevo Cupón</span>
@@ -174,31 +237,32 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
 
       {/* Coupons List */}
       {coupons.length === 0 ? (
-        <div className="p-12 text-center rounded-3xl border border-dashed border-border bg-card space-y-3">
+        <div className="p-8 sm:p-12 text-center rounded-3xl border border-dashed border-border bg-card space-y-3 w-full">
           <Ticket className="w-10 h-10 text-muted-foreground mx-auto opacity-40" />
           <h3 className="text-sm font-bold text-foreground">No tienes cupones creados</h3>
           <p className="text-xs text-muted-foreground max-w-sm mx-auto">
             Crea tu primer cupón para premiar a tus clientes con descuentos fijos o en porcentaje en su carrito de compras.
           </p>
           <button
-            onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-colors"
+            onClick={handleOpenCreate}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Crear Cupón</span>
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 w-full">
           {coupons.map((coupon) => {
             const expired = isExpired(coupon.expires_at);
+            const scheduled = isScheduled(coupon.starts_at);
             const isDeleting = deletingId === coupon.id;
             const isToggling = togglingId === coupon.id;
 
             return (
               <div
                 key={coupon.id}
-                className={`p-5 rounded-2xl border transition-all flex flex-col justify-between space-y-4 shadow-xs ${
+                className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col justify-between space-y-3 sm:space-y-4 shadow-xs w-full ${
                   !coupon.is_active || expired
                     ? "bg-muted/30 border-border opacity-85"
                     : "bg-card border-border hover:border-primary/40"
@@ -207,14 +271,14 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
                 {/* Header: Code & Status */}
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-black text-sm px-2.5 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 tracking-wider">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-mono font-black text-xs sm:text-sm px-2.5 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 tracking-wider truncate">
                         {coupon.code}
                       </span>
                       <button
                         type="button"
                         onClick={() => handleCopy(coupon.code)}
-                        className="p-1.5 rounded-lg border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        className="p-1.5 rounded-lg border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
                         title="Copiar código del cupón"
                       >
                         {copiedCode === coupon.code ? (
@@ -225,23 +289,29 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
                       </button>
                     </div>
 
-                    {expired ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/20">
-                        Vencido
-                      </span>
-                    ) : coupon.is_active ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                        Activo
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
-                        Pausado
-                      </span>
-                    )}
+                    <div className="shrink-0">
+                      {scheduled ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                          Programado
+                        </span>
+                      ) : expired ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/20">
+                          Vencido
+                        </span>
+                      ) : coupon.is_active ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                          Activo
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+                          Pausado
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {coupon.description && (
-                    <p className="text-xs text-muted-foreground leading-snug">
+                    <p className="text-xs text-muted-foreground leading-snug line-clamp-2">
                       {coupon.description}
                     </p>
                   )}
@@ -285,34 +355,53 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between pt-1 border-t border-border/60">
-                    <span className="text-muted-foreground font-medium flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span>Vencimiento:</span>
-                    </span>
-                    <span
-                      className={`font-semibold ${
-                        expired ? "text-destructive font-bold" : "text-foreground"
-                      }`}
-                    >
-                      {coupon.expires_at
-                        ? new Date(coupon.expires_at).toLocaleDateString("es-VE", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })
-                        : "Sin fecha límite"}
-                    </span>
+                  {/* Dates: Starts and Expires */}
+                  <div className="pt-2 border-t border-border/60 space-y-1.5 text-[11px]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-primary shrink-0" />
+                        <span>Inicio:</span>
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {coupon.starts_at
+                          ? new Date(coupon.starts_at).toLocaleDateString("es-VE", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })
+                          : "Inmediato"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-muted-foreground shrink-0" />
+                        <span>Vence:</span>
+                      </span>
+                      <span
+                        className={`font-semibold ${
+                          expired ? "text-destructive font-bold" : "text-foreground"
+                        }`}
+                      >
+                        {coupon.expires_at
+                          ? new Date(coupon.expires_at).toLocaleDateString("es-VE", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })
+                          : "Sin fecha límite"}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Bottom Actions */}
-                <div className="flex items-center justify-between pt-2 border-t border-border">
+                {/* Bottom Actions: Pause, Edit, Delete */}
+                <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-border">
                   <button
                     type="button"
                     onClick={() => handleToggleActive(coupon)}
                     disabled={isToggling}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50 ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50 ${
                       coupon.is_active
                         ? "bg-muted hover:bg-muted/80 text-muted-foreground border-border"
                         : "bg-emerald-500/10 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/20"
@@ -322,19 +411,32 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
                     <span>{coupon.is_active ? "Pausar" : "Reactivar"}</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(coupon.id)}
-                    disabled={isDeleting}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-destructive/20 text-destructive hover:bg-destructive/10 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
-                  >
-                    {isDeleting ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-3.5 h-3.5" />
-                    )}
-                    <span>Eliminar</span>
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEdit(coupon)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary text-xs font-semibold transition-colors cursor-pointer"
+                      title="Editar cupón"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span>Editar</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(coupon.id)}
+                      disabled={isDeleting}
+                      className="inline-flex items-center justify-center p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border border-destructive/20 text-destructive hover:bg-destructive/10 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                      title="Eliminar cupón"
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3.5 h-3.5" />
+                      )}
+                      <span className="hidden sm:inline sm:ml-1">Eliminar</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -342,34 +444,38 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
         </div>
       )}
 
-      {/* CREATE COUPON MODAL */}
+      {/* CREATE & EDIT COUPON MODAL */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative w-full max-w-lg rounded-3xl bg-card border border-border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg rounded-2xl sm:rounded-3xl bg-card border border-border shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
             {/* Modal Header */}
-            <div className="p-5 border-b border-border flex items-center justify-between bg-muted/40">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+            <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between bg-muted/40">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
                   <Ticket className="w-5 h-5" />
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-foreground">Crear Nuevo Cupón</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Configura el código, valor de descuento y fecha de expiración.
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-bold text-foreground truncate">
+                    {editingCoupon ? `Editar Cupón (${editingCoupon.code})` : "Crear Nuevo Cupón"}
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground truncate">
+                    {editingCoupon
+                      ? "Modifica el descuento, fechas de vigencia y límites."
+                      : "Configura el código, valor y fechas de activación."}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleCreateCoupon} className="p-6 overflow-y-auto space-y-4 text-xs">
+            <form onSubmit={handleSubmitCoupon} className="p-4 sm:p-6 overflow-y-auto space-y-4 text-xs">
               {error && (
                 <div className="p-3.5 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive font-semibold flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -449,30 +555,48 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
                     onChange={(e) =>
                       setDiscountValue(e.target.value === "" ? "" : parseFloat(e.target.value))
                     }
-                    placeholder={discountType === "FIXED_USD" ? "Ej: 5.00" : "Ej: 15"}
+                    placeholder={discountType === "FIXED_USD" ? "Ej: 5.00" : "Ej: 10"}
                     className="w-full h-10 pl-8 pr-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-mono font-bold focus:ring-2 focus:ring-primary focus:outline-none"
                   />
                 </div>
               </div>
 
-              {/* Expiration Date */}
-              <div>
-                <label className="font-semibold text-muted-foreground block mb-1.5 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-primary" />
-                  <span>Fecha de Vencimiento del Cupón</span>
-                </label>
-                <input
-                  type="date"
-                  value={expiresAt}
-                  onChange={(e) => setExpiresAt(e.target.value)}
-                  className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
-                />
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  Déjalo vacío si no deseas que tenga fecha de vencimiento.
-                </p>
+              {/* DATES: Start Date & Expiration Date */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-muted-foreground block mb-1.5 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-primary" />
+                    <span>Fecha de Inicio (Válido desde)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={startsAt}
+                    onChange={(e) => setStartsAt(e.target.value)}
+                    className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Déjalo vacío para activar de inmediato.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-muted-foreground block mb-1.5 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-destructive" />
+                    <span>Fecha de Vencimiento</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={expiresAt}
+                    onChange={(e) => setExpiresAt(e.target.value)}
+                    className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Déjalo vacío si no tiene caducidad.
+                  </p>
+                </div>
               </div>
 
-              {/* Min Order Amount & Max Discount */}
+              {/* Min Order Amount & Usage Limit */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-muted-foreground block mb-1.5">
@@ -559,12 +683,12 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
                   {loading ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Creando...</span>
+                      <span>{editingCoupon ? "Guardando..." : "Creando..."}</span>
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4" />
-                      <span>Crear Cupón</span>
+                      <span>{editingCoupon ? "Guardar Cambios" : "Crear Cupón"}</span>
                     </>
                   )}
                 </button>

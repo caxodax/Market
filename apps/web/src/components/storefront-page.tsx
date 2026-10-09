@@ -98,7 +98,7 @@ export function StorefrontPage({
           `,
         }}
       />
-      <div className="min-h-screen bg-background text-foreground flex flex-col">
+      <div className="min-h-screen bg-background text-foreground flex flex-col w-full max-w-full overflow-x-hidden">
         {/* Brand Header with Live BCV exchange rate, Cart trigger and Branch Selector */}
         <StoreHeader
           settings={settings}

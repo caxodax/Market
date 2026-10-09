@@ -1,7 +1,7 @@
 "use server";
 
 import { MarketOSRepository } from "@marketos/database";
-import { PaymentStatus, CreateProductInput, UpdateProductInput, InviteStaffInput, UserRole, TenantSettings, CreateCouponInput, Coupon } from "@marketos/types";
+import { PaymentStatus, CreateProductInput, UpdateProductInput, InviteStaffInput, UserRole, TenantSettings, CreateCouponInput, UpdateCouponInput, Coupon } from "@marketos/types";
 import { revalidatePath } from "next/cache";
 
 export async function reviewPaymentAction(
@@ -319,6 +319,24 @@ export async function deleteCouponAction(tenantId: string, couponId: string) {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Error al eliminar el cupón",
+    };
+  }
+}
+
+/**
+ * Update an existing Coupon
+ */
+export async function updateCouponAction(input: UpdateCouponInput) {
+  try {
+    const updated = await MarketOSRepository.updateCoupon(input);
+    revalidatePath("/admin");
+    revalidatePath("/");
+    return { success: true, coupon: updated };
+  } catch (error) {
+    console.error("Error updating coupon:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al actualizar el cupón",
     };
   }
 }
