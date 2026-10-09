@@ -36,7 +36,8 @@ export const INITIAL_SETTINGS: TenantSettings = {
   primary_color: "#DC2626", // Shop Market Red
   secondary_color: "#09090B", // Shop Market Black
   accent_color: "#FFFFFF", // Crisp White
-  logo_url: "/brand/logo.png",
+  font_family: "Inter",
+  logo_url: null,
   banner_url: null,
   phone: "+58 424-5919577",
   email: "shopmarketca@gmail.com",
@@ -46,6 +47,44 @@ export const INITIAL_SETTINGS: TenantSettings = {
   default_currency: "USD",
   social_links: {
     instagram: "@shopmarketca",
+  },
+  payment_settings: {
+    enabled_methods: ["PAGO_MOVIL", "BANK_TRANSFER", "ZELLE", "CASH_USD"],
+    pago_movil: {
+      bank: "Bancamiga",
+      phone: "04245919577",
+      id_doc: "J-50123456-7",
+      name: "Shop Market C.A.",
+    },
+    bank_transfer: {
+      bank: "Bancamiga",
+      account_number: "01720111551100012345",
+      account_type: "Corriente",
+      id_doc: "J-50123456-7",
+      name: "Shop Market C.A.",
+    },
+    zelle: {
+      email: "pagos@shopmarket.com",
+      name: "Shop Market C.A.",
+    },
+    cash_usd: {
+      instructions: "Billetes en buen estado sin roturas ni marcas. Pago al retirar en tienda o contra entrega.",
+    },
+    cash_ves: {
+      instructions: "Efectivo en Bolívares en caja según tasa oficial.",
+    },
+    pos: {
+      instructions: "Punto de venta disponible en caja para tarjetas de débito.",
+    },
+  },
+  operational_settings: {
+    is_open: true,
+    closed_message: "Actualmente nos encontramos fuera de horario de atención. Tomaremos tu pedido a primera hora.",
+    schedule: "Lunes a Sábado: 8:00 AM - 9:00 PM | Domingos: 9:00 AM - 6:00 PM",
+    min_order_usd: 0,
+    announcement_banner: "¡Bienvenidos a Shop Market! Delivery rápido en Barquisimeto y Cabudare 🛵",
+    estimated_delivery_time: "30 a 60 minutos",
+    custom_whatsapp_message: "Hola Shop Market, acabo de realizar un pedido por la tienda web:",
   },
 };
 

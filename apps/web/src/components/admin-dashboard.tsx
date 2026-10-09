@@ -31,6 +31,7 @@ import { logoutUserAction } from "../app/login/actions";
 import { ProductModal } from "./product-modal";
 import { StaffModal, ROLE_LABELS } from "./staff-modal";
 import { ExchangeRateManager } from "./exchange-rate-manager";
+import { StoreSettingsTab } from "./store-settings-tab";
 import {
   PackageCheck,
   Boxes,
@@ -62,6 +63,7 @@ import {
   Image as ImageIcon,
   Sparkles,
   Landmark,
+  Sliders,
 } from "lucide-react";
 
 interface AdminDashboardProps {
@@ -94,8 +96,9 @@ export function AdminDashboard({
   staffMembers: initialStaffMembers = [],
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<
-    "PAYMENTS" | "ORDERS" | "INVENTORY" | "DELIVERY" | "RATES" | "AUDIT" | "STAFF"
+    "PAYMENTS" | "ORDERS" | "INVENTORY" | "DELIVERY" | "RATES" | "AUDIT" | "STAFF" | "SETTINGS"
   >("PAYMENTS");
+  const [settingsState, setSettingsState] = useState(settings);
   const [products, setProducts] = useState(initialProducts);
   const [orders, setOrders] = useState(initialOrders);
   const [payments, setPayments] = useState(initialPayments);
@@ -288,20 +291,28 @@ export function AdminDashboard({
       <header className="border-b border-border bg-card/60 backdrop-blur sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-black text-xl shadow-sm tracking-tighter">
-              SM
-            </div>
+            {settingsState.logo_url ? (
+              <img
+                src={settingsState.logo_url}
+                alt={settingsState.business_name}
+                className="h-10 w-10 object-contain rounded-xl bg-card border border-border p-0.5 shadow-xs"
+              />
+            ) : (
+              <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-black text-xl shadow-sm tracking-tighter">
+                {settingsState.business_name ? settingsState.business_name.substring(0, 2).toUpperCase() : "SM"}
+              </div>
+            )}
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-extrabold text-base tracking-tight text-foreground">
-                  {settings.business_name}
+                  {settingsState.business_name}
                 </h1>
                 <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded-full">
                   Tenant Admin
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Sucursal Nueva Segovia • Barquisimeto
+              <p className="text-xs text-muted-foreground truncate max-w-[280px]">
+                {settingsState.address || "Sucursal Nueva Segovia • Barquisimeto"}
               </p>
             </div>
           </div>
@@ -535,6 +546,18 @@ export function AdminDashboard({
           >
             <ShieldCheck className="w-4 h-4" />
             <span>Equipo y Roles ({staff.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("SETTINGS")}
+            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === "SETTINGS"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Sliders className="w-4 h-4" />
+            <span>Configuración & Marca</span>
           </button>
         </div>
 
@@ -1244,6 +1267,14 @@ export function AdminDashboard({
               </div>
             </div>
           </div>
+        )}
+
+        {/* TAB 8: STORE SETTINGS & BRANDING */}
+        {activeTab === "SETTINGS" && (
+          <StoreSettingsTab
+            settings={settingsState}
+            onUpdateSuccess={(updated) => setSettingsState(updated)}
+          />
         )}
       </main>
 

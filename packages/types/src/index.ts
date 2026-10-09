@@ -14,6 +14,46 @@ export interface Tenant {
   updated_at: string;
 }
 
+export interface PaymentAccountSettings {
+  enabled_methods: PaymentMethodType[];
+  pago_movil?: {
+    bank: string;
+    phone: string;
+    id_doc: string;
+    name: string;
+  };
+  bank_transfer?: {
+    bank: string;
+    account_number: string;
+    account_type: string;
+    id_doc: string;
+    name: string;
+  };
+  zelle?: {
+    email: string;
+    name: string;
+  };
+  cash_usd?: {
+    instructions: string;
+  };
+  cash_ves?: {
+    instructions: string;
+  };
+  pos?: {
+    instructions: string;
+  };
+}
+
+export interface StoreOperationalSettings {
+  is_open?: boolean;
+  closed_message?: string;
+  schedule?: string;
+  min_order_usd?: number;
+  announcement_banner?: string;
+  estimated_delivery_time?: string;
+  custom_whatsapp_message?: string;
+}
+
 export interface TenantSettings {
   tenant_id: string;
   business_name: string;
@@ -21,6 +61,7 @@ export interface TenantSettings {
   primary_color: string; // e.g. '#DC2626' (Shop Market Red)
   secondary_color: string; // e.g. '#09090B' (Shop Market Black)
   accent_color: string; // e.g. '#FFFFFF' (Shop Market White)
+  font_family?: string; // e.g. 'Inter' | 'Poppins' | 'Montserrat' | 'Plus Jakarta Sans' | 'Roboto' | 'Outfit'
   logo_url: string | null;
   banner_url: string | null;
   phone: string;
@@ -34,6 +75,8 @@ export interface TenantSettings {
   };
   supported_currencies: CurrencyCode[];
   default_currency: CurrencyCode;
+  payment_settings?: PaymentAccountSettings;
+  operational_settings?: StoreOperationalSettings;
 }
 
 export interface Store {

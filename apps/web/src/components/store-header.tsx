@@ -36,6 +36,20 @@ export function StoreHeader({
 
   return (
     <header className="sticky top-0 z-30 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      {/* Announcement Banner */}
+      {settings.operational_settings?.announcement_banner && (
+        <div className="bg-primary text-primary-foreground text-xs py-1.5 px-4 text-center font-bold tracking-tight shadow-xs">
+          {settings.operational_settings.announcement_banner}
+        </div>
+      )}
+
+      {/* Store Closed Warning */}
+      {settings.operational_settings?.is_open === false && (
+        <div className="bg-amber-600 text-white text-xs py-1.5 px-4 text-center font-semibold">
+          ⏰ {settings.operational_settings?.closed_message || "Actualmente nos encontramos fuera de horario de atención comercial."}
+        </div>
+      )}
+
       {/* Top Banner - BCV Rate & Branch Selection */}
       <div className="bg-secondary text-secondary-foreground text-xs py-1.5 px-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
@@ -74,9 +88,17 @@ export function StoreHeader({
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
         {/* Brand identity */}
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-black text-xl shadow-sm tracking-tighter">
-            SM
-          </div>
+          {settings.logo_url ? (
+            <img
+              src={settings.logo_url}
+              alt={settings.business_name}
+              className="h-10 w-10 object-contain rounded-xl bg-card border border-border p-0.5 shadow-xs"
+            />
+          ) : (
+            <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-black text-xl shadow-sm tracking-tighter">
+              {settings.business_name ? settings.business_name.substring(0, 2).toUpperCase() : "SM"}
+            </div>
+          )}
           <div>
             <h1 className="font-black text-lg sm:text-xl tracking-tight leading-tight text-foreground">
               {settings.business_name}

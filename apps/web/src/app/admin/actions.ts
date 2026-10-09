@@ -1,7 +1,7 @@
 "use server";
 
 import { MarketOSRepository } from "@marketos/database";
-import { PaymentStatus, CreateProductInput, UpdateProductInput, InviteStaffInput, UserRole } from "@marketos/types";
+import { PaymentStatus, CreateProductInput, UpdateProductInput, InviteStaffInput, UserRole, TenantSettings } from "@marketos/types";
 import { revalidatePath } from "next/cache";
 
 export async function reviewPaymentAction(
@@ -240,6 +240,27 @@ export async function saveManualRateAction(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Error al guardar tasa manual",
+    };
+  }
+}
+
+/**
+ * Update Tenant Settings, Branding and Payment Methods
+ */
+export async function updateTenantSettingsAction(
+  tenantId: string,
+  updates: Partial<TenantSettings>
+) {
+  try {
+    const settings = await MarketOSRepository.updateTenantSettings(tenantId, updates);
+    revalidatePath("/admin");
+    revalidatePath("/");
+    return { success: true, settings };
+  } catch (error) {
+    console.error("Error updating tenant settings:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al guardar la configuración",
     };
   }
 }

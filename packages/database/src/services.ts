@@ -125,12 +125,118 @@ export class MarketOSRepository {
         .maybeSingle();
 
       if (!error && data) {
-        return data as TenantSettings;
+        return {
+          ...INITIAL_SETTINGS,
+          ...(data as TenantSettings),
+          payment_settings: {
+            ...INITIAL_SETTINGS.payment_settings,
+            ...(data.payment_settings || {}),
+          },
+          operational_settings: {
+            ...INITIAL_SETTINGS.operational_settings,
+            ...(data.operational_settings || {}),
+          },
+        };
       }
     }
 
     const settings = state.settings.find((s) => s.tenant_id === tenantId);
     return settings || INITIAL_SETTINGS;
+  }
+
+  /**
+   * Update Tenant Settings, Branding and Payment Accounts
+   */
+  static async updateTenantSettings(
+    tenantId: string,
+    updates: Partial<TenantSettings>
+  ): Promise<TenantSettings> {
+    const current = await this.getTenantSettings(tenantId);
+    const updated: TenantSettings = {
+      ...current,
+      ...updates,
+      social_links: updates.social_links
+        ? { ...current.social_links, ...updates.social_links }
+        : current.social_links,
+      payment_settings: updates.payment_settings
+        ? { ...current.payment_settings, ...updates.payment_settings }
+        : current.payment_settings,
+      operational_settings: updates.operational_settings
+        ? { ...current.operational_settings, ...updates.operational_settings }
+        : current.operational_settings,
+    };
+
+    const supabase = getSupabase();
+    if (supabase) {
+      const payload: Record<string, any> = {
+        business_name: updated.business_name,
+        category: updated.category,
+        primary_color: updated.primary_color,
+        secondary_color: updated.secondary_color,
+        accent_color: updated.accent_color,
+        font_family: updated.font_family,
+        logo_url: updated.logo_url,
+        banner_url: updated.banner_url,
+        phone: updated.phone,
+        email: updated.email,
+        whatsapp_number: updated.whatsapp_number,
+        address: updated.address,
+        social_links: updated.social_links,
+        supported_currencies: updated.supported_currencies,
+        default_currency: updated.default_currency,
+        payment_settings: updated.payment_settings,
+        operational_settings: updated.operational_settings,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
+        .from("tenant_settings")
+        .update(payload)
+        .eq("tenant_id", tenantId);
+
+      if (error) {
+        console.warn(
+          "[MarketOS] updateTenantSettings Supabase error, retrying without extended columns:",
+          error.message
+        );
+        const safePayload = { ...payload };
+        delete safePayload.payment_settings;
+        delete safePayload.operational_settings;
+        delete safePayload.font_family;
+        await supabase
+          .from("tenant_settings")
+          .update(safePayload)
+          .eq("tenant_id", tenantId);
+      }
+    }
+
+    // Keep in-memory cache synchronized
+    const idx = state.settings.findIndex((s) => s.tenant_id === tenantId);
+    if (idx !== -1) {
+      state.settings[idx] = updated;
+    } else {
+      state.settings.push(updated);
+    }
+
+    // Log to Audit Trail
+    try {
+      await MarketOSRepository.recordAuditLog({
+        tenantId,
+        action: "CONFIGURACIÓN_ACTUALIZADA",
+        entity: "tenant_settings",
+        entityId: tenantId,
+        newData: {
+          business_name: updated.business_name,
+          primary_color: updated.primary_color,
+          font_family: updated.font_family,
+          enabled_payment_methods: updated.payment_settings?.enabled_methods,
+        },
+      });
+    } catch (e) {
+      // audit log failure non-blocking
+    }
+
+    return updated;
   }
 
   /**

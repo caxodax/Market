@@ -76,16 +76,58 @@ export function CheckoutDialog({
   const [couponMessage, setCouponMessage] = useState<string | null>(null);
 
   // Payment states
+  const paymentSettings = settings.payment_settings;
+  const initialPaymentMethod = (paymentSettings?.enabled_methods?.[0] as any) || "PAGO_MOVIL";
   const [paymentMethod, setPaymentMethod] = useState<
     "PAGO_MOVIL" | "BANK_TRANSFER" | "ZELLE" | "CASH_USD"
-  >("PAGO_MOVIL");
-  const [bankName, setBankName] = useState("Bancamiga");
+  >(initialPaymentMethod);
+  const [bankName, setBankName] = useState(paymentSettings?.pago_movil?.bank || "Bancamiga");
   const [referenceNumber, setReferenceNumber] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  // Payment methods and accounts config
+  const allPaymentMethodOptions: { id: "PAGO_MOVIL" | "BANK_TRANSFER" | "ZELLE" | "CASH_USD"; label: string }[] = [
+    { id: "PAGO_MOVIL", label: "Pago Móvil" },
+    { id: "BANK_TRANSFER", label: "Transferencia Bs." },
+    { id: "ZELLE", label: "Zelle USD" },
+    { id: "CASH_USD", label: "Efectivo Tienda" },
+  ];
+
+  const enabledMethodKeys = paymentSettings?.enabled_methods;
+  const availablePaymentMethods = enabledMethodKeys && enabledMethodKeys.length > 0
+    ? allPaymentMethodOptions.filter((opt) => enabledMethodKeys.includes(opt.id))
+    : allPaymentMethodOptions;
+
+  const activePaymentMethod = availablePaymentMethods.some((m) => m.id === paymentMethod)
+    ? paymentMethod
+    : (availablePaymentMethods[0]?.id || "PAGO_MOVIL");
+
+  const pmData = paymentSettings?.pago_movil || {
+    bank: "Bancamiga",
+    phone: "04245919577",
+    id_doc: "J-50123456-7",
+    name: settings.business_name,
+  };
+
+  const btData = paymentSettings?.bank_transfer || {
+    bank: "Bancamiga",
+    account_number: "01720111551100012345",
+    account_type: "Corriente",
+    id_doc: "J-50123456-7",
+    name: settings.business_name,
+  };
+
+  const zelleData = paymentSettings?.zelle || {
+    email: "pagos@shopmarket.com",
+    name: settings.business_name,
+  };
+
+  const cashInstructions = paymentSettings?.cash_usd?.instructions ||
+    "Pagas el monto exacto en dólares o bolívares al momento de retirar tu pedido en tienda o cuando el repartidor llegue a tu domicilio.";
 
   // Calculations
   const selectedZone = deliveryZones.find((z) => z.id === selectedZoneId) || deliveryZones[0];
@@ -514,6 +556,11 @@ export function CheckoutDialog({
                     setError("Indica la dirección para el despacho");
                     return;
                   }
+                  const minOrder = settings.operational_settings?.min_order_usd || 0;
+                  if (minOrder > 0 && subtotalUsd < minOrder) {
+                    setError(`El monto mínimo de compra en la tienda es de $${minOrder.toFixed(2)} USD.`);
+                    return;
+                  }
                   setError(null);
                   setStep("PAYMENT");
                 }}
@@ -530,18 +577,13 @@ export function CheckoutDialog({
                   Selecciona Método de Pago
                 </label>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  {[
-                    { id: "PAGO_MOVIL", label: "Pago Móvil" },
-                    { id: "BANK_TRANSFER", label: "Transferencia Bs." },
-                    { id: "ZELLE", label: "Zelle USD" },
-                    { id: "CASH_USD", label: "Efectivo Tienda" },
-                  ].map((m) => (
+                  {availablePaymentMethods.map((m) => (
                     <button
                       key={m.id}
                       type="button"
-                      onClick={() => setPaymentMethod(m.id as any)}
+                      onClick={() => setPaymentMethod(m.id)}
                       className={`p-2.5 rounded-xl border text-center transition-all ${
-                        paymentMethod === m.id
+                        activePaymentMethod === m.id
                           ? "border-primary bg-primary/10 text-primary font-semibold"
                           : "border-border bg-background hover:bg-muted"
                       }`}
@@ -552,7 +594,7 @@ export function CheckoutDialog({
                 </div>
               </div>
 
-              {/* Shop Market Account Instructions with 1-Click Copy */}
+              {/* Shop Account Instructions with 1-Click Copy */}
               <div className="p-4 rounded-2xl bg-muted/40 border border-border text-xs space-y-3">
                 <div className="font-bold text-foreground flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
@@ -560,18 +602,30 @@ export function CheckoutDialog({
                     <span>Datos de Pago {settings.business_name}</span>
                   </div>
                   <span className="text-[10px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full">
-                    {paymentMethod === "PAGO_MOVIL"
-                      ? "Bancamiga / Banesco"
-                      : paymentMethod === "BANK_TRANSFER"
-                      ? "Transferencia"
-                      : paymentMethod === "ZELLE"
+                    {activePaymentMethod === "PAGO_MOVIL"
+                      ? `${pmData.bank}`
+                      : activePaymentMethod === "BANK_TRANSFER"
+                      ? `${btData.bank}`
+                      : activePaymentMethod === "ZELLE"
                       ? "Zelle USD"
                       : "Efectivo"}
                   </span>
                 </div>
 
-                {paymentMethod === "PAGO_MOVIL" && (
+                {activePaymentMethod === "PAGO_MOVIL" && (
                   <div className="space-y-2 pt-1">
+                    {/* Banco */}
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border">
+                      <div>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold block">
+                          Banco Receptor
+                        </span>
+                        <span className="font-bold text-xs text-foreground">
+                          {pmData.bank}
+                        </span>
+                      </div>
+                    </div>
+
                     {/* Teléfono */}
                     <div className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border">
                       <div>
@@ -579,12 +633,12 @@ export function CheckoutDialog({
                           Teléfono
                         </span>
                         <span className="font-mono font-bold text-xs text-foreground">
-                          0424-5919577
+                          {pmData.phone}
                         </span>
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleCopy("04245919577", "phone")}
+                        onClick={() => handleCopy(pmData.phone.replace(/\D/g, ""), "phone")}
                         className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
                           copiedField === "phone"
                             ? "bg-emerald-600 text-white"
@@ -609,15 +663,15 @@ export function CheckoutDialog({
                     <div className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border">
                       <div>
                         <span className="text-[10px] text-muted-foreground uppercase font-bold block">
-                          RIF / Cédula
+                          RIF / Cédula / Titular
                         </span>
                         <span className="font-mono font-bold text-xs text-foreground">
-                          J-50123456-7
+                          {pmData.id_doc} {pmData.name ? `(${pmData.name})` : ""}
                         </span>
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleCopy("J501234567", "rif")}
+                        onClick={() => handleCopy(pmData.id_doc.replace(/[^A-Za-z0-9]/g, ""), "rif")}
                         className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
                           copiedField === "rif"
                             ? "bg-emerald-600 text-white"
@@ -679,22 +733,22 @@ export function CheckoutDialog({
                   </div>
                 )}
 
-                {paymentMethod === "BANK_TRANSFER" && (
+                {activePaymentMethod === "BANK_TRANSFER" && (
                   <div className="space-y-2 pt-1">
                     {/* N° Cuenta */}
                     <div className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border">
                       <div>
                         <span className="text-[10px] text-muted-foreground uppercase font-bold block">
-                          N° Cuenta Corriente (Bancamiga)
+                          N° Cuenta {btData.account_type || "Corriente"} ({btData.bank})
                         </span>
-                        <span className="font-mono font-bold text-xs text-foreground">
-                          0172-0111-55-1100012345
+                        <span className="font-mono font-bold text-xs text-foreground tracking-wide">
+                          {btData.account_number}
                         </span>
                       </div>
                       <button
                         type="button"
                         onClick={() =>
-                          handleCopy("01720111551100012345", "bank_account")
+                          handleCopy(btData.account_number.replace(/\D/g, ""), "bank_account")
                         }
                         className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
                           copiedField === "bank_account"
@@ -723,12 +777,12 @@ export function CheckoutDialog({
                           RIF / Titular
                         </span>
                         <span className="font-mono font-bold text-xs text-foreground">
-                          J-50123456-7 (Shop Market C.A.)
+                          {btData.id_doc} ({btData.name || settings.business_name})
                         </span>
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleCopy("J501234567", "bank_rif")}
+                        onClick={() => handleCopy(btData.id_doc.replace(/[^A-Za-z0-9]/g, ""), "bank_rif")}
                         className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
                           copiedField === "bank_rif"
                             ? "bg-emerald-600 text-white"
@@ -790,7 +844,7 @@ export function CheckoutDialog({
                   </div>
                 )}
 
-                {paymentMethod === "ZELLE" && (
+                {activePaymentMethod === "ZELLE" && (
                   <div className="space-y-2 pt-1">
                     {/* Correo Zelle */}
                     <div className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border">
@@ -799,13 +853,13 @@ export function CheckoutDialog({
                           Correo Zelle
                         </span>
                         <span className="font-mono font-bold text-xs text-foreground">
-                          shopmarketca@gmail.com
+                          {zelleData.email}
                         </span>
                       </div>
                       <button
                         type="button"
                         onClick={() =>
-                          handleCopy("shopmarketca@gmail.com", "zelle_email")
+                          handleCopy(zelleData.email, "zelle_email")
                         }
                         className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
                           copiedField === "zelle_email"
@@ -833,7 +887,7 @@ export function CheckoutDialog({
                         Titular de la Cuenta
                       </span>
                       <span className="font-bold text-xs text-foreground">
-                        Shop Market C.A.
+                        {zelleData.name || settings.business_name}
                       </span>
                     </div>
 
@@ -874,15 +928,13 @@ export function CheckoutDialog({
                   </div>
                 )}
 
-                {paymentMethod === "CASH_USD" && (
+                {activePaymentMethod === "CASH_USD" && (
                   <div className="text-muted-foreground leading-relaxed pt-1 p-3 rounded-xl bg-background border border-border">
                     <p className="font-semibold text-foreground">
-                      💵 Pago contra entrega en efectivo:
+                      💵 Pago contra entrega / en tienda física:
                     </p>
                     <p className="mt-1 text-[11px]">
-                      Pagas el monto exacto en dólares o bolívares al momento de
-                      retirar tu pedido en tienda o cuando el repartidor llegue a
-                      tu domicilio.
+                      {cashInstructions}
                     </p>
                   </div>
                 )}

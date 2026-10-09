@@ -1136,3 +1136,45 @@ SET rate = EXCLUDED.rate,
     usdt_promedio = EXCLUDED.usdt_promedio,
     source = EXCLUDED.source,
     created_at = EXCLUDED.created_at;
+
+-- ==============================================================================
+-- 6. BRANDING, TYPOGRAPHY, PAYMENT ACCOUNTS & OPERATIONAL SETTINGS
+-- ==============================================================================
+ALTER TABLE public.tenant_settings 
+ADD COLUMN IF NOT EXISTS payment_settings JSONB DEFAULT '{
+  "enabled_methods": ["PAGO_MOVIL", "BANK_TRANSFER", "ZELLE", "CASH_USD"],
+  "pago_movil": {
+    "bank": "Bancamiga",
+    "phone": "04245919577",
+    "id_doc": "J-50123456-7",
+    "name": "Shop Market C.A."
+  },
+  "bank_transfer": {
+    "bank": "Bancamiga",
+    "account_number": "01720111551100012345",
+    "account_type": "Corriente",
+    "id_doc": "J-50123456-7",
+    "name": "Shop Market C.A."
+  },
+  "zelle": {
+    "email": "pagos@shopmarket.com",
+    "name": "Shop Market C.A."
+  },
+  "cash_usd": {
+    "instructions": "Billetes en buen estado sin roturas ni marcas. Pago al retirar en tienda o contra entrega."
+  }
+}'::jsonb;
+
+ALTER TABLE public.tenant_settings 
+ADD COLUMN IF NOT EXISTS operational_settings JSONB DEFAULT '{
+  "is_open": true,
+  "closed_message": "Actualmente nos encontramos fuera de horario de atención. Tomaremos tu pedido a primera hora.",
+  "schedule": "Lunes a Sábado: 8:00 AM - 9:00 PM | Domingos: 9:00 AM - 6:00 PM",
+  "min_order_usd": 0,
+  "announcement_banner": "¡Bienvenidos a Shop Market! Delivery rápido en Barquisimeto y Cabudare 🛵",
+  "estimated_delivery_time": "30 a 60 minutos",
+  "custom_whatsapp_message": "Hola Shop Market, acabo de realizar un pedido por la tienda web:"
+}'::jsonb;
+
+ALTER TABLE public.tenant_settings 
+ADD COLUMN IF NOT EXISTS font_family TEXT DEFAULT 'Inter';
