@@ -207,8 +207,18 @@ export class MarketOSRepository {
         delete safePayload.font_family;
         await supabase
           .from("tenant_settings")
-          .update(safePayload)
-          .eq("tenant_id", tenantId);
+      }
+
+      // Also keep public.tenants table in sync if logo or name changed
+      if (updated.logo_url || updated.business_name) {
+        await supabase
+          .from("tenants")
+          .update({
+            ...(updated.logo_url ? { logo_url: updated.logo_url } : {}),
+            ...(updated.business_name ? { name: updated.business_name } : {}),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", tenantId);
       }
     }
 
@@ -218,6 +228,12 @@ export class MarketOSRepository {
       state.settings[idx] = updated;
     } else {
       state.settings.push(updated);
+    }
+
+    const tenantIdx = state.tenants.findIndex((t) => t.id === tenantId);
+    if (tenantIdx !== -1) {
+      if (updated.logo_url) state.tenants[tenantIdx].logo_url = updated.logo_url;
+      if (updated.business_name) state.tenants[tenantIdx].name = updated.business_name;
     }
 
     // Log to Audit Trail

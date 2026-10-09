@@ -12,6 +12,7 @@ export function createServerComponentClient(cookieStore?: {
 }) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 
@@ -23,7 +24,7 @@ export function createServerComponentClient(cookieStore?: {
         }
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1500);
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
 
         try {
           const res = await fetch(input, {

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { TenantSettings, ExchangeRate, Store } from "@marketos/types";
 import { formatCurrency } from "@marketos/utils";
@@ -33,6 +33,7 @@ export function StoreHeader({
   onOpenAccount,
 }: StoreHeaderProps) {
   const { totalItems, setIsOpen } = useCart();
+  const [logoError, setLogoError] = useState(false);
 
   return (
     <header className="sticky top-0 z-30 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -88,10 +89,11 @@ export function StoreHeader({
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
         {/* Brand identity */}
         <div className="flex items-center gap-3">
-          {settings.logo_url ? (
+          {settings.logo_url && !logoError ? (
             <img
               src={settings.logo_url}
               alt={settings.business_name}
+              onError={() => setLogoError(true)}
               className="h-10 w-10 object-contain rounded-xl bg-card border border-border p-0.5 shadow-xs"
             />
           ) : (
