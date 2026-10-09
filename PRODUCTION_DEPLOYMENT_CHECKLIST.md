@@ -134,3 +134,14 @@ Este script ejecuta en tiempo real:
 * Test de lectura y RLS de **Supabase PostgreSQL**.
 * Test de lectura/escritura/expiración en **Upstash Redis**.
 * Test de operaciones de objetos en **Cloudflare R2**.
+
+---
+
+## 📌 Pendientes por Verificar / Próximas Fases
+
+- [ ] **Next.js Middleware para Multi-Tenancy Dinámico & Dominios Propios:**
+  - **Soporte de Subdominios:** Mapeo automático de `empresa.marketos.app` directamente al `tenant_id` mediante cabeceras HTTP.
+  - **Dominios Personalizados:** Soporte para dominios de clientes (`mitienda.com`, `elbodegon.com`) con registro CNAME a Vercel/Cloudflare y reescritura invisible (reverse proxy).
+  - **Enrutamiento por Sucursales (Slash):** Resolución de sedes físicas (`mitienda.com/sucursal-este`, `mitienda.com/cabudare`) vs selector modal de sucursal más cercana para inventario y delivery local.
+  - **Columna `custom_domain` en Supabase:** Registrar y verificar el dominio asignado a cada tenant en la tabla `tenants`.
+
