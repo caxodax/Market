@@ -32,10 +32,10 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 4. Programar Cron Job Diario en Postgres (Supabase pg_cron)
--- Se ejecuta de Lunes a Viernes a las 21:00 UTC (5:00 PM hora Venezuela, hora oficial de emisión BCV)
+-- Se ejecuta todos los días a las 11:00 UTC (7:00 AM hora Venezuela VET, idéntico a KsaSport)
 SELECT cron.schedule(
     'marketos-daily-bcv-sync',
-    '0 21 * * 1-5',
+    '0 11 * * *',
     $$ SELECT public.trigger_bcv_rate_sync(); $$
 );
 
