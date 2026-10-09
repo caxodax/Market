@@ -1,0 +1,9 @@
+# MarketOS Robots.txt
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /platform
+Disallow: /api/
+Disallow: /login
+
+Sitemap: https://marketos.app/sitemap.xml
