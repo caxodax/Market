@@ -64,67 +64,125 @@ export function BranchSelectorModal({
 
   if (!isOpen) return null;
 
-  // Detect nearest branch using HTML5 Geolocation API
-  const handleDetectGps = () => {
-    if (!navigator.geolocation) {
-      setGpsMessage("Tu navegador no soporta geolocalización.");
-      return;
+  const applyCoordinates = (
+    lat: number,
+    lng: number,
+    sourceLabel?: string
+  ) => {
+    const calculated: Record<string, number> = {};
+    let nearestStore: Store | null = null;
+    let minDistance = Infinity;
+
+    for (const store of stores) {
+      // Fallback coordinates based on code or index
+      const coords =
+        STORE_COORDINATES[store.code] ||
+        (store.code.includes("NS")
+          ? { lat: 10.054, lng: -69.298 }
+          : { lat: 10.029, lng: -69.261 });
+
+      const dist = calculateDistanceKm(lat, lng, coords.lat, coords.lng);
+      calculated[store.id] = dist;
+
+      if (dist < minDistance) {
+        minDistance = dist;
+        nearestStore = store;
+      }
     }
 
+    setDistances(calculated);
+    setDetectingGps(false);
+
+    if (nearestStore !== null) {
+      const matchedStore: Store = nearestStore;
+      onSelectStore(matchedStore, minDistance);
+      const tag = sourceLabel ? ` (${sourceLabel})` : "";
+      setGpsMessage(
+        `¡Ubicación detectada${tag}! Tu sucursal más cercana es ${matchedStore.name} (${minDistance} km).`
+      );
+    }
+  };
+
+  const fetchFallbackIpLocation = async (): Promise<boolean> => {
+    try {
+      // 1. Intentar endpoint interno first-party
+      const res = await fetch("/api/geo", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.lat && data.lng) {
+          applyCoordinates(data.lat, data.lng, data.city || "Red");
+          return true;
+        }
+      }
+    } catch {
+      // Fallback a cliente
+    }
+
+    try {
+      // 2. Intentar servicio público cliente
+      const res2 = await fetch("https://ipwho.is/", { cache: "no-store" });
+      if (res2.ok) {
+        const data2 = await res2.json();
+        if (data2.latitude && data2.longitude) {
+          applyCoordinates(data2.latitude, data2.longitude, data2.city || "Red");
+          return true;
+        }
+      }
+    } catch {
+      // Ambos fallaron
+    }
+
+    return false;
+  };
+
+  // Detect nearest branch using Browser Geolocation with IP Fallback
+  const handleDetectGps = async () => {
     setDetectingGps(true);
     setGpsMessage(null);
 
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      const resolved = await fetchFallbackIpLocation();
+      if (!resolved) {
+        setDetectingGps(false);
+        setGpsMessage("Tu navegador no soporta geolocalización. Selecciona tu sede de la lista.");
+      }
+      return;
+    }
+
+    // 1. Intentar con navegador (modo standard accuracy: mucho más confiable en laptops/desktops sin GPS de hardware)
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const userLat = position.coords.latitude;
-        const userLng = position.coords.longitude;
-
-        const calculated: Record<string, number> = {};
-        let nearestStore: Store | null = null;
-        let minDistance = Infinity;
-
-        for (const store of stores) {
-          // Fallback coordinates based on code or index
-          const coords =
-            STORE_COORDINATES[store.code] ||
-            (store.code.includes("NS")
-              ? { lat: 10.054, lng: -69.298 }
-              : { lat: 10.029, lng: -69.261 });
-
-          const dist = calculateDistanceKm(
-            userLat,
-            userLng,
-            coords.lat,
-            coords.lng
-          );
-          calculated[store.id] = dist;
-
-          if (dist < minDistance) {
-            minDistance = dist;
-            nearestStore = store;
+        applyCoordinates(
+          position.coords.latitude,
+          position.coords.longitude,
+          "GPS"
+        );
+      },
+      async (error) => {
+        // Si el usuario denegó expresamente o el hardware no tiene satélite/proveedor disponible
+        const resolved = await fetchFallbackIpLocation();
+        if (!resolved) {
+          setDetectingGps(false);
+          if (error.code === error.PERMISSION_DENIED) {
+            setGpsMessage(
+              "Permiso de ubicación no concedido en el navegador. Haz clic en el candado 🔒 de tu barra de direcciones para habilitarlo, o selecciona tu sede directamente."
+            );
+          } else if (error.code === error.TIMEOUT) {
+            setGpsMessage(
+              "Tiempo de espera agotado buscando señal GPS. Por favor selecciona tu sede de la lista."
+            );
+          } else {
+            setGpsMessage(
+              "No se pudo determinar tu posición por GPS. Por favor selecciona tu sede de la lista."
+            );
           }
         }
-
-        setDistances(calculated);
-        setDetectingGps(false);
-
-        if (nearestStore !== null) {
-          const matchedStore: Store = nearestStore;
-          onSelectStore(matchedStore, minDistance);
-          setGpsMessage(
-            `¡Ubicación detectada! Tu sucursal más cercana es ${matchedStore.name} (${minDistance} km).`
-          );
-        }
       },
-      (error) => {
-        setDetectingGps(false);
-        if (error.code === error.PERMISSION_DENIED) {
-          setGpsMessage("Permiso de ubicación denegado. Puedes elegir tu sucursal manualmente.");
-        } else {
-          setGpsMessage("No se pudo obtener tu ubicación. Por favor selecciona tu sede.");
-        }
-      },
-      { timeout: 8000, enableHighAccuracy: true }
+      {
+        enableHighAccuracy: false, // Standard accuracy no exige chip GPS dedicado y funciona con Wi-Fi/red
+        timeout: 6000,
+        maximumAge: 300000, // Usa ubicación reciente en caché si existe (5 min)
+      }
     );
   };
 
@@ -185,9 +243,19 @@ export function BranchSelectorModal({
           </button>
 
           {gpsMessage && (
-            <div className="p-3 rounded-xl bg-muted border border-border text-xs flex items-start gap-2.5 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-              <span className="text-muted-foreground">{gpsMessage}</span>
+            <div
+              className={`p-3.5 rounded-2xl border text-xs flex items-start gap-2.5 animate-in fade-in transition-all ${
+                gpsMessage.startsWith("¡Ubicación")
+                  ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-700 dark:text-emerald-300 shadow-sm"
+                  : "bg-muted/70 border-border text-muted-foreground"
+              }`}
+            >
+              {gpsMessage.startsWith("¡Ubicación") ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+              )}
+              <span className="leading-relaxed font-medium">{gpsMessage}</span>
             </div>
           )}
 
