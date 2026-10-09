@@ -83,6 +83,7 @@ export function CheckoutDialog({
   const [referenceNumber, setReferenceNumber] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -129,8 +130,6 @@ export function CheckoutDialog({
     setCouponCode("");
     setCouponMessage(null);
   };
-
-  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const handleCopy = (text: string, fieldId: string) => {
     try {
