@@ -17,6 +17,7 @@ import { CartDrawer } from "./cart-drawer";
 import { CheckoutDialog } from "./checkout-dialog";
 import { OrderSuccessModal } from "./order-success-modal";
 import { OrderTrackerModal } from "./order-tracker-modal";
+import { useFavorites } from "../context/favorites-context";
 import {
   Search,
   SlidersHorizontal,
@@ -26,6 +27,7 @@ import {
   ShoppingBag,
   ArrowRight,
   RotateCcw,
+  Heart,
 } from "lucide-react";
 
 interface CatalogViewProps {
@@ -37,6 +39,8 @@ interface CatalogViewProps {
   exchangeRate: ExchangeRate;
   isTrackerOpen: boolean;
   setIsTrackerOpen: (open: boolean) => void;
+  selectedCategory?: string | null;
+  setSelectedCategory?: (cat: string | null) => void;
 }
 
 export function CatalogView({
@@ -48,28 +52,43 @@ export function CatalogView({
   exchangeRate,
   isTrackerOpen,
   setIsTrackerOpen,
+  selectedCategory: controlledCategory,
+  setSelectedCategory: setControlledCategory,
 }: CatalogViewProps) {
   const { totalItems, totalUsd, setIsOpen } = useCart();
+  const { favorites, favoritesCount } = useFavorites();
   const totalVes = convertUsdToVes(totalUsd, exchangeRate.value);
 
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [internalCategory, setInternalCategory] = useState<string | null>(null);
+  const activeCategory = controlledCategory !== undefined ? controlledCategory : internalCategory;
+
+  const handleSelectCategory = (cat: string | null) => {
+    if (setControlledCategory) {
+      setControlledCategory(cat);
+    }
+    setInternalCategory(cat);
+  };
+
   const [searchQuery, setSearchQuery] = useState("");
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
 
-  // Filter products by category and search
+  // Filter products by category, favorites and search
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
-      const matchesCategory =
-        !selectedCategory || product.category_id === selectedCategory;
+      if (activeCategory === "favorites") {
+        if (!favorites.includes(product.id)) return false;
+      } else if (activeCategory && product.category_id !== activeCategory) {
+        return false;
+      }
       const matchesSearch =
         !searchQuery.trim() ||
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (product.sku &&
           product.sku.toLowerCase().includes(searchQuery.toLowerCase()));
-      return matchesCategory && matchesSearch;
+      return matchesSearch;
     });
-  }, [products, selectedCategory, searchQuery]);
+  }, [products, activeCategory, searchQuery, favorites]);
 
   return (
     <div
@@ -104,14 +123,36 @@ export function CatalogView({
           <div className="relative">
             <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none no-scrollbar pr-6">
               <button
-                onClick={() => setSelectedCategory(null)}
+                onClick={() => handleSelectCategory(null)}
                 className={`h-9 px-4 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                  selectedCategory === null
+                  activeCategory === null
                     ? "bg-primary text-primary-foreground shadow-xs ring-2 ring-primary/20"
                     : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 Todos ({products.length})
+              </button>
+
+              {/* Favorites Pill */}
+              <button
+                onClick={() => handleSelectCategory(activeCategory === "favorites" ? null : "favorites")}
+                className={`h-9 px-3.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeCategory === "favorites"
+                    ? "bg-rose-500 text-white shadow-xs ring-2 ring-rose-500/25"
+                    : favoritesCount > 0
+                    ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-500/20"
+                    : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+                title="Ver tus productos guardados en favoritos"
+              >
+                <Heart
+                  className={`w-3.5 h-3.5 ${
+                    activeCategory === "favorites" || favoritesCount > 0
+                      ? "fill-current text-current"
+                      : "text-muted-foreground"
+                  }`}
+                />
+                <span>Favoritos ({favoritesCount})</span>
               </button>
 
               {categories.map((cat) => {
@@ -121,9 +162,9 @@ export function CatalogView({
                 return (
                   <button
                     key={cat.id}
-                    onClick={() => setSelectedCategory(cat.id)}
+                    onClick={() => handleSelectCategory(cat.id)}
                     className={`h-9 px-4 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                      selectedCategory === cat.id
+                      activeCategory === cat.id
                         ? "bg-primary text-primary-foreground shadow-xs ring-2 ring-primary/20"
                         : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
@@ -167,39 +208,77 @@ export function CatalogView({
         {/* Section Heading */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-black tracking-tight text-foreground flex items-center gap-1.5">
-            <Sparkles className="w-4 h-4 text-primary" />
-            <span>
-              {selectedCategory
-                ? categories.find((c) => c.id === selectedCategory)?.name
-                : "Catálogo Disponible"}
-            </span>
+            {activeCategory === "favorites" ? (
+              <>
+                <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />
+                <span>Mis Productos Favoritos</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 text-primary" />
+                <span>
+                  {activeCategory
+                    ? categories.find((c) => c.id === activeCategory)?.name
+                    : "Catálogo Disponible"}
+                </span>
+              </>
+            )}
             <span className="text-xs text-muted-foreground font-semibold">
-              ({filteredProducts.length} productos)
+              ({filteredProducts.length} {filteredProducts.length === 1 ? "producto" : "productos"})
             </span>
           </h2>
+
+          {activeCategory && (
+            <button
+              onClick={() => handleSelectCategory(null)}
+              className="text-xs font-bold text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+            >
+              Ver todo el catálogo
+            </button>
+          )}
         </div>
 
         {/* Products Grid or Empty State */}
         {filteredProducts.length === 0 ? (
-          <div className="p-12 text-center rounded-2xl border border-dashed border-border bg-card/60">
-            <SlidersHorizontal className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-40" />
-            <p className="font-bold text-foreground text-sm">
-              No se encontraron productos
-            </p>
-            <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-              Prueba con otro término de búsqueda o selecciona otra categoría.
-            </p>
-            <button
-              onClick={() => {
-                setSearchQuery("");
-                setSelectedCategory(null);
-              }}
-              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-transform active:scale-95 cursor-pointer shadow-xs"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Ver todos los productos</span>
-            </button>
-          </div>
+          activeCategory === "favorites" ? (
+            <div className="p-12 text-center rounded-2xl border border-dashed border-rose-500/30 bg-rose-500/5 max-w-lg mx-auto">
+              <div className="w-14 h-14 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-500 mx-auto mb-3">
+                <Heart className="w-7 h-7 stroke-[1.8]" />
+              </div>
+              <p className="font-bold text-foreground text-sm">
+                Aún no tienes productos favoritos
+              </p>
+              <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
+                Toca el corazón (❤️) en la esquina de cualquier producto para guardarlo aquí y comprarlo en un clic.
+              </p>
+              <button
+                onClick={() => handleSelectCategory(null)}
+                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-transform active:scale-95 cursor-pointer shadow-xs"
+              >
+                <span>Explorar todo el catálogo</span>
+              </button>
+            </div>
+          ) : (
+            <div className="p-12 text-center rounded-2xl border border-dashed border-border bg-card/60">
+              <SlidersHorizontal className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-40" />
+              <p className="font-bold text-foreground text-sm">
+                No se encontraron productos
+              </p>
+              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                Prueba con otro término de búsqueda o selecciona otra categoría.
+              </p>
+              <button
+                onClick={() => {
+                  setSearchQuery("");
+                  handleSelectCategory(null);
+                }}
+                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-transform active:scale-95 cursor-pointer shadow-xs"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Ver todos los productos</span>
+              </button>
+            </div>
+          )
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
             {filteredProducts.map((product) => (

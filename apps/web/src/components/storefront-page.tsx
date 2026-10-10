@@ -11,6 +11,7 @@ import {
   DeliveryZone,
 } from "@marketos/types";
 import { CartProvider } from "../context/cart-context";
+import { FavoritesProvider } from "../context/favorites-context";
 import { StoreHeader } from "./store-header";
 import { CatalogView } from "./catalog-view";
 import { CustomerLookupModal } from "./customer-lookup-modal";
@@ -79,47 +80,52 @@ export function StorefrontPage({
     }
   );
   const [isBranchSelectorOpen, setIsBranchSelectorOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   const primaryHsl = settings.primary_color ? hexToHslString(settings.primary_color) : null;
   const secondaryHsl = settings.secondary_color ? hexToHslString(settings.secondary_color) : null;
   const fontFamilyName = settings.font_family || "Inter";
 
   return (
-    <CartProvider>
-      {/* Dynamic Brand Themes & Typography */}
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-            :root {
-              ${primaryHsl ? `--primary: ${primaryHsl}; --ring: ${primaryHsl};` : ""}
-              ${secondaryHsl ? `--secondary: ${secondaryHsl};` : ""}
-              ${fontFamilyName ? `font-family: '${fontFamilyName}', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;` : ""}
-            }
-          `,
-        }}
-      />
-      <div className="min-h-screen bg-background text-foreground flex flex-col w-full max-w-full overflow-x-hidden">
-        {/* Brand Header with Live BCV exchange rate, Cart trigger and Branch Selector */}
-        <StoreHeader
-          settings={settings}
-          exchangeRate={exchangeRate}
-          selectedStore={selectedStore}
-          onOpenBranchSelector={() => setIsBranchSelectorOpen(true)}
-          onOpenTracker={() => setIsTrackerOpen(true)}
-          onOpenAccount={() => setIsAccountOpen(true)}
+    <FavoritesProvider tenantId={settings.tenant_id}>
+      <CartProvider>
+        {/* Dynamic Brand Themes & Typography */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              :root {
+                ${primaryHsl ? `--primary: ${primaryHsl}; --ring: ${primaryHsl};` : ""}
+                ${secondaryHsl ? `--secondary: ${secondaryHsl};` : ""}
+                ${fontFamilyName ? `font-family: '${fontFamilyName}', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;` : ""}
+              }
+            `,
+          }}
         />
+        <div className="min-h-screen bg-background text-foreground flex flex-col w-full max-w-full overflow-x-hidden">
+          {/* Brand Header with Live BCV exchange rate, Cart trigger and Branch Selector */}
+          <StoreHeader
+            settings={settings}
+            exchangeRate={exchangeRate}
+            selectedStore={selectedStore}
+            onOpenBranchSelector={() => setIsBranchSelectorOpen(true)}
+            onOpenTracker={() => setIsTrackerOpen(true)}
+            onOpenAccount={() => setIsAccountOpen(true)}
+            onOpenFavorites={() => setActiveCategory("favorites")}
+          />
 
-        {/* Dynamic Catalog with Search, Category Filter, Promo banner, Cart and Delivery Zones */}
-        <CatalogView
-          categories={categories}
-          products={products}
-          settings={settings}
-          stores={stores}
-          deliveryZones={deliveryZones}
-          exchangeRate={exchangeRate}
-          isTrackerOpen={isTrackerOpen}
-          setIsTrackerOpen={setIsTrackerOpen}
-        />
+          {/* Dynamic Catalog with Search, Category Filter, Promo banner, Cart and Delivery Zones */}
+          <CatalogView
+            categories={categories}
+            products={products}
+            settings={settings}
+            stores={stores}
+            deliveryZones={deliveryZones}
+            exchangeRate={exchangeRate}
+            isTrackerOpen={isTrackerOpen}
+            setIsTrackerOpen={setIsTrackerOpen}
+            selectedCategory={activeCategory}
+            setSelectedCategory={setActiveCategory}
+          />
 
         {/* Storefront Footer */}
         <footer className="mt-auto border-t border-border bg-card py-8 px-4 text-xs text-muted-foreground">
@@ -171,6 +177,7 @@ export function StorefrontPage({
           onClose={() => setIsAccountOpen(false)}
         />
       </div>
-    </CartProvider>
+      </CartProvider>
+    </FavoritesProvider>
   );
 }

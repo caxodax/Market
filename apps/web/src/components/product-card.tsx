@@ -4,7 +4,8 @@ import React from "react";
 import { Product } from "@marketos/types";
 import { formatCurrency, convertUsdToVes } from "@marketos/utils";
 import { useCart } from "../context/cart-context";
-import { Plus, Minus, ShoppingCart } from "lucide-react";
+import { useFavorites } from "../context/favorites-context";
+import { Plus, Minus, ShoppingCart, Heart } from "lucide-react";
 
 interface ProductCardProps {
   product: Product & { stock: number };
@@ -13,9 +14,11 @@ interface ProductCardProps {
 
 export function ProductCard({ product, exchangeRate }: ProductCardProps) {
   const { items, addItem, updateQuantity } = useCart();
+  const { isFavorite, toggleFavorite } = useFavorites();
 
   const cartItem = items.find((i) => i.product.id === product.id);
   const quantityInCart = cartItem ? cartItem.quantity : 0;
+  const favorited = isFavorite(product.id);
 
   const priceVes = convertUsdToVes(product.price_usd, exchangeRate);
   const isOutOfStock = product.stock <= 0;
@@ -55,6 +58,31 @@ export function ProductCard({ product, exchangeRate }: ProductCardProps) {
             </span>
           )}
         </div>
+
+        {/* Favorite Wishlist Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleFavorite(product.id);
+          }}
+          className={`absolute top-2.5 right-2.5 z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer backdrop-blur-md shadow-2xs active:scale-90 ${
+            favorited
+              ? "bg-rose-500/15 border border-rose-500/30 text-rose-500 shadow-sm"
+              : "bg-background/80 hover:bg-background border border-border/60 text-muted-foreground hover:text-rose-500 hover:scale-105"
+          }`}
+          aria-label={favorited ? "Quitar de favoritos" : "Guardar en favoritos"}
+          title={favorited ? "Quitar de favoritos" : "Guardar en favoritos"}
+        >
+          <Heart
+            className={`w-4 h-4 transition-transform ${
+              favorited
+                ? "fill-rose-500 text-rose-500 scale-110"
+                : "stroke-[2]"
+            }`}
+          />
+        </button>
       </div>
 
       {/* Content */}

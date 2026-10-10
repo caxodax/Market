@@ -5,6 +5,7 @@ import Link from "next/link";
 import { TenantSettings, ExchangeRate, Store } from "@marketos/types";
 import { formatCurrency } from "@marketos/utils";
 import { useCart } from "../context/cart-context";
+import { useFavorites } from "../context/favorites-context";
 import {
   ShoppingBag,
   MapPin,
@@ -13,6 +14,7 @@ import {
   Award,
   ChevronDown,
   ShieldCheck,
+  Heart,
 } from "lucide-react";
 
 interface StoreHeaderProps {
@@ -22,6 +24,7 @@ interface StoreHeaderProps {
   onOpenBranchSelector?: () => void;
   onOpenTracker?: () => void;
   onOpenAccount?: () => void;
+  onOpenFavorites?: () => void;
 }
 
 export function StoreHeader({
@@ -31,8 +34,10 @@ export function StoreHeader({
   onOpenBranchSelector,
   onOpenTracker,
   onOpenAccount,
+  onOpenFavorites,
 }: StoreHeaderProps) {
   const { totalItems, setIsOpen } = useCart();
+  const { favoritesCount } = useFavorites();
   const [logoError, setLogoError] = useState(false);
 
   return (
@@ -130,6 +135,31 @@ export function StoreHeader({
             >
               <Award className="w-4 h-4 text-amber-500" />
               <span className="hidden sm:inline">Mis Puntos</span>
+            </button>
+          )}
+
+          {onOpenFavorites && (
+            <button
+              onClick={onOpenFavorites}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                favoritesCount > 0
+                  ? "border-rose-500/30 text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20"
+                  : "border-border text-foreground hover:bg-muted"
+              }`}
+              title="Mis productos favoritos"
+              aria-label="Mis favoritos"
+            >
+              <Heart
+                className={`w-4 h-4 ${
+                  favoritesCount > 0 ? "fill-rose-500 text-rose-500" : "text-muted-foreground"
+                }`}
+              />
+              <span className="hidden md:inline">Favoritos</span>
+              {favoritesCount > 0 && (
+                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-rose-500 text-white">
+                  {favoritesCount}
+                </span>
+              )}
             </button>
           )}
 
