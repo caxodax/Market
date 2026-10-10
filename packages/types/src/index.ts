@@ -510,4 +510,66 @@ export interface InviteStaffInput {
   phone?: string;
 }
 
+// ==============================================================================
+// PWA & WEB PUSH NOTIFICATIONS TYPES (MULTI-TENANT)
+// ==============================================================================
+
+export interface PushSubscriptionRecord {
+  id: string;
+  tenant_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  customer_id?: string | null;
+  user_agent?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SavePushSubscriptionInput {
+  tenantId: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  customerId?: string | null;
+  userAgent?: string | null;
+}
+
+export interface PushNotificationLog {
+  id: string;
+  tenant_id: string;
+  title: string;
+  body: string;
+  url: string;
+  target_type: "all" | "customers";
+  sent_count: number;
+  created_by?: string | null;
+  created_at: string;
+}
+
+export interface SendPushBroadcastInput {
+  tenantId: string;
+  title: string;
+  body: string;
+  url?: string;
+  icon?: string;
+  badge?: string;
+  tag?: string;
+  createdBy?: string | null;
+}
+
+export interface PushStats {
+  subscriberCount: number;
+  totalSentCount: number;
+  lastSentAt: string | null;
+}
+
+export interface DevicePwaStatus {
+  isIos: boolean;
+  isStandalone: boolean;
+  hasNativePushApis: boolean;
+  canSubscribePush: boolean;
+}
+
+
 

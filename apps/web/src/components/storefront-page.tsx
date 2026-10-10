@@ -16,6 +16,7 @@ import { StoreHeader } from "./store-header";
 import { CatalogView } from "./catalog-view";
 import { CustomerLookupModal } from "./customer-lookup-modal";
 import { BranchSelectorModal } from "./branch-selector-modal";
+import { PwaPushBanner } from "./pwa/pwa-push-banner";
 import { ShieldCheck, MapPin, Heart } from "lucide-react";
 
 interface StorefrontPageProps {
@@ -175,6 +176,13 @@ export function StorefrontPage({
           settings={settings}
           isOpen={isAccountOpen}
           onClose={() => setIsAccountOpen(false)}
+        />
+
+        {/* Multi-Tenant PWA & Web Push Notification Prompt */}
+        <PwaPushBanner
+          tenantId={settings.tenant_id}
+          storeName={settings.business_name}
+          logoUrl={settings.logo_url}
         />
       </div>
       </CartProvider>

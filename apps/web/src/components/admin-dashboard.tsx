@@ -34,6 +34,7 @@ import { StaffModal, ROLE_LABELS } from "./staff-modal";
 import { ExchangeRateManager } from "./exchange-rate-manager";
 import { StoreSettingsTab } from "./store-settings-tab";
 import { CouponManager } from "./coupon-manager";
+import { PushNotificationsManager } from "./push-notifications-manager";
 import {
   PackageCheck,
   Boxes,
@@ -67,6 +68,7 @@ import {
   Landmark,
   Sliders,
   Ticket,
+  BellRing,
   ChevronDown,
   Check,
 } from "lucide-react";
@@ -103,7 +105,7 @@ export function AdminDashboard({
   coupons: initialCoupons = [],
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<
-    "PAYMENTS" | "ORDERS" | "INVENTORY" | "DELIVERY" | "COUPONS" | "RATES" | "AUDIT" | "STAFF" | "SETTINGS"
+    "PAYMENTS" | "ORDERS" | "INVENTORY" | "DELIVERY" | "COUPONS" | "PUSH" | "RATES" | "AUDIT" | "STAFF" | "SETTINGS"
   >("PAYMENTS");
   const [settingsState, setSettingsState] = useState(settings);
   const [products, setProducts] = useState(initialProducts);
@@ -338,6 +340,15 @@ export function AdminDashboard({
       icon: <Ticket className="w-4 h-4" />,
       badge: initialCoupons.length > 0 ? `${initialCoupons.length}` : null,
       badgeClassName: "bg-purple-500/10 text-purple-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+    },
+    {
+      id: "PUSH" as const,
+      label: "Notificaciones Push",
+      shortLabel: "Push",
+      description: "Difusiones Web Push a móviles",
+      icon: <BellRing className="w-4 h-4" />,
+      badge: "PWA",
+      badgeClassName: "bg-amber-500/10 text-amber-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
     },
     {
       id: "RATES" as const,
@@ -1132,7 +1143,16 @@ export function AdminDashboard({
           />
         )}
 
-        {/* TAB 6: EXCHANGE RATES & HISTORICAL LOG */}
+        {/* TAB 6: WEB PUSH NOTIFICATIONS BROADCAST HUB */}
+        {activeTab === "PUSH" && (
+          <PushNotificationsManager
+            tenantId={settings.tenant_id}
+            settings={settingsState}
+            adminEmail={currentUser?.email}
+          />
+        )}
+
+        {/* TAB 7: EXCHANGE RATES & HISTORICAL LOG */}
         {activeTab === "RATES" && (
           <div className="space-y-4 animate-in fade-in">
             <ExchangeRateManager

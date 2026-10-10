@@ -33,6 +33,11 @@ import {
   UserProfile,
   UserRole,
   RateHistoryItem,
+  PushSubscriptionRecord,
+  SavePushSubscriptionInput,
+  PushNotificationLog,
+  SendPushBroadcastInput,
+  PushStats,
 } from "@marketos/types";
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
 import { fetchBcvRate, convertUsdToVes } from "@marketos/utils";
@@ -2424,5 +2429,219 @@ export class MarketOSRepository {
         p.email.toLowerCase() === userIdOrEmail.toLowerCase().trim()
     );
     return mem || null;
+  }
+
+  // ==============================================================================
+  // PWA & WEB PUSH NOTIFICATIONS REPOSITORY (MULTI-TENANT)
+  // ==============================================================================
+
+  /**
+   * Save or update client device push subscription for a tenant
+   */
+  static async savePushSubscription(
+    input: SavePushSubscriptionInput
+  ): Promise<PushSubscriptionRecord> {
+    const now = new Date().toISOString();
+    const id = `sub-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+    const record: PushSubscriptionRecord = {
+      id,
+      tenant_id: input.tenantId,
+      endpoint: input.endpoint,
+      p256dh: input.p256dh,
+      auth: input.auth,
+      customer_id: input.customerId || null,
+      user_agent: input.userAgent || null,
+      created_at: now,
+      updated_at: now,
+    };
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("push_subscriptions")
+          .upsert(
+            {
+              tenant_id: input.tenantId,
+              endpoint: input.endpoint,
+              p256dh: input.p256dh,
+              auth: input.auth,
+              customer_id: input.customerId || null,
+              user_agent: input.userAgent || null,
+              updated_at: now,
+            },
+            { onConflict: "endpoint" }
+          )
+          .select()
+          .maybeSingle();
+
+        if (!error && data) {
+          record.id = data.id;
+        }
+      } catch (err) {
+        console.warn("[MarketOS] Could not save push subscription to Supabase:", err);
+      }
+    }
+
+    // Update in-memory state
+    const existingIdx = state.pushSubscriptions.findIndex(
+      (s) => s.endpoint === input.endpoint
+    );
+    if (existingIdx !== -1) {
+      state.pushSubscriptions[existingIdx] = {
+        ...state.pushSubscriptions[existingIdx],
+        tenant_id: input.tenantId,
+        p256dh: input.p256dh,
+        auth: input.auth,
+        customer_id: input.customerId || null,
+        user_agent: input.userAgent || null,
+        updated_at: now,
+      };
+      return state.pushSubscriptions[existingIdx];
+    } else {
+      state.pushSubscriptions.push(record);
+      return record;
+    }
+  }
+
+  /**
+   * Get all active push subscriptions for a tenant
+   */
+  static async getPushSubscriptions(
+    tenantId: string
+  ): Promise<PushSubscriptionRecord[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("push_subscriptions")
+          .select("*")
+          .eq("tenant_id", tenantId);
+
+        if (!error && data && data.length > 0) {
+          return data as PushSubscriptionRecord[];
+        }
+      } catch (err) {
+        console.warn("[MarketOS] Could not fetch push subscriptions from Supabase:", err);
+      }
+    }
+
+    return state.pushSubscriptions.filter((s) => s.tenant_id === tenantId);
+  }
+
+  /**
+   * Delete an expired or revoked subscription endpoint
+   */
+  static async deletePushSubscription(endpoint: string): Promise<void> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase
+          .from("push_subscriptions")
+          .delete()
+          .eq("endpoint", endpoint);
+      } catch (err) {
+        console.warn("[MarketOS] Could not delete push subscription from Supabase:", err);
+      }
+    }
+
+    state.pushSubscriptions = state.pushSubscriptions.filter(
+      (s) => s.endpoint !== endpoint
+    );
+  }
+
+  /**
+   * Record a push broadcast log for audit & metrics
+   */
+  static async recordPushNotificationLog(input: {
+    tenantId: string;
+    title: string;
+    body: string;
+    url?: string;
+    targetType?: "all" | "customers";
+    sentCount: number;
+    createdBy?: string | null;
+  }): Promise<PushNotificationLog> {
+    const now = new Date().toISOString();
+    const id = `log-${Date.now()}`;
+    const logRecord: PushNotificationLog = {
+      id,
+      tenant_id: input.tenantId,
+      title: input.title,
+      body: input.body,
+      url: input.url || "/",
+      target_type: input.targetType || "all",
+      sent_count: input.sentCount,
+      created_by: input.createdBy || null,
+      created_at: now,
+    };
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase.from("push_notifications_log").insert({
+          tenant_id: input.tenantId,
+          title: input.title,
+          body: input.body,
+          url: input.url || "/",
+          target_type: input.targetType || "all",
+          sent_count: input.sentCount,
+          created_by: input.createdBy || null,
+          created_at: now,
+        });
+      } catch (err) {
+        console.warn("[MarketOS] Could not save push log to Supabase:", err);
+      }
+    }
+
+    state.pushLogs.unshift(logRecord);
+    return logRecord;
+  }
+
+  /**
+   * Get push notification logs for a tenant
+   */
+  static async getPushNotificationLogs(
+    tenantId: string
+  ): Promise<PushNotificationLog[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("push_notifications_log")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .order("created_at", { ascending: false })
+          .limit(50);
+
+        if (!error && data && data.length > 0) {
+          return data as PushNotificationLog[];
+        }
+      } catch (err) {
+        console.warn("[MarketOS] Could not fetch push logs from Supabase:", err);
+      }
+    }
+
+    return state.pushLogs
+      .filter((l) => l.tenant_id === tenantId)
+      .slice(0, 50);
+  }
+
+  /**
+   * Get push statistics for a tenant
+   */
+  static async getPushStats(tenantId: string): Promise<PushStats> {
+    const subscriptions = await this.getPushSubscriptions(tenantId);
+    const logs = await this.getPushNotificationLogs(tenantId);
+
+    const totalSent = logs.reduce((acc, l) => acc + l.sent_count, 0);
+    const lastSentAt = logs.length > 0 ? logs[0].created_at : null;
+
+    return {
+      subscriberCount: subscriptions.length,
+      totalSentCount: totalSent,
+      lastSentAt,
+    };
   }
 }

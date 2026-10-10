@@ -17,6 +17,8 @@ import {
   AuditLog,
   UserProfile,
   RateHistoryItem,
+  PushSubscriptionRecord,
+  PushNotificationLog,
 } from "@marketos/types";
 
 export const INITIAL_TENANT: Tenant = {
@@ -695,4 +697,6 @@ export const state = {
   auditLogs: [] as AuditLog[],
   customers: [] as Customer[],
   profiles: INITIAL_PROFILES,
+  pushSubscriptions: [] as PushSubscriptionRecord[],
+  pushLogs: [] as PushNotificationLog[],
 };
