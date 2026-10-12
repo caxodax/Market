@@ -3,6 +3,7 @@
 import { MarketOSRepository } from "@marketos/database";
 import { PaymentStatus, CreateProductInput, UpdateProductInput, InviteStaffInput, UserRole, TenantSettings, CreateCouponInput, UpdateCouponInput, Coupon } from "@marketos/types";
 import { revalidatePath } from "next/cache";
+import { sendOrderStatusPushNotification } from "@/lib/pushNotifications";
 
 export async function reviewPaymentAction(
   tenantId: string,
@@ -17,6 +18,29 @@ export async function reviewPaymentAction(
       status,
       rejectionReason
     );
+
+    // Enviar notificación push al cliente si tiene alertas activas en su dispositivo
+    if (updated) {
+      try {
+        const orders = await MarketOSRepository.getTenantOrders(tenantId);
+        const relatedOrder = orders.find((o) => o.id === updated.order_id);
+        const settings = await MarketOSRepository.getTenantSettings(tenantId);
+        if (relatedOrder) {
+          await sendOrderStatusPushNotification({
+            tenantId,
+            orderNumber: relatedOrder.order_number,
+            status,
+            customerId: relatedOrder.customer_id,
+            customerPhone: relatedOrder.customer_phone,
+            storeName: settings.business_name,
+            rejectionReason,
+          });
+        }
+      } catch (pushErr) {
+        console.warn("[MarketOS Push] No se pudo despachar push de pago:", pushErr);
+      }
+    }
+
     revalidatePath("/admin");
     return { success: true, payment: updated };
   } catch (error) {
@@ -87,6 +111,27 @@ export async function updateOrderStatusAction(
       driverId
     );
     if (!order) throw new Error("Orden no encontrada");
+
+    // Enviar notificación push al cliente si tiene alertas activas en su dispositivo
+    try {
+      const settings = await MarketOSRepository.getTenantSettings(tenantId);
+      let driverName: string | undefined = undefined;
+      if (driverId) {
+        const drivers = await MarketOSRepository.getDrivers(tenantId);
+        driverName = drivers.find((d) => d.id === driverId)?.name;
+      }
+      await sendOrderStatusPushNotification({
+        tenantId,
+        orderNumber: order.order_number,
+        status,
+        customerId: order.customer_id,
+        customerPhone: order.customer_phone,
+        storeName: settings.business_name,
+        driverName,
+      });
+    } catch (pushErr) {
+      console.warn("[MarketOS Push] No se pudo despachar push de pedido:", pushErr);
+    }
 
     revalidatePath("/admin");
     revalidatePath("/");

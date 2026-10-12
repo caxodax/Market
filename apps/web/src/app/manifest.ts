@@ -18,16 +18,42 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     description:
       settings.operational_settings?.announcement_banner ||
       `Catálogo digital y pedidos directos en ${settings.business_name}`,
-    start_url: "/",
+    id: "/",
+    start_url: "/?source=pwa",
+    scope: "/",
     display: "standalone",
+    orientation: "portrait",
     background_color: "#FFFFFF",
     theme_color: settings.primary_color || "#DC2626",
     icons: [
+      {
+        src: "/icon-192.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icon-192.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "maskable",
+      },
       {
         src: iconUrl,
         sizes: "512x512",
         type: iconType,
         purpose: "any",
+      },
+      {
+        src: iconUrl,
+        sizes: "512x512",
+        type: iconType,
+        purpose: "maskable",
+      },
+      {
+        src: "/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
       },
       {
         src: "/icon.svg",

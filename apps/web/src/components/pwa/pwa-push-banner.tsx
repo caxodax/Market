@@ -18,6 +18,7 @@ import {
 import { savePushSubscriptionAction } from "@/app/admin/push-actions";
 import { IosInstallGuideModal } from "./ios-install-guide-modal";
 import { AndroidInstallGuideModal } from "./android-install-guide-modal";
+import { useCart } from "../../context/cart-context";
 
 interface PwaPushBannerProps {
   tenantId: string;
@@ -242,6 +243,12 @@ export function PwaPushBanner({
         applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as unknown as BufferSource,
       });
 
+      const storedPhone =
+        typeof window !== "undefined"
+          ? localStorage.getItem(`marketos_customer_phone_${tenantId}`) ||
+            localStorage.getItem("marketos_customer_phone")
+          : null;
+
       const subJson = subscription.toJSON();
       if (subJson.endpoint && subJson.keys) {
         await savePushSubscriptionAction({
@@ -249,6 +256,7 @@ export function PwaPushBanner({
           endpoint: subJson.endpoint,
           p256dh: subJson.keys.p256dh,
           auth: subJson.keys.auth,
+          customerId: storedPhone || undefined,
           userAgent: navigator.userAgent,
         });
       }
@@ -280,14 +288,16 @@ export function PwaPushBanner({
     }
   };
 
+  const { totalItems } = useCart();
   const displayLogo = logoUrl || "/brand/logo.png";
+  const bottomOffsetClass = totalItems > 0 ? "bottom-20 sm:bottom-4" : "bottom-4";
 
   return (
     <>
       {/* Banner flotante inferior con soporte de áreas seguras y mobile first */}
       <aside
         aria-label={`Notificaciones y PWA de ${storeName}`}
-        className="fixed bottom-4 inset-x-3 sm:inset-x-auto sm:right-6 sm:w-[440px] z-50 transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 pb-[env(safe-area-inset-bottom,0px)]"
+        className={`fixed ${bottomOffsetClass} inset-x-3 sm:inset-x-auto sm:right-6 sm:w-[440px] z-50 transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 pb-[env(safe-area-inset-bottom,0px)]`}
       >
         <div className="bg-slate-950/95 text-white rounded-3xl p-4 sm:p-5 shadow-[0_16px_50px_rgba(0,0,0,0.5)] border border-white/15 backdrop-blur-xl relative overflow-hidden">
           {/* Acento sutil de gradiente de marca */}

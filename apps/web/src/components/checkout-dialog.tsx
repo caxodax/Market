@@ -10,6 +10,7 @@ import {
   validateCouponAction,
   uploadPaymentProofToR2Action,
 } from "../app/actions";
+import { savePushSubscriptionAction } from "../app/admin/push-actions";
 import {
   X,
   CreditCard,
@@ -274,6 +275,34 @@ export function CheckoutDialog({
         currency: paymentMethod === "ZELLE" ? "USD" : "VES",
         proofImageUrl,
       });
+
+      // 4. Record customer phone and link active Web Push subscription for automatic tracking alerts
+      try {
+        localStorage.setItem(`marketos_customer_phone_${settings.tenant_id}`, customerPhone);
+        localStorage.setItem(`marketos_customer_name_${settings.tenant_id}`, customerName);
+        localStorage.setItem("marketos_customer_phone", customerPhone);
+
+        if (typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window) {
+          navigator.serviceWorker.ready.then(async (reg) => {
+            try {
+              const sub = await reg.pushManager.getSubscription();
+              if (sub) {
+                const subJson = sub.toJSON();
+                if (subJson.endpoint && subJson.keys) {
+                  await savePushSubscriptionAction({
+                    tenantId: settings.tenant_id,
+                    endpoint: subJson.endpoint,
+                    p256dh: subJson.keys.p256dh,
+                    auth: subJson.keys.auth,
+                    customerId: customerPhone,
+                    userAgent: navigator.userAgent,
+                  });
+                }
+              }
+            } catch {}
+          }).catch(() => {});
+        }
+      } catch {}
 
       clearCart();
       onOrderCompleted(orderRes.order);

@@ -146,3 +146,101 @@ export async function sendTenantPushBroadcast(
     log,
   };
 }
+
+/**
+ * Enviar notificación push automática al cliente sobre el cambio de estado de su pedido.
+ */
+export async function sendOrderStatusPushNotification(input: {
+  tenantId: string;
+  orderNumber: string;
+  status: string;
+  customerId?: string | null;
+  customerPhone?: string | null;
+  storeName?: string;
+  driverName?: string;
+  rejectionReason?: string;
+}): Promise<void> {
+  const {
+    tenantId,
+    orderNumber,
+    status,
+    customerId,
+    customerPhone,
+    storeName = "MarketOS",
+    driverName,
+    rejectionReason,
+  } = input;
+
+  try {
+    const subscriptions = await MarketOSRepository.getPushSubscriptions(tenantId);
+    // Filtrar suscriptores asociados al teléfono o ID del cliente
+    const targetSubs = subscriptions.filter(
+      (s) =>
+        (customerId && s.customer_id === customerId) ||
+        (customerPhone && s.customer_id === customerPhone)
+    );
+
+    if (targetSubs.length === 0) return;
+
+    let title = `Actualización de tu Pedido #${orderNumber}`;
+    let body = `El estado de tu pedido ha cambiado a: ${status}.`;
+
+    switch (status) {
+      case "APPROVED":
+      case "PAYMENT_APPROVED":
+        title = `🎉 ¡Pago Aprobado! (${orderNumber})`;
+        body = `Tu comprobante ha sido verificado en ${storeName}. Tu pedido está en preparación.`;
+        break;
+      case "REJECTED":
+        title = `⚠️ Aviso sobre tu pago (${orderNumber})`;
+        body = rejectionReason
+          ? `El pago no pudo verificarse: ${rejectionReason}. Por favor contáctanos.`
+          : `El comprobante de tu pedido no pudo ser validado. Por favor contáctanos.`;
+        break;
+      case "PREPARING":
+        title = `📦 Preparando tu Pedido (${orderNumber})`;
+        body = `Estamos empacando tus productos cuidadosamente en ${storeName}.`;
+        break;
+      case "READY":
+        title = `🛍️ ¡Pedido Listo! (${orderNumber})`;
+        body = `Tu pedido está listo para ser despachado o retirado en tienda.`;
+        break;
+      case "DELIVERING":
+        title = `🛵 ¡Tu pedido va en camino! (${orderNumber})`;
+        body = driverName
+          ? `El repartidor ${driverName} está en ruta hacia tu dirección.`
+          : `El repartidor está en ruta hacia tu dirección de entrega.`;
+        break;
+      case "COMPLETED":
+        title = `✅ ¡Pedido Entregado con Éxito! (${orderNumber})`;
+        body = `Gracias por tu compra en ${storeName}. ¡Esperamos que disfrutes tus productos!`;
+        break;
+      case "CANCELLED":
+        title = `Aviso: Pedido Cancelado (${orderNumber})`;
+        body = `Tu pedido ha sido cancelado en ${storeName}.`;
+        break;
+    }
+
+    await Promise.allSettled(
+      targetSubs.map((sub) =>
+        sendSinglePushNotification(
+          {
+            endpoint: sub.endpoint,
+            p256dh: sub.p256dh,
+            auth: sub.auth,
+          },
+          {
+            title,
+            body,
+            url: `/?order=${orderNumber}`,
+            icon: "/icon-192.png",
+            badge: "/apple-touch-icon.png",
+            tag: `order-${orderNumber}`,
+          }
+        )
+      )
+    );
+  } catch (err) {
+    console.warn("[MarketOS Push] Error enviando push de estado de pedido:", err);
+  }
+}

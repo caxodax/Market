@@ -26,7 +26,9 @@ import {
   sendPushBroadcastAction,
   getPushStatsAction,
   getPushLogsAction,
+  savePushSubscriptionAction,
 } from "@/app/admin/push-actions";
+import { urlBase64ToUint8Array } from "@/lib/pushClient";
 import type {
   TenantSettings,
   PushStats,
@@ -203,6 +205,74 @@ export function PushNotificationsManager({
       });
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const [isSendingTest, setIsSendingTest] = useState(false);
+
+  const handleSendTestPush = async () => {
+    setIsSendingTest(true);
+    setFeedback(null);
+    try {
+      if (typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window) {
+        const reg = await navigator.serviceWorker.ready;
+        let sub = await reg.pushManager.getSubscription();
+
+        if (!sub) {
+          const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+          if (!vapidPublicKey) {
+            throw new Error("Clave VAPID pública no configurada.");
+          }
+          const perm = await Notification.requestPermission();
+          if (perm !== "granted") {
+            throw new Error("Permiso de notificaciones denegado en este navegador.");
+          }
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as unknown as BufferSource,
+          });
+          const subJson = sub.toJSON();
+          if (subJson.endpoint && subJson.keys) {
+            await savePushSubscriptionAction({
+              tenantId,
+              endpoint: subJson.endpoint,
+              p256dh: subJson.keys.p256dh,
+              auth: subJson.keys.auth,
+              userAgent: navigator.userAgent,
+            });
+          }
+        }
+      }
+
+      const result = await sendPushBroadcastAction({
+        tenantId,
+        title: `🔔 Prueba: ${settings.business_name}`,
+        body: "¡Excelente! Tu dispositivo está recibiendo alertas Web Push en tiempo real.",
+        url: "/admin",
+        createdBy: adminEmail || "Admin (Prueba)",
+      });
+
+      if (result.success) {
+        setFeedback({
+          type: "success",
+          text: `¡Notificación de prueba enviada con éxito! Revisa la pantalla o barra de notificaciones de tu dispositivo.`,
+        });
+        await refreshData();
+      } else {
+        setFeedback({
+          type: "error",
+          text:
+            ("error" in result ? (result as any).error : result.message) ||
+            "Error al enviar la notificación de prueba.",
+        });
+      }
+    } catch (err: any) {
+      setFeedback({
+        type: "error",
+        text: err.message || "Error al solicitar o enviar prueba push.",
+      });
+    } finally {
+      setIsSendingTest(false);
     }
   };
 
@@ -462,7 +532,7 @@ export function PushNotificationsManager({
             </div>
 
             {/* Botón de Enviar Broadcast */}
-            <div className="pt-2">
+            <div className="pt-2 space-y-2">
               <button
                 type="submit"
                 disabled={isSending || !title.trim() || !body.trim()}
@@ -480,6 +550,25 @@ export function PushNotificationsManager({
                       Enviar Push a {stats.subscriberCount}{" "}
                       {stats.subscriberCount === 1 ? "Dispositivo" : "Dispositivos"}
                     </span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSendTestPush}
+                disabled={isSendingTest || isSending}
+                className="w-full min-h-[42px] py-2.5 px-3 rounded-xl border border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-[0.98]"
+              >
+                {isSendingTest ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    <span>Enviando prueba a este dispositivo...</span>
+                  </>
+                ) : (
+                  <>
+                    <BellRing className="w-3.5 h-3.5 shrink-0" />
+                    <span>Enviar Notificación de Prueba a Mi Dispositivo</span>
                   </>
                 )}
               </button>
