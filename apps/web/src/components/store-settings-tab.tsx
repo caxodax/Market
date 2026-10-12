@@ -7,7 +7,7 @@ import {
   PaymentAccountSettings,
   StoreOperationalSettings,
 } from "@marketos/types";
-import { updateTenantSettingsAction } from "../app/admin/actions";
+import { updateTenantSettingsAction, uploadStoreLogoAction } from "../app/admin/actions";
 import { compressImage } from "@marketos/utils";
 import {
   Store,
@@ -239,14 +239,14 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
     });
   };
 
-  // Handle Logo Upload with client compression
+  // Handle Logo Upload with client compression and permanent Cloudflare R2 storage
   const handleLogoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsProcessingLogo(true);
     try {
-      // Compress to optimal web dimensions (max 512x512)
+      // 1. Compress to optimal web dimensions (max 512x512 WebP)
       const compressed = await compressImage(file, {
         maxWidth: 512,
         maxHeight: 512,
@@ -254,21 +254,33 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
         targetFormat: "image/webp",
       });
 
-      const reader = new FileReader();
-      reader.onload = () => {
-        setLogoUrl(reader.result as string);
-        setIsProcessingLogo(false);
-      };
-      reader.readAsDataURL(compressed.blob);
+      // 2. Upload to Cloudflare R2
+      const formData = new FormData();
+      formData.append("file", compressed.file);
+      formData.append("tenantId", settings.tenant_id);
+
+      const uploadRes = await uploadStoreLogoAction(formData);
+      if (uploadRes.success && uploadRes.url) {
+        setLogoUrl(uploadRes.url);
+      } else {
+        // Fallback to base64 preview if R2 upload fails
+        console.warn("R2 upload fallback to data URL:", uploadRes.error);
+        const reader = new FileReader();
+        reader.onload = () => {
+          setLogoUrl(reader.result as string);
+        };
+        reader.readAsDataURL(compressed.blob);
+      }
     } catch (err) {
       console.error("Error processing logo image:", err);
       // Fallback direct read
       const reader = new FileReader();
       reader.onload = () => {
         setLogoUrl(reader.result as string);
-        setIsProcessingLogo(false);
       };
       reader.readAsDataURL(file);
+    } finally {
+      setIsProcessingLogo(false);
     }
   };
 

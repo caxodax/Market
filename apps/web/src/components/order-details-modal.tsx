@@ -3,6 +3,7 @@
 import React from "react";
 import { Order, OrderStatus, TenantSettings, Driver } from "@marketos/types";
 import { formatCurrency, generateOrderStatusNotificationWhatsAppLink } from "@marketos/utils";
+import { BottomSheetModal } from "./bottom-sheet-modal";
 import {
   X,
   Package,
@@ -121,15 +122,13 @@ export function OrderDetailsModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="order-details-title"
-        className="bg-card text-foreground rounded-t-[32px] sm:rounded-3xl max-w-2xl w-full shadow-2xl border border-border space-y-5 animate-in slide-in-from-bottom-6 max-h-[92vh] overflow-y-auto p-5 sm:p-7"
-      >
-        {/* Header con Número de Orden, Estado y Cerrar */}
-        <div className="flex items-start justify-between gap-3 border-b border-border pb-4">
+    <BottomSheetModal
+      isOpen={isOpen && !!order}
+      onClose={onClose}
+      maxWidth="max-w-2xl"
+      bodyClassName="space-y-5"
+      customHeader={
+        <div className="flex items-start justify-between gap-3 border-b border-border p-5 sm:p-6 bg-muted/20 shrink-0">
           <div className="space-y-1">
             <div className="flex items-center gap-2.5 flex-wrap">
               <span className="font-mono font-black text-lg sm:text-xl text-foreground">
@@ -159,6 +158,8 @@ export function OrderDetailsModal({
             <X className="w-5 h-5" />
           </button>
         </div>
+      }
+    >
 
         {/* Datos del Cliente y Despacho */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -460,7 +461,6 @@ export function OrderDetailsModal({
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </BottomSheetModal>
   );
 }

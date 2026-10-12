@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useId } from "react";
+import React, { useState, useId, useEffect } from "react";
 import { Store, TenantSettings, Order, DeliveryZone } from "@marketos/types";
 import { useCart } from "../context/cart-context";
-import { formatCurrency, convertUsdToVes } from "@marketos/utils";
+import { formatCurrency, convertUsdToVes, compressImage, formatFileSize } from "@marketos/utils";
 import {
   createOrderAction,
   submitPaymentProofAction,
@@ -86,7 +86,33 @@ export function CheckoutDialog({
   const [referenceNumber, setReferenceNumber] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
+  const [isCompressingProof, setIsCompressingProof] = useState(false);
+  const [proofCompressionInfo, setProofCompressionInfo] = useState<{
+    originalSize: number;
+    compressedSize: number;
+    savedPercent: number;
+  } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  // Lock body scroll when checkout dialog is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalStyle;
+    };
+  }, [isOpen]);
+
+  // Close with Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -184,12 +210,36 @@ export function CheckoutDialog({
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    setIsCompressingProof(true);
+    setProofCompressionInfo(null);
+    try {
+      // Compress to high-fidelity WebP (max 1600x1600, quality 0.85)
+      const result = await compressImage(file, {
+        maxWidth: 1600,
+        maxHeight: 1600,
+        quality: 0.85,
+        targetFormat: "image/webp",
+      });
+
+      setProofFile(result.file);
+      setProofPreview(result.previewUrl);
+      setProofCompressionInfo({
+        originalSize: result.originalSize,
+        compressedSize: result.compressedSize,
+        savedPercent: result.savedPercent,
+      });
+    } catch (err) {
+      console.warn("Error comprimiendo comprobante:", err);
+      // Fallback: direct original file
       setProofFile(file);
       const url = URL.createObjectURL(file);
       setProofPreview(url);
+    } finally {
+      setIsCompressingProof(false);
     }
   };
 
@@ -315,8 +365,22 @@ export function CheckoutDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-card w-full max-w-lg rounded-2xl border border-border shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/65 backdrop-blur-xs animate-in fade-in duration-200">
+      <div
+        className="fixed inset-0 bg-transparent cursor-pointer"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+        className="relative z-10 bg-card w-full max-w-lg rounded-t-[28px] sm:rounded-2xl border border-border shadow-2xl flex flex-col max-h-[92vh] overflow-hidden animate-in slide-in-from-bottom-6 sm:slide-in-from-bottom-0 sm:zoom-in-95"
+      >
+        {/* Barra tirador para gestos en móvil (Drag handle) */}
+        <div className="pt-3 pb-1 flex justify-center sm:hidden shrink-0">
+          <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full" />
+        </div>
         {/* Modal Stepper Header */}
         <div className="p-4 border-b border-border flex items-center justify-between bg-muted/20">
           <div className="flex items-center gap-3">
@@ -1001,29 +1065,47 @@ export function CheckoutDialog({
                     />
                   </div>
 
-                  {/* Cloudflare R2 Proof Screenshot Upload */}
+                  {/* Cloudflare R2 Proof Screenshot Upload with WebP compression */}
                   <div className="pt-1">
                     <label className="text-xs font-medium text-foreground block mb-1">
                       Adjuntar Captura / Screenshot (Opcional - R2 Storage)
                     </label>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2.5">
                       <label
                         htmlFor={fileInputId}
-                        className="cursor-pointer flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-input bg-muted/40 hover:bg-muted text-xs font-medium text-muted-foreground transition-colors"
+                        className={`cursor-pointer flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-input bg-muted/40 hover:bg-muted text-xs font-medium text-muted-foreground transition-colors ${
+                          isCompressingProof ? "opacity-60 pointer-events-none" : ""
+                        }`}
                       >
-                        <Upload className="w-4 h-4 text-primary" />
-                        <span>{proofFile ? proofFile.name : "Subir comprobante"}</span>
+                        {isCompressingProof ? (
+                          <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                        ) : (
+                          <Upload className="w-4 h-4 text-primary" />
+                        )}
+                        <span>
+                          {isCompressingProof
+                            ? "Optimizando comprobante..."
+                            : proofFile
+                            ? proofFile.name
+                            : "Subir comprobante"}
+                        </span>
                       </label>
                       <input
                         id={fileInputId}
                         type="file"
                         accept="image/*"
                         onChange={handleFileChange}
+                        disabled={isCompressingProof}
                         className="sr-only"
                       />
-                      {proofPreview && (
-                        <div className="text-[11px] text-emerald-600 font-medium">
-                          ✓ Foto lista
+                      {proofPreview && !isCompressingProof && (
+                        <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 font-semibold bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                          <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>
+                            {proofCompressionInfo
+                              ? `Optimizado WebP (${formatFileSize(proofCompressionInfo.compressedSize)})`
+                              : "Comprobante listo"}
+                          </span>
                         </div>
                       )}
                     </div>

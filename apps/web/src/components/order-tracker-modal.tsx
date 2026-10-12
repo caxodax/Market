@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Order, TenantSettings } from "@marketos/types";
 import { formatCurrency } from "@marketos/utils";
 import { trackOrderAction } from "../app/actions";
+import { BottomSheetModal } from "./bottom-sheet-modal";
 import {
   X,
   Search,
@@ -96,10 +97,13 @@ export function OrderTrackerModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-card w-full max-w-lg rounded-2xl border border-border shadow-2xl flex flex-col max-h-[88vh] overflow-hidden">
-        {/* Header */}
-        <div className="p-4 border-b border-border flex items-center justify-between bg-muted/20">
+    <BottomSheetModal
+      isOpen={isOpen}
+      onClose={onClose}
+      maxWidth="max-w-lg"
+      bodyClassName="p-0 flex flex-col"
+      customHeader={
+        <div className="p-4 border-b border-border flex items-center justify-between bg-muted/20 shrink-0">
           <div>
             <h2 className="text-base font-bold text-foreground flex items-center gap-2">
               <Package className="w-4 h-4 text-primary" />
@@ -111,11 +115,14 @@ export function OrderTrackerModal({
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
+            className="min-h-[40px] min-w-[40px] p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors cursor-pointer"
+            aria-label="Cerrar modal"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
+      }
+    >
 
         {/* Search bar */}
         <div className="p-4 border-b border-border bg-background">
@@ -206,7 +213,6 @@ export function OrderTrackerModal({
             );
           })}
         </div>
-      </div>
-    </div>
+    </BottomSheetModal>
   );
 }

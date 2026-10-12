@@ -179,6 +179,40 @@ export async function uploadProductImageAction(formData: FormData) {
   }
 }
 
+/**
+ * Upload store logo permanently to Cloudflare R2
+ */
+export async function uploadStoreLogoAction(formData: FormData) {
+  try {
+    const file = formData.get("file") as File | null;
+    const tenantId = (formData.get("tenantId") as string) || "shop-market-ca";
+
+    if (!file || file.size === 0) {
+      return { success: false, error: "No se seleccionó ninguna imagen de logo" };
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const { uploadToR2 } = await import("@marketos/utils");
+    const res = await uploadToR2({
+      tenantId,
+      folder: "branding",
+      fileName: file.name || "logo.webp",
+      body: buffer,
+      contentType: file.type || "image/webp",
+    });
+
+    return { success: true, url: res.url, key: res.key };
+  } catch (error) {
+    console.error("Error uploading store logo to R2:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al subir logo a Cloudflare R2",
+    };
+  }
+}
+
 export async function createProductAction(input: CreateProductInput) {
   try {
     const product = await MarketOSRepository.createProduct(input);

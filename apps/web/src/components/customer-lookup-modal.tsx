@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { CustomerAccountSummary, TenantSettings } from "@marketos/types";
 import { formatCurrency } from "@marketos/utils";
 import { lookupCustomerAction } from "../app/actions";
+import { BottomSheetModal } from "./bottom-sheet-modal";
 import {
   X,
   Search,
@@ -78,10 +79,13 @@ export function CustomerLookupModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm">
-      <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl border border-border bg-card shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="p-4 border-b border-border flex items-center justify-between bg-muted/30">
+    <BottomSheetModal
+      isOpen={isOpen}
+      onClose={onClose}
+      maxWidth="max-w-lg"
+      bodyClassName="space-y-5"
+      customHeader={
+        <div className="p-4 border-b border-border flex items-center justify-between bg-muted/30 shrink-0">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-xl bg-primary/10 text-primary">
               <Award className="w-5 h-5" />
@@ -98,14 +102,14 @@ export function CustomerLookupModal({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted"
+            className="min-h-[40px] min-w-[40px] p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            aria-label="Cerrar modal"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
-
-        {/* Content */}
-        <div className="p-5 overflow-y-auto space-y-5">
+      }
+    >
           {/* Lookup Input */}
           <form onSubmit={handleSearch} className="flex gap-2">
             <div className="relative flex-1">
@@ -255,8 +259,6 @@ export function CustomerLookupModal({
               </p>
             </div>
           )}
-        </div>
-      </div>
-    </div>
+    </BottomSheetModal>
   );
 }

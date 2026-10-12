@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Store } from "@marketos/types";
+import { BottomSheetModal } from "./bottom-sheet-modal";
 import {
   MapPin,
   Navigation,
@@ -187,10 +188,13 @@ export function BranchSelectorModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg rounded-3xl bg-card border border-border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Modal Header */}
-        <div className="p-5 border-b border-border flex items-center justify-between bg-muted/40">
+    <BottomSheetModal
+      isOpen={isOpen}
+      onClose={onClose}
+      maxWidth="max-w-lg"
+      bodyClassName="p-5 space-y-4"
+      customHeader={
+        <div className="p-5 border-b border-border flex items-center justify-between bg-muted/40 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
               <StoreIcon className="w-5 h-5" />
@@ -206,14 +210,14 @@ export function BranchSelectorModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+            className="min-h-[40px] min-w-[40px] p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer flex items-center justify-center"
+            aria-label="Cerrar modal"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
-
-        {/* Modal Body */}
-        <div className="p-5 overflow-y-auto space-y-4">
+      }
+    >
           {/* GPS Quick Action Button */}
           <button
             onClick={handleDetectGps}
@@ -324,13 +328,11 @@ export function BranchSelectorModal({
               );
             })}
           </div>
-        </div>
 
-        {/* Modal Footer */}
-        <div className="p-4 border-t border-border bg-muted/20 text-center text-[11px] text-muted-foreground">
-          <span>Los precios se mantienen iguales en todas las sucursales según la tasa oficial del día.</span>
-        </div>
-      </div>
-    </div>
+          {/* Modal Footer note */}
+          <div className="pt-2 text-center text-[11px] text-muted-foreground border-t border-border">
+            <span>Los precios se mantienen iguales en todas las sucursales según la tasa oficial del día.</span>
+          </div>
+    </BottomSheetModal>
   );
 }
