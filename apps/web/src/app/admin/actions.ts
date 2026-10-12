@@ -340,3 +340,45 @@ export async function updateCouponAction(input: UpdateCouponInput) {
     };
   }
 }
+
+/**
+ * Fetch latest enriched orders for tenant dashboard
+ */
+export async function getLatestOrdersAction(tenantId: string) {
+  try {
+    const orders = await MarketOSRepository.getTenantOrders(tenantId);
+    return { success: true, orders };
+  } catch (error) {
+    console.error("Error fetching latest orders:", error);
+    return { success: false, orders: [] };
+  }
+}
+
+/**
+ * Fetch latest payments for tenant dashboard
+ */
+export async function getLatestPaymentsAction(tenantId: string) {
+  try {
+    const payments = await MarketOSRepository.getTenantPayments(tenantId);
+    return { success: true, payments };
+  } catch (error) {
+    console.error("Error fetching latest payments:", error);
+    return { success: false, payments: [] };
+  }
+}
+
+/**
+ * Fetch Sales & Financial Analytics for tenant reports
+ */
+export async function getSalesAnalyticsAction(
+  tenantId: string,
+  dateRange: "today" | "week" | "month" | "all" = "all"
+) {
+  try {
+    const report = await MarketOSRepository.getSalesAnalytics(tenantId, { dateRange });
+    return { success: true, report };
+  } catch (error) {
+    console.error("Error fetching sales analytics:", error);
+    return { success: false, error: "No se pudieron calcular las métricas de ventas" };
+  }
+}

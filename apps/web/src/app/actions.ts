@@ -11,6 +11,7 @@ export async function createOrderAction(input: CreateOrderInput) {
   try {
     const order = await MarketOSRepository.createOrder(input);
     revalidatePath("/");
+    revalidatePath("/admin");
     return { success: true, order };
   } catch (error) {
     console.error("Error creating order:", error);
@@ -25,6 +26,7 @@ export async function submitPaymentProofAction(input: SubmitPaymentInput) {
   try {
     const payment = await MarketOSRepository.submitPaymentProof(input);
     revalidatePath("/");
+    revalidatePath("/admin");
     return { success: true, payment };
   } catch (error) {
     console.error("Error submitting payment proof:", error);

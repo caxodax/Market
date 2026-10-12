@@ -27,6 +27,8 @@ import {
   syncBcvRateAction,
   updateOrderStatusAction,
   updateStaffRoleAction,
+  getLatestOrdersAction,
+  getLatestPaymentsAction,
 } from "../app/admin/actions";
 import { logoutUserAction } from "../app/login/actions";
 import { ProductModal } from "./product-modal";
@@ -35,6 +37,8 @@ import { ExchangeRateManager } from "./exchange-rate-manager";
 import { StoreSettingsTab } from "./store-settings-tab";
 import { CouponManager } from "./coupon-manager";
 import { PushNotificationsManager } from "./push-notifications-manager";
+import { OrderDetailsModal } from "./order-details-modal";
+import { SalesReportsTab } from "./sales-reports-tab";
 import {
   PackageCheck,
   Boxes,
@@ -69,6 +73,8 @@ import {
   Sliders,
   Ticket,
   BellRing,
+  BarChart3,
+  Eye,
   ChevronDown,
   Check,
 } from "lucide-react";
@@ -105,7 +111,7 @@ export function AdminDashboard({
   coupons: initialCoupons = [],
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<
-    "PAYMENTS" | "ORDERS" | "INVENTORY" | "DELIVERY" | "COUPONS" | "PUSH" | "RATES" | "AUDIT" | "STAFF" | "SETTINGS"
+    "PAYMENTS" | "ORDERS" | "REPORTS" | "INVENTORY" | "DELIVERY" | "COUPONS" | "PUSH" | "RATES" | "AUDIT" | "STAFF" | "SETTINGS"
   >("PAYMENTS");
   const [settingsState, setSettingsState] = useState(settings);
   const [products, setProducts] = useState(initialProducts);
@@ -121,8 +127,10 @@ export function AdminDashboard({
   const [syncingBcv, setSyncingBcv] = useState(false);
   const [bcvMessage, setBcvMessage] = useState<string | null>(null);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [refreshingOrders, setRefreshingOrders] = useState(false);
 
   // Modals state
+  const [selectedOrderForModal, setSelectedOrderForModal] = useState<Order | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<(Product & { stock: number }) | null>(null);
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
@@ -205,6 +213,27 @@ export function AdminDashboard({
     }
   };
 
+  // Refresh latest orders and payments from server
+  const handleRefreshOrdersAndPayments = async () => {
+    setRefreshingOrders(true);
+    try {
+      const [oRes, pRes] = await Promise.all([
+        getLatestOrdersAction(settings.tenant_id),
+        getLatestPaymentsAction(settings.tenant_id),
+      ]);
+      if (oRes.success && oRes.orders) {
+        setOrders(oRes.orders);
+      }
+      if (pRes.success && pRes.payments) {
+        setPayments(pRes.payments);
+      }
+    } catch (e) {
+      console.error("Error refreshing data:", e);
+    } finally {
+      setRefreshingOrders(false);
+    }
+  };
+
   // Review Payment Handler
   const handleReview = async (paymentId: string, status: "APPROVED" | "REJECTED") => {
     setProcessingId(paymentId);
@@ -215,14 +244,34 @@ export function AdminDashboard({
         setPayments((prev) =>
           prev.map((p) => (p.id === paymentId ? { ...p, status } : p))
         );
-        // update order state
-        setOrders((prev) =>
-          prev.map((o) =>
-            o.id === res.payment?.order_id
-              ? { ...o, status: status === "APPROVED" ? "PREPARING" : "CANCELLED" }
-              : o
-          )
-        );
+        // Refresh latest orders to ensure newly updated order is displayed with items & status
+        const oRes = await getLatestOrdersAction(settings.tenant_id);
+        if (oRes.success && oRes.orders) {
+          setOrders(oRes.orders);
+        } else {
+          setOrders((prev) =>
+            prev.map((o) =>
+              o.id === res.payment?.order_id
+                ? {
+                    ...o,
+                    status: status === "APPROVED" ? "PREPARING" : "CANCELLED",
+                    payment_status: status,
+                  }
+                : o
+            )
+          );
+        }
+        if (selectedOrderForModal?.id === res.payment?.order_id) {
+          setSelectedOrderForModal((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: status === "APPROVED" ? "PREPARING" : "CANCELLED",
+                  payment_status: status,
+                }
+              : null
+          );
+        }
       }
     } catch (err) {
       console.error(err);
@@ -285,6 +334,11 @@ export function AdminDashboard({
         setOrders((prev) =>
           prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
         );
+        if (selectedOrderForModal?.id === orderId) {
+          setSelectedOrderForModal((prev) =>
+            prev ? { ...prev, status: newStatus } : null
+          );
+        }
       }
     } catch (err) {
       console.error(err);
@@ -313,6 +367,33 @@ export function AdminDashboard({
       icon: <PackageCheck className="w-4 h-4" />,
       badge: orders.length > 0 ? `${orders.length}` : null,
       badgeClassName: "bg-primary/10 text-primary text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+    },
+    {
+      id: "REPORTS" as const,
+      label: "Reportes & Ventas",
+      shortLabel: "Reportes",
+      description: "Ingresos en $ y Bs, métodos y top ventas",
+      icon: <BarChart3 className="w-4 h-4" />,
+      badge:
+        orders.length > 0
+          ? formatCurrency(
+              orders.reduce(
+                (acc, o) =>
+                  [
+                    "COMPLETED",
+                    "PAYMENT_APPROVED",
+                    "PREPARING",
+                    "READY",
+                    "DELIVERING",
+                  ].includes(o.status)
+                    ? acc + o.total_usd
+                    : acc,
+                0
+              ),
+              "USD"
+            )
+          : null,
+      badgeClassName: "bg-emerald-500/10 text-emerald-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
     },
     {
       id: "INVENTORY" as const,
@@ -471,8 +552,22 @@ export function AdminDashboard({
                 className={`w-3.5 h-3.5 ${syncingBcv ? "animate-spin" : ""}`}
               />
               <span className="hidden xl:inline">
-                {syncingBcv ? "Sincronizando..." : "Sincronizar"}
+                {syncingBcv ? "Sincronizando..." : "Sincronizar BCV"}
               </span>
+            </button>
+
+            <button
+              onClick={handleRefreshOrdersAndPayments}
+              disabled={refreshingOrders}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-card border border-border text-foreground text-xs font-semibold hover:bg-muted transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+              title="Refrescar pedidos y pagos más recientes"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 text-primary ${
+                  refreshingOrders ? "animate-spin" : ""
+                }`}
+              />
+              <span className="hidden md:inline">Actualizar</span>
             </button>
 
             {currentUser && (
@@ -783,30 +878,43 @@ export function AdminDashboard({
                         )}
                       </div>
 
-                      {payment.status === "PENDING" && (
-                        <div className="flex items-center gap-2 self-end md:self-center">
+                      <div className="flex flex-wrap items-center gap-2 self-end md:self-center">
+                        {relatedOrder && (
                           <button
-                            disabled={processingId === payment.id}
-                            onClick={() => handleReview(payment.id, "REJECTED")}
-                            className="px-3 py-1.5 rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/10 text-xs font-bold transition-colors disabled:opacity-50"
+                            type="button"
+                            onClick={() => setSelectedOrderForModal(relatedOrder)}
+                            className="px-3 py-1.5 rounded-xl border border-border bg-muted/60 hover:bg-muted text-foreground text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
                           >
-                            Rechazar
+                            <Eye className="w-3.5 h-3.5 text-primary" />
+                            <span>Ver Pedido</span>
                           </button>
+                        )}
 
-                          <button
-                            disabled={processingId === payment.id}
-                            onClick={() => handleReview(payment.id, "APPROVED")}
-                            className="px-4 py-1.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5"
-                          >
-                            {processingId === payment.id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <CheckCircle className="w-3.5 h-3.5" />
-                            )}
-                            <span>Aprobar Pago</span>
-                          </button>
-                        </div>
-                      )}
+                        {payment.status === "PENDING" && (
+                          <>
+                            <button
+                              disabled={processingId === payment.id}
+                              onClick={() => handleReview(payment.id, "REJECTED")}
+                              className="px-3 py-1.5 rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/10 text-xs font-bold transition-colors disabled:opacity-50 cursor-pointer"
+                            >
+                              Rechazar
+                            </button>
+
+                            <button
+                              disabled={processingId === payment.id}
+                              onClick={() => handleReview(payment.id, "APPROVED")}
+                              className="px-4 py-1.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                            >
+                              {processingId === payment.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <CheckCircle className="w-3.5 h-3.5" />
+                              )}
+                              <span>Aprobar Pago</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -834,52 +942,102 @@ export function AdminDashboard({
                   return (
                     <div
                       key={order.id}
-                      className="p-4 rounded-2xl border border-border bg-card space-y-3"
+                      className="p-4 rounded-2xl border border-border bg-card space-y-3 hover:border-primary/30 transition-all shadow-xs"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="font-mono font-black text-sm text-foreground">
                             {order.order_number}
                           </span>
                           <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                             {order.status}
                           </span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-muted-foreground font-medium">
                             {order.delivery_type === "DELIVERY"
                               ? "🛵 Delivery"
                               : "🏬 Retiro Tienda"}
                           </span>
+                          {order.payment_status && (
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                order.payment_status === "APPROVED"
+                                  ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                                  : order.payment_status === "REJECTED"
+                                  ? "bg-destructive/10 text-destructive border-destructive/20"
+                                  : "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                              }`}
+                            >
+                              Pago {order.payment_status}
+                            </span>
+                          )}
                         </div>
 
                         <div className="text-right">
                           <span className="text-sm font-black text-primary">
                             {formatCurrency(order.total_usd, "USD")}
                           </span>
-                          <span className="block text-[11px] text-muted-foreground">
+                          <span className="block text-[11px] text-muted-foreground font-mono">
                             Bs. {order.total_ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
                           </span>
                         </div>
                       </div>
 
-                      {order.delivery_address && (
-                        <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                          <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
-                          <span>{order.delivery_address}</span>
+                      {/* Customer info & Delivery Address */}
+                      <div className="grid sm:grid-cols-2 gap-2 text-xs">
+                        {(order.customer_name || order.customer_phone) && (
+                          <div className="flex items-center gap-1.5 text-foreground font-medium">
+                            <UserCheck className="w-3.5 h-3.5 text-primary shrink-0" />
+                            <span>
+                              <strong>Cliente:</strong> {order.customer_name || "Cliente"}
+                              {order.customer_phone ? ` (${order.customer_phone})` : ""}
+                            </span>
+                          </div>
+                        )}
+
+                        {order.delivery_address && (
+                          <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
+                            <span className="truncate">{order.delivery_address}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Purchased Items summary preview */}
+                      {order.items && order.items.length > 0 && (
+                        <div className="bg-muted/40 p-2.5 rounded-xl border border-border/60 text-xs space-y-1">
+                          <div className="flex items-center justify-between text-muted-foreground">
+                            <span className="font-bold text-[10px] uppercase tracking-wider">
+                              Artículos Comprados ({order.items.reduce((s, it) => s + it.quantity, 0)} unid.):
+                            </span>
+                          </div>
+                          <p className="text-foreground text-xs leading-relaxed line-clamp-2">
+                            {order.items.map((it) => `${it.quantity}x ${it.product_name}`).join(" • ")}
+                          </p>
                         </div>
                       )}
 
-                      {/* State transition workflow */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                      {/* State transition workflow & action buttons */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border/50">
                         <div className="text-xs text-muted-foreground flex items-center gap-1">
-                          <UserCheck className="w-3.5 h-3.5 text-primary" />
-                          <span>Repartidor asignado: <strong>{driver ? driver.name : "Por asignar"}</strong></span>
+                          <Truck className="w-3.5 h-3.5 text-primary" />
+                          <span>Repartidor: <strong>{driver ? driver.name : "Por asignar"}</strong></span>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-1.5">
+                          {/* Ver Detalle Completo Button */}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOrderForModal(order)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 text-xs font-bold border border-primary/20 transition-colors cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Ver Detalle</span>
+                          </button>
+
                           <a
                             href={generateOrderStatusNotificationWhatsAppLink({
-                              customerName: "Cliente",
-                              customerPhone: settings.whatsapp_number || settings.phone,
+                              customerName: order.customer_name || "Cliente",
+                              customerPhone: order.customer_phone || settings.whatsapp_number || settings.phone,
                               businessName: settings.business_name,
                               orderNumber: order.order_number,
                               status: order.status,
@@ -889,7 +1047,7 @@ export function AdminDashboard({
                             })}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-xs font-bold border border-emerald-500/20 transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-xs font-bold border border-emerald-500/20 transition-colors cursor-pointer"
                             title="Abrir WhatsApp para enviar estado al cliente"
                           >
                             <MessageCircle className="w-3.5 h-3.5" />
@@ -899,7 +1057,7 @@ export function AdminDashboard({
                           {order.status === "PREPARING" && (
                             <button
                               onClick={() => handleUpdateOrderStatus(order.id, "READY")}
-                              className="px-3 py-1 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"
+                              className="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 cursor-pointer"
                             >
                               Marcar Listo
                             </button>
@@ -908,7 +1066,7 @@ export function AdminDashboard({
                           {order.status === "READY" && (
                             <button
                               onClick={() => handleUpdateOrderStatus(order.id, "DELIVERING", driver?.id)}
-                              className="px-3 py-1 rounded-lg bg-orange-600 text-white text-xs font-bold hover:bg-orange-700"
+                              className="px-3 py-1.5 rounded-xl bg-orange-600 text-white text-xs font-bold hover:bg-orange-700 cursor-pointer"
                             >
                               Enviar a Ruta
                             </button>
@@ -917,7 +1075,7 @@ export function AdminDashboard({
                           {order.status === "DELIVERING" && (
                             <button
                               onClick={() => handleUpdateOrderStatus(order.id, "COMPLETED")}
-                              className="px-3 py-1 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700"
+                              className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 cursor-pointer"
                             >
                               Confirmar Entrega
                             </button>
@@ -930,6 +1088,17 @@ export function AdminDashboard({
               </div>
             )}
           </div>
+        )}
+
+        {/* TAB: SALES & FINANCIAL REPORTS */}
+        {activeTab === "REPORTS" && (
+          <SalesReportsTab
+            tenantId={settings.tenant_id}
+            settings={settingsState}
+            exchangeRate={rate}
+            initialOrders={orders}
+            initialPayments={payments}
+          />
         )}
 
         {/* TAB 3: INVENTORY */}
@@ -1463,6 +1632,23 @@ export function AdminDashboard({
         isOpen={isStaffModalOpen}
         onClose={() => setIsStaffModalOpen(false)}
         onStaffAdded={handleStaffAdded}
+      />
+
+      {/* Order Details & Operational Modal */}
+      <OrderDetailsModal
+        order={selectedOrderForModal}
+        isOpen={Boolean(selectedOrderForModal)}
+        onClose={() => setSelectedOrderForModal(null)}
+        settings={settingsState}
+        drivers={drivers}
+        onUpdateStatus={handleUpdateOrderStatus}
+        onReviewPayment={async (paymentId, status) => {
+          await handleReview(paymentId, status);
+        }}
+        paymentId={
+          payments.find((p) => p.order_id === selectedOrderForModal?.id)?.id
+        }
+        isProcessing={processingId !== null}
       />
     </div>
   );

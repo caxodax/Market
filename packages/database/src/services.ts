@@ -6,6 +6,8 @@ import {
   Product,
   ExchangeRate,
   Order,
+  OrderItem,
+  SalesAnalytics,
   PaymentProof,
   DeliveryType,
   PaymentMethodType,
@@ -1162,6 +1164,19 @@ export class MarketOSRepository {
       notes: input.notes || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      customer_name: input.customerName,
+      customer_phone: input.customerPhone,
+      customer_email: input.customerEmail || null,
+      items: input.items.map((it, idx) => ({
+        id: `item-${Date.now()}-${idx}`,
+        order_id: `ord-${Date.now()}`,
+        tenant_id: input.tenantId,
+        product_id: it.productId,
+        product_name: it.productName,
+        quantity: it.quantity,
+        unit_price_usd: it.unitPriceUsd,
+        total_price_usd: Number((it.quantity * it.unitPriceUsd).toFixed(2)),
+      })),
     };
 
     // 6. Insert Order into Supabase
@@ -1191,6 +1206,16 @@ export class MarketOSRepository {
 
         if (insertedOrder) {
           newOrder.id = insertedOrder.id;
+          newOrder.items = input.items.map((it, idx) => ({
+            id: `item-${insertedOrder.id}-${idx}`,
+            order_id: insertedOrder.id,
+            tenant_id: input.tenantId,
+            product_id: it.productId,
+            product_name: it.productName,
+            quantity: it.quantity,
+            unit_price_usd: it.unitPriceUsd,
+            total_price_usd: Number((it.quantity * it.unitPriceUsd).toFixed(2)),
+          }));
 
           // Insert order items
           const itemsPayload = input.items.map((it) => ({
@@ -1318,10 +1343,14 @@ export class MarketOSRepository {
 
     state.payments.unshift(payment);
 
-    // Update order status in memory
+    // Update order status and payment fields in memory
     const order = state.orders.find((o) => o.id === input.orderId);
     if (order) {
       order.status = "PAYMENT_PENDING";
+      order.payment_method = input.method;
+      order.payment_reference = input.referenceNumber;
+      order.payment_status = "PENDING";
+      order.proof_image_url = input.proofImageUrl || null;
       order.updated_at = new Date().toISOString();
     }
 
@@ -1342,23 +1371,263 @@ export class MarketOSRepository {
   }
 
   /**
-   * Get Orders for Tenant Admin
+   * Get Orders for Tenant Admin with full enrichment (items, customer, payment details)
    */
   static async getTenantOrders(tenantId: string): Promise<Order[]> {
     const supabase = getSupabase();
     if (supabase) {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .order("created_at", { ascending: false });
+      try {
+        const { data: rawOrders, error } = await supabase
+          .from("orders")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .order("created_at", { ascending: false });
 
-      if (!error && data && data.length > 0) {
-        return data as Order[];
+        if (!error && rawOrders && rawOrders.length > 0) {
+          const orderIds = rawOrders.map((o: any) => o.id);
+          const customerIds = Array.from(
+            new Set(rawOrders.map((o: any) => o.customer_id).filter(Boolean))
+          );
+          const storeIds = Array.from(
+            new Set(rawOrders.map((o: any) => o.store_id).filter(Boolean))
+          );
+
+          const [itemsRes, custRes, payRes, storesRes] = await Promise.all([
+            supabase.from("order_items").select("*").in("order_id", orderIds),
+            customerIds.length > 0
+              ? supabase.from("customers").select("id, name, phone, email").in("id", customerIds)
+              : Promise.resolve({ data: [] }),
+            supabase.from("payments").select("*").in("order_id", orderIds),
+            storeIds.length > 0
+              ? supabase.from("stores").select("id, name").in("id", storeIds)
+              : Promise.resolve({ data: [] }),
+          ]);
+
+          const itemsMap = new Map<string, OrderItem[]>();
+          ((itemsRes as any)?.data || []).forEach((item: OrderItem) => {
+            const list = itemsMap.get(item.order_id) || [];
+            list.push(item);
+            itemsMap.set(item.order_id, list);
+          });
+
+          const custMap = new Map<string, any>();
+          ((custRes as any)?.data || []).forEach((c: any) => custMap.set(c.id, c));
+
+          const payMap = new Map<string, any>();
+          ((payRes as any)?.data || []).forEach((p: any) => payMap.set(p.order_id, p));
+
+          const storeMap = new Map<string, string>();
+          ((storesRes as any)?.data || []).forEach((s: any) => storeMap.set(s.id, s.name));
+
+          return rawOrders.map((o: any) => {
+            const cust = custMap.get(o.customer_id);
+            const pay = payMap.get(o.id);
+            const storeName = storeMap.get(o.store_id);
+
+            return {
+              ...o,
+              items: itemsMap.get(o.id) || [],
+              customer_name: cust?.name,
+              customer_phone: cust?.phone,
+              customer_email: cust?.email,
+              payment_method: pay?.method,
+              payment_reference: pay?.reference_number,
+              payment_status: pay?.status,
+              proof_image_url: pay?.proof_image_url,
+              store_name: storeName,
+            } as Order;
+          });
+        }
+      } catch (err) {
+        console.warn("[MarketOS] getTenantOrders Supabase error:", err);
       }
     }
 
-    return state.orders.filter((o) => o.tenant_id === tenantId);
+    // In-memory fallback enriched with payments and stores
+    return state.orders
+      .filter((o) => o.tenant_id === tenantId)
+      .map((o) => {
+        const pay = state.payments.find((p) => p.order_id === o.id);
+        const st = state.stores.find((s) => s.id === o.store_id);
+        return {
+          ...o,
+          payment_method: pay?.method || o.payment_method,
+          payment_reference: pay?.reference_number || o.payment_reference,
+          payment_status: pay?.status || o.payment_status,
+          proof_image_url: pay?.proof_image_url || o.proof_image_url,
+          store_name: st?.name || o.store_name,
+        };
+      });
+  }
+
+  /**
+   * Get Sales and Financial Analytics for Store Owner
+   */
+  static async getSalesAnalytics(
+    tenantId: string,
+    filter?: { dateRange?: "today" | "week" | "month" | "all"; storeId?: string }
+  ): Promise<SalesAnalytics> {
+    const orders = await this.getTenantOrders(tenantId);
+
+    const now = new Date();
+    let startDate: Date | null = null;
+
+    if (filter?.dateRange === "today") {
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else if (filter?.dateRange === "week") {
+      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (filter?.dateRange === "month") {
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+
+    const filteredOrders = orders.filter((o) => {
+      if (filter?.storeId && o.store_id !== filter.storeId) return false;
+      if (startDate) {
+        const orderDate = new Date(o.created_at);
+        if (orderDate < startDate) return false;
+      }
+      return true;
+    });
+
+    let totalRevenueUsd = 0;
+    let totalRevenueVes = 0;
+    let completedOrdersCount = 0;
+    let pendingOrdersCount = 0;
+    let cancelledOrdersCount = 0;
+    let itemsSoldTotal = 0;
+
+    const methodStatsMap = new Map<PaymentMethodType, { totalUsd: number; totalVes: number; count: number }>();
+    const statusStatsMap = new Map<OrderStatus, { totalUsd: number; count: number }>();
+    const productStatsMap = new Map<string, { name: string; quantity: number; revenueUsd: number }>();
+    const dailyMap = new Map<string, { totalUsd: number; count: number }>();
+
+    for (const order of filteredOrders) {
+      const isPaidOrCompleted = ["PAYMENT_APPROVED", "PREPARING", "READY", "DELIVERING", "COMPLETED"].includes(order.status);
+
+      if (order.status === "COMPLETED") completedOrdersCount++;
+      else if (order.status === "CANCELLED") cancelledOrdersCount++;
+      else pendingOrdersCount++;
+
+      if (isPaidOrCompleted) {
+        totalRevenueUsd += order.total_usd;
+        totalRevenueVes += order.total_ves;
+      }
+
+      // Status breakdown
+      const st = statusStatsMap.get(order.status) || { totalUsd: 0, count: 0 };
+      st.totalUsd += order.total_usd;
+      st.count += 1;
+      statusStatsMap.set(order.status, st);
+
+      // Payment method breakdown
+      if (order.payment_method) {
+        const m = methodStatsMap.get(order.payment_method) || { totalUsd: 0, totalVes: 0, count: 0 };
+        m.totalUsd += order.total_usd;
+        m.totalVes += order.total_ves;
+        m.count += 1;
+        methodStatsMap.set(order.payment_method, m);
+      }
+
+      // Products breakdown
+      if (order.items && order.items.length > 0) {
+        for (const item of order.items) {
+          if (isPaidOrCompleted) {
+            itemsSoldTotal += item.quantity;
+          }
+          const p = productStatsMap.get(item.product_id) || { name: item.product_name, quantity: 0, revenueUsd: 0 };
+          p.quantity += item.quantity;
+          p.revenueUsd += item.total_price_usd;
+          productStatsMap.set(item.product_id, p);
+        }
+      }
+
+      // Daily breakdown
+      const dayKey = order.created_at.split("T")[0];
+      const d = dailyMap.get(dayKey) || { totalUsd: 0, count: 0 };
+      if (isPaidOrCompleted) {
+        d.totalUsd += order.total_usd;
+      }
+      d.count += 1;
+      dailyMap.set(dayKey, d);
+    }
+
+    const totalOrdersCount = filteredOrders.length;
+    const averageTicketUsd =
+      completedOrdersCount > 0
+        ? Number((totalRevenueUsd / completedOrdersCount).toFixed(2))
+        : totalOrdersCount > 0
+        ? Number((totalRevenueUsd / totalOrdersCount).toFixed(2))
+        : 0;
+
+    const METHOD_LABELS: Record<PaymentMethodType, string> = {
+      PAGO_MOVIL: "Pago Móvil (VES)",
+      BANK_TRANSFER: "Transferencia Bancaria",
+      ZELLE: "Zelle (USD)",
+      CASH_USD: "Efectivo Dólares ($)",
+      CASH_VES: "Efectivo Bolívares (Bs)",
+      POS: "Punto de Venta / Tarjeta",
+    };
+
+    const STATUS_LABELS: Record<OrderStatus, string> = {
+      CREATED: "Iniciado",
+      PAYMENT_PENDING: "Por Verificar Pago",
+      PAYMENT_APPROVED: "Pago Aprobado",
+      PREPARING: "En Preparación",
+      READY: "Listo para Despacho",
+      DELIVERING: "En Ruta",
+      COMPLETED: "Completado y Entregado",
+      CANCELLED: "Cancelado / Rechazado",
+    };
+
+    const revenueByMethod = Array.from(methodStatsMap.entries())
+      .map(([method, val]) => ({
+        method,
+        label: METHOD_LABELS[method] || method,
+        totalUsd: Number(val.totalUsd.toFixed(2)),
+        totalVes: Number(val.totalVes.toFixed(2)),
+        count: val.count,
+      }))
+      .sort((a, b) => b.totalUsd - a.totalUsd);
+
+    const revenueByStatus = Array.from(statusStatsMap.entries()).map(([status, val]) => ({
+      status,
+      label: STATUS_LABELS[status] || status,
+      totalUsd: Number(val.totalUsd.toFixed(2)),
+      count: val.count,
+    }));
+
+    const topSellingProducts = Array.from(productStatsMap.entries())
+      .map(([productId, val]) => ({
+        productId,
+        productName: val.name,
+        quantitySold: val.quantity,
+        totalRevenueUsd: Number(val.revenueUsd.toFixed(2)),
+      }))
+      .sort((a, b) => b.quantitySold - a.quantitySold)
+      .slice(0, 10);
+
+    const dailySales = Array.from(dailyMap.entries())
+      .map(([date, val]) => ({
+        date,
+        totalUsd: Number(val.totalUsd.toFixed(2)),
+        orderCount: val.count,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    return {
+      totalRevenueUsd: Number(totalRevenueUsd.toFixed(2)),
+      totalRevenueVes: Number(totalRevenueVes.toFixed(2)),
+      completedOrdersCount,
+      pendingOrdersCount,
+      cancelledOrdersCount,
+      totalOrdersCount,
+      averageTicketUsd,
+      itemsSoldTotal,
+      revenueByMethod,
+      revenueByStatus,
+      topSellingProducts,
+      dailySales,
+    };
   }
 
   /**
@@ -1447,6 +1716,7 @@ export class MarketOSRepository {
         } else if (status === "REJECTED") {
           order.status = "CANCELLED";
         }
+        order.payment_status = status;
         order.updated_at = new Date().toISOString();
       }
     }

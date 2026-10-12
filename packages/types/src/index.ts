@@ -347,6 +347,51 @@ export interface Order {
   notes?: string | null;
   created_at: string;
   updated_at: string;
+  // Enriched fields for operational visibility and reports
+  items?: OrderItem[];
+  customer_name?: string;
+  customer_phone?: string;
+  customer_email?: string | null;
+  payment_method?: PaymentMethodType;
+  payment_reference?: string;
+  payment_status?: PaymentStatus;
+  proof_image_url?: string | null;
+  store_name?: string;
+}
+
+export interface SalesAnalytics {
+  totalRevenueUsd: number;
+  totalRevenueVes: number;
+  completedOrdersCount: number;
+  pendingOrdersCount: number;
+  cancelledOrdersCount: number;
+  totalOrdersCount: number;
+  averageTicketUsd: number;
+  itemsSoldTotal: number;
+  revenueByMethod: {
+    method: PaymentMethodType;
+    label: string;
+    totalUsd: number;
+    totalVes: number;
+    count: number;
+  }[];
+  revenueByStatus: {
+    status: OrderStatus;
+    label: string;
+    totalUsd: number;
+    count: number;
+  }[];
+  topSellingProducts: {
+    productId: string;
+    productName: string;
+    quantitySold: number;
+    totalRevenueUsd: number;
+  }[];
+  dailySales: {
+    date: string;
+    totalUsd: number;
+    orderCount: number;
+  }[];
 }
 
 export interface PaymentProof {
