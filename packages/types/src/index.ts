@@ -586,7 +586,7 @@ export interface PushNotificationLog {
   title: string;
   body: string;
   url: string;
-  target_type: "all" | "customers";
+  target_type: "all" | "customers" | "with_orders" | "without_orders" | string;
   sent_count: number;
   created_by?: string | null;
   created_at: string;
@@ -600,6 +600,7 @@ export interface SendPushBroadcastInput {
   icon?: string;
   badge?: string;
   tag?: string;
+  targetType?: "all" | "with_orders" | "without_orders" | string;
   createdBy?: string | null;
 }
 

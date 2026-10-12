@@ -89,12 +89,12 @@ export async function sendTenantPushBroadcast(
   message?: string;
   log?: PushNotificationLog;
 }> {
-  const { tenantId, title, body, url, icon, badge, tag, createdBy } = input;
+  const { tenantId, title, body, url, icon, badge, tag, targetType = "all", createdBy } = input;
 
   // 1. Obtener suscriptores activos exclusivos de este tenant
-  const subscriptions = await MarketOSRepository.getPushSubscriptions(tenantId);
+  const allSubscriptions = await MarketOSRepository.getPushSubscriptions(tenantId);
 
-  if (!subscriptions || subscriptions.length === 0) {
+  if (!allSubscriptions || allSubscriptions.length === 0) {
     return {
       success: true,
       sentCount: 0,
@@ -103,7 +103,24 @@ export async function sendTenantPushBroadcast(
     };
   }
 
-  // 2. Enviar en paralelo a todas las suscripciones activas
+  // Segmentación por perfil de cliente
+  let subscriptions = allSubscriptions;
+  if (targetType === "with_orders") {
+    subscriptions = allSubscriptions.filter((s) => Boolean(s.customer_id));
+  } else if (targetType === "without_orders") {
+    subscriptions = allSubscriptions.filter((s) => !s.customer_id);
+  }
+
+  if (subscriptions.length === 0) {
+    return {
+      success: true,
+      sentCount: 0,
+      totalTargeted: 0,
+      message: `No se encontraron dispositivos en el segmento seleccionado (${targetType}).`,
+    };
+  }
+
+  // 2. Enviar en paralelo a todas las suscripciones activas del segmento
   const results = await Promise.allSettled(
     subscriptions.map((sub) =>
       sendSinglePushNotification(
@@ -134,7 +151,7 @@ export async function sendTenantPushBroadcast(
     title,
     body,
     url: url || "/",
-    targetType: "all",
+    targetType,
     sentCount,
     createdBy: createdBy || "Admin",
   });

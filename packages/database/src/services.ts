@@ -2821,7 +2821,7 @@ export class MarketOSRepository {
     title: string;
     body: string;
     url?: string;
-    targetType?: "all" | "customers";
+    targetType?: "all" | "customers" | "with_orders" | "without_orders" | string;
     sentCount: number;
     createdBy?: string | null;
   }): Promise<PushNotificationLog> {
