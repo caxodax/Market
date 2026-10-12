@@ -5,6 +5,7 @@ export * from "./redis";
 export * from "./storage";
 export * from "./whatsapp";
 export * from "./image-compressor";
+export * from "./dates";
 
 /**
  * Currency Formatting Utilities for MarketOS

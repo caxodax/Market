@@ -42,7 +42,7 @@ import {
   PushStats,
 } from "@marketos/types";
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
-import { fetchBcvRate, convertUsdToVes } from "@marketos/utils";
+import { fetchBcvRate, convertUsdToVes, getCaracasDateKey, getCaracasRangeBounds } from "@marketos/utils";
 import { createServerComponentClient } from "./server";
 import { isSupabaseOffline } from "./circuit-breaker";
 
@@ -1469,22 +1469,14 @@ export class MarketOSRepository {
   ): Promise<SalesAnalytics> {
     const orders = await this.getTenantOrders(tenantId);
 
-    const now = new Date();
-    let startDate: Date | null = null;
-
-    if (filter?.dateRange === "today") {
-      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    } else if (filter?.dateRange === "week") {
-      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    } else if (filter?.dateRange === "month") {
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    }
+    const range = filter?.dateRange || "all";
+    const { startUtc, endUtc } = getCaracasRangeBounds(range);
 
     const filteredOrders = orders.filter((o) => {
       if (filter?.storeId && o.store_id !== filter.storeId) return false;
-      if (startDate) {
+      if (startUtc) {
         const orderDate = new Date(o.created_at);
-        if (orderDate < startDate) return false;
+        if (orderDate < startUtc || orderDate > endUtc) return false;
       }
       return true;
     });
@@ -1541,8 +1533,8 @@ export class MarketOSRepository {
         }
       }
 
-      // Daily breakdown
-      const dayKey = order.created_at.split("T")[0];
+      // Daily breakdown (normalized to America/Caracas timezone)
+      const dayKey = getCaracasDateKey(order.created_at) || order.created_at.split("T")[0];
       const d = dailyMap.get(dayKey) || { totalUsd: 0, count: 0 };
       if (isPaidOrCompleted) {
         d.totalUsd += order.total_usd;

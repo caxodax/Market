@@ -10,7 +10,13 @@ import {
   PaymentMethodType,
   OrderStatus,
 } from "@marketos/types";
-import { formatCurrency } from "@marketos/utils";
+import {
+  formatCurrency,
+  formatCaracasDateTime,
+  formatCaracasDate,
+  getCaracasDateKey,
+  getCaracasRangeBounds,
+} from "@marketos/utils";
 import { getSalesAnalyticsAction } from "../app/admin/actions";
 import {
   TrendingUp,
@@ -28,6 +34,8 @@ import {
   Filter,
   Eye,
   Search,
+  FileSpreadsheet,
+  Loader2,
 } from "lucide-react";
 import { OrderDetailsModal } from "./order-details-modal";
 
@@ -51,6 +59,7 @@ export function SalesReportsTab({
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
 
   const fetchAnalytics = async (range: "today" | "week" | "month" | "all") => {
     setLoading(true);
@@ -70,16 +79,64 @@ export function SalesReportsTab({
     fetchAnalytics(dateRange);
   }, [tenantId, dateRange]);
 
-  // Export report to CSV
+  // Filter orders by active dateRange (normalized to America/Caracas UTC-4)
+  const dateFilteredOrders = initialOrders.filter((o) => {
+    const { startUtc, endUtc } = getCaracasRangeBounds(dateRange);
+    if (startUtc) {
+      const orderDate = new Date(o.created_at);
+      if (orderDate < startUtc || orderDate > endUtc) return false;
+    }
+    return true;
+  });
+
+  // Filtered orders list for the detailed audit table (dateRange + search query)
+  const filteredOrders = dateFilteredOrders.filter((o) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      o.order_number.toLowerCase().includes(query) ||
+      (o.customer_name && o.customer_name.toLowerCase().includes(query)) ||
+      (o.customer_phone && o.customer_phone.includes(query)) ||
+      (o.payment_method && o.payment_method.toLowerCase().includes(query)) ||
+      (o.payment_reference && o.payment_reference.toLowerCase().includes(query))
+    );
+  });
+
+  // Export full multi-sheet executive report to Excel (.xlsx)
+  const handleExportExcel = async () => {
+    if (!dateFilteredOrders || dateFilteredOrders.length === 0) {
+      alert("No hay pedidos registrados en el período seleccionado para exportar.");
+      return;
+    }
+
+    setIsExportingExcel(true);
+    try {
+      const { exportSalesReportsToExcel } = await import("../lib/exportExcel");
+      await exportSalesReportsToExcel({
+        settings,
+        orders: dateFilteredOrders,
+        analytics,
+        exchangeRate,
+        dateRange,
+      });
+    } catch (err) {
+      console.error("Error exportando reporte a Excel:", err);
+      alert("Ocurrió un error al generar el archivo Excel.");
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
+  // Export report to CSV with Caracas timestamps
   const handleExportCsv = () => {
-    if (!initialOrders || initialOrders.length === 0) {
-      alert("No hay pedidos registrados para exportar.");
+    if (!dateFilteredOrders || dateFilteredOrders.length === 0) {
+      alert("No hay pedidos registrados en el período seleccionado para exportar.");
       return;
     }
 
     const headers = [
       "Numero_Pedido",
-      "Fecha",
+      "Fecha_Hora_Caracas",
       "Cliente",
       "Telefono",
       "Modalidad",
@@ -92,9 +149,9 @@ export function SalesReportsTab({
       "Tasa_BCV",
     ];
 
-    const rows = initialOrders.map((o) => [
+    const rows = dateFilteredOrders.map((o) => [
       o.order_number,
-      o.created_at,
+      `"${formatCaracasDateTime(o.created_at)}"`,
       `"${o.customer_name || "Cliente General"}"`,
       `"${o.customer_phone || ""}"`,
       o.delivery_type,
@@ -108,33 +165,21 @@ export function SalesReportsTab({
     ]);
 
     const csvContent =
-      "data:text/csv;charset=utf-8," +
+      "data:text/csv;charset=utf-8,\uFEFF" +
       [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
+    const dateStr = getCaracasDateKey(new Date()) || new Date().toISOString().split("T")[0];
     link.setAttribute(
       "download",
-      `reporte_ventas_${settings.business_name.toLowerCase().replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.csv`
+      `reporte_ventas_${settings.business_name.toLowerCase().replace(/\s+/g, "_")}_${dateRange}_${dateStr}.csv`
     );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
-
-  // Filtered orders list for the detailed audit table
-  const filteredOrders = initialOrders.filter((o) => {
-    if (!searchQuery.trim()) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      o.order_number.toLowerCase().includes(query) ||
-      (o.customer_name && o.customer_name.toLowerCase().includes(query)) ||
-      (o.customer_phone && o.customer_phone.includes(query)) ||
-      (o.payment_method && o.payment_method.toLowerCase().includes(query)) ||
-      (o.payment_reference && o.payment_reference.toLowerCase().includes(query))
-    );
-  });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -215,21 +260,38 @@ export function SalesReportsTab({
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-primary" : ""}`} />
           </button>
 
+          {/* Exportar Excel (.xlsx) */}
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            disabled={isExportingExcel}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+            title="Descargar libro Excel profesional (.xlsx) con hojas ejecutivas"
+          >
+            {isExportingExcel ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+            )}
+            <span>Exportar Excel</span>
+          </button>
+
           {/* Exportar CSV */}
           <button
             type="button"
             onClick={handleExportCsv}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-card border border-border hover:bg-muted text-xs font-bold text-foreground transition-all cursor-pointer shadow-xs active:scale-95"
+            title="Exportar archivo plano CSV"
           >
-            <Download className="w-3.5 h-3.5 text-primary" />
-            <span className="hidden sm:inline">Exportar CSV</span>
+            <Download className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="hidden sm:inline">CSV</span>
           </button>
 
           {/* Imprimir Reporte */}
           <button
             type="button"
             onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:brightness-110 transition-all cursor-pointer shadow-xs active:scale-95"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-secondary text-secondary-foreground text-xs font-bold hover:bg-secondary/80 transition-all cursor-pointer shadow-xs active:scale-95"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>Imprimir</span>
@@ -537,10 +599,7 @@ export function SalesReportsTab({
                         {order.order_number}
                       </td>
                       <td className="p-3 text-muted-foreground whitespace-nowrap font-mono text-[11px]">
-                        {new Date(order.created_at).toLocaleString("es-VE", {
-                          dateStyle: "short",
-                          timeStyle: "short",
-                        })}
+                        {formatCaracasDateTime(order.created_at)}
                       </td>
                       <td className="p-3 whitespace-nowrap">
                         <p className="font-bold text-foreground">

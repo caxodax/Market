@@ -15,6 +15,7 @@
     "@marketos/types": "workspace:*",
     "@marketos/ui": "workspace:*",
     "@marketos/utils": "workspace:*",
+    "exceljs": "^4.4.0",
     "lucide-react": "^1.16.0",
     "next": "^16.3.8",
     "react": "^19.0.0",
