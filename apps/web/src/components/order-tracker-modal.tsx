@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Order, TenantSettings } from "@marketos/types";
 import { formatCurrency } from "@marketos/utils";
 import { trackOrderAction } from "../app/actions";
 import { BottomSheetModal } from "./bottom-sheet-modal";
+import { OrderDetailsModal } from "./order-details-modal";
 import {
   X,
   Search,
@@ -15,6 +16,8 @@ import {
   AlertCircle,
   Loader2,
   Calendar,
+  Eye,
+  ShoppingBag,
 } from "lucide-react";
 
 interface OrderTrackerModalProps {
@@ -75,6 +78,28 @@ export function OrderTrackerModal({
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
+
+  // Auto-fill and search if customer phone exists in localStorage
+  useEffect(() => {
+    if (!isOpen) return;
+    try {
+      const savedPhone =
+        localStorage.getItem(`marketos_customer_phone_${settings.tenant_id}`) ||
+        localStorage.getItem("marketos_customer_phone");
+      if (savedPhone && !query) {
+        setQuery(savedPhone);
+        setLoading(true);
+        setSearched(true);
+        trackOrderAction(settings.tenant_id, savedPhone.trim()).then((res) => {
+          if (res.success) {
+            setOrders(res.orders || []);
+          }
+          setLoading(false);
+        }).catch(() => setLoading(false));
+      }
+    } catch {}
+  }, [isOpen, settings.tenant_id]);
 
   if (!isOpen) return null;
 
@@ -97,33 +122,33 @@ export function OrderTrackerModal({
   };
 
   return (
-    <BottomSheetModal
-      isOpen={isOpen}
-      onClose={onClose}
-      maxWidth="max-w-lg"
-      bodyClassName="p-0 flex flex-col"
-      customHeader={
-        <div className="p-4 border-b border-border flex items-center justify-between bg-muted/20 shrink-0">
-          <div>
-            <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-              <Package className="w-4 h-4 text-primary" />
-              Rastrear mis Pedidos
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              Ingresa tu número de WhatsApp o código de pedido (ej. ORD-123456)
-            </p>
+    <>
+      <BottomSheetModal
+        isOpen={isOpen}
+        onClose={onClose}
+        maxWidth="max-w-lg"
+        bodyClassName="p-0 flex flex-col"
+        customHeader={
+          <div className="p-4 border-b border-border flex items-center justify-between bg-muted/20 shrink-0">
+            <div>
+              <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+                <Package className="w-4 h-4 text-primary" />
+                Rastrear mis Pedidos
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Ingresa tu número de WhatsApp o código de pedido (ej. ORD-123456)
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="min-h-[40px] min-w-[40px] p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors cursor-pointer"
+              aria-label="Cerrar modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="min-h-[40px] min-w-[40px] p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors cursor-pointer"
-            aria-label="Cerrar modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-      }
-    >
-
+        }
+      >
         {/* Search bar */}
         <div className="p-4 border-b border-border bg-background">
           <form onSubmit={handleSearch} className="flex gap-2">
@@ -132,7 +157,7 @@ export function OrderTrackerModal({
               <input
                 type="text"
                 required
-                placeholder="Teléfono o N° Pedido..."
+                placeholder="Teléfono (ej. 04128505629) o N° Pedido..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="w-full h-11 pl-10 pr-3 rounded-xl border border-input bg-muted/30 text-xs focus:ring-2 focus:ring-primary"
@@ -141,7 +166,7 @@ export function OrderTrackerModal({
             <button
               type="submit"
               disabled={loading || !query.trim()}
-              className="px-4 h-11 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1.5"
+              className="px-4 h-11 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -196,23 +221,55 @@ export function OrderTrackerModal({
                   {statusInfo.desc}
                 </p>
 
+                {/* Items Purchased Preview */}
+                {ord.items && ord.items.length > 0 && (
+                  <div className="p-2.5 rounded-xl bg-muted/40 border border-border/70 space-y-1 text-xs">
+                    <div className="flex items-center gap-1 text-[11px] font-bold text-foreground">
+                      <ShoppingBag className="w-3.5 h-3.5 text-primary" />
+                      <span>Artículos ordenados ({ord.items.reduce((acc, it) => acc + it.quantity, 0)}):</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
+                      {ord.items.map((it) => `${it.quantity}x ${it.product_name}`).join(", ")}
+                    </p>
+                  </div>
+                )}
+
                 <div className="pt-2 border-t border-border flex items-center justify-between text-[11px] text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Calendar className="w-3 h-3" />
                     <span>{new Date(ord.created_at).toLocaleDateString("es-VE")}</span>
-                  </div>
-                  <div>
+                    <span className="mx-1">•</span>
                     <span>
                       {ord.delivery_type === "DELIVERY"
                         ? "Delivery a Domicilio"
                         : "Retiro en Tienda"}
                     </span>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOrderForDetails(ord)}
+                    className="inline-flex items-center gap-1 text-primary hover:text-primary/80 font-bold text-xs bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20 transition-colors cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Ver Detalle</span>
+                  </button>
                 </div>
               </div>
             );
           })}
         </div>
-    </BottomSheetModal>
+      </BottomSheetModal>
+
+      {/* Full Order Details Modal */}
+      {selectedOrderForDetails && (
+        <OrderDetailsModal
+          order={selectedOrderForDetails}
+          isOpen={!!selectedOrderForDetails}
+          onClose={() => setSelectedOrderForDetails(null)}
+          settings={settings}
+        />
+      )}
+    </>
   );
 }

@@ -6,7 +6,7 @@ import {
   formatCurrency,
   generateCustomerOrderWhatsAppLink,
 } from "@marketos/utils";
-import { CheckCircle2, MessageCircle, X, Clock } from "lucide-react";
+import { CheckCircle2, MessageCircle, X, Clock, ShoppingBag } from "lucide-react";
 
 interface OrderSuccessModalProps {
   order: Order | null;
@@ -80,6 +80,29 @@ export function OrderSuccessModal({
             </span>
           </div>
         </div>
+
+        {/* Ordered Items Preview */}
+        {order.items && order.items.length > 0 && (
+          <div className="p-3.5 rounded-xl bg-muted/40 border border-border text-xs space-y-2 text-left">
+            <div className="flex items-center gap-1.5 font-bold text-foreground">
+              <ShoppingBag className="w-3.5 h-3.5 text-primary" />
+              <span>Productos en tu orden ({order.items.reduce((acc, it) => acc + it.quantity, 0)}):</span>
+            </div>
+            <div className="max-h-36 overflow-y-auto divide-y divide-border/50 pr-1">
+              {order.items.map((item, idx) => (
+                <div key={item.id || idx} className="py-1.5 flex items-center justify-between text-[11px]">
+                  <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                    <span className="font-bold text-primary shrink-0">{item.quantity}x</span>
+                    <span className="text-foreground truncate">{item.product_name}</span>
+                  </div>
+                  <span className="font-semibold text-foreground shrink-0">
+                    {formatCurrency(item.total_price_usd, "USD")}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Direct WhatsApp Call to Action */}
         <div className="space-y-2 pt-1">

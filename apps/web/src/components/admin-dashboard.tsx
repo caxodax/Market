@@ -77,6 +77,7 @@ import {
   Eye,
   ChevronDown,
   Check,
+  Search,
 } from "lucide-react";
 
 interface AdminDashboardProps {
@@ -122,12 +123,28 @@ export function AdminDashboard({
   const [staff, setStaff] = useState<UserProfile[]>(initialStaffMembers);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [auditFilter, setAuditFilter] = useState<string>("ALL");
+  const [orderSearchQuery, setOrderSearchQuery] = useState<string>("");
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string>("ALL");
 
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [syncingBcv, setSyncingBcv] = useState(false);
   const [bcvMessage, setBcvMessage] = useState<string | null>(null);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [refreshingOrders, setRefreshingOrders] = useState(false);
+
+  const filteredOrders = orders.filter((order) => {
+    if (orderStatusFilter !== "ALL" && order.status !== orderStatusFilter) {
+      return false;
+    }
+    if (!orderSearchQuery.trim()) return true;
+    const q = orderSearchQuery.toLowerCase().trim();
+    const matchNumber = order.order_number?.toLowerCase().includes(q);
+    const matchName = order.customer_name?.toLowerCase().includes(q);
+    const matchPhone = order.customer_phone?.toLowerCase().includes(q);
+    const matchAddress = order.delivery_address?.toLowerCase().includes(q);
+    const matchItem = order.items?.some((it) => it.product_name.toLowerCase().includes(q));
+    return Boolean(matchNumber || matchName || matchPhone || matchAddress || matchItem);
+  });
 
   // Modals state
   const [selectedOrderForModal, setSelectedOrderForModal] = useState<Order | null>(null);
@@ -926,17 +943,100 @@ export function AdminDashboard({
         {/* TAB 2: ORDERS FULFILLMENT & DISPATCH */}
         {activeTab === "ORDERS" && (
           <div className="space-y-4 animate-in fade-in">
-            <h2 className="text-sm font-bold text-foreground">
-              Despacho y Seguimiento de Pedidos
-            </h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-bold text-foreground">
+                  Despacho y Seguimiento de Pedidos
+                </h2>
+                <p className="text-[11px] text-muted-foreground">
+                  Gestiona el estado, comprobantes y entregas de tus clientes en tiempo real
+                </p>
+              </div>
 
-            {orders.length === 0 ? (
-              <div className="p-8 text-center rounded-2xl border border-dashed border-border bg-card">
-                <p className="text-xs text-muted-foreground">No hay pedidos registrados.</p>
+              <button
+                type="button"
+                onClick={handleRefreshOrdersAndPayments}
+                disabled={refreshingOrders}
+                className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card hover:bg-muted text-xs font-semibold text-foreground transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshingOrders ? "animate-spin" : ""}`} />
+                <span>Actualizar</span>
+              </button>
+            </div>
+
+            {/* Search & Filter Bar */}
+            <div className="p-3.5 rounded-2xl border border-border bg-card space-y-3">
+              <div className="relative">
+                <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Buscar por cliente (ej. Luis Montes), teléfono (04128505629), orden (ORD-...) o producto..."
+                  value={orderSearchQuery}
+                  onChange={(e) => setOrderSearchQuery(e.target.value)}
+                  className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                {orderSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setOrderSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+
+              {/* Status Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                {[
+                  { id: "ALL", label: `Todos (${orders.length})` },
+                  { id: "PAYMENT_PENDING", label: `Pendientes (${orders.filter(o => o.status === "PAYMENT_PENDING").length})` },
+                  { id: "PAYMENT_APPROVED", label: `Pagados (${orders.filter(o => o.status === "PAYMENT_APPROVED").length})` },
+                  { id: "PREPARING", label: `En Preparación (${orders.filter(o => o.status === "PREPARING").length})` },
+                  { id: "READY", label: `Listos (${orders.filter(o => o.status === "READY").length})` },
+                  { id: "DELIVERING", label: `En Camino (${orders.filter(o => o.status === "DELIVERING").length})` },
+                  { id: "COMPLETED", label: `Entregados (${orders.filter(o => o.status === "COMPLETED").length})` },
+                  { id: "CANCELLED", label: `Cancelados (${orders.filter(o => o.status === "CANCELLED").length})` },
+                ].map((pill) => (
+                  <button
+                    key={pill.id}
+                    type="button"
+                    onClick={() => setOrderStatusFilter(pill.id)}
+                    className={`px-2.5 py-1 rounded-lg font-medium whitespace-nowrap transition-colors cursor-pointer text-[11px] ${
+                      orderStatusFilter === pill.id
+                        ? "bg-primary text-primary-foreground font-bold"
+                        : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    {pill.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {filteredOrders.length === 0 ? (
+              <div className="p-8 text-center rounded-2xl border border-dashed border-border bg-card space-y-2">
+                <p className="text-xs font-semibold text-foreground">
+                  {orders.length === 0
+                    ? "No hay pedidos registrados aún."
+                    : "No se encontraron pedidos que coincidan con la búsqueda o filtro."}
+                </p>
+                {(orderSearchQuery || orderStatusFilter !== "ALL") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOrderSearchQuery("");
+                      setOrderStatusFilter("ALL");
+                    }}
+                    className="text-xs text-primary underline"
+                  >
+                    Restablecer filtros
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid gap-3">
-                {orders.map((order) => {
+                {filteredOrders.map((order) => {
                   const driver = drivers.find((d) => d.id === order.driver_id) || drivers[0];
 
                   return (

@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
-import { CustomerAccountSummary, TenantSettings } from "@marketos/types";
+import React, { useState, useEffect } from "react";
+import { CustomerAccountSummary, TenantSettings, Order } from "@marketos/types";
 import { formatCurrency } from "@marketos/utils";
 import { lookupCustomerAction } from "../app/actions";
 import { BottomSheetModal } from "./bottom-sheet-modal";
+import { OrderDetailsModal } from "./order-details-modal";
 import {
   X,
   Search,
@@ -16,6 +17,8 @@ import {
   Loader2,
   AlertCircle,
   Sparkles,
+  Eye,
+  Calendar,
 } from "lucide-react";
 
 interface CustomerLookupModalProps {
@@ -36,6 +39,27 @@ export function CustomerLookupModal({
   const [searched, setSearched] = useState(false);
   const [data, setData] = useState<CustomerAccountSummary | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    try {
+      const savedPhone =
+        localStorage.getItem(`marketos_customer_phone_${tenantId}`) ||
+        localStorage.getItem("marketos_customer_phone");
+      if (savedPhone && !query) {
+        setQuery(savedPhone);
+        setLoading(true);
+        setSearched(true);
+        lookupCustomerAction(tenantId, savedPhone.trim()).then((res) => {
+          if (res.success && res.summary) {
+            setData(res.summary);
+          }
+          setLoading(false);
+        }).catch(() => setLoading(false));
+      }
+    } catch {}
+  }, [isOpen, tenantId]);
 
   if (!isOpen) return null;
 
@@ -79,7 +103,8 @@ export function CustomerLookupModal({
   };
 
   return (
-    <BottomSheetModal
+    <>
+      <BottomSheetModal
       isOpen={isOpen}
       onClose={onClose}
       maxWidth="max-w-lg"
@@ -205,13 +230,13 @@ export function CustomerLookupModal({
                     No tienes pedidos registrados aún.
                   </p>
                 ) : (
-                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                  <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
                     {data.orders.map((order) => (
                       <div
                         key={order.id}
-                        className="p-3 rounded-xl border border-border bg-card flex items-center justify-between gap-3 text-xs"
+                        className="p-3.5 rounded-xl border border-border bg-card space-y-2 text-xs"
                       >
-                        <div className="space-y-0.5">
+                        <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="font-mono font-bold text-foreground">
                               {order.order_number}
@@ -224,21 +249,50 @@ export function CustomerLookupModal({
                               {order.status}
                             </span>
                           </div>
-                          <p className="text-[11px] text-muted-foreground">
-                            {new Date(order.created_at).toLocaleDateString("es-VE")} •{" "}
-                            {order.delivery_type === "DELIVERY"
-                              ? "🛵 Delivery"
-                              : "🏪 Retiro Tienda"}
-                          </p>
+
+                          <div className="text-right">
+                            <span className="font-bold text-primary text-xs">
+                              {formatCurrency(order.total_usd, "USD")}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground ml-1">
+                              (Bs. {order.total_ves.toFixed(2)})
+                            </span>
+                          </div>
                         </div>
 
-                        <div className="text-right">
-                          <div className="font-bold text-primary">
-                            {formatCurrency(order.total_usd, "USD")}
+                        {/* Items Preview */}
+                        {order.items && order.items.length > 0 && (
+                          <div className="p-2 rounded-lg bg-muted/40 border border-border/70 space-y-1">
+                            <div className="flex items-center gap-1 text-[11px] font-bold text-foreground">
+                              <ShoppingBag className="w-3.5 h-3.5 text-primary" />
+                              <span>Artículos ({order.items.reduce((acc, it) => acc + it.quantity, 0)}):</span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
+                              {order.items.map((it) => `${it.quantity}x ${it.product_name}`).join(", ")}
+                            </p>
                           </div>
-                          <div className="text-[10px] text-muted-foreground">
-                            Bs. {order.total_ves.toFixed(2)}
+                        )}
+
+                        <div className="pt-2 border-t border-border flex items-center justify-between text-[11px] text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            <span>{new Date(order.created_at).toLocaleDateString("es-VE")}</span>
+                            <span className="mx-1">•</span>
+                            <span>
+                              {order.delivery_type === "DELIVERY"
+                                ? "🛵 Delivery"
+                                : "🏪 Retiro Tienda"}
+                            </span>
                           </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOrderForDetails(order)}
+                            className="inline-flex items-center gap-1 text-primary hover:text-primary/80 font-bold text-xs bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20 transition-colors cursor-pointer"
+                          >
+                            <Eye className="w-3 h-3" />
+                            <span>Ver Detalle</span>
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -259,6 +313,17 @@ export function CustomerLookupModal({
               </p>
             </div>
           )}
-    </BottomSheetModal>
+      </BottomSheetModal>
+
+      {/* Full Order Details Modal */}
+      {selectedOrderForDetails && (
+        <OrderDetailsModal
+          order={selectedOrderForDetails}
+          isOpen={!!selectedOrderForDetails}
+          onClose={() => setSelectedOrderForDetails(null)}
+          settings={settings}
+        />
+      )}
+    </>
   );
 }
