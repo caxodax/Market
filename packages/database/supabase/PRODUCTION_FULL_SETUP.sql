@@ -151,6 +151,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
     tenant_id TEXT NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
     auth_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     name TEXT NOT NULL,
+    id_number TEXT,
     phone TEXT NOT NULL,
     email TEXT,
     is_guest BOOLEAN NOT NULL DEFAULT true,
@@ -180,6 +181,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
     tenant_id TEXT NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
     store_id UUID NOT NULL REFERENCES public.stores(id) ON DELETE RESTRICT,
     customer_id UUID NOT NULL REFERENCES public.customers(id) ON DELETE RESTRICT,
+    customer_id_number TEXT,
     order_number TEXT NOT NULL,
     status public.order_status NOT NULL DEFAULT 'CREATED',
     delivery_type public.delivery_type NOT NULL DEFAULT 'PICKUP',
@@ -827,6 +829,9 @@ USING (tenant_id = public.current_user_tenant_id() OR public.is_super_admin());
 
 -- 7. PERFORMANCE INDEXES
 CREATE INDEX IF NOT EXISTS idx_customers_phone ON public.customers (tenant_id, phone);
+CREATE INDEX IF NOT EXISTS idx_customers_tenant_id_number ON public.customers (tenant_id, id_number);
+CREATE INDEX IF NOT EXISTS idx_customers_id_number ON public.customers (id_number);
+CREATE INDEX IF NOT EXISTS idx_orders_customer_id_number ON public.orders (tenant_id, customer_id_number);
 CREATE INDEX IF NOT EXISTS idx_inventory_movements_prod ON public.inventory_movements (tenant_id, product_id, created_at DESC);
 -- =====================================================================
 -- MIGRATION: 00006_auth_roles_profiles.sql

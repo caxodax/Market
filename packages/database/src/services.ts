@@ -1275,6 +1275,7 @@ export class MarketOSRepository {
             tenant_id: newOrder.tenant_id,
             store_id: validStoreId,
             customer_id: customerId,
+            customer_id_number: newOrder.customer_id_number,
             order_number: newOrder.order_number,
             status: newOrder.status,
             delivery_type: newOrder.delivery_type,
