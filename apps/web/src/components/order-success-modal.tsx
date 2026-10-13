@@ -6,18 +6,20 @@ import {
   formatCurrency,
   generateCustomerOrderWhatsAppLink,
 } from "@marketos/utils";
-import { CheckCircle2, MessageCircle, X, Clock, ShoppingBag } from "lucide-react";
+import { CheckCircle2, MessageCircle, X, Clock, ShoppingBag, Eye, ShieldCheck } from "lucide-react";
 
 interface OrderSuccessModalProps {
   order: Order | null;
   settings: TenantSettings;
   onClose: () => void;
+  onViewTicket?: (order: Order) => void;
 }
 
 export function OrderSuccessModal({
   order,
   settings,
   onClose,
+  onViewTicket,
 }: OrderSuccessModalProps) {
   if (!order) return null;
 
@@ -57,6 +59,13 @@ export function OrderSuccessModal({
           <p className="font-mono text-lg font-bold text-primary mt-1">
             {order.order_number}
           </p>
+
+          {order.customer_id_number && (
+            <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-primary/10 border border-primary/20 text-xs font-mono font-bold text-primary">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Cédula: {order.customer_id_number}</span>
+            </div>
+          )}
         </div>
 
         {/* Order Details box */}
@@ -104,17 +113,31 @@ export function OrderSuccessModal({
           </div>
         )}
 
-        {/* Direct WhatsApp Call to Action */}
+        {/* Direct WhatsApp Call to Action & Ticket Viewer */}
         <div className="space-y-2 pt-1">
           <a
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full h-12 rounded-xl bg-emerald-600 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-700 transition-all shadow-md active:scale-[0.98]"
+            className="w-full h-11 rounded-xl bg-emerald-600 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 hover:bg-emerald-700 transition-all shadow-md active:scale-[0.98]"
           >
-            <MessageCircle className="w-5 h-5" />
+            <MessageCircle className="w-4 h-4" />
             <span>Notificar a WhatsApp</span>
           </a>
+
+          {onViewTicket && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onViewTicket(order);
+              }}
+              className="w-full h-11 rounded-xl bg-primary/10 hover:bg-primary/20 border border-primary/25 text-primary font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            >
+              <Eye className="w-4 h-4" />
+              <span>Ver Ticket Digital y Código QR</span>
+            </button>
+          )}
 
           <button
             onClick={onClose}

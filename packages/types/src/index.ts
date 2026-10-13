@@ -155,6 +155,7 @@ export interface Customer {
   tenant_id: string;
   name: string;
   phone: string;
+  id_number?: string | null; // Cédula de Identidad / RIF (ej. V-12345678)
   email: string | null;
   is_guest: boolean;
   loyalty_points?: number;
@@ -351,6 +352,7 @@ export interface Order {
   items?: OrderItem[];
   customer_name?: string;
   customer_phone?: string;
+  customer_id_number?: string | null; // Cédula de Identidad / RIF (ej. V-12345678)
   customer_email?: string | null;
   payment_method?: PaymentMethodType;
   payment_reference?: string;

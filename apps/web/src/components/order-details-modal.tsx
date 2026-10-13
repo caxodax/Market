@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Order, OrderStatus, TenantSettings, Driver } from "@marketos/types";
 import { formatCurrency, generateOrderStatusNotificationWhatsAppLink } from "@marketos/utils";
 import { BottomSheetModal } from "./bottom-sheet-modal";
@@ -22,6 +22,11 @@ import {
   Tag,
   CreditCard,
   FileText,
+  Copy,
+  Check,
+  ZoomIn,
+  ShieldCheck,
+  Download,
 } from "lucide-react";
 
 interface OrderDetailsModalProps {
@@ -93,7 +98,16 @@ export function OrderDetailsModal({
   paymentId,
   isProcessing = false,
 }: OrderDetailsModalProps) {
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+
   if (!isOpen || !order) return null;
+
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
   const statusInfo = STATUS_CONFIG[order.status] || {
     label: order.status,
@@ -122,48 +136,48 @@ export function OrderDetailsModal({
   });
 
   return (
-    <BottomSheetModal
-      isOpen={isOpen && !!order}
-      onClose={onClose}
-      maxWidth="max-w-2xl"
-      bodyClassName="space-y-5"
-      customHeader={
-        <div className="flex items-start justify-between gap-3 border-b border-border p-5 sm:p-6 bg-muted/20 shrink-0">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <span className="font-mono font-black text-lg sm:text-xl text-foreground">
-                {order.order_number}
-              </span>
-              <span
-                className={`inline-flex items-center gap-1 text-xs font-black px-2.5 py-0.5 rounded-full border ${statusInfo.badgeClass}`}
-              >
-                {statusInfo.icon}
-                <span>{statusInfo.label}</span>
-              </span>
-              <span className="text-xs font-semibold text-muted-foreground">
-                {order.delivery_type === "DELIVERY" ? "🛵 Delivery" : "🏬 Retiro en Tienda"}
-              </span>
+    <>
+      <BottomSheetModal
+        isOpen={isOpen && !!order}
+        onClose={onClose}
+        maxWidth="max-w-2xl"
+        bodyClassName="space-y-5"
+        customHeader={
+          <div className="flex items-start justify-between gap-3 border-b border-border p-5 sm:p-6 bg-muted/20 shrink-0">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="font-mono font-black text-lg sm:text-xl text-foreground">
+                  {order.order_number}
+                </span>
+                <span
+                  className={`inline-flex items-center gap-1 text-xs font-black px-2.5 py-0.5 rounded-full border ${statusInfo.badgeClass}`}
+                >
+                  {statusInfo.icon}
+                  <span>{statusInfo.label}</span>
+                </span>
+                <span className="text-xs font-semibold text-muted-foreground">
+                  {order.delivery_type === "DELIVERY" ? "🛵 Delivery" : "🏬 Retiro en Tienda"}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Registrado el {formattedDate} {order.store_name && `• Sucursal: ${order.store_name}`}
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Registrado el {formattedDate} {order.store_name && `• Sucursal: ${order.store_name}`}
-            </p>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="min-h-[40px] min-w-[40px] text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-xl transition-colors cursor-pointer flex items-center justify-center shrink-0"
+              aria-label="Cerrar modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="min-h-[40px] min-w-[40px] text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-xl transition-colors cursor-pointer flex items-center justify-center shrink-0"
-            aria-label="Cerrar modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-      }
-    >
-
+        }
+      >
         {/* Datos del Cliente y Despacho */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-          {/* Tarjeta Cliente */}
+          {/* Tarjeta Cliente con Cédula destacada */}
           <div className="bg-muted/40 p-3.5 rounded-2xl border border-border space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider flex items-center gap-1.5">
@@ -171,21 +185,79 @@ export function OrderDetailsModal({
                 <span>Datos del Cliente</span>
               </span>
               {order.customer_phone && (
-                <a
-                  href={`tel:${order.customer_phone}`}
-                  className="text-primary hover:underline font-semibold flex items-center gap-1 text-[11px]"
-                >
-                  <Phone className="w-3 h-3" />
-                  <span>Llamar</span>
-                </a>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`tel:${order.customer_phone}`}
+                    className="text-primary hover:underline font-semibold flex items-center gap-1 text-[11px]"
+                  >
+                    <Phone className="w-3 h-3" />
+                    <span>Llamar</span>
+                  </a>
+                  <a
+                    href={`https://wa.me/${order.customer_phone.replace(/\D/g, "")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-emerald-600 hover:underline font-semibold flex items-center gap-1 text-[11px]"
+                  >
+                    <MessageCircle className="w-3 h-3" />
+                    <span>WhatsApp</span>
+                  </a>
+                </div>
               )}
             </div>
+
             <p className="font-extrabold text-sm text-foreground">
               {order.customer_name || "Cliente General"}
             </p>
-            <p className="font-mono text-muted-foreground">
-              {order.customer_phone || "Teléfono no registrado"}
-            </p>
+
+            {/* Cédula o RIF destacado para verificación física */}
+            <div className="flex items-center gap-2 pt-0.5">
+              <span className="text-[11px] font-semibold text-muted-foreground">Cédula / RIF:</span>
+              {order.customer_id_number ? (
+                <div className="flex items-center gap-1">
+                  <span className="font-mono font-black text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20 flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3" />
+                    <span>{order.customer_id_number}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(order.customer_id_number!, "ci")}
+                    className="p-1 rounded text-muted-foreground hover:text-foreground cursor-pointer"
+                    title="Copiar Cédula"
+                  >
+                    {copiedField === "ci" ? (
+                      <Check className="w-3 h-3 text-emerald-600" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <span className="text-muted-foreground font-italic">No registrada</span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-semibold text-muted-foreground">Teléfono:</span>
+              <span className="font-mono text-foreground font-semibold">
+                {order.customer_phone || "No registrado"}
+              </span>
+              {order.customer_phone && (
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(order.customer_phone!, "phone")}
+                  className="p-1 rounded text-muted-foreground hover:text-foreground cursor-pointer"
+                  title="Copiar Teléfono"
+                >
+                  {copiedField === "phone" ? (
+                    <Check className="w-3 h-3 text-emerald-600" />
+                  ) : (
+                    <Copy className="w-3 h-3" />
+                  )}
+                </button>
+              )}
+            </div>
+
             {order.customer_email && (
               <p className="text-muted-foreground truncate">{order.customer_email}</p>
             )}
@@ -213,6 +285,16 @@ export function OrderDetailsModal({
               <p className="text-muted-foreground">
                 Retiro presencial en mostrador de la tienda.
               </p>
+            )}
+
+            {/* Repartidor asignado si es delivery */}
+            {order.delivery_type === "DELIVERY" && drivers.length > 0 && (
+              <div className="pt-1.5 border-t border-border flex items-center justify-between text-[11px]">
+                <span className="text-muted-foreground">Repartidor Asignado:</span>
+                <span className="font-semibold text-foreground">
+                  {assignedDriver ? assignedDriver.name : "Sin asignar"}
+                </span>
+              </div>
             )}
           </div>
         </div>
@@ -265,16 +347,35 @@ export function OrderDetailsModal({
           )}
         </div>
 
-        {/* Resumen Financiero y Método de Pago */}
+        {/* Resumen Financiero y VERIFICACIÓN DE PAGO (Inspector de Comprobante) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-          {/* Información de Pago Reportada */}
-          <div className="bg-muted/40 p-3.5 rounded-2xl border border-border space-y-2">
-            <span className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider flex items-center gap-1.5">
-              <CreditCard className="w-3.5 h-3.5 text-primary" />
-              <span>Detalles del Pago</span>
-            </span>
+          {/* Tarjeta de Verificación del Pago & Comprobante Adjunto */}
+          <div className="bg-muted/40 p-3.5 rounded-2xl border border-border space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5 text-primary" />
+                <span>Auditoría de Pago</span>
+              </span>
+              {order.payment_status && (
+                <span
+                  className={`font-black text-[10px] px-2 py-0.5 rounded-full border ${
+                    order.payment_status === "APPROVED"
+                      ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                      : order.payment_status === "REJECTED"
+                      ? "bg-rose-500/10 text-rose-600 border-rose-500/20"
+                      : "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                  }`}
+                >
+                  {order.payment_status === "APPROVED"
+                    ? "PAGO VERIFICADO"
+                    : order.payment_status === "REJECTED"
+                    ? "PAGO RECHAZADO"
+                    : "POR VERIFICAR"}
+                </span>
+              )}
+            </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1 text-xs">
               <p>
                 <strong>Método:</strong>{" "}
                 <span className="font-semibold text-foreground">
@@ -282,44 +383,74 @@ export function OrderDetailsModal({
                 </span>
               </p>
               {order.payment_reference && (
-                <p>
-                  <strong>Referencia:</strong>{" "}
-                  <span className="font-mono font-bold text-foreground">
+                <div className="flex items-center gap-1.5">
+                  <strong>Referencia:</strong>
+                  <span className="font-mono font-black text-foreground bg-background px-2 py-0.5 rounded border border-border">
                     {order.payment_reference}
                   </span>
-                </p>
-              )}
-              {order.payment_status && (
-                <p className="flex items-center gap-1.5 pt-0.5">
-                  <strong>Estado Pago:</strong>
-                  <span
-                    className={`font-black text-[10px] px-2 py-0.5 rounded-full border ${
-                      order.payment_status === "APPROVED"
-                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                        : order.payment_status === "REJECTED"
-                        ? "bg-rose-500/10 text-rose-600 border-rose-500/20"
-                        : "bg-amber-500/10 text-amber-600 border-amber-500/20"
-                    }`}
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(order.payment_reference!, "ref")}
+                    className="p-1 rounded text-muted-foreground hover:text-foreground cursor-pointer"
+                    title="Copiar referencia bancaria"
                   >
-                    {order.payment_status}
-                  </span>
-                </p>
+                    {copiedField === "ref" ? (
+                      <Check className="w-3 h-3 text-emerald-600" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                  </button>
+                </div>
               )}
             </div>
 
-            {order.proof_image_url && (
-              <div className="pt-1">
-                <a
-                  href={order.proof_image_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline bg-primary/10 px-2.5 py-1 rounded-lg"
-                >
-                  <ExternalLink className="w-3 h-3" />
-                  <span>Ver Comprobante Adjunto</span>
-                </a>
-              </div>
-            )}
+            {/* INSPECTOR VISUAL DEL COMPROBANTE ADJUNTO */}
+            <div className="pt-1 border-t border-border/80">
+              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block mb-1.5">
+                Comprobante Visual Adjunto
+              </span>
+
+              {order.proof_image_url ? (
+                <div className="rounded-xl border border-border bg-card overflow-hidden">
+                  <div
+                    onClick={() => setIsLightboxOpen(true)}
+                    className="relative cursor-pointer aspect-video bg-muted/60 flex items-center justify-center overflow-hidden group"
+                  >
+                    <img
+                      src={order.proof_image_url}
+                      alt="Comprobante de Pago Adjunto"
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white font-bold text-xs">
+                      <ZoomIn className="w-4 h-4" />
+                      <span>Inspeccionar Comprobante</span>
+                    </div>
+                  </div>
+
+                  <div className="p-2 bg-muted/20 border-t border-border flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground">Adjunto subido por cliente</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsLightboxOpen(true)}
+                      className="inline-flex items-center gap-1 text-primary hover:underline font-bold cursor-pointer"
+                    >
+                      <ZoomIn className="w-3 h-3" />
+                      <span>Ver en Grande</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-[11px]">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>Sin imagen de captura adjunta</span>
+                  </div>
+                  <p className="text-[10px] opacity-90 leading-tight">
+                    El cliente no subió imagen o reportó pago en efectivo. Valida la referencia bancaria en tu estado de cuenta.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Desglose de Totales */}
@@ -395,17 +526,42 @@ export function OrderDetailsModal({
 
             {/* Botones de flujo operativo */}
             <div className="flex flex-wrap items-center gap-2">
-              {/* Aprobar Pago si está pendiente */}
-              {onReviewPayment && paymentId && order.status === "PAYMENT_PENDING" && (
-                <button
-                  type="button"
-                  disabled={isProcessing}
-                  onClick={() => onReviewPayment(paymentId, "APPROVED")}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Aprobar Pago</span>
-                </button>
+              {/* Aprobar / Rechazar Pago si está pendiente */}
+              {order.status === "PAYMENT_PENDING" && (
+                <>
+                  <button
+                    type="button"
+                    disabled={isProcessing}
+                    onClick={() => {
+                      if (onReviewPayment && paymentId) {
+                        onReviewPayment(paymentId, "APPROVED");
+                      } else if (onUpdateStatus) {
+                        onUpdateStatus(order.id, "PREPARING");
+                      }
+                    }}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Aprobar Pago</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isProcessing}
+                    onClick={() => {
+                      if (window.confirm("¿Seguro que deseas rechazar este pago? El pedido quedará cancelado.")) {
+                        if (onReviewPayment && paymentId) {
+                          onReviewPayment(paymentId, "REJECTED");
+                        } else if (onUpdateStatus) {
+                          onUpdateStatus(order.id, "CANCELLED");
+                        }
+                      }
+                    }}
+                    className="px-3 py-2 rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/10 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    Rechazar
+                  </button>
+                </>
               )}
 
               {onUpdateStatus && order.status === "PREPARING" && (
@@ -444,23 +600,84 @@ export function OrderDetailsModal({
                 </button>
               )}
 
-              {onUpdateStatus && order.status !== "COMPLETED" && order.status !== "CANCELLED" && (
-                <button
-                  type="button"
-                  disabled={isProcessing}
-                  onClick={() => {
-                    if (window.confirm("¿Seguro que deseas cancelar este pedido?")) {
-                      onUpdateStatus(order.id, "CANCELLED");
-                    }
-                  }}
-                  className="px-3 py-2 rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/10 text-xs font-bold transition-all cursor-pointer"
-                >
-                  Cancelar Pedido
-                </button>
-              )}
+              {onUpdateStatus &&
+                order.status !== "COMPLETED" &&
+                order.status !== "CANCELLED" &&
+                order.status !== "PAYMENT_PENDING" && (
+                  <button
+                    type="button"
+                    disabled={isProcessing}
+                    onClick={() => {
+                      if (window.confirm("¿Seguro que deseas cancelar este pedido?")) {
+                        onUpdateStatus(order.id, "CANCELLED");
+                      }
+                    }}
+                    className="px-3 py-2 rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/10 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    Cancelar Pedido
+                  </button>
+                )}
             </div>
           </div>
         </div>
-    </BottomSheetModal>
+      </BottomSheetModal>
+
+      {/* Lightbox / Zoom Modal for Attached Payment Proof */}
+      {isLightboxOpen && order.proof_image_url && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200"
+          onClick={() => setIsLightboxOpen(false)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[95vh] w-full flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header toolbar */}
+            <div className="w-full flex items-center justify-between gap-3 p-3.5 bg-slate-900/90 rounded-t-2xl border border-white/10 text-white text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-bold text-emerald-400">Comprobante de Pago</span>
+                <span className="font-mono text-slate-400 truncate">#{order.order_number}</span>
+                {order.payment_reference && (
+                  <span className="font-mono bg-white/10 px-2 py-0.5 rounded text-[11px] text-white shrink-0">
+                    Ref: {order.payment_reference}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={order.proof_image_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors flex items-center gap-1 font-semibold text-[11px]"
+                  title="Abrir imagen en nueva pestaña"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Abrir original</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setIsLightboxOpen(false)}
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                  title="Cerrar vista previa"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* High-res Image Preview */}
+            <div className="w-full overflow-auto max-h-[82vh] bg-slate-950 p-2 sm:p-4 rounded-b-2xl border-x border-b border-white/10 flex items-center justify-center">
+              <img
+                src={order.proof_image_url}
+                alt="Comprobante de Pago en alta resolución"
+                className="max-h-[76vh] w-auto max-w-full object-contain rounded-lg shadow-2xl"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

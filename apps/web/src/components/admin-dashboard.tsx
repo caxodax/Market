@@ -1084,11 +1084,12 @@ export function AdminDashboard({
 
                       {/* Customer info & Delivery Address */}
                       <div className="grid sm:grid-cols-2 gap-2 text-xs">
-                        {(order.customer_name || order.customer_phone) && (
-                          <div className="flex items-center gap-1.5 text-foreground font-medium">
+                        {(order.customer_name || order.customer_phone || order.customer_id_number) && (
+                          <div className="flex items-center gap-1.5 text-foreground font-medium flex-wrap">
                             <UserCheck className="w-3.5 h-3.5 text-primary shrink-0" />
                             <span>
                               <strong>Cliente:</strong> {order.customer_name || "Cliente"}
+                              {order.customer_id_number ? ` • CI: ${order.customer_id_number}` : ""}
                               {order.customer_phone ? ` (${order.customer_phone})` : ""}
                             </span>
                           </div>

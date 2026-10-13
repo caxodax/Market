@@ -5,7 +5,7 @@ import { CustomerAccountSummary, TenantSettings, Order } from "@marketos/types";
 import { formatCurrency } from "@marketos/utils";
 import { lookupCustomerAction } from "../app/actions";
 import { BottomSheetModal } from "./bottom-sheet-modal";
-import { OrderDetailsModal } from "./order-details-modal";
+import { CustomerOrderTicketModal } from "./customer-order-ticket-modal";
 import {
   X,
   Search,
@@ -19,6 +19,7 @@ import {
   Sparkles,
   Eye,
   Calendar,
+  ShieldCheck,
 } from "lucide-react";
 
 interface CustomerLookupModalProps {
@@ -44,14 +45,20 @@ export function CustomerLookupModal({
   useEffect(() => {
     if (!isOpen) return;
     try {
+      const savedCi =
+        localStorage.getItem(`marketos_customer_ci_${tenantId}`) ||
+        localStorage.getItem("marketos_customer_ci");
       const savedPhone =
         localStorage.getItem(`marketos_customer_phone_${tenantId}`) ||
         localStorage.getItem("marketos_customer_phone");
-      if (savedPhone && !query) {
-        setQuery(savedPhone);
+
+      const defaultQuery = savedCi || savedPhone;
+
+      if (defaultQuery && !query) {
+        setQuery(defaultQuery);
         setLoading(true);
         setSearched(true);
-        lookupCustomerAction(tenantId, savedPhone.trim()).then((res) => {
+        lookupCustomerAction(tenantId, defaultQuery.trim()).then((res) => {
           if (res.success && res.summary) {
             setData(res.summary);
           }
@@ -140,7 +147,7 @@ export function CustomerLookupModal({
             <div className="relative flex-1">
               <input
                 type="text"
-                placeholder="Ingresa tu teléfono (ej. 04241234567) o correo"
+                placeholder="Cédula (ej. V-12345678), Teléfono o # Orden"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="w-full h-11 pl-4 pr-10 rounded-xl border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
@@ -150,7 +157,7 @@ export function CustomerLookupModal({
             <button
               type="submit"
               disabled={loading || !query.trim()}
-              className="px-5 h-11 rounded-xl bg-primary text-primary-foreground font-bold text-xs flex items-center gap-1.5 hover:opacity-90 transition-opacity disabled:opacity-50 shrink-0"
+              className="px-5 h-11 rounded-xl bg-primary text-primary-foreground font-bold text-xs flex items-center gap-1.5 hover:opacity-90 transition-opacity disabled:opacity-50 shrink-0 cursor-pointer"
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -178,9 +185,15 @@ export function CustomerLookupModal({
                     <h4 className="font-extrabold text-sm text-foreground">
                       {data.customer.name}
                     </h4>
-                    <p className="text-xs text-muted-foreground">
-                      Tel: {data.customer.phone}
-                    </p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap mt-0.5">
+                      {data.customer.id_number && (
+                        <span className="font-mono font-bold text-primary flex items-center gap-1">
+                          <ShieldCheck className="w-3 h-3" />
+                          <span>{data.customer.id_number}</span>
+                        </span>
+                      )}
+                      <span>Tel: {data.customer.phone}</span>
+                    </div>
                   </div>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                     Cliente Frecuente
@@ -315,9 +328,9 @@ export function CustomerLookupModal({
           )}
       </BottomSheetModal>
 
-      {/* Full Order Details Modal */}
+      {/* Dedicated Customer Order Ticket Modal */}
       {selectedOrderForDetails && (
-        <OrderDetailsModal
+        <CustomerOrderTicketModal
           order={selectedOrderForDetails}
           isOpen={!!selectedOrderForDetails}
           onClose={() => setSelectedOrderForDetails(null)}

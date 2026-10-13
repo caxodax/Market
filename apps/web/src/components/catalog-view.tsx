@@ -17,6 +17,7 @@ import { CartDrawer } from "./cart-drawer";
 import { CheckoutDialog } from "./checkout-dialog";
 import { OrderSuccessModal } from "./order-success-modal";
 import { OrderTrackerModal } from "./order-tracker-modal";
+import { CustomerOrderTicketModal } from "./customer-order-ticket-modal";
 import { useFavorites } from "../context/favorites-context";
 import {
   Search,
@@ -72,6 +73,7 @@ export function CatalogView({
   const [searchQuery, setSearchQuery] = useState("");
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
+  const [ticketOrder, setTicketOrder] = useState<Order | null>(null);
 
   // Filter products by category, favorites and search
   const filteredProducts = useMemo(() => {
@@ -351,6 +353,19 @@ export function CatalogView({
         order={completedOrder}
         settings={settings}
         onClose={() => setCompletedOrder(null)}
+        onViewTicket={(ord) => {
+          setCompletedOrder(null);
+          setTicketOrder(ord);
+        }}
+      />
+
+      {/* Customer Ticket & QR Receipt Modal */}
+      <CustomerOrderTicketModal
+        order={ticketOrder}
+        isOpen={Boolean(ticketOrder)}
+        onClose={() => setTicketOrder(null)}
+        settings={settings}
+        store={stores[0]}
       />
 
       {/* Customer Order Tracker Modal */}

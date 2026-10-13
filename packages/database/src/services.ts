@@ -67,6 +67,7 @@ export interface CreateOrderInput {
   storeId: string;
   customerName: string;
   customerPhone: string;
+  customerIdNumber?: string; // Cédula o RIF (ej. V-12345678)
   customerEmail?: string;
   deliveryType: DeliveryType;
   deliveryZoneId?: string;
@@ -1169,6 +1170,7 @@ export class MarketOSRepository {
               name: input.customerName,
               email: input.customerEmail || null,
               phone: input.customerPhone,
+              id_number: input.customerIdNumber || existingCustomer.id_number || null,
               updated_at: new Date().toISOString(),
             })
             .eq("id", customerId);
@@ -1179,6 +1181,7 @@ export class MarketOSRepository {
               tenant_id: input.tenantId,
               name: input.customerName,
               phone: input.customerPhone,
+              id_number: input.customerIdNumber || null,
               email: input.customerEmail || null,
               loyalty_points: earnedPoints,
               is_guest: true,
@@ -1207,6 +1210,9 @@ export class MarketOSRepository {
     );
     if (memIdx !== -1) {
       state.customers[memIdx].name = input.customerName;
+      if (input.customerIdNumber) {
+        state.customers[memIdx].id_number = input.customerIdNumber;
+      }
       state.customers[memIdx].loyalty_points =
         (state.customers[memIdx].loyalty_points || 0) + earnedPoints;
     } else {
@@ -1216,6 +1222,7 @@ export class MarketOSRepository {
         auth_user_id: null,
         name: input.customerName,
         phone: input.customerPhone,
+        id_number: input.customerIdNumber || null,
         email: input.customerEmail || null,
         loyalty_points: earnedPoints,
         is_guest: true,
@@ -1245,6 +1252,7 @@ export class MarketOSRepository {
       updated_at: new Date().toISOString(),
       customer_name: input.customerName,
       customer_phone: input.customerPhone,
+      customer_id_number: input.customerIdNumber || null,
       customer_email: input.customerEmail || null,
       items: input.items.map((it, idx) => ({
         id: `item-${Date.now()}-${idx}`,
@@ -1443,6 +1451,15 @@ export class MarketOSRepository {
 
     state.payments.unshift(payment);
 
+    // Sync proof and payment info to memory order
+    const memOrder = state.orders.find((o) => o.id === input.orderId);
+    if (memOrder) {
+      memOrder.payment_method = input.method;
+      memOrder.payment_reference = input.referenceNumber;
+      memOrder.payment_status = "PENDING";
+      memOrder.proof_image_url = input.proofImageUrl || null;
+    }
+
     await MarketOSRepository.recordAuditLog({
       tenantId: input.tenantId,
       action: "PAYMENT_PROOF_SUBMITTED",
@@ -1485,7 +1502,7 @@ export class MarketOSRepository {
           const [itemsRes, custRes, payRes, storesRes] = await Promise.all([
             supabase.from("order_items").select("*").in("order_id", orderIds),
             customerIds.length > 0
-              ? supabase.from("customers").select("id, name, phone, email").in("id", customerIds)
+              ? supabase.from("customers").select("id, name, phone, email, id_number").in("id", customerIds)
               : Promise.resolve({ data: [] }),
             supabase.from("payments").select("*").in("order_id", orderIds),
             storeIds.length > 0
@@ -1517,13 +1534,14 @@ export class MarketOSRepository {
             return {
               ...o,
               items: itemsMap.get(o.id) || [],
-              customer_name: cust?.name,
-              customer_phone: cust?.phone,
-              customer_email: cust?.email,
-              payment_method: pay?.method,
-              payment_reference: pay?.reference_number,
-              payment_status: pay?.status,
-              proof_image_url: pay?.proof_image_url,
+              customer_name: cust?.name || o.customer_name,
+              customer_phone: cust?.phone || o.customer_phone,
+              customer_id_number: cust?.id_number || o.customer_id_number || null,
+              customer_email: cust?.email || o.customer_email,
+              payment_method: pay?.method || o.payment_method,
+              payment_reference: pay?.reference_number || o.payment_reference,
+              payment_status: pay?.status || o.payment_status,
+              proof_image_url: pay?.proof_image_url || o.proof_image_url || null,
               store_name: storeName,
             } as Order;
           });
@@ -1538,13 +1556,18 @@ export class MarketOSRepository {
       .filter((o) => o.tenant_id === tenantId)
       .map((o) => {
         const pay = state.payments.find((p) => p.order_id === o.id);
+        const cust = state.customers.find((c) => c.id === o.customer_id);
         const st = state.stores.find((s) => s.id === o.store_id);
         return {
           ...o,
+          customer_name: cust?.name || o.customer_name,
+          customer_phone: cust?.phone || o.customer_phone,
+          customer_id_number: cust?.id_number || o.customer_id_number || null,
+          customer_email: cust?.email || o.customer_email,
           payment_method: pay?.method || o.payment_method,
           payment_reference: pay?.reference_number || o.payment_reference,
           payment_status: pay?.status || o.payment_status,
-          proof_image_url: pay?.proof_image_url || o.proof_image_url,
+          proof_image_url: pay?.proof_image_url || o.proof_image_url || null,
           store_name: st?.name || o.store_name,
         };
       });
@@ -2052,17 +2075,60 @@ export class MarketOSRepository {
       try {
         let customer: any = null;
 
-        // Try exact phone match
-        const { data: byExactPhone } = await supabase
-          .from("customers")
-          .select("*")
-          .eq("tenant_id", tenantId)
-          .eq("phone", rawInput)
-          .maybeSingle();
+        // 1. Try search by Order Number (e.g. ORD-289699 or numeric part)
+        if (rawInput.toUpperCase().startsWith("ORD-") || /^\d{5,8}$/.test(rawInput)) {
+          const { data: orderMatch } = await supabase
+            .from("orders")
+            .select("customer_id")
+            .eq("tenant_id", tenantId)
+            .ilike("order_number", `%${rawInput}%`)
+            .limit(1)
+            .maybeSingle();
 
-        customer = byExactPhone;
+          if (orderMatch?.customer_id) {
+            const { data: byOrderCust } = await supabase
+              .from("customers")
+              .select("*")
+              .eq("id", orderMatch.customer_id)
+              .maybeSingle();
+            customer = byOrderCust;
+          }
+        }
 
-        // Try fuzzy last-7-digit phone match
+        // 2. Try Cédula / RIF match on id_number
+        if (!customer) {
+          if (cleanPhone.length >= 5) {
+            const { data: byCi } = await supabase
+              .from("customers")
+              .select("*")
+              .eq("tenant_id", tenantId)
+              .or(`id_number.eq.${rawInput},id_number.ilike.%${cleanPhone}%`)
+              .limit(1)
+              .maybeSingle();
+            customer = byCi;
+          } else if (rawInput.includes("-")) {
+            const { data: byCiExact } = await supabase
+              .from("customers")
+              .select("*")
+              .eq("tenant_id", tenantId)
+              .eq("id_number", rawInput)
+              .maybeSingle();
+            customer = byCiExact;
+          }
+        }
+
+        // 3. Try exact phone match
+        if (!customer) {
+          const { data: byExactPhone } = await supabase
+            .from("customers")
+            .select("*")
+            .eq("tenant_id", tenantId)
+            .eq("phone", rawInput)
+            .maybeSingle();
+          customer = byExactPhone;
+        }
+
+        // 4. Try fuzzy last-7-digit phone match
         if (!customer && cleanPhone.length >= 7) {
           const { data: byCleanPhone } = await supabase
             .from("customers")
@@ -2074,7 +2140,7 @@ export class MarketOSRepository {
           customer = byCleanPhone;
         }
 
-        // Try email match
+        // 5. Try email match
         if (!customer && rawInput.includes("@")) {
           const { data: byEmail } = await supabase
             .from("customers")
@@ -2131,6 +2197,7 @@ export class MarketOSRepository {
                 items: itemsMap.get(o.id) || [],
                 customer_name: customer.name,
                 customer_phone: customer.phone,
+                customer_id_number: customer.id_number || (o as any).customer_id_number || null,
                 customer_email: customer.email,
                 payment_method: pay?.method,
                 payment_reference: pay?.reference_number,
@@ -2158,15 +2225,35 @@ export class MarketOSRepository {
       }
     }
 
-    const memoryCustomer = state.customers.find((c) => {
-      if (c.tenant_id !== tenantId) return false;
-      if (c.email && c.email.toLowerCase() === rawInput.toLowerCase()) return true;
-      if (c.phone === rawInput) return true;
-      if (cleanPhone.length >= 7 && c.phone.replace(/\D/g, "").includes(cleanPhone.slice(-7))) {
-        return true;
-      }
-      return false;
-    });
+    const memoryCustomer =
+      state.customers.find((c) => {
+        if (c.tenant_id !== tenantId) return false;
+        if (c.email && c.email.toLowerCase() === rawInput.toLowerCase()) return true;
+        if (c.phone === rawInput) return true;
+        if (
+          c.id_number &&
+          (c.id_number.toLowerCase() === rawInput.toLowerCase() ||
+            (cleanPhone.length >= 5 &&
+              c.id_number.replace(/\D/g, "").includes(cleanPhone)))
+        ) {
+          return true;
+        }
+        if (cleanPhone.length >= 7 && c.phone.replace(/\D/g, "").includes(cleanPhone.slice(-7))) {
+          return true;
+        }
+        return false;
+      }) ||
+      (() => {
+        const matchedOrder = state.orders.find(
+          (o) =>
+            o.tenant_id === tenantId &&
+            o.order_number.toLowerCase().includes(rawInput.toLowerCase())
+        );
+        if (matchedOrder && matchedOrder.customer_id) {
+          return state.customers.find((c) => c.id === matchedOrder.customer_id);
+        }
+        return undefined;
+      })();
 
     if (memoryCustomer) {
       const orders = state.orders
@@ -2178,6 +2265,7 @@ export class MarketOSRepository {
             ...o,
             customer_name: memoryCustomer.name,
             customer_phone: memoryCustomer.phone,
+            customer_id_number: memoryCustomer.id_number || (o as any).customer_id_number || null,
             payment_method: pay?.method || o.payment_method,
             payment_reference: pay?.reference_number || o.payment_reference,
             payment_status: pay?.status || o.payment_status,
@@ -2199,7 +2287,7 @@ export class MarketOSRepository {
   }
 
   /**
-   * Get Orders for a specific customer by phone, order number, or ID with full item enrichment
+   * Get Orders for a specific customer by phone, Cédula, order number, or ID with full item enrichment
    */
   static async getCustomerOrders(
     tenantId: string,
@@ -2244,7 +2332,27 @@ export class MarketOSRepository {
           }
         }
 
-        // 3. If query is a valid UUID, search by exact order ID or customer ID
+        // 3. Search by Customer Cédula / RIF (id_number)
+        if (cleanDigits.length >= 5 || rawQuery.includes("-")) {
+          const { data: matchedCiCusts } = await supabase
+            .from("customers")
+            .select("id")
+            .eq("tenant_id", tenantId)
+            .or(`id_number.eq.${rawQuery},id_number.ilike.%${cleanDigits}%`);
+
+          const ciCustIds = (matchedCiCusts || []).map((c: any) => c.id);
+          if (ciCustIds.length > 0) {
+            const { data: byCiOrders } = await supabase
+              .from("orders")
+              .select("id")
+              .eq("tenant_id", tenantId)
+              .in("customer_id", ciCustIds);
+
+            (byCiOrders || []).forEach((o: any) => matchedOrderIds.add(o.id));
+          }
+        }
+
+        // 4. If query is a valid UUID, search by exact order ID or customer ID
         if (isUuid(rawQuery)) {
           const { data: byUuid } = await supabase
             .from("orders")
@@ -2255,7 +2363,7 @@ export class MarketOSRepository {
           (byUuid || []).forEach((o: any) => matchedOrderIds.add(o.id));
         }
 
-        // 4. Also search by delivery address or notes containing phone/reference
+        // 5. Also search by delivery address or notes containing phone/reference
         const { data: byText } = await supabase
           .from("orders")
           .select("id")
@@ -2284,7 +2392,7 @@ export class MarketOSRepository {
             const [itemsRes, custRes, payRes, storesRes] = await Promise.all([
               supabase.from("order_items").select("*").in("order_id", orderIds),
               customerIds.length > 0
-                ? supabase.from("customers").select("id, name, phone, email").in("id", customerIds)
+                ? supabase.from("customers").select("id, name, phone, email, id_number").in("id", customerIds)
                 : Promise.resolve({ data: [] }),
               supabase.from("payments").select("*").in("order_id", orderIds),
               storeIds.length > 0
@@ -2318,6 +2426,7 @@ export class MarketOSRepository {
                 items: itemsMap.get(o.id) || [],
                 customer_name: cust?.name || o.customer_name,
                 customer_phone: cust?.phone || o.customer_phone,
+                customer_id_number: cust?.id_number || o.customer_id_number || null,
                 customer_email: cust?.email || o.customer_email,
                 payment_method: pay?.method,
                 payment_reference: pay?.reference_number,
@@ -2341,6 +2450,19 @@ export class MarketOSRepository {
         if (o.id === rawQuery) return true;
         if (o.customer_id === rawQuery) return true;
         if (
+          cleanDigits.length >= 5 &&
+          o.customer_id_number &&
+          o.customer_id_number.replace(/\D/g, "").includes(cleanDigits)
+        ) {
+          return true;
+        }
+        if (
+          o.customer_id_number &&
+          o.customer_id_number.toLowerCase().includes(rawQuery.toLowerCase())
+        ) {
+          return true;
+        }
+        if (
           cleanDigits.length >= 7 &&
           o.customer_phone &&
           o.customer_phone.replace(/\D/g, "").includes(cleanDigits.slice(-7))
@@ -2363,9 +2485,14 @@ export class MarketOSRepository {
       })
       .map((o) => {
         const pay = state.payments.find((p) => p.order_id === o.id);
+        const cust = state.customers.find((c) => c.id === o.customer_id);
         const st = state.stores.find((s) => s.id === o.store_id);
         return {
           ...o,
+          customer_name: cust?.name || o.customer_name,
+          customer_phone: cust?.phone || o.customer_phone,
+          customer_id_number: cust?.id_number || o.customer_id_number || null,
+          customer_email: cust?.email || o.customer_email,
           payment_method: pay?.method || o.payment_method,
           payment_reference: pay?.reference_number || o.payment_reference,
           payment_status: pay?.status || o.payment_status,

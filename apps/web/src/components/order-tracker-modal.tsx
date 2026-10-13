@@ -5,7 +5,7 @@ import { Order, TenantSettings } from "@marketos/types";
 import { formatCurrency } from "@marketos/utils";
 import { trackOrderAction } from "../app/actions";
 import { BottomSheetModal } from "./bottom-sheet-modal";
-import { OrderDetailsModal } from "./order-details-modal";
+import { CustomerOrderTicketModal } from "./customer-order-ticket-modal";
 import {
   X,
   Search,
@@ -18,6 +18,7 @@ import {
   Calendar,
   Eye,
   ShoppingBag,
+  ShieldCheck,
 } from "lucide-react";
 
 interface OrderTrackerModalProps {
@@ -80,18 +81,24 @@ export function OrderTrackerModal({
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
 
-  // Auto-fill and search if customer phone exists in localStorage
+  // Auto-fill and search if customer CI or phone exists in localStorage
   useEffect(() => {
     if (!isOpen) return;
     try {
+      const savedCi =
+        localStorage.getItem(`marketos_customer_ci_${settings.tenant_id}`) ||
+        localStorage.getItem("marketos_customer_ci");
       const savedPhone =
         localStorage.getItem(`marketos_customer_phone_${settings.tenant_id}`) ||
         localStorage.getItem("marketos_customer_phone");
-      if (savedPhone && !query) {
-        setQuery(savedPhone);
+
+      const defaultQuery = savedCi || savedPhone;
+
+      if (defaultQuery && !query) {
+        setQuery(defaultQuery);
         setLoading(true);
         setSearched(true);
-        trackOrderAction(settings.tenant_id, savedPhone.trim()).then((res) => {
+        trackOrderAction(settings.tenant_id, defaultQuery.trim()).then((res) => {
           if (res.success) {
             setOrders(res.orders || []);
           }
@@ -136,7 +143,7 @@ export function OrderTrackerModal({
                 Rastrear mis Pedidos
               </h2>
               <p className="text-xs text-muted-foreground">
-                Ingresa tu número de WhatsApp o código de pedido (ej. ORD-123456)
+                Ingresa tu Cédula, teléfono o código de pedido (ej. ORD-289699)
               </p>
             </div>
             <button
@@ -157,7 +164,7 @@ export function OrderTrackerModal({
               <input
                 type="text"
                 required
-                placeholder="Teléfono (ej. 04128505629) o N° Pedido..."
+                placeholder="Cédula (V-12345678), Teléfono o N° Pedido..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="w-full h-11 pl-10 pr-3 rounded-xl border border-input bg-muted/30 text-xs focus:ring-2 focus:ring-primary"
@@ -183,7 +190,7 @@ export function OrderTrackerModal({
             <div className="text-center py-8 text-muted-foreground">
               <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-40" />
               <p className="text-xs font-semibold">No se encontraron pedidos asociados</p>
-              <p className="text-[11px] mt-1">Verifica que el teléfono o número de orden coincidan.</p>
+              <p className="text-[11px] mt-1">Verifica que tu cédula, teléfono o número de orden coincidan.</p>
             </div>
           )}
 
@@ -201,7 +208,7 @@ export function OrderTrackerModal({
                 className="p-3.5 rounded-xl border border-border bg-card hover:border-primary/40 transition-colors space-y-2.5"
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono text-xs font-black text-foreground">
                       {ord.order_number}
                     </span>
@@ -210,6 +217,12 @@ export function OrderTrackerModal({
                     >
                       {statusInfo.label}
                     </span>
+                    {ord.customer_id_number && (
+                      <span className="text-[10px] font-bold font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded-md border border-primary/20 flex items-center gap-1">
+                        <ShieldCheck className="w-2.5 h-2.5" />
+                        <span>{ord.customer_id_number}</span>
+                      </span>
+                    )}
                   </div>
 
                   <span className="text-xs font-black text-primary">
@@ -252,7 +265,7 @@ export function OrderTrackerModal({
                     className="inline-flex items-center gap-1 text-primary hover:text-primary/80 font-bold text-xs bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20 transition-colors cursor-pointer"
                   >
                     <Eye className="w-3.5 h-3.5" />
-                    <span>Ver Detalle</span>
+                    <span>Ver Ticket</span>
                   </button>
                 </div>
               </div>
@@ -261,9 +274,9 @@ export function OrderTrackerModal({
         </div>
       </BottomSheetModal>
 
-      {/* Full Order Details Modal */}
+      {/* Dedicated Customer Order Ticket Modal */}
       {selectedOrderForDetails && (
-        <OrderDetailsModal
+        <CustomerOrderTicketModal
           order={selectedOrderForDetails}
           isOpen={!!selectedOrderForDetails}
           onClose={() => setSelectedOrderForDetails(null)}

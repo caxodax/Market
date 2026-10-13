@@ -57,8 +57,48 @@ export function CheckoutDialog({
   const [error, setError] = useState<string | null>(null);
 
   // Form states
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerName, setCustomerName] = useState(() => {
+    if (typeof window !== "undefined") {
+      return (
+        localStorage.getItem(`marketos_customer_name_${settings.tenant_id}`) ||
+        localStorage.getItem("marketos_customer_name") || ""
+      );
+    }
+    return "";
+  });
+  const [customerPhone, setCustomerPhone] = useState(() => {
+    if (typeof window !== "undefined") {
+      return (
+        localStorage.getItem(`marketos_customer_phone_${settings.tenant_id}`) ||
+        localStorage.getItem("marketos_customer_phone") || ""
+      );
+    }
+    return "";
+  });
+  const [ciPrefix, setCiPrefix] = useState<"V" | "E" | "J" | "G">(() => {
+    if (typeof window !== "undefined") {
+      const saved =
+        localStorage.getItem(`marketos_customer_ci_${settings.tenant_id}`) ||
+        localStorage.getItem("marketos_customer_ci") || "";
+      if (saved.startsWith("E-")) return "E";
+      if (saved.startsWith("J-")) return "J";
+      if (saved.startsWith("G-")) return "G";
+      return "V";
+    }
+    return "V";
+  });
+  const [ciNumber, setCiNumber] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved =
+        localStorage.getItem(`marketos_customer_ci_${settings.tenant_id}`) ||
+        localStorage.getItem("marketos_customer_ci") || "";
+      if (saved.includes("-")) {
+        return saved.split("-")[1] || "";
+      }
+      return saved.replace(/\D/g, "");
+    }
+    return "";
+  });
   const [deliveryType, setDeliveryType] = useState<"PICKUP" | "DELIVERY">("PICKUP");
   const [selectedZoneId, setSelectedZoneId] = useState<string>(
     deliveryZones[0]?.id || ""
@@ -247,8 +287,8 @@ export function CheckoutDialog({
     e.preventDefault();
     setError(null);
 
-    if (!customerName.trim() || !customerPhone.trim()) {
-      setError("Por favor completa tu nombre y número de teléfono (WhatsApp)");
+    if (!customerName.trim() || !customerPhone.trim() || !ciNumber.trim()) {
+      setError("Por favor completa tu nombre, cédula / RIF y número de teléfono (WhatsApp)");
       return;
     }
 
@@ -281,17 +321,20 @@ export function CheckoutDialog({
         }
       }
 
-      // 2. Create order with Phase 2 fields
+      // 2. Create order with Phase 2 fields and mandatory CI
       const fullDeliveryAddress =
         deliveryType === "DELIVERY"
           ? `${deliveryAddress} ${deliveryReference ? `(Ref: ${deliveryReference})` : ""} - Zona: ${selectedZone?.name || ""}`
           : undefined;
+
+      const fullCi = `${ciPrefix}-${ciNumber.trim()}`;
 
       const orderRes = await createOrderAction({
         tenantId: settings.tenant_id,
         storeId: selectedStore.id,
         customerName,
         customerPhone,
+        customerIdNumber: fullCi,
         deliveryType,
         deliveryZoneId: deliveryType === "DELIVERY" ? selectedZone?.id : undefined,
         deliveryAddress: fullDeliveryAddress,
@@ -320,16 +363,18 @@ export function CheckoutDialog({
           paymentMethod === "PAGO_MOVIL" || paymentMethod === "BANK_TRANSFER"
             ? bankName
             : undefined,
-        referenceNumber: referenceNumber || "CASH-PENDING",
+        referenceNumber: referenceNumber || (paymentMethod === "CASH_USD" ? "EFECTIVO-TIENDA" : "PENDIENTE"),
         amount: paymentMethod === "ZELLE" ? totalUsd : totalVes,
         currency: paymentMethod === "ZELLE" ? "USD" : "VES",
         proofImageUrl,
       });
 
-      // 4. Record customer phone and link active Web Push subscription for automatic tracking alerts
+      // 4. Record customer data and link active Web Push subscription for automatic tracking alerts
       try {
+        localStorage.setItem(`marketos_customer_ci_${settings.tenant_id}`, fullCi);
         localStorage.setItem(`marketos_customer_phone_${settings.tenant_id}`, customerPhone);
         localStorage.setItem(`marketos_customer_name_${settings.tenant_id}`, customerName);
+        localStorage.setItem("marketos_customer_ci", fullCi);
         localStorage.setItem("marketos_customer_phone", customerPhone);
 
         if (typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window) {
@@ -354,8 +399,17 @@ export function CheckoutDialog({
         }
       } catch {}
 
+      const completedOrder: Order = {
+        ...orderRes.order,
+        customer_id_number: fullCi,
+        payment_method: paymentMethod,
+        payment_reference: referenceNumber || (paymentMethod === "CASH_USD" ? "EFECTIVO-TIENDA" : "PENDIENTE"),
+        payment_status: "PENDING",
+        proof_image_url: proofImageUrl || undefined,
+      };
+
       clearCart();
-      onOrderCompleted(orderRes.order);
+      onOrderCompleted(completedOrder);
       onClose();
     } catch (err: any) {
       setError(err.message || "Error al procesar el pedido. Intenta nuevamente.");
@@ -447,26 +501,58 @@ export function CheckoutDialog({
             <>
               {/* Customer info */}
               <div className="space-y-3">
-                <label className="text-xs font-semibold text-foreground uppercase tracking-wider">
-                  Datos de Contacto
-                </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                    Datos del Cliente
+                  </label>
+                  <span className="text-[10px] text-muted-foreground font-medium">
+                    Requeridos para retiro y seguimiento
+                  </span>
+                </div>
+                <div className="space-y-2.5">
                   <input
                     type="text"
                     required
-                    placeholder="Tu Nombre completo"
+                    placeholder="Nombre y Apellido completo *"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    className="h-11 px-3 rounded-xl border border-input bg-background text-xs focus:ring-2 focus:ring-primary"
+                    className="w-full h-11 px-3 rounded-xl border border-input bg-background text-xs focus:ring-2 focus:ring-primary"
                   />
-                  <input
-                    type="tel"
-                    required
-                    placeholder="Teléfono / WhatsApp"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    className="h-11 px-3 rounded-xl border border-input bg-background text-xs focus:ring-2 focus:ring-primary"
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* Cédula de Identidad / RIF */}
+                    <div className="flex gap-1.5">
+                      <select
+                        value={ciPrefix}
+                        onChange={(e) => setCiPrefix(e.target.value as "V" | "E" | "J" | "G")}
+                        className="h-11 px-2.5 rounded-xl border border-input bg-background text-xs font-bold text-foreground focus:ring-2 focus:ring-primary shrink-0 cursor-pointer"
+                        title="Tipo de documento"
+                      >
+                        <option value="V">V-</option>
+                        <option value="E">E-</option>
+                        <option value="J">J-</option>
+                        <option value="G">G-</option>
+                      </select>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        required
+                        placeholder="Cédula de Identidad *"
+                        value={ciNumber}
+                        onChange={(e) => setCiNumber(e.target.value.replace(/\D/g, ""))}
+                        className="w-full h-11 px-3 rounded-xl border border-input bg-background text-xs focus:ring-2 focus:ring-primary font-mono"
+                      />
+                    </div>
+
+                    {/* Teléfono / WhatsApp */}
+                    <input
+                      type="tel"
+                      required
+                      placeholder="Teléfono / WhatsApp *"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="w-full h-11 px-3 rounded-xl border border-input bg-background text-xs focus:ring-2 focus:ring-primary font-mono"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -641,8 +727,8 @@ export function CheckoutDialog({
               <button
                 type="button"
                 onClick={() => {
-                  if (!customerName.trim() || !customerPhone.trim()) {
-                    setError("Completa tu nombre y teléfono antes de continuar");
+                  if (!customerName.trim() || !customerPhone.trim() || !ciNumber.trim()) {
+                    setError("Completa tu nombre, cédula / RIF y teléfono antes de continuar");
                     return;
                   }
                   if (deliveryType === "DELIVERY" && !deliveryAddress.trim()) {
