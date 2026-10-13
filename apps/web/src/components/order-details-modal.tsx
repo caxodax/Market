@@ -158,6 +158,16 @@ export function OrderDetailsModal({
                 <span className="text-xs font-semibold text-muted-foreground">
                   {order.delivery_type === "DELIVERY" ? "🛵 Delivery" : "🏬 Retiro en Tienda"}
                 </span>
+                {order.is_fiscal_invoice ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                    <Receipt className="w-3 h-3" />
+                    <span>Factura: {order.fiscal_invoice_number} (Ctrl: {order.fiscal_control_number})</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+                    <span>Ticket Preventa</span>
+                  </span>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
                 Registrado el {formattedDate} {order.store_name && `• Sucursal: ${order.store_name}`}

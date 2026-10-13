@@ -22,6 +22,8 @@ import {
   ShieldCheck,
   AlertCircle,
   ExternalLink,
+  Receipt,
+  Scale,
 } from "lucide-react";
 
 interface CustomerOrderTicketModalProps {
@@ -143,6 +145,32 @@ export function CustomerOrderTicketModal({
   const items = order.items || [];
   const totalItemsCount = items.reduce((acc, it) => acc + it.quantity, 0);
 
+  // SENIAT Fiscal Compliance Status (Providencia 00071 & Factura Digital)
+  const isFiscal = Boolean(order.is_fiscal_invoice || settings.billing_settings?.fiscal_billing_enabled);
+  const billingSettings = settings.billing_settings;
+  const emitterRif = billingSettings?.emitter_fiscal_data?.rif || "J-50123456-7";
+  const emitterBusinessName = billingSettings?.emitter_fiscal_data?.business_name || settings.business_name;
+  const emitterAddress = billingSettings?.emitter_fiscal_data?.fiscal_address || settings.address;
+  const emitterPhone = billingSettings?.emitter_fiscal_data?.phone || settings.phone;
+  const invoiceNumber = order.fiscal_invoice_number || `FACT-${order.order_number.replace(/^ORD-/, "")}`;
+  const controlNumber = order.fiscal_control_number || `00-${order.order_number.replace(/^ORD-/, "000")}`;
+  const cuv = order.fiscal_cuv || `CUV-${order.order_number.replace(/^ORD-/, "")}`;
+
+  // Fiscal Calculations (Providencia 00071)
+  const ivaRate = (billingSettings?.default_iva_rate || 16) / 100;
+  const subtotalTaxableUsd = order.subtotal_taxable_usd ?? Number((order.total_usd / (1 + ivaRate)).toFixed(2));
+  const subtotalExemptUsd = order.subtotal_exempt_usd ?? 0;
+  const ivaAmountUsd = order.iva_amount_usd ?? Number((order.total_usd - subtotalTaxableUsd).toFixed(2));
+  const ivaAmountVes = order.iva_amount_ves ?? Number((ivaAmountUsd * order.exchange_rate_applied).toFixed(2));
+  const taxableVes = Number((subtotalTaxableUsd * order.exchange_rate_applied).toFixed(2));
+  const exemptVes = Number((subtotalExemptUsd * order.exchange_rate_applied).toFixed(2));
+  const hasIgtf = Boolean(
+    billingSettings?.apply_igtf &&
+      (order.payment_method === "CASH_USD" || order.payment_method === "ZELLE")
+  );
+  const igtfAmountUsd = order.igtf_amount_usd ?? (hasIgtf ? Number((order.total_usd * 0.03).toFixed(2)) : 0);
+  const igtfAmountVes = order.igtf_amount_ves ?? Number((igtfAmountUsd * order.exchange_rate_applied).toFixed(2));
+
   // QR Code visibility flag from operational settings (defaults to true)
   const showQr = settings.operational_settings?.show_ticket_qr !== false;
 
@@ -152,9 +180,9 @@ export function CustomerOrderTicketModal({
       ? `${window.location.origin}/?track=${encodeURIComponent(order.order_number)}`
       : `/?track=${order.order_number}`;
 
-  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-    trackingUrl
-  )}`;
+  const qrImageUrl = isFiscal && order.fiscal_qr_url
+    ? order.fiscal_qr_url
+    : `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(trackingUrl)}`;
 
   return (
     <>
@@ -168,7 +196,7 @@ export function CustomerOrderTicketModal({
             {settings.logo_url ? (
               <img
                 src={settings.logo_url}
-                alt={settings.business_name}
+                alt={isFiscal ? emitterBusinessName : settings.business_name}
                 className="h-16 w-auto max-w-[140px] object-contain"
               />
             ) : (
@@ -178,25 +206,39 @@ export function CustomerOrderTicketModal({
             )}
             <div>
               <h1 className="text-xl font-black tracking-tight text-slate-950 uppercase leading-none">
-                {settings.business_name}
+                {isFiscal ? emitterBusinessName : settings.business_name}
               </h1>
-              <p className="text-xs text-slate-600 mt-1">
+              {isFiscal && (
+                <p className="text-xs font-mono font-black text-slate-900 mt-1">
+                  RIF: {emitterRif}
+                </p>
+              )}
+              <p className="text-xs text-slate-600 mt-0.5">
                 {settings.category || "Comercio Digital"} • Barquisimeto, Venezuela
               </p>
               <p className="text-[11px] text-slate-500">
-                {settings.address && `${settings.address} • `}
-                {settings.phone && `Tlf: ${settings.phone}`}
+                {(isFiscal ? emitterAddress : settings.address) && `${isFiscal ? emitterAddress : settings.address} • `}
+                {(isFiscal ? emitterPhone : settings.phone) && `Tlf: ${isFiscal ? emitterPhone : settings.phone}`}
               </p>
             </div>
           </div>
 
           <div className="text-right">
-            <span className="inline-block bg-slate-950 text-white text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider">
-              Ticket de Compra
+            <span
+              className={`inline-block text-white text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider ${
+                isFiscal ? "bg-emerald-700" : "bg-slate-950"
+              }`}
+            >
+              {isFiscal ? "FACTURA FISCAL DIGITAL" : "Ticket de Compra"}
             </span>
             <div className="mt-1 font-mono font-black text-base text-slate-950">
-              #{order.order_number}
+              {isFiscal ? invoiceNumber : `#${order.order_number}`}
             </div>
+            {isFiscal && (
+              <div className="text-[10px] font-mono font-black text-slate-700">
+                N° Control: {controlNumber}
+              </div>
+            )}
             <div className="text-[10px] text-slate-600 font-medium">
               {formattedDate}
             </div>
@@ -329,15 +371,42 @@ export function CustomerOrderTicketModal({
               </div>
             ) : null}
 
+            {isFiscal ? (
+              <div className="pt-1.5 pb-1 space-y-0.5 border-t border-slate-300 text-[11px] text-slate-700">
+                <div className="flex justify-between">
+                  <span>Subtotal Exento / Exonerado:</span>
+                  <span className="font-mono">${subtotalExemptUsd.toFixed(2)} | Bs. {exemptVes.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Base Imponible Gravable (16%):</span>
+                  <span className="font-mono">${subtotalTaxableUsd.toFixed(2)} | Bs. {taxableVes.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between font-semibold text-slate-900">
+                  <span>IVA Liquidado (16%):</span>
+                  <span className="font-mono font-bold">${ivaAmountUsd.toFixed(2)} | Bs. {ivaAmountVes.toFixed(2)}</span>
+                </div>
+                {igtfAmountUsd > 0 && (
+                  <div className="flex justify-between font-bold text-amber-900 bg-amber-50 px-1 py-0.5 rounded">
+                    <span>IGTF (3% Divisas):</span>
+                    <span className="font-mono">${igtfAmountUsd.toFixed(2)} | Bs. {igtfAmountVes.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+            ) : null}
+
             <div className="flex justify-between items-baseline pt-1 border-t border-slate-300">
-              <span className="font-black text-sm text-slate-900">TOTAL USD:</span>
+              <span className="font-black text-sm text-slate-900">
+                {isFiscal ? "TOTAL FACTURA USD:" : "TOTAL USD:"}
+              </span>
               <span className="font-mono font-black text-lg text-slate-950">
                 ${order.total_usd.toFixed(2)}
               </span>
             </div>
 
             <div className="flex justify-between items-baseline font-mono">
-              <span className="text-slate-600 font-bold text-xs">TOTAL BOLÍVARES:</span>
+              <span className="text-slate-600 font-bold text-xs">
+                {isFiscal ? "TOTAL FACTURA BOLÍVARES:" : "TOTAL BOLÍVARES:"}
+              </span>
               <span className="font-bold text-base text-slate-950">
                 Bs. {order.total_ves.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
@@ -351,25 +420,34 @@ export function CustomerOrderTicketModal({
             <div className="space-y-0.5 text-slate-600 text-[11px] max-w-[70%]">
               <p className="font-bold text-slate-900 flex items-center gap-1">
                 <QrCode className="w-3.5 h-3.5" />
-                <span>Rastreo Digital en Tiempo Real</span>
+                <span>{isFiscal ? "Validación Fiscal Digital SENIAT" : "Rastreo Digital en Tiempo Real"}</span>
               </p>
               <p className="text-[10px] text-slate-500 leading-snug">
-                Escanea este código con la cámara de tu smartphone para consultar el estado del pedido, ruta de despacho y confirmación en tiempo real.
+                {isFiscal
+                  ? "Escanea este código con tu teléfono para verificar la autenticidad y validez fiscal de este documento ante la plataforma fiscal autorizada."
+                  : "Escanea este código con la cámara de tu smartphone para consultar el estado del pedido, ruta de despacho y confirmación en tiempo real."}
               </p>
+              {isFiscal && (
+                <p className="text-[9px] font-mono text-slate-600 pt-0.5">
+                  <strong>CUV:</strong> {cuv}
+                </p>
+              )}
             </div>
             <div className="w-20 h-20 bg-white p-1 border border-slate-300 rounded shrink-0 flex items-center justify-center">
               <img
                 src={qrImageUrl}
-                alt={`QR ${order.order_number}`}
+                alt={`QR ${isFiscal ? invoiceNumber : order.order_number}`}
                 className="w-full h-full object-contain"
               />
             </div>
           </div>
         )}
 
-        {/* Closing Thank-you note */}
+        {/* Closing Legal / Thank-you note */}
         <div className="text-center text-[10px] text-slate-500 pt-2 border-t border-slate-200">
-          ¡Gracias por su compra en {settings.business_name}! Este comprobante certifica su orden de compra digital.
+          {isFiscal
+            ? `Factura digital emitida conforme a la Providencia Administrativa SNAT/2011/00071 y normativas de Facturación Digital para Comercio Electrónico. Proveedor: ${billingSettings?.fiscal_provider || "The Factory HKA"} • Control: ${controlNumber}`
+            : `¡Gracias por su compra en ${settings.business_name}! Este comprobante certifica su orden de compra digital.`}
         </div>
       </div>
 
@@ -399,12 +477,24 @@ export function CustomerOrderTicketModal({
                   </div>
                 )}
                 <div className="min-w-0">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-primary">
-                    Ticket Digital de Compra
+                  <span className="text-[10px] font-black uppercase tracking-wider text-primary flex items-center gap-1">
+                    {isFiscal ? (
+                      <>
+                        <Receipt className="w-3 h-3 text-emerald-600" />
+                        <span>Factura Fiscal Digital (SENIAT)</span>
+                      </>
+                    ) : (
+                      <span>Ticket Digital de Compra</span>
+                    )}
                   </span>
                   <h3 className="font-extrabold text-base sm:text-lg text-foreground truncate">
-                    {settings.business_name}
+                    {isFiscal ? emitterBusinessName : settings.business_name}
                   </h3>
+                  {isFiscal && (
+                    <span className="text-[11px] font-mono font-bold text-muted-foreground block">
+                      RIF: {emitterRif}
+                    </span>
+                  )}
                   <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
                     <Calendar className="w-3 h-3 shrink-0" />
                     <span>{formattedDate}</span>
@@ -439,7 +529,7 @@ export function CustomerOrderTicketModal({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <span className="text-[11px] font-semibold text-muted-foreground block">
-                  Número de Orden
+                  {isFiscal ? "Documento Fiscal & Orden" : "Número de Orden"}
                 </span>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="font-mono font-black text-xl sm:text-2xl text-foreground tracking-tight">
@@ -459,6 +549,16 @@ export function CustomerOrderTicketModal({
                     )}
                   </button>
                 </div>
+                {isFiscal && (
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                      N° Factura: {invoiceNumber}
+                    </span>
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-muted text-muted-foreground border border-border">
+                      N° Control: {controlNumber}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
@@ -802,8 +902,35 @@ export function CustomerOrderTicketModal({
                   </div>
                 ) : null}
 
+                {isFiscal ? (
+                  <div className="pt-1.5 pb-0.5 border-t border-border space-y-1 text-[11px] text-muted-foreground">
+                    <div className="flex justify-between">
+                      <span>Base Gravable (16%):</span>
+                      <span className="font-mono text-foreground font-semibold">
+                        {formatCurrency(subtotalTaxableUsd, "USD")}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-semibold text-foreground">
+                      <span>IVA Liquidado (16%):</span>
+                      <span className="font-mono text-primary font-bold">
+                        {formatCurrency(ivaAmountUsd, "USD")} (Bs. {ivaAmountVes.toFixed(2)})
+                      </span>
+                    </div>
+                    {igtfAmountUsd > 0 && (
+                      <div className="flex justify-between font-bold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md">
+                        <span>IGTF (3% Divisas):</span>
+                        <span className="font-mono">
+                          {formatCurrency(igtfAmountUsd, "USD")} (Bs. {igtfAmountVes.toFixed(2)})
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+
                 <div className="border-t border-border pt-1.5 mt-1 flex justify-between items-baseline">
-                  <span className="font-black text-sm text-foreground">Total USD:</span>
+                  <span className="font-black text-sm text-foreground">
+                    {isFiscal ? "Total Factura USD:" : "Total USD:"}
+                  </span>
                   <span className="font-black text-base text-primary">
                     {formatCurrency(order.total_usd, "USD")}
                   </span>
