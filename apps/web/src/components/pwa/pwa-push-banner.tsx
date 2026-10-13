@@ -128,17 +128,23 @@ export function PwaPushBanner({
       });
     };
 
+    const handleOpenBanner = () => {
+      setIsDismissed(false);
+    };
+
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     window.addEventListener("appinstalled", handleAppInstalled);
+    window.addEventListener("open-marketos-pwa-banner", handleOpenBanner);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
       window.removeEventListener("appinstalled", handleAppInstalled);
+      window.removeEventListener("open-marketos-pwa-banner", handleOpenBanner);
     };
   }, [tenantId, storeName]);
 
-  // Si no está montado en cliente o fue cerrado por el usuario en esta sesión
-  if (!mounted || isDismissed) {
+  // Si no está montado en cliente
+  if (!mounted) {
     return null;
   }
 
@@ -292,44 +298,82 @@ export function PwaPushBanner({
   const displayLogo = logoUrl || "/brand/logo.png";
   const bottomOffsetClass = totalItems > 0 ? "bottom-20 sm:bottom-4" : "bottom-4";
 
+  // Si el usuario descartó el banner principal, dejamos una píldora discreta no intrusiva
+  if (isDismissed) {
+    return (
+      <>
+        <aside
+          aria-label="Abrir instalador de la app"
+          className={`fixed ${bottomOffsetClass} right-3 z-40 animate-in fade-in zoom-in-95`}
+        >
+          <button
+            type="button"
+            onClick={() => setIsDismissed(false)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-slate-950/90 text-white hover:bg-slate-900 border border-white/20 shadow-xl backdrop-blur-md text-xs font-bold transition-transform active:scale-95 cursor-pointer group"
+            title="Instalar App o Activar Alertas"
+          >
+            <Download className="w-3.5 h-3.5 text-primary group-hover:scale-110 transition-transform" />
+            <span>📲 Instalar App</span>
+          </button>
+        </aside>
+
+        <IosInstallGuideModal
+          isOpen={showIosGuide}
+          onClose={() => setShowIosGuide(false)}
+          reason={iosGuideReason}
+          storeName={storeName}
+          logoUrl={logoUrl}
+        />
+
+        <AndroidInstallGuideModal
+          isOpen={showAndroidGuide}
+          onClose={() => setShowAndroidGuide(false)}
+          storeName={storeName}
+          logoUrl={logoUrl}
+          onMarkInstalled={markAsInstalled}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       {/* Banner flotante inferior con soporte de áreas seguras y mobile first */}
       <aside
         aria-label={`Notificaciones y PWA de ${storeName}`}
-        className={`fixed ${bottomOffsetClass} inset-x-3 sm:inset-x-auto sm:right-6 sm:w-[440px] z-50 transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 pb-[env(safe-area-inset-bottom,0px)]`}
+        className={`fixed ${bottomOffsetClass} inset-x-3 sm:inset-x-auto sm:right-6 sm:w-[420px] z-50 transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 pb-[env(safe-area-inset-bottom,0px)]`}
       >
-        <div className="bg-slate-950/95 text-white rounded-3xl p-4 sm:p-5 shadow-[0_16px_50px_rgba(0,0,0,0.5)] border border-white/15 backdrop-blur-xl relative overflow-hidden">
+        <div className="bg-slate-950/95 text-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 shadow-[0_16px_50px_rgba(0,0,0,0.5)] border border-white/15 backdrop-blur-xl relative overflow-hidden">
           {/* Acento sutil de gradiente de marca */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full blur-2xl pointer-events-none" />
 
-          <div className="space-y-3 relative z-10">
+          <div className="space-y-2.5 relative z-10">
             {/* Encabezado */}
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/15 p-1 shadow-md flex items-center justify-center shrink-0 overflow-hidden">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/10 border border-white/15 p-0.5 shadow-md flex items-center justify-center shrink-0 overflow-hidden">
                   <img
                     src={displayLogo}
                     alt={storeName}
-                    className="w-full h-full object-contain rounded-xl"
+                    className="w-full h-full object-contain rounded-lg"
                   />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <h4 className="font-extrabold text-sm text-white tracking-tight truncate">
+                    <h4 className="font-extrabold text-xs sm:text-sm text-white tracking-tight truncate">
                       {storeName}
                     </h4>
-                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-primary/30 text-primary-foreground border border-primary/40 shrink-0">
+                    <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full bg-primary/30 text-primary-foreground border border-primary/40 shrink-0">
                       App Oficial
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-300 truncate mt-0.5">
+                  <p className="text-[10px] sm:text-[11px] text-slate-300 truncate mt-0.5">
                     {isIos && !isStandalone
-                      ? "Agrega la app al inicio para recibir ofertas"
+                      ? "Agrega la app al inicio para ofertas"
                       : !isInstalled && !pushGranted
                       ? "Instala la app y recibe ofertas exclusivas"
                       : !isInstalled
-                      ? "Agrega el acceso directo a tu inicio"
+                      ? "Agrega el acceso a tu pantalla de inicio"
                       : "Activa alertas de pedidos y cupones"}
                   </p>
                 </div>
@@ -343,18 +387,18 @@ export function PwaPushBanner({
                   e.stopPropagation();
                   setIsDismissed(true);
                 }}
-                className="min-h-[44px] min-w-[44px] text-white/60 hover:text-white p-2 hover:bg-white/10 rounded-2xl transition-colors cursor-pointer flex items-center justify-center shrink-0 active:scale-95"
+                className="h-8 w-8 text-white/60 hover:text-white p-1 hover:bg-white/10 rounded-xl transition-colors cursor-pointer flex items-center justify-center shrink-0 active:scale-95"
                 title="Cerrar aviso"
                 aria-label="Cerrar aviso de instalación"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Mensaje de feedback temporal */}
             {statusMessage && (
               <div
-                className={`text-[11px] font-medium px-3 py-1.5 rounded-xl border ${
+                className={`text-[11px] font-medium px-2.5 py-1 rounded-xl border ${
                   statusMessage.type === "success"
                     ? "bg-emerald-950/60 border-emerald-500/40 text-emerald-300"
                     : statusMessage.type === "error"
@@ -366,80 +410,80 @@ export function PwaPushBanner({
               </div>
             )}
 
-            {/* Acciones principales: Instalar y Activar Notificaciones */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+            {/* Acciones principales: Instalar y Activar Notificaciones (2 Columnas siempre) */}
+            <div className="grid grid-cols-2 gap-2 pt-0.5">
               {/* Botón de Instalación */}
               {!isInstalled ? (
-                <div className="flex flex-col">
+                <div className="flex flex-col min-w-0">
                   <button
                     type="button"
                     onClick={handleInstallClick}
-                    className="min-h-[44px] w-full px-3 py-2.5 rounded-2xl bg-primary text-primary-foreground font-black text-xs transition-all shadow-md hover:brightness-110 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                    className="min-h-[40px] w-full px-2.5 py-2 rounded-xl bg-primary text-primary-foreground font-black text-xs transition-all shadow-md hover:brightness-110 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                   >
                     {isIos ? (
                       <>
-                        <Share className="w-4 h-4 shrink-0" />
-                        <span>Agregar a Inicio</span>
+                        <Share className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">Agregar App</span>
                       </>
                     ) : (
                       <>
-                        <Download className="w-4 h-4 shrink-0" />
-                        <span>Instalar en Inicio</span>
+                        <Download className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">Instalar App</span>
                       </>
                     )}
                   </button>
                   {isIos ? (
-                    <span className="text-[10px] text-slate-400 text-center py-0.5 mt-0.5">
-                      Ver 4 pasos en Safari
+                    <span className="text-[9px] text-slate-400 text-center py-0.5 truncate">
+                      Ver pasos Safari
                     </span>
                   ) : (
                     <button
                       type="button"
                       onClick={markAsInstalled}
-                      className="text-[10px] text-slate-400 hover:text-slate-200 underline underline-offset-2 transition-colors cursor-pointer text-center py-1 mt-0.5"
+                      className="text-[9px] text-slate-400 hover:text-slate-200 underline underline-offset-2 transition-colors cursor-pointer text-center py-0.5 truncate"
                     >
-                      ¿Ya la instalaste? Toca aquí
+                      ¿Ya instalada?
                     </button>
                   )}
                 </div>
               ) : (
-                <div className="min-h-[44px] px-3 py-2 rounded-2xl bg-white/10 border border-white/15 text-emerald-400 font-bold text-xs flex items-center justify-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>App Instalada</span>
+                <div className="min-h-[40px] px-2 py-2 rounded-xl bg-white/10 border border-white/15 text-emerald-400 font-bold text-xs flex items-center justify-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span className="truncate">Instalada</span>
                 </div>
               )}
 
               {/* Botón de Notificaciones Push */}
               {!pushGranted ? (
-                <div className="flex flex-col">
+                <div className="flex flex-col min-w-0">
                   <button
                     type="button"
                     onClick={handleEnablePush}
                     disabled={isSubscribingPush}
-                    className="min-h-[44px] w-full px-3 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/20 text-white font-black text-xs transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
+                    className="min-h-[40px] w-full px-2.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-white font-black text-xs transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
                   >
                     {isSubscribingPush ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                        <span>Conectando...</span>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                        <span className="truncate">Conectando...</span>
                       </>
                     ) : (
                       <>
-                        <Bell className="w-4 h-4 text-amber-300 shrink-0" />
-                        <span>Activar Alertas</span>
+                        <Bell className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                        <span className="truncate">Alertas</span>
                       </>
                     )}
                   </button>
                   {isIos && !isStandalone && (
-                    <span className="text-[10px] text-amber-300/80 text-center py-0.5 mt-0.5">
-                      (Requiere abrir desde inicio)
+                    <span className="text-[9px] text-amber-300/80 text-center py-0.5 truncate">
+                      Abrir desde inicio
                     </span>
                   )}
                 </div>
               ) : (
-                <div className="min-h-[44px] px-3 py-2 rounded-2xl bg-white/10 border border-white/15 text-emerald-400 font-bold text-xs flex items-center justify-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Alertas Activas</span>
+                <div className="min-h-[40px] px-2 py-2 rounded-xl bg-white/10 border border-white/15 text-emerald-400 font-bold text-xs flex items-center justify-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span className="truncate">Alertas ON</span>
                 </div>
               )}
             </div>

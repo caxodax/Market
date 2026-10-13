@@ -1,0 +1,30 @@
+/**
+ * MarketOS — Barrel export de todos los Puertos (Interfaces)
+ */
+export type {
+  ITenantRepository,
+  IStoreRepository,
+  ICategoryRepository,
+  IProductRepository,
+  IInventoryRepository,
+  IExchangeRateRepository,
+  IDeliveryZoneRepository,
+  ICouponRepository,
+  IDriverRepository,
+  IOrderRepository,
+  IPaymentRepository,
+  ICustomerRepository,
+  IAuditLogRepository,
+  IUserRepository,
+  IPushNotificationRepository,
+  IPlatformRepository,
+  IAuthProvider,
+  IStorageProvider,
+  IMarketOSRepositories,
+  AuthResult,
+  CreateOrderInput,
+  SubmitPaymentInput,
+  UploadFileInput,
+  UploadResult,
+  StorageFolder,
+} from "./repository.port";
