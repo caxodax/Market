@@ -36,6 +36,10 @@ import {
   Smartphone,
   Banknote,
   QrCode,
+  Globe,
+  Copy,
+  ExternalLink,
+  Link2,
 } from "lucide-react";
 
 interface StoreSettingsTabProps {
@@ -122,11 +126,21 @@ const VENEZUELAN_BANKS = [
 ];
 
 export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTabProps) {
-  const [activeSubTab, setActiveSubTab] = useState<"GENERAL" | "PAYMENTS" | "BRANDING" | "OPERATIONS">("GENERAL");
+  const [activeSubTab, setActiveSubTab] = useState<"GENERAL" | "DOMAINS" | "PAYMENTS" | "BRANDING" | "OPERATIONS">("GENERAL");
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Form State: General
+  // Form State: General & Custom Domain
+  const [customDomain, setCustomDomain] = useState(settings.custom_domain || "");
+  const [copiedDnsKey, setCopiedDnsKey] = useState<string | null>(null);
+
+  const copyDnsValue = (val: string, key: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(val);
+      setCopiedDnsKey(key);
+      setTimeout(() => setCopiedDnsKey(null), 2500);
+    }
+  };
   const [businessName, setBusinessName] = useState(settings.business_name || "");
   const [category, setCategory] = useState(settings.category || "Minimarket");
   const [address, setAddress] = useState(settings.address || "");
@@ -348,6 +362,7 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
       secondary_color: secondaryColor,
       font_family: fontFamily,
       logo_url: logoUrl,
+      custom_domain: customDomain.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "") || null,
       payment_settings: updatedPaymentSettings,
       operational_settings: updatedOperationalSettings,
     };
@@ -432,10 +447,11 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
       )}
 
       {/* Sub Navigation Tabs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 border-b border-border pb-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 border-b border-border pb-3">
         <button
+          type="button"
           onClick={() => setActiveSubTab("GENERAL")}
-          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
             activeSubTab === "GENERAL"
               ? "bg-primary text-primary-foreground border-primary shadow-xs"
               : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted"
@@ -446,8 +462,22 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
         </button>
 
         <button
+          type="button"
+          onClick={() => setActiveSubTab("DOMAINS")}
+          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            activeSubTab === "DOMAINS"
+              ? "bg-primary text-primary-foreground border-primary shadow-xs"
+              : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted"
+          }`}
+        >
+          <Globe className="w-4 h-4" />
+          <span>Dominio Web</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveSubTab("PAYMENTS")}
-          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
             activeSubTab === "PAYMENTS"
               ? "bg-primary text-primary-foreground border-primary shadow-xs"
               : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted"
@@ -458,27 +488,29 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
         </button>
 
         <button
+          type="button"
           onClick={() => setActiveSubTab("BRANDING")}
-          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
             activeSubTab === "BRANDING"
               ? "bg-primary text-primary-foreground border-primary shadow-xs"
               : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted"
           }`}
         >
           <Palette className="w-4 h-4" />
-          <span>Marca, Colores & Logo</span>
+          <span>Marca & Colores</span>
         </button>
 
         <button
+          type="button"
           onClick={() => setActiveSubTab("OPERATIONS")}
-          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
             activeSubTab === "OPERATIONS"
               ? "bg-primary text-primary-foreground border-primary shadow-xs"
               : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted"
           }`}
         >
           <Settings2 className="w-4 h-4" />
-          <span>Operatividad & Tienda</span>
+          <span>Operatividad</span>
         </button>
       </div>
 
@@ -634,6 +666,186 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
                   placeholder="@shopmarket"
                   className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
                 />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUBTAB: CUSTOM WEB DOMAIN & DNS SETUP */}
+      {activeSubTab === "DOMAINS" && (
+        <div className="space-y-6">
+          <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-primary" />
+                  <span>Dominio Web Propio (Tu Marca en Internet)</span>
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Conecta tu propio dominio (ej. <strong>tiendasanpedro.com</strong> o <strong>pedidos.fruteria.com</strong>) para que tus clientes naveguen directamente en tu marca con certificado de seguridad SSL (HTTPS).
+                </p>
+              </div>
+
+              {customDomain ? (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-xs font-bold shrink-0">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  <span>Dominio Asignado</span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20 text-xs font-bold shrink-0">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  <span>Usando Dominio Plataforma</span>
+                </div>
+              )}
+            </div>
+
+            {/* Input & Action */}
+            <div className="space-y-2 pt-2">
+              <label className="text-xs font-semibold text-foreground block">
+                Nombre de tu Dominio Web o Subdominio
+              </label>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="relative flex-1">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-mono text-muted-foreground">
+                    https://
+                  </span>
+                  <input
+                    type="text"
+                    value={customDomain}
+                    onChange={(e) => setCustomDomain(e.target.value.toLowerCase().trim())}
+                    placeholder="ej. tiendasanpedro.com o pedidos.fruteria.com"
+                    className="w-full h-11 pl-20 pr-4 rounded-xl border border-input bg-background text-foreground text-xs font-mono font-medium focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-muted-foreground"
+                  />
+                </div>
+
+                {customDomain && (
+                  <button
+                    type="button"
+                    onClick={() => setCustomDomain("")}
+                    className="px-3 py-2.5 rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/10 text-xs font-semibold transition-colors cursor-pointer shrink-0"
+                    title="Desvincular dominio"
+                  >
+                    Limpiar
+                  </button>
+                )}
+
+                {customDomain && (
+                  <a
+                    href={`https://${customDomain.replace(/^https?:\/\//, "")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 text-xs font-bold transition-colors cursor-pointer shrink-0"
+                  >
+                    <span>Probar Enlace</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                No incluyas <code>https://</code> ni diagonales al final. Pulsa <strong>Guardar Configuración</strong> arriba para aplicar.
+              </p>
+            </div>
+          </div>
+
+          {/* DNS Configuration Guide Card */}
+          <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
+            <div>
+              <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+                <Link2 className="w-4 h-4 text-primary" />
+                <span>Instrucciones de Conexión DNS (En tu proveedor de dominio)</span>
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Ingresa al panel donde compraste tu dominio (GoDaddy, Namecheap, Nic.ve, DonDominio, Cloudflare, etc.) y agrega <strong>UNO</strong> de los siguientes registros en la sección de Gestión DNS:
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+              {/* Option A: Subdomain CNAME */}
+              <div className="p-4 rounded-xl bg-muted/40 border border-border space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded-md">
+                    Opción A • Recomendada
+                  </span>
+                  <span className="text-[11px] font-semibold text-muted-foreground">Para Subdominios</span>
+                </div>
+                <h4 className="text-xs font-bold text-foreground">
+                  Subdominio (ej: pedidos.tudominio.com)
+                </h4>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-background border border-border">
+                    <span className="text-muted-foreground font-mono text-[11px]">Tipo de Registro:</span>
+                    <strong className="font-mono text-foreground font-bold">CNAME</strong>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-background border border-border">
+                    <span className="text-muted-foreground font-mono text-[11px]">Nombre / Host:</span>
+                    <strong className="font-mono text-foreground font-bold">pedidos (o tu subdominio)</strong>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-background border border-border gap-2">
+                    <span className="text-muted-foreground font-mono text-[11px]">Valor / Destino:</span>
+                    <div className="flex items-center gap-1.5">
+                      <strong className="font-mono text-primary font-bold text-[11px]">cname.vercel-dns.com</strong>
+                      <button
+                        type="button"
+                        onClick={() => copyDnsValue("cname.vercel-dns.com", "cname")}
+                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
+                        title="Copiar valor CNAME"
+                      >
+                        {copiedDnsKey === "cname" ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Option B: Apex Domain A Record */}
+              <div className="p-4 rounded-xl bg-muted/40 border border-border space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-slate-500/10 text-slate-400 px-2 py-0.5 rounded-md">
+                    Opción B
+                  </span>
+                  <span className="text-[11px] font-semibold text-muted-foreground">Para Dominio Raíz</span>
+                </div>
+                <h4 className="text-xs font-bold text-foreground">
+                  Dominio Principal (ej: tudominio.com)
+                </h4>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-background border border-border">
+                    <span className="text-muted-foreground font-mono text-[11px]">Tipo de Registro:</span>
+                    <strong className="font-mono text-foreground font-bold">A</strong>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-background border border-border">
+                    <span className="text-muted-foreground font-mono text-[11px]">Nombre / Host:</span>
+                    <strong className="font-mono text-foreground font-bold">@ (o en blanco)</strong>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-background border border-border gap-2">
+                    <span className="text-muted-foreground font-mono text-[11px]">Valor / Destino:</span>
+                    <div className="flex items-center gap-1.5">
+                      <strong className="font-mono text-primary font-bold text-[11px]">76.76.21.21</strong>
+                      <button
+                        type="button"
+                        onClick={() => copyDnsValue("76.76.21.21", "a")}
+                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
+                        title="Copiar dirección IP"
+                      >
+                        {copiedDnsKey === "a" ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Verification note */}
+            <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/20 flex items-start gap-3 text-xs">
+              <Sparkles className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <strong className="text-foreground font-bold block">
+                  Propagación Automática y Certificados SSL Gratuitos:
+                </strong>
+                <p className="text-muted-foreground leading-relaxed">
+                  Una vez guardados los registros en tu registrador DNS, la propagación suele tardar entre 5 y 30 minutos. Vercel emitirá y renovará automáticamente tu certificado de seguridad SSL HTTPS de forma gratuita.
+                </p>
               </div>
             </div>
           </div>

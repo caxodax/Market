@@ -110,15 +110,16 @@ function getSupabase() {
 
 export class MarketOSRepository {
   /**
-   * Fetch Tenant by ID or Slug
+   * Fetch Tenant by ID, Slug, or Custom Domain
    */
-  static async getTenant(tenantIdOrSlug: string): Promise<Tenant | null> {
+  static async getTenant(tenantIdOrSlugOrDomain: string): Promise<Tenant | null> {
+    const cleanSearch = tenantIdOrSlugOrDomain.trim().toLowerCase();
     const supabase = getSupabase();
     if (supabase) {
       const { data, error } = await supabase
         .from("tenants")
         .select("*")
-        .or(`id.eq.${tenantIdOrSlug},slug.eq.${tenantIdOrSlug}`)
+        .or(`id.eq.${cleanSearch},slug.eq.${cleanSearch},custom_domain.eq.${cleanSearch}`)
         .maybeSingle();
 
       if (!error && data) {
@@ -127,7 +128,10 @@ export class MarketOSRepository {
     }
 
     const tenant = state.tenants.find(
-      (t) => t.id === tenantIdOrSlug || t.slug === tenantIdOrSlug
+      (t) =>
+        t.id.toLowerCase() === cleanSearch ||
+        t.slug.toLowerCase() === cleanSearch ||
+        (t.custom_domain && t.custom_domain.toLowerCase() === cleanSearch)
     );
     return tenant || INITIAL_TENANT;
   }
@@ -145,9 +149,22 @@ export class MarketOSRepository {
         .maybeSingle();
 
       if (!error && data) {
+        let customDomain = data.custom_domain || null;
+        if (!customDomain) {
+          const { data: tenantData } = await supabase
+            .from("tenants")
+            .select("custom_domain")
+            .eq("id", tenantId)
+            .maybeSingle();
+          if (tenantData?.custom_domain) {
+            customDomain = tenantData.custom_domain;
+          }
+        }
+
         return {
           ...INITIAL_SETTINGS,
           ...(data as TenantSettings),
+          custom_domain: customDomain,
           payment_settings: {
             ...INITIAL_SETTINGS.payment_settings,
             ...(data.payment_settings || {}),
@@ -155,6 +172,10 @@ export class MarketOSRepository {
           operational_settings: {
             ...INITIAL_SETTINGS.operational_settings,
             ...(data.operational_settings || {}),
+          },
+          billing_settings: {
+            ...INITIAL_SETTINGS.billing_settings,
+            ...(data.billing_settings || {}),
           },
         };
       }
@@ -184,6 +205,9 @@ export class MarketOSRepository {
       operational_settings: updates.operational_settings
         ? { ...current.operational_settings, ...updates.operational_settings }
         : current.operational_settings,
+      billing_settings: updates.billing_settings
+        ? { ...current.billing_settings, ...updates.billing_settings }
+        : current.billing_settings,
     };
 
     const supabase = getSupabase();
@@ -206,6 +230,8 @@ export class MarketOSRepository {
         default_currency: updated.default_currency,
         payment_settings: updated.payment_settings,
         operational_settings: updated.operational_settings,
+        billing_settings: updated.billing_settings,
+        custom_domain: updated.custom_domain,
         updated_at: new Date().toISOString(),
       };
 
@@ -222,18 +248,23 @@ export class MarketOSRepository {
         const safePayload = { ...payload };
         delete safePayload.payment_settings;
         delete safePayload.operational_settings;
+        delete safePayload.billing_settings;
         delete safePayload.font_family;
+        delete safePayload.custom_domain;
         await supabase
           .from("tenant_settings")
+          .update(safePayload)
+          .eq("tenant_id", tenantId);
       }
 
-      // Also keep public.tenants table in sync if logo or name changed
-      if (updated.logo_url || updated.business_name) {
+      // Also keep public.tenants table in sync if logo, name, or custom_domain changed
+      if (updated.logo_url || updated.business_name || updates.custom_domain !== undefined) {
         await supabase
           .from("tenants")
           .update({
             ...(updated.logo_url ? { logo_url: updated.logo_url } : {}),
             ...(updated.business_name ? { name: updated.business_name } : {}),
+            ...(updates.custom_domain !== undefined ? { custom_domain: updates.custom_domain } : {}),
             updated_at: new Date().toISOString(),
           })
           .eq("id", tenantId);
@@ -246,6 +277,19 @@ export class MarketOSRepository {
       state.settings[idx] = updated;
     } else {
       state.settings.push(updated);
+    }
+
+    const tIdx = state.tenants.findIndex((t) => t.id === tenantId);
+    if (tIdx !== -1) {
+      if (updates.custom_domain !== undefined) {
+        state.tenants[tIdx].custom_domain = updates.custom_domain;
+      }
+      if (updated.business_name) {
+        state.tenants[tIdx].name = updated.business_name;
+      }
+      if (updated.logo_url) {
+        state.tenants[tIdx].logo_url = updated.logo_url;
+      }
     }
 
     const tenantIdx = state.tenants.findIndex((t) => t.id === tenantId);
@@ -1855,7 +1899,7 @@ export class MarketOSRepository {
       try {
         const { data: paymentRow } = await supabase
           .from("payments")
-          .select("order_id")
+          .select("order_id, currency")
           .eq("id", paymentId)
           .eq("tenant_id", tenantId)
           .maybeSingle();
@@ -1875,10 +1919,62 @@ export class MarketOSRepository {
         if (orderIdToUpdate) {
           const newOrderStatus: OrderStatus =
             status === "APPROVED" ? "PREPARING" : "CANCELLED";
+
+          let fiscalPayload: Record<string, any> = {};
+          if (status === "APPROVED") {
+            try {
+              const settings = await MarketOSRepository.getTenantSettings(tenantId);
+              if (settings?.billing_settings?.fiscal_billing_enabled) {
+                const { data: ordRow } = await supabase
+                  .from("orders")
+                  .select("total_usd, total_ves, exchange_rate_applied, order_number")
+                  .eq("id", orderIdToUpdate)
+                  .maybeSingle();
+
+                const totUsd = Number(ordRow?.total_usd || 0);
+                const exRate = Number(ordRow?.exchange_rate_applied || 1);
+                const ivaRate = (settings.billing_settings.default_iva_rate || 16) / 100;
+                const baseImponible = Number((totUsd / (1 + ivaRate)).toFixed(2));
+                const ivaUsd = Number((totUsd - baseImponible).toFixed(2));
+                const ivaVes = Number((ivaUsd * exRate).toFixed(2));
+
+                const isForeignPayment = paymentRow?.currency === "USD";
+                let igtfUsd = 0;
+                let igtfVes = 0;
+                if (settings.billing_settings.apply_igtf && isForeignPayment) {
+                  igtfUsd = Number((totUsd * 0.03).toFixed(2));
+                  igtfVes = Number((igtfUsd * exRate).toFixed(2));
+                }
+
+                const invSeq = Date.now().toString().slice(-8);
+                const invNum = `FACT-${invSeq}`;
+                const ctrlNum = `00-${invSeq}`;
+                const rif = settings.billing_settings.emitter_fiscal_data?.rif || "J-50123456-7";
+
+                fiscalPayload = {
+                  is_fiscal_invoice: true,
+                  fiscal_invoice_number: invNum,
+                  fiscal_control_number: ctrlNum,
+                  fiscal_cuv: `CUV-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+                  fiscal_qr_url: `https://fiscal.seniat.gob.ve/verificar?rif=${encodeURIComponent(rif)}&factura=${invNum}&control=${ctrlNum}`,
+                  subtotal_exempt_usd: 0,
+                  subtotal_taxable_usd: baseImponible,
+                  iva_amount_usd: ivaUsd,
+                  iva_amount_ves: ivaVes,
+                  igtf_amount_usd: igtfUsd,
+                  igtf_amount_ves: igtfVes,
+                };
+              }
+            } catch (err) {
+              console.warn("[MarketOS] Fiscal generation error:", err);
+            }
+          }
+
           await supabase
             .from("orders")
             .update({
               status: newOrderStatus,
+              ...fiscalPayload,
               updated_at: new Date().toISOString(),
             })
             .eq("id", orderIdToUpdate)
@@ -1905,6 +2001,41 @@ export class MarketOSRepository {
       if (order) {
         if (status === "APPROVED") {
           order.status = "PREPARING";
+          const settings = state.settings.find((s) => s.tenant_id === tenantId);
+          if (settings?.billing_settings?.fiscal_billing_enabled) {
+            const totUsd = order.total_usd || 0;
+            const exRate = order.exchange_rate_applied || 1;
+            const ivaRate = (settings.billing_settings.default_iva_rate || 16) / 100;
+            const baseImponible = Number((totUsd / (1 + ivaRate)).toFixed(2));
+            const ivaUsd = Number((totUsd - baseImponible).toFixed(2));
+            const ivaVes = Number((ivaUsd * exRate).toFixed(2));
+            const isForeignPayment =
+              payment.currency === "USD" ||
+              order.payment_method === "CASH_USD" ||
+              order.payment_method === "ZELLE";
+            let igtfUsd = 0;
+            let igtfVes = 0;
+            if (settings.billing_settings.apply_igtf && isForeignPayment) {
+              igtfUsd = Number((totUsd * 0.03).toFixed(2));
+              igtfVes = Number((igtfUsd * exRate).toFixed(2));
+            }
+            const invSeq = Date.now().toString().slice(-8);
+            const invNum = `FACT-${invSeq}`;
+            const ctrlNum = `00-${invSeq}`;
+            const rif = settings.billing_settings.emitter_fiscal_data?.rif || "J-50123456-7";
+
+            order.is_fiscal_invoice = true;
+            order.fiscal_invoice_number = invNum;
+            order.fiscal_control_number = ctrlNum;
+            order.fiscal_cuv = `CUV-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+            order.fiscal_qr_url = `https://fiscal.seniat.gob.ve/verificar?rif=${encodeURIComponent(rif)}&factura=${invNum}&control=${ctrlNum}`;
+            order.subtotal_exempt_usd = 0;
+            order.subtotal_taxable_usd = baseImponible;
+            order.iva_amount_usd = ivaUsd;
+            order.iva_amount_ves = ivaVes;
+            order.igtf_amount_usd = igtfUsd;
+            order.igtf_amount_ves = igtfVes;
+          }
         } else if (status === "REJECTED") {
           order.status = "CANCELLED";
           await MarketOSRepository.restoreOrderInventoryStock(tenantId, payment.order_id);

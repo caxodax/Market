@@ -10,6 +10,7 @@ export interface Tenant {
   slug: string;
   logo_url: string | null;
   status: TenantStatus;
+  custom_domain?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -55,6 +56,37 @@ export interface StoreOperationalSettings {
   show_ticket_qr?: boolean;
 }
 
+export type FiscalBillingMode = "TICKET_ONLY" | "DIGITAL_INVOICE" | "MANUAL_INVOICE";
+export type FiscalTaxPayerType = "ORDINARY" | "SPECIAL";
+export type FiscalProvider =
+  | "THE_FACTORY_HKA"
+  | "LIXIE"
+  | "GURUSOFT"
+  | "FACTURATECH"
+  | "MANUAL_SIMULATION";
+
+export interface FiscalEmitterData {
+  rif: string; // e.g. "J-50123456-7"
+  business_name: string; // Razón Social Fiscal
+  fiscal_address: string; // Domicilio Fiscal
+  phone?: string;
+}
+
+export interface TenantBillingSettings {
+  fiscal_billing_enabled?: boolean; // Default FALSE (OFF)
+  billing_mode?: FiscalBillingMode; // Default "TICKET_ONLY"
+  tax_payer_type?: FiscalTaxPayerType; // Default "ORDINARY"
+  apply_igtf?: boolean; // Default false (Aplica 3% si es divisa)
+  default_iva_rate?: number; // Default 16.0
+  fiscal_provider?: FiscalProvider; // Default "THE_FACTORY_HKA"
+  emitter_fiscal_data?: FiscalEmitterData;
+  provider_credentials?: {
+    api_key?: string;
+    token?: string;
+    environment?: "SANDBOX" | "PRODUCTION";
+  };
+}
+
 export interface TenantSettings {
   tenant_id: string;
   business_name: string;
@@ -78,6 +110,8 @@ export interface TenantSettings {
   default_currency: CurrencyCode;
   payment_settings?: PaymentAccountSettings;
   operational_settings?: StoreOperationalSettings;
+  billing_settings?: TenantBillingSettings;
+  custom_domain?: string | null;
 }
 
 export interface Store {
@@ -360,6 +394,18 @@ export interface Order {
   payment_status?: PaymentStatus;
   proof_image_url?: string | null;
   store_name?: string;
+  // SENIAT Fiscal Invoice Data (Providencia 00071 & Factura Digital)
+  is_fiscal_invoice?: boolean;
+  fiscal_invoice_number?: string | null;
+  fiscal_control_number?: string | null;
+  fiscal_qr_url?: string | null;
+  fiscal_cuv?: string | null;
+  subtotal_exempt_usd?: number;
+  subtotal_taxable_usd?: number;
+  iva_amount_usd?: number;
+  iva_amount_ves?: number;
+  igtf_amount_usd?: number;
+  igtf_amount_ves?: number;
 }
 
 export interface SalesAnalytics {

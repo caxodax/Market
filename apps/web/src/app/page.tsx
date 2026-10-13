@@ -1,5 +1,6 @@
 import React from "react";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { MarketOSRepository } from "@marketos/database";
 import { StorefrontPage } from "../components/storefront-page";
 
@@ -9,12 +10,35 @@ interface HomePageProps {
   searchParams: Promise<{ tenant?: string }>;
 }
 
+async function resolveTenantIdentifier(explicitParam?: string): Promise<string> {
+  if (explicitParam) return explicitParam;
+  try {
+    const headersList = await headers();
+    const host = headersList.get("host")?.split(":")[0].toLowerCase() || "";
+    const platformDomain = (process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || "").toLowerCase();
+    const isPlatformDomain =
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host.endsWith(".vercel.app") ||
+      (Boolean(platformDomain) && host === platformDomain);
+
+    if (!isPlatformDomain && host) {
+      if (platformDomain && host.endsWith(`.${platformDomain}`)) {
+        return host.replace(`.${platformDomain}`, "");
+      }
+      return host;
+    }
+  } catch {
+    // ignore
+  }
+  return process.env.DEFAULT_TENANT_ID || "shop-market-ca";
+}
+
 export async function generateMetadata({
   searchParams,
 }: HomePageProps): Promise<Metadata> {
   const params = await searchParams;
-  const tenantSlugOrId =
-    params?.tenant || process.env.DEFAULT_TENANT_ID || "shop-market-ca";
+  const tenantSlugOrId = await resolveTenantIdentifier(params?.tenant);
 
   const tenant = await MarketOSRepository.getTenant(tenantSlugOrId);
   const activeTenantId = tenant?.id || "shop-market-ca";
@@ -52,9 +76,7 @@ export async function generateMetadata({
 
 export default async function HomePage({ searchParams }: HomePageProps) {
   const params = await searchParams;
-  // Dynamic multi-tenant resolution: ?tenant=slug or fallback to default
-  const tenantSlugOrId =
-    params?.tenant || process.env.DEFAULT_TENANT_ID || "shop-market-ca";
+  const tenantSlugOrId = await resolveTenantIdentifier(params?.tenant);
 
   const tenant = await MarketOSRepository.getTenant(tenantSlugOrId);
   const activeTenantId = tenant?.id || "shop-market-ca";

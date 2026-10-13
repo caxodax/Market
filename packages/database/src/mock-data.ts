@@ -27,6 +27,7 @@ export const INITIAL_TENANT: Tenant = {
   slug: "shop-market",
   logo_url: "/brand/logo.png",
   status: "active",
+  custom_domain: null,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
@@ -89,6 +90,26 @@ export const INITIAL_SETTINGS: TenantSettings = {
     custom_whatsapp_message: "Hola Shop Market, acabo de realizar un pedido por la tienda web:",
     show_ticket_qr: true,
   },
+  billing_settings: {
+    fiscal_billing_enabled: false,
+    billing_mode: "TICKET_ONLY",
+    tax_payer_type: "ORDINARY",
+    apply_igtf: false,
+    default_iva_rate: 16.0,
+    fiscal_provider: "THE_FACTORY_HKA",
+    emitter_fiscal_data: {
+      rif: "J-50123456-7",
+      business_name: "Shop Market C.A.",
+      fiscal_address: "Calle 3 entre Carreras 1 y 2, Urb. Nueva Segovia, Barquisimeto, Lara",
+      phone: "+58 424-5919577",
+    },
+    provider_credentials: {
+      api_key: "",
+      token: "",
+      environment: "SANDBOX",
+    },
+  },
+  custom_domain: null,
 };
 
 export const INITIAL_STORES: Store[] = [

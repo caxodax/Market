@@ -501,3 +501,40 @@ export async function updateStoreAction(
     return { success: false, error: "No se pudo actualizar la sucursal" };
   }
 }
+
+/**
+ * Update tenant custom domain (e.g. 'tiendasanpedro.com' or null)
+ */
+export async function updateTenantCustomDomainAction(
+  tenantId: string,
+  rawDomain: string | null
+) {
+  try {
+    let cleanDomain: string | null = null;
+    if (rawDomain && rawDomain.trim()) {
+      cleanDomain = rawDomain
+        .trim()
+        .toLowerCase()
+        .replace(/^https?:\/\//, "")
+        .replace(/\/.*$/, "")
+        .replace(/:\d+$/, "")
+        .trim();
+    }
+
+    const settings = await MarketOSRepository.updateTenantSettings(tenantId, {
+      custom_domain: cleanDomain,
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/");
+    revalidatePath("/platform");
+
+    return { success: true, customDomain: cleanDomain, settings };
+  } catch (error: any) {
+    console.error("Error updating custom domain:", error);
+    return {
+      success: false,
+      error: error.message || "No se pudo vincular el dominio personalizado",
+    };
+  }
+}

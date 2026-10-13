@@ -14,9 +14,12 @@ CREATE TABLE IF NOT EXISTS public.tenants (
     slug TEXT NOT NULL UNIQUE,
     logo_url TEXT,
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended', 'trial')),
+    custom_domain TEXT UNIQUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
+
+CREATE INDEX IF NOT EXISTS idx_tenants_custom_domain ON public.tenants (custom_domain);
 
 -- 3. TENANT SETTINGS (Branding, Currencies, Socials)
 CREATE TABLE IF NOT EXISTS public.tenant_settings (
@@ -35,6 +38,7 @@ CREATE TABLE IF NOT EXISTS public.tenant_settings (
     supported_currencies TEXT[] NOT NULL DEFAULT ARRAY['USD', 'VES'],
     default_currency TEXT NOT NULL DEFAULT 'USD',
     social_links JSONB DEFAULT '{}'::jsonb,
+    custom_domain TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
@@ -1183,3 +1187,46 @@ ADD COLUMN IF NOT EXISTS operational_settings JSONB DEFAULT '{
 
 ALTER TABLE public.tenant_settings 
 ADD COLUMN IF NOT EXISTS font_family TEXT DEFAULT 'Inter';
+
+-- 00011: Cédula de Identidad / RIF en clientes y pedidos
+ALTER TABLE public.customers 
+  ADD COLUMN IF NOT EXISTS id_number TEXT;
+
+ALTER TABLE public.orders 
+  ADD COLUMN IF NOT EXISTS customer_id_number TEXT;
+
+-- 00012: Configuración Fiscal SENIAT (Providencia 00071 & Facturación Digital)
+ALTER TABLE public.tenant_settings 
+ADD COLUMN IF NOT EXISTS billing_settings JSONB DEFAULT '{
+  "fiscal_billing_enabled": false,
+  "billing_mode": "TICKET_ONLY",
+  "tax_payer_type": "ORDINARY",
+  "apply_igtf": false,
+  "default_iva_rate": 16.0,
+  "fiscal_provider": "THE_FACTORY_HKA",
+  "emitter_fiscal_data": {
+    "rif": "J-50123456-7",
+    "business_name": "Shop Market C.A.",
+    "fiscal_address": "Calle 3 entre Carreras 1 y 2, Urb. Nueva Segovia, Barquisimeto, Edo. Lara, Venezuela",
+    "phone": "+58 424-5919577"
+  },
+  "provider_credentials": {
+    "api_key": "",
+    "token": "",
+    "environment": "SANDBOX"
+  }
+}'::jsonb;
+
+ALTER TABLE public.orders 
+  ADD COLUMN IF NOT EXISTS is_fiscal_invoice BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS fiscal_invoice_number TEXT,
+  ADD COLUMN IF NOT EXISTS fiscal_control_number TEXT,
+  ADD COLUMN IF NOT EXISTS fiscal_qr_url TEXT,
+  ADD COLUMN IF NOT EXISTS fiscal_cuv TEXT,
+  ADD COLUMN IF NOT EXISTS subtotal_exempt_usd NUMERIC(12, 2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS subtotal_taxable_usd NUMERIC(12, 2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS iva_amount_usd NUMERIC(12, 2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS iva_amount_ves NUMERIC(14, 2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS igtf_amount_usd NUMERIC(12, 2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS igtf_amount_ves NUMERIC(14, 2) DEFAULT 0;
+
