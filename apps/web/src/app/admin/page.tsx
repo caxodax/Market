@@ -4,11 +4,14 @@ import { MarketOSRepository } from "@marketos/database";
 import { AdminDashboard } from "../../components/admin-dashboard";
 import { getCurrentUser } from "../login/actions";
 
-const TENANT_ID = process.env.DEFAULT_TENANT_ID || "shop-market-ca";
+interface AdminPageProps {
+  searchParams: Promise<{ tenant?: string; store?: string }>;
+}
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminPage() {
+export default async function AdminPage({ searchParams }: AdminPageProps) {
+  const params = await searchParams;
   const currentUser = await getCurrentUser();
 
   if (!currentUser) {
@@ -29,6 +32,20 @@ export default async function AdminPage() {
     redirect("/login");
   }
 
+  const isSuperAdmin = currentUser.role === "PLATFORM_SUPER_ADMIN";
+
+  // Dynamic tenant selection:
+  // If PLATFORM_SUPER_ADMIN, allow inspecting any tenant passed via query string (?tenant=...)
+  // Otherwise, use currentUser.tenant_id or default tenant
+  let targetTenantId = process.env.DEFAULT_TENANT_ID || "shop-market-ca";
+  if (isSuperAdmin) {
+    if (params?.tenant) {
+      targetTenantId = params.tenant;
+    }
+  } else if (currentUser.tenant_id) {
+    targetTenantId = currentUser.tenant_id;
+  }
+
   const [
     settings,
     products,
@@ -42,19 +59,23 @@ export default async function AdminPage() {
     staffMembers,
     ratesHistory,
     coupons,
+    stores,
+    allTenants,
   ] = await Promise.all([
-    MarketOSRepository.getTenantSettings(TENANT_ID),
-    MarketOSRepository.getProducts(TENANT_ID),
-    MarketOSRepository.getCategories(TENANT_ID),
-    MarketOSRepository.getTenantOrders(TENANT_ID),
-    MarketOSRepository.getTenantPayments(TENANT_ID),
-    MarketOSRepository.getExchangeRate(TENANT_ID),
-    MarketOSRepository.getDeliveryZones(TENANT_ID),
-    MarketOSRepository.getDrivers(TENANT_ID),
-    MarketOSRepository.getAuditLogs(TENANT_ID),
-    MarketOSRepository.getTenantStaff(TENANT_ID),
-    MarketOSRepository.getExchangeRateHistory(TENANT_ID, 40),
-    MarketOSRepository.getCoupons(TENANT_ID),
+    MarketOSRepository.getTenantSettings(targetTenantId),
+    MarketOSRepository.getProducts(targetTenantId),
+    MarketOSRepository.getCategories(targetTenantId),
+    MarketOSRepository.getTenantOrders(targetTenantId),
+    MarketOSRepository.getTenantPayments(targetTenantId),
+    MarketOSRepository.getExchangeRate(targetTenantId),
+    MarketOSRepository.getDeliveryZones(targetTenantId),
+    MarketOSRepository.getDrivers(targetTenantId),
+    MarketOSRepository.getAuditLogs(targetTenantId),
+    MarketOSRepository.getTenantStaff(targetTenantId),
+    MarketOSRepository.getExchangeRateHistory(targetTenantId, 40),
+    MarketOSRepository.getCoupons(targetTenantId),
+    MarketOSRepository.getStores(targetTenantId, true),
+    isSuperAdmin ? MarketOSRepository.getAllTenants() : Promise.resolve([]),
   ]);
 
   return (
@@ -72,6 +93,9 @@ export default async function AdminPage() {
       currentUser={currentUser}
       staffMembers={staffMembers}
       coupons={coupons}
+      stores={stores}
+      allTenants={allTenants}
+      currentStoreId={params?.store}
     />
   );
 }

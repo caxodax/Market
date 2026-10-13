@@ -278,21 +278,106 @@ export class MarketOSRepository {
   /**
    * Get Stores for Tenant
    */
-  static async getStores(tenantId: string): Promise<Store[]> {
+  static async getStores(tenantId: string, includeInactive: boolean = false): Promise<Store[]> {
     const supabase = getSupabase();
     if (supabase) {
-      const { data, error } = await supabase
-        .from("stores")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .eq("is_active", true);
+      let query = supabase.from("stores").select("*").eq("tenant_id", tenantId);
+      if (!includeInactive) {
+        query = query.eq("is_active", true);
+      }
+      const { data, error } = await query.order("created_at", { ascending: true });
 
       if (!error && data && data.length > 0) {
         return data as Store[];
       }
     }
 
-    return state.stores.filter((s) => s.tenant_id === tenantId && s.is_active);
+    return state.stores.filter(
+      (s) => s.tenant_id === tenantId && (includeInactive || s.is_active)
+    );
+  }
+
+  /**
+   * Create new Store / Sucursal for Tenant
+   */
+  static async createStore(storeInput: {
+    tenantId: string;
+    name: string;
+    code?: string;
+    address?: string;
+    phone?: string;
+    isActive?: boolean;
+  }): Promise<Store> {
+    const supabase = getSupabase();
+    const newStore: Store = {
+      id: generateUuid(),
+      tenant_id: storeInput.tenantId,
+      name: storeInput.name,
+      code: storeInput.code || `STR-${Math.floor(1000 + Math.random() * 9000)}`,
+      address: storeInput.address || "",
+      phone: storeInput.phone || null,
+      is_active: storeInput.isActive !== undefined ? storeInput.isActive : true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("stores")
+          .insert(newStore)
+          .select()
+          .maybeSingle();
+
+        if (!error && data) {
+          state.stores.push(data as Store);
+          return data as Store;
+        }
+      } catch (err) {
+        console.warn("[MarketOS] createStore Supabase error:", err);
+      }
+    }
+
+    state.stores.push(newStore);
+    return newStore;
+  }
+
+  /**
+   * Update Store / Sucursal
+   */
+  static async updateStore(
+    storeId: string,
+    updates: Partial<Store>
+  ): Promise<Store | null> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("stores")
+          .update({
+            ...updates,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", storeId)
+          .select()
+          .maybeSingle();
+
+        if (!error && data) {
+          const idx = state.stores.findIndex((s) => s.id === storeId);
+          if (idx !== -1) state.stores[idx] = data as Store;
+          return data as Store;
+        }
+      } catch (err) {
+        console.warn("[MarketOS] updateStore Supabase error:", err);
+      }
+    }
+
+    const st = state.stores.find((s) => s.id === storeId);
+    if (st) {
+      Object.assign(st, updates, { updated_at: new Date().toISOString() });
+      return st;
+    }
+    return null;
   }
 
   /**
@@ -1798,6 +1883,10 @@ export class MarketOSRepository {
             })
             .eq("id", orderIdToUpdate)
             .eq("tenant_id", tenantId);
+
+          if (status === "REJECTED") {
+            await MarketOSRepository.restoreOrderInventoryStock(tenantId, orderIdToUpdate);
+          }
         }
       } catch (e) {
         console.warn("[Supabase] Update payment fallback to state:", e);
@@ -1818,6 +1907,7 @@ export class MarketOSRepository {
           order.status = "PREPARING";
         } else if (status === "REJECTED") {
           order.status = "CANCELLED";
+          await MarketOSRepository.restoreOrderInventoryStock(tenantId, payment.order_id);
         }
         order.payment_status = status;
         order.updated_at = new Date().toISOString();
@@ -1838,6 +1928,83 @@ export class MarketOSRepository {
     });
 
     return payment || null;
+  }
+
+  /**
+   * Revert / Return inventory stock when an order is cancelled or payment rejected
+   */
+  static async restoreOrderInventoryStock(
+    tenantId: string,
+    orderId?: string | null
+  ): Promise<void> {
+    if (!orderId) return;
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data: ord } = await supabase
+          .from("orders")
+          .select("id, store_id, tenant_id")
+          .eq("id", orderId)
+          .maybeSingle();
+
+        const storeId = ord?.store_id;
+        const targetTenantId = ord?.tenant_id || tenantId;
+
+        const { data: items } = await supabase
+          .from("order_items")
+          .select("product_id, quantity, product_name")
+          .eq("order_id", orderId);
+
+        if (items && items.length > 0 && storeId) {
+          for (const item of items) {
+            if (item.product_id) {
+              const { data: inv } = await supabase
+                .from("inventory")
+                .select("id, quantity")
+                .eq("store_id", storeId)
+                .eq("product_id", item.product_id)
+                .maybeSingle();
+
+              if (inv) {
+                const newQty = inv.quantity + item.quantity;
+                await supabase
+                  .from("inventory")
+                  .update({
+                    quantity: newQty,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", inv.id);
+
+                await supabase.from("inventory_movements").insert({
+                  tenant_id: targetTenantId,
+                  store_id: storeId,
+                  product_id: item.product_id,
+                  quantity_change: item.quantity,
+                  previous_quantity: inv.quantity,
+                  new_quantity: newQty,
+                  reason: "CANCELLATION",
+                });
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[MarketOS] Revert inventory error:", err);
+      }
+    }
+
+    // In-memory state rollback
+    const memOrder = state.orders.find((o) => o.id === orderId);
+    if (memOrder && memOrder.items) {
+      for (const item of memOrder.items) {
+        const prod = state.products.find(
+          (p) => p.id === item.product_id || p.name === item.product_name
+        );
+        if (prod) {
+          prod.stock += item.quantity;
+        }
+      }
+    }
   }
 
   /**
@@ -1864,6 +2031,10 @@ export class MarketOSRepository {
           .update(updateData)
           .eq("id", orderId)
           .eq("tenant_id", tenantId);
+
+        if (status === "CANCELLED") {
+          await MarketOSRepository.restoreOrderInventoryStock(tenantId, orderId);
+        }
       } catch (e) {
         console.warn("[MarketOS] Update order status in Supabase error:", e);
       }
@@ -1877,6 +2048,10 @@ export class MarketOSRepository {
       order.status = status;
       if (driverId) order.driver_id = driverId;
       order.updated_at = new Date().toISOString();
+
+      if (status === "CANCELLED" && oldStatus !== "CANCELLED") {
+        await MarketOSRepository.restoreOrderInventoryStock(tenantId, orderId);
+      }
 
       await MarketOSRepository.recordAuditLog({
         tenantId,
@@ -2556,6 +2731,7 @@ export class MarketOSRepository {
         return {
           ...t,
           settings,
+          stores,
           storesCount: stores.length,
           productsCount: products.length,
           ordersCount: orders.length,

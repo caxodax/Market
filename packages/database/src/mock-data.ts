@@ -87,6 +87,7 @@ export const INITIAL_SETTINGS: TenantSettings = {
     announcement_banner: "¡Bienvenidos a Shop Market! Delivery rápido en Barquisimeto y Cabudare 🛵",
     estimated_delivery_time: "30 a 60 minutos",
     custom_whatsapp_message: "Hola Shop Market, acabo de realizar un pedido por la tienda web:",
+    show_ticket_qr: true,
   },
 };
 

@@ -214,6 +214,7 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
     announcement_banner: "¡Bienvenidos a nuestra tienda digital! Envíos rápidos y seguros 🛵",
     estimated_delivery_time: "30 a 60 minutos",
     custom_whatsapp_message: "Hola, acabo de realizar este pedido en la tienda web:",
+    show_ticket_qr: true,
   };
 
   const [isOpen, setIsOpen] = useState(defaultOps.is_open ?? true);
@@ -223,6 +224,7 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
   const [announcementBanner, setAnnouncementBanner] = useState(defaultOps.announcement_banner || "");
   const [estimatedDeliveryTime, setEstimatedDeliveryTime] = useState(defaultOps.estimated_delivery_time || "30 a 60 minutos");
   const [customWhatsappMessage, setCustomWhatsappMessage] = useState(defaultOps.custom_whatsapp_message || "");
+  const [showTicketQr, setShowTicketQr] = useState(defaultOps.show_ticket_qr ?? true);
 
   // Toggle payment method
   const togglePaymentMethod = (methodId: PaymentMethodType) => {
@@ -327,6 +329,7 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
       announcement_banner: announcementBanner.trim(),
       estimated_delivery_time: estimatedDeliveryTime.trim(),
       custom_whatsapp_message: customWhatsappMessage.trim(),
+      show_ticket_qr: showTicketQr,
     };
 
     const payload: Partial<TenantSettings> = {
@@ -1276,6 +1279,49 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
               <p className="text-[10px] text-muted-foreground mt-1">
                 Aparece destacado en la parte superior del catálogo para todos los clientes que visiten la tienda.
               </p>
+            </div>
+          </div>
+
+          {/* Tickets & QR Settings Card */}
+          <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+                  <QrCode className="w-4 h-4 text-primary" />
+                  <span>Código QR en Tickets y Comprobantes de Pedido</span>
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Controla con un clic si el comprobante digital e impreso incluye el código QR para escaneo y rastreo automático del pedido.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowTicketQr(!showTicketQr)}
+                className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  showTicketQr ? "bg-emerald-600" : "bg-muted-foreground/30"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                    showTicketQr ? "translate-x-7" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div
+              className={`p-3.5 rounded-xl border text-xs font-semibold ${
+                showTicketQr
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                  : "bg-muted/40 border-border text-muted-foreground"
+              }`}
+            >
+              <span>
+                {showTicketQr
+                  ? "🟢 Código QR Activado: Se incluirá en el ticket un QR inteligente que, al ser escaneado con la cámara de cualquier teléfono, abre automáticamente el rastreador en vivo del pedido."
+                  : "⚪ Código QR Desactivado: Los tickets se imprimirán y guardarán de forma limpia sin código QR."}
+              </span>
             </div>
           </div>
         </div>

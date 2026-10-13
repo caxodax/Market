@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Category,
   Product,
@@ -74,6 +74,19 @@ export function CatalogView({
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
   const [ticketOrder, setTicketOrder] = useState<Order | null>(null);
+  const [trackingInitialQuery, setTrackingInitialQuery] = useState<string | undefined>(undefined);
+
+  // Auto-open tracker when user scans QR code (e.g. /?track=ORD-123456)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const trackParam = params.get("track");
+      if (trackParam && trackParam.trim()) {
+        setTrackingInitialQuery(trackParam.trim());
+        setIsTrackerOpen(true);
+      }
+    }
+  }, [setIsTrackerOpen]);
 
   // Filter products by category, favorites and search
   const filteredProducts = useMemo(() => {
@@ -371,8 +384,12 @@ export function CatalogView({
       {/* Customer Order Tracker Modal */}
       <OrderTrackerModal
         isOpen={isTrackerOpen}
-        onClose={() => setIsTrackerOpen(false)}
+        onClose={() => {
+          setIsTrackerOpen(false);
+          setTrackingInitialQuery(undefined);
+        }}
         settings={settings}
+        initialQuery={trackingInitialQuery}
       />
     </div>
   );

@@ -25,6 +25,7 @@ interface OrderTrackerModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: TenantSettings;
+  initialQuery?: string;
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string; desc: string }> = {
@@ -74,16 +75,38 @@ export function OrderTrackerModal({
   isOpen,
   onClose,
   settings,
+  initialQuery,
 }: OrderTrackerModalProps) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery || "");
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
 
-  // Auto-fill and search if customer CI or phone exists in localStorage
+  // Auto-fill and search if initialQuery or saved credentials exist
   useEffect(() => {
     if (!isOpen) return;
+
+    const targetQuery = initialQuery?.trim();
+    if (targetQuery) {
+      setQuery(targetQuery);
+      setLoading(true);
+      setSearched(true);
+      trackOrderAction(settings.tenant_id, targetQuery)
+        .then((res) => {
+          if (res.success) {
+            const list = res.orders || [];
+            setOrders(list);
+            if (list.length === 1) {
+              setSelectedOrderForDetails(list[0]);
+            }
+          }
+          setLoading(false);
+        })
+        .catch(() => setLoading(false));
+      return;
+    }
+
     try {
       const savedCi =
         localStorage.getItem(`marketos_customer_ci_${settings.tenant_id}`) ||
@@ -106,7 +129,7 @@ export function OrderTrackerModal({
         }).catch(() => setLoading(false));
       }
     } catch {}
-  }, [isOpen, settings.tenant_id]);
+  }, [isOpen, initialQuery, settings.tenant_id]);
 
   if (!isOpen) return null;
 

@@ -1,7 +1,7 @@
 "use server";
 
 import { MarketOSRepository } from "@marketos/database";
-import { PaymentStatus, CreateProductInput, UpdateProductInput, InviteStaffInput, UserRole, TenantSettings, CreateCouponInput, UpdateCouponInput, Coupon } from "@marketos/types";
+import { PaymentStatus, CreateProductInput, UpdateProductInput, InviteStaffInput, UserRole, TenantSettings, CreateCouponInput, UpdateCouponInput, Coupon, Store } from "@marketos/types";
 import { revalidatePath } from "next/cache";
 import { sendOrderStatusPushNotification } from "@/lib/pushNotifications";
 
@@ -459,5 +459,45 @@ export async function getSalesAnalyticsAction(
   } catch (error) {
     console.error("Error fetching sales analytics:", error);
     return { success: false, error: "No se pudieron calcular las métricas de ventas" };
+  }
+}
+
+/**
+ * Create a new store / sucursal for tenant
+ */
+export async function createStoreAction(input: {
+  tenantId: string;
+  name: string;
+  code?: string;
+  address?: string;
+  phone?: string;
+  isActive?: boolean;
+}) {
+  try {
+    const store = await MarketOSRepository.createStore(input);
+    revalidatePath("/admin");
+    revalidatePath("/platform");
+    return { success: true, store };
+  } catch (error) {
+    console.error("Error creating store:", error);
+    return { success: false, error: "No se pudo crear la sucursal" };
+  }
+}
+
+/**
+ * Update an existing store / sucursal
+ */
+export async function updateStoreAction(
+  storeId: string,
+  updates: Partial<Store>
+) {
+  try {
+    const store = await MarketOSRepository.updateStore(storeId, updates);
+    revalidatePath("/admin");
+    revalidatePath("/platform");
+    return { success: true, store };
+  } catch (error) {
+    console.error("Error updating store:", error);
+    return { success: false, error: "No se pudo actualizar la sucursal" };
   }
 }

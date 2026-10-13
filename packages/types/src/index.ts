@@ -52,6 +52,7 @@ export interface StoreOperationalSettings {
   announcement_banner?: string;
   estimated_delivery_time?: string;
   custom_whatsapp_message?: string;
+  show_ticket_qr?: boolean;
 }
 
 export interface TenantSettings {
@@ -450,6 +451,7 @@ export interface TenantSubscription {
 
 export interface TenantWithDetails extends Tenant {
   settings?: TenantSettings | null;
+  stores?: Store[];
   storesCount: number;
   productsCount: number;
   ordersCount: number;

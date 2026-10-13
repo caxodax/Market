@@ -38,6 +38,11 @@ import {
   Users,
   LogOut,
   Landmark,
+  Smartphone,
+  MapPin,
+  Phone,
+  ChevronRight,
+  Sliders,
 } from "lucide-react";
 import { logoutUserAction } from "../app/login/actions";
 import { ExchangeRateManager } from "./exchange-rate-manager";
@@ -72,6 +77,7 @@ export function SuperAdminDashboard({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [selectedTenantForStores, setSelectedTenantForStores] = useState<TenantWithDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -242,6 +248,15 @@ export function SuperAdminDashboard({
                 </strong>
               </button>
             )}
+
+            <a
+              href="/admin"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-card text-foreground hover:bg-muted text-xs font-bold transition-all shadow-xs cursor-pointer"
+              title="Entrar a administrar catálogo, pedidos y despacho de tienda"
+            >
+              <Store className="w-3.5 h-3.5 text-primary" />
+              <span className="hidden md:inline">Ir a Panel de Tienda</span>
+            </a>
 
             <button
               onClick={() => setIsOnboardingOpen(true)}
@@ -485,9 +500,16 @@ export function SuperAdminDashboard({
                         {/* Stores & Products */}
                         <td className="py-3.5 px-4">
                           <div className="space-y-0.5">
-                            <p className="font-semibold text-foreground">
-                              {tenant.storesCount} {tenant.storesCount === 1 ? "Sucursal" : "Sucursales"}
-                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedTenantForStores(tenant)}
+                              className="font-bold text-foreground hover:text-primary transition-colors flex items-center gap-1.5 cursor-pointer text-left group"
+                              title="Ver y monitorear sucursales de este comercio"
+                            >
+                              <Store className="w-3.5 h-3.5 text-primary shrink-0" />
+                              <span>{tenant.storesCount} {tenant.storesCount === 1 ? "Sucursal" : "Sucursales"}</span>
+                              <ChevronRight className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-colors" />
+                            </button>
                             <p className="text-[11px] text-muted-foreground">
                               {tenant.productsCount} Productos
                             </p>
@@ -523,23 +545,35 @@ export function SuperAdminDashboard({
 
                         {/* Actions */}
                         <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-2 flex-wrap">
+                            {/* Administrar Tienda */}
                             <a
-                              href={`http://localhost:3000/?tenant=${tenant.slug}`}
+                              href={`/admin?tenant=${tenant.id}`}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-[11px] font-bold transition-all shadow-xs"
+                              title={`Entrar al panel de administración de ${tenant.name}`}
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              <span>Administrar Tienda</span>
+                            </a>
+
+                            {/* Ver PWA en vivo */}
+                            <a
+                              href={`/?tenant=${tenant.slug || tenant.id}`}
                               target="_blank"
                               rel="noreferrer"
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-border text-foreground hover:bg-muted text-[11px] font-semibold transition-colors"
-                              title="Abrir Catálogo PWA en vivo"
+                              title="Abrir Catálogo PWA en vivo para clientes"
                             >
-                              <ExternalLink className="w-3 h-3 text-primary" />
+                              <Smartphone className="w-3.5 h-3.5 text-primary" />
                               <span>Ver PWA</span>
                             </a>
 
+                            {/* Suspender o Activar */}
                             <button
                               onClick={() =>
                                 handleToggleStatus(tenant.id, tenant.status)
                               }
-                              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
+                              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
                                 tenant.status === "active"
                                   ? "border border-destructive/30 text-destructive hover:bg-destructive/10"
                                   : "bg-emerald-600 text-white hover:bg-emerald-700"
@@ -853,6 +887,117 @@ export function SuperAdminDashboard({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* SUCURSALES INSPECTION MODAL */}
+      {selectedTenantForStores && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-xl rounded-2xl border border-border bg-card shadow-2xl p-6 space-y-5">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                  <Store className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-foreground">
+                    Sucursales de {selectedTenantForStores.name}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Puntos de venta, sedes de retiro físico y despacho de pedidos
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedTenantForStores(null)}
+                className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* List of Stores */}
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+              {(!selectedTenantForStores.stores || selectedTenantForStores.stores.length === 0) ? (
+                <div className="p-8 text-center rounded-xl border border-dashed border-border bg-muted/20 space-y-2">
+                  <Store className="w-8 h-8 text-muted-foreground mx-auto opacity-40" />
+                  <p className="text-xs font-semibold text-foreground">
+                    No hay sucursales registradas aún para este comercio.
+                  </p>
+                </div>
+              ) : (
+                selectedTenantForStores.stores.map((st) => (
+                  <div
+                    key={st.id}
+                    className="p-4 rounded-xl border border-border bg-muted/30 hover:border-primary/40 transition-colors space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-foreground text-sm">
+                          {st.name}
+                        </span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-secondary text-secondary-foreground font-semibold">
+                          {st.code}
+                        </span>
+                      </div>
+
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          st.is_active
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                            : "bg-destructive/10 text-destructive border-destructive/20"
+                        }`}
+                      >
+                        {st.is_active ? "Operativa / Activa" : "Inactiva"}
+                      </span>
+                    </div>
+
+                    <div className="grid sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
+                        <span className="truncate">{st.address || "Dirección no especificada"}</span>
+                      </div>
+                      {st.phone && (
+                        <div className="flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 text-primary shrink-0" />
+                          <span>{st.phone}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-border flex items-center justify-end gap-2">
+                      <a
+                        href={`/admin?tenant=${selectedTenantForStores.id}&store=${st.id}`}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-bold transition-all shadow-xs"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>Administrar esta Sucursal</span>
+                      </a>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-border flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedTenantForStores(null)}
+                className="px-4 py-2 rounded-xl border border-border text-foreground hover:bg-muted text-xs font-semibold cursor-pointer"
+              >
+                Cerrar
+              </button>
+              <a
+                href={`/admin?tenant=${selectedTenantForStores.id}`}
+                className="px-4 py-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-bold flex items-center gap-1.5"
+              >
+                <Store className="w-3.5 h-3.5" />
+                <span>Entrar al Panel Completo de la Tienda</span>
+              </a>
+            </div>
           </div>
         </div>
       )}

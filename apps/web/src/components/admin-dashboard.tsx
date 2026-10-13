@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   TenantSettings,
   Product,
@@ -16,6 +16,8 @@ import {
   UserRole,
   RateHistoryItem,
   Coupon,
+  Store as StoreType,
+  TenantWithDetails,
 } from "@marketos/types";
 import {
   formatCurrency,
@@ -29,6 +31,8 @@ import {
   updateStaffRoleAction,
   getLatestOrdersAction,
   getLatestPaymentsAction,
+  createStoreAction,
+  updateStoreAction,
 } from "../app/admin/actions";
 import { logoutUserAction } from "../app/login/actions";
 import { ProductModal } from "./product-modal";
@@ -78,6 +82,14 @@ import {
   ChevronDown,
   Check,
   Search,
+  CheckCircle2,
+  AlertCircle,
+  Info,
+  X,
+  Smartphone,
+  Layers,
+  Building2,
+  Phone,
 } from "lucide-react";
 
 interface AdminDashboardProps {
@@ -94,7 +106,29 @@ interface AdminDashboardProps {
   currentUser?: UserProfile;
   staffMembers?: UserProfile[];
   coupons?: Coupon[];
+  stores?: StoreType[];
+  allTenants?: TenantWithDetails[];
+  currentStoreId?: string;
 }
+
+interface AdminToast {
+  id: string;
+  type: "success" | "error" | "info";
+  title: string;
+  message: string;
+  durationMs?: number;
+}
+
+const STATUS_SPANISH_LABELS: Record<OrderStatus, string> = {
+  CREATED: "Recibido",
+  PAYMENT_PENDING: "Validando Pago",
+  PAYMENT_APPROVED: "Pago Aprobado",
+  PREPARING: "En Preparación",
+  READY: "Listo para Despacho",
+  DELIVERING: "En Ruta",
+  COMPLETED: "Entregado",
+  CANCELLED: "Cancelado",
+};
 
 export function AdminDashboard({
   settings,
@@ -110,9 +144,12 @@ export function AdminDashboard({
   currentUser,
   staffMembers: initialStaffMembers = [],
   coupons: initialCoupons = [],
+  stores: initialStores = [],
+  allTenants = [],
+  currentStoreId,
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<
-    "PAYMENTS" | "ORDERS" | "REPORTS" | "INVENTORY" | "DELIVERY" | "COUPONS" | "PUSH" | "RATES" | "AUDIT" | "STAFF" | "SETTINGS"
+    "PAYMENTS" | "ORDERS" | "REPORTS" | "INVENTORY" | "DELIVERY" | "COUPONS" | "PUSH" | "RATES" | "AUDIT" | "STAFF" | "SETTINGS" | "STORES"
   >("PAYMENTS");
   const [settingsState, setSettingsState] = useState(settings);
   const [products, setProducts] = useState(initialProducts);
@@ -125,12 +162,72 @@ export function AdminDashboard({
   const [auditFilter, setAuditFilter] = useState<string>("ALL");
   const [orderSearchQuery, setOrderSearchQuery] = useState<string>("");
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>("ALL");
+  const [stores, setStores] = useState<StoreType[]>(initialStores);
+  const [storeFilter, setStoreFilter] = useState<string>(currentStoreId || "ALL");
+  const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
+  const [newStoreName, setNewStoreName] = useState("");
+  const [newStoreCode, setNewStoreCode] = useState("");
+  const [newStoreAddress, setNewStoreAddress] = useState("");
+  const [newStorePhone, setNewStorePhone] = useState("");
+  const [savingStore, setSavingStore] = useState(false);
 
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [syncingBcv, setSyncingBcv] = useState(false);
   const [bcvMessage, setBcvMessage] = useState<string | null>(null);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [refreshingOrders, setRefreshingOrders] = useState(false);
+
+  // Reactive Toast Notification with Countdown Progress Bar
+  const [toast, setToast] = useState<AdminToast | null>(null);
+  const [toastProgress, setToastProgress] = useState(100);
+  const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const toastProgressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const showToast = useCallback(
+    (toastData: {
+      type: "success" | "error" | "info";
+      title: string;
+      message: string;
+      durationMs?: number;
+    }) => {
+      const duration = toastData.durationMs || 4000;
+      const id = Date.now().toString();
+
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (toastProgressIntervalRef.current) clearInterval(toastProgressIntervalRef.current);
+
+      setToast({ ...toastData, id, durationMs: duration });
+      setToastProgress(100);
+
+      const startTime = Date.now();
+      toastProgressIntervalRef.current = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, 100 - (elapsed / duration) * 100);
+        setToastProgress(remaining);
+        if (remaining <= 0) {
+          if (toastProgressIntervalRef.current) clearInterval(toastProgressIntervalRef.current);
+        }
+      }, 30);
+
+      toastTimerRef.current = setTimeout(() => {
+        setToast(null);
+      }, duration);
+    },
+    []
+  );
+
+  const dismissToast = useCallback(() => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    if (toastProgressIntervalRef.current) clearInterval(toastProgressIntervalRef.current);
+    setToast(null);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (toastProgressIntervalRef.current) clearInterval(toastProgressIntervalRef.current);
+    };
+  }, []);
 
   const filteredOrders = orders.filter((order) => {
     if (orderStatusFilter !== "ALL" && order.status !== orderStatusFilter) {
@@ -254,44 +351,54 @@ export function AdminDashboard({
   // Review Payment Handler
   const handleReview = async (paymentId: string, status: "APPROVED" | "REJECTED") => {
     setProcessingId(paymentId);
-    playChime();
     try {
+      // 1. Optimistic update
+      setPayments((prev) =>
+        prev.map((p) => (p.id === paymentId ? { ...p, status } : p))
+      );
+
       const res = await reviewPaymentAction(settings.tenant_id, paymentId, status);
       if (res.success && res.payment) {
-        setPayments((prev) =>
-          prev.map((p) => (p.id === paymentId ? { ...p, status } : p))
-        );
-        // Refresh latest orders to ensure newly updated order is displayed with items & status
-        const oRes = await getLatestOrdersAction(settings.tenant_id);
+        // 2. Fresh internal sync of orders and payments without global F5
+        const [oRes, pRes] = await Promise.all([
+          getLatestOrdersAction(settings.tenant_id),
+          getLatestPaymentsAction(settings.tenant_id),
+        ]);
         if (oRes.success && oRes.orders) {
           setOrders(oRes.orders);
-        } else {
-          setOrders((prev) =>
-            prev.map((o) =>
-              o.id === res.payment?.order_id
-                ? {
-                    ...o,
-                    status: status === "APPROVED" ? "PREPARING" : "CANCELLED",
-                    payment_status: status,
-                  }
-                : o
-            )
-          );
+          if (selectedOrderForModal?.id === res.payment.order_id) {
+            const fresh = oRes.orders.find((o) => o.id === res.payment?.order_id);
+            if (fresh) setSelectedOrderForModal(fresh);
+          }
         }
-        if (selectedOrderForModal?.id === res.payment?.order_id) {
-          setSelectedOrderForModal((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  status: status === "APPROVED" ? "PREPARING" : "CANCELLED",
-                  payment_status: status,
-                }
-              : null
-          );
+        if (pRes.success && pRes.payments) {
+          setPayments(pRes.payments);
         }
+
+        // 3. Audio & animated alert toast with countdown progress bar
+        playChime();
+        showToast({
+          type: status === "APPROVED" ? "success" : "error",
+          title: status === "APPROVED" ? "¡Pago Aprobado y Conciliado!" : "¡Pago Rechazado!",
+          message:
+            status === "APPROVED"
+              ? "Comprobante verificado. El pedido pasó automáticamente a Preparación."
+              : "Comprobante rechazado. El pedido se canceló y se reintegró el stock a inventario.",
+        });
+      } else {
+        showToast({
+          type: "error",
+          title: "Error al revisar pago",
+          message: res.error || "No se pudo actualizar el comprobante.",
+        });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      showToast({
+        type: "error",
+        title: "Error inesperado",
+        message: err.message || "Ocurrió un error al procesar el pago.",
+      });
     } finally {
       setProcessingId(null);
     }
@@ -341,24 +448,62 @@ export function AdminDashboard({
   ) => {
     setProcessingId(orderId);
     try {
+      // 1. Optimistic local update
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: newStatus, driver_id: driverId || o.driver_id } : o))
+      );
+      if (selectedOrderForModal?.id === orderId) {
+        setSelectedOrderForModal((prev) =>
+          prev ? { ...prev, status: newStatus, driver_id: driverId || prev.driver_id } : null
+        );
+      }
+
       const res = await updateOrderStatusAction(
         settings.tenant_id,
         orderId,
         newStatus,
         driverId
       );
+
       if (res.success && res.order) {
-        setOrders((prev) =>
-          prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
-        );
-        if (selectedOrderForModal?.id === orderId) {
-          setSelectedOrderForModal((prev) =>
-            prev ? { ...prev, status: newStatus } : null
-          );
+        // 2. Refresh latest orders and payments internally from server (No global F5 needed!)
+        const [oRes, pRes] = await Promise.all([
+          getLatestOrdersAction(settings.tenant_id),
+          getLatestPaymentsAction(settings.tenant_id),
+        ]);
+        if (oRes.success && oRes.orders) {
+          setOrders(oRes.orders);
+          const freshOrder = oRes.orders.find((o) => o.id === orderId);
+          if (freshOrder && selectedOrderForModal?.id === orderId) {
+            setSelectedOrderForModal(freshOrder);
+          }
         }
+        if (pRes.success && pRes.payments) {
+          setPayments(pRes.payments);
+        }
+
+        // 3. Audio & animated alert toast with countdown progress bar
+        playChime();
+        const readableStatus = STATUS_SPANISH_LABELS[newStatus] || newStatus;
+        showToast({
+          type: "success",
+          title: "¡Estado de Pedido Actualizado!",
+          message: `El pedido fue cambiado a "${readableStatus}" exitosamente. Sincronizado en tiempo real.`,
+        });
+      } else {
+        showToast({
+          type: "error",
+          title: "Error al actualizar estado",
+          message: res.error || "No se pudo actualizar el estado de la orden.",
+        });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      showToast({
+        type: "error",
+        title: "Error de conexión",
+        message: err.message || "Ocurrió un error inesperado al actualizar el pedido.",
+      });
     } finally {
       setProcessingId(null);
     }
@@ -1751,6 +1896,68 @@ export function AdminDashboard({
         }
         isProcessing={processingId !== null}
       />
+
+      {/* Reactive Alert Toast with Countdown Progress Bar */}
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 right-4 sm:right-6 z-50 max-w-sm sm:max-w-md w-[calc(100vw-2rem)] rounded-2xl bg-card border border-border shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 duration-300"
+        >
+          <div className="p-4 flex items-start gap-3">
+            <div
+              className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                toast.type === "success"
+                  ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                  : toast.type === "error"
+                  ? "bg-rose-500/10 text-rose-600 border border-rose-500/20"
+                  : "bg-blue-500/10 text-blue-600 border border-blue-500/20"
+              }`}
+            >
+              {toast.type === "success" ? (
+                <CheckCircle2 className="w-5 h-5" />
+              ) : toast.type === "error" ? (
+                <AlertCircle className="w-5 h-5" />
+              ) : (
+                <Info className="w-5 h-5" />
+              )}
+            </div>
+
+            <div className="flex-1 min-w-0 pr-1">
+              <h4 className="font-extrabold text-sm text-foreground leading-tight">
+                {toast.title}
+              </h4>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
+                {toast.message}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={dismissToast}
+              className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted transition-colors cursor-pointer shrink-0"
+              title="Cerrar notificación"
+              aria-label="Cerrar notificación"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Animated Countdown Progress Bar */}
+          <div className="h-1.5 w-full bg-muted overflow-hidden">
+            <div
+              className={`h-full transition-all duration-75 ease-linear ${
+                toast.type === "success"
+                  ? "bg-emerald-600"
+                  : toast.type === "error"
+                  ? "bg-rose-600"
+                  : "bg-blue-600"
+              }`}
+              style={{ width: `${toastProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

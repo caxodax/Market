@@ -34,6 +34,7 @@ import {
   Server,
   Users,
   LogOut,
+  Smartphone,
 } from "lucide-react";
 import { UserProfile } from "@marketos/types";
 import { logoutSuperAdminAction } from "../app/login/actions";
@@ -470,15 +471,24 @@ export function SuperAdminDashboard({
 
                         {/* Actions */}
                         <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-2 flex-wrap">
                             <a
-                              href={`http://localhost:3000/?tenant=${tenant.slug}`}
+                              href={`/admin?tenant=${tenant.id}`}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-[11px] font-bold transition-all shadow-xs"
+                              title={`Entrar a administrar ${tenant.name}`}
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              <span>Administrar Tienda</span>
+                            </a>
+
+                            <a
+                              href={`/?tenant=${tenant.slug || tenant.id}`}
                               target="_blank"
                               rel="noreferrer"
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-border text-foreground hover:bg-muted text-[11px] font-semibold transition-colors"
                               title="Abrir Catálogo PWA en vivo"
                             >
-                              <ExternalLink className="w-3 h-3 text-primary" />
+                              <Smartphone className="w-3.5 h-3.5 text-primary" />
                               <span>Ver PWA</span>
                             </a>
 
