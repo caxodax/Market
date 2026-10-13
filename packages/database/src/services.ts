@@ -101,13 +101,7 @@ function getSupabase() {
   }
 
   try {
-    if (
-      process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
-    ) {
-      return createServerComponentClient();
-    }
+    return createServerComponentClient();
   } catch (e) {
     console.warn("[MarketOS] Could not initialize Supabase server client:", e);
   }
@@ -1491,7 +1485,10 @@ export class MarketOSRepository {
           .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false });
 
-        if (!error && rawOrders && rawOrders.length > 0) {
+        if (!error && rawOrders) {
+          if (rawOrders.length === 0) {
+            return [];
+          }
           const orderIds = rawOrders.map((o: any) => o.id);
           const customerIds = Array.from(
             new Set(rawOrders.map((o: any) => o.customer_id).filter(Boolean))
@@ -1748,7 +1745,7 @@ export class MarketOSRepository {
         .eq("tenant_id", tenantId)
         .order("created_at", { ascending: false });
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return data as PaymentProof[];
       }
     }

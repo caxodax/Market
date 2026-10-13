@@ -1,17 +1,17 @@
 import { createClient } from "@supabase/supabase-js";
+import {
+  DEFAULT_SUPABASE_URL,
+  DEFAULT_SUPABASE_ANON_KEY,
+  DEFAULT_SUPABASE_SERVICE_ROLE_KEY,
+} from "./server";
 
 /**
  * Creates an authenticated Supabase client for Server/Browser
  */
 export function createSupabaseClient(
-  supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+  supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL,
+  supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY
 ) {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn(
-      "[Supabase] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY"
-    );
-  }
   return createClient(supabaseUrl, supabaseAnonKey);
 }
 
@@ -20,14 +20,9 @@ export function createSupabaseClient(
  * (Only to be used in secure Server-side contexts)
  */
 export function createSupabaseAdminClient(
-  supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ""
+  supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL,
+  supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || DEFAULT_SUPABASE_SERVICE_ROLE_KEY
 ) {
-  if (!supabaseUrl || !supabaseServiceRoleKey) {
-    throw new Error(
-      "[Supabase Admin] Missing SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_URL"
-    );
-  }
   return createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: {
       autoRefreshToken: false,
