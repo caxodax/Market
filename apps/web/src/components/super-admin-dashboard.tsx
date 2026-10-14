@@ -858,6 +858,18 @@ export function SuperAdminDashboard({
           </button>
 
           <button
+            onClick={() => setActiveTab("BILLING")}
+            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === "BILLING"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <CreditCard className="w-4 h-4" />
+            <span>Facturación & Suscripciones SaaS ({tenants.length})</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab("USERS")}
             className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
               activeTab === "USERS"
@@ -1148,7 +1160,329 @@ export function SuperAdminDashboard({
       </div>
     )}
 
-      {/* TAB 2: USERS & MULTI-TENANT STAFF DIRECTORY */}
+      {/* TAB 2: FACTURACIÓN & SUSCRIPCIONES SAAS */}
+      {activeTab === "BILLING" && (
+        <div className="space-y-6 animate-in fade-in">
+          {/* Feedback Alert Message */}
+          {billingAlert && (
+            <div
+              className={`p-3.5 rounded-2xl border text-xs font-semibold flex items-center justify-between shadow-lg transition-all animate-in fade-in slide-in-from-top-2 ${
+                billingAlert.type === "success"
+                  ? "bg-emerald-950/80 border-emerald-500/40 text-emerald-200"
+                  : "bg-rose-950/80 border-rose-500/40 text-rose-200"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                {billingAlert.type === "success" ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                )}
+                <span>{billingAlert.text}</span>
+              </div>
+              <button
+                onClick={() => setBillingAlert(null)}
+                className="text-muted-foreground hover:text-foreground p-1 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Billing Overview Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            {/* Total MRR */}
+            <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-xs font-semibold">MRR Suscripciones</span>
+                <DollarSign className="w-4 h-4 text-emerald-500" />
+              </div>
+              <div className="text-2xl font-black text-foreground">
+                {formatCurrency(billingKpis.totalMRR, "USD")}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Ingresos mensuales recurrentes
+              </p>
+            </div>
+
+            {/* Up to Date */}
+            <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-xs font-semibold">Tiendas Al Día</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              </div>
+              <div className="text-2xl font-black text-foreground">
+                {billingKpis.upToDateCount}
+                <span className="text-xs font-normal text-muted-foreground ml-1.5">
+                  / {tenants.length} comercios
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Suscripción activa y vigente
+              </p>
+            </div>
+
+            {/* Trial */}
+            <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-xs font-semibold">Periodo de Prueba</span>
+                <Sparkles className="w-4 h-4 text-blue-500" />
+              </div>
+              <div className="text-2xl font-black text-foreground">
+                {billingKpis.trialCount}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Nuevas tiendas en onboarding
+              </p>
+            </div>
+
+            {/* Suspended / Past Due */}
+            <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-xs font-semibold">Mora / Suspendidas</span>
+                <AlertTriangle className="w-4 h-4 text-rose-500" />
+              </div>
+              <div className="text-2xl font-black text-rose-500">
+                {billingKpis.suspendedCount}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Servicio cortado / bloqueo activo
+              </p>
+            </div>
+          </div>
+
+          {/* Controls: Search & Filters */}
+          <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-card p-3 rounded-2xl border border-border">
+            {/* Search */}
+            <div className="relative w-full md:w-80">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Buscar por comercio, slug o email..."
+                value={billingSearchQuery}
+                onChange={(e) => setBillingSearchQuery(e.target.value)}
+                className="w-full h-10 pl-10 pr-3 rounded-xl border border-input bg-background text-xs focus:ring-2 focus:ring-primary"
+              />
+            </div>
+
+            {/* Plan & Status Filters */}
+            <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto">
+              <select
+                value={billingPlanFilter}
+                onChange={(e) => setBillingPlanFilter(e.target.value)}
+                className="h-10 px-3 rounded-xl border border-input bg-background text-xs font-semibold focus:ring-2 focus:ring-primary cursor-pointer"
+              >
+                <option value="ALL">📦 Todos los Planes</option>
+                <option value="STARTER">Starter ($19/mes)</option>
+                <option value="GROWTH">Growth ($49/mes)</option>
+                <option value="ENTERPRISE">Enterprise ($99/mes)</option>
+              </select>
+
+              <select
+                value={billingStatusFilter}
+                onChange={(e) => setBillingStatusFilter(e.target.value)}
+                className="h-10 px-3 rounded-xl border border-input bg-background text-xs font-semibold focus:ring-2 focus:ring-primary cursor-pointer"
+              >
+                <option value="ALL">🏷️ Todos los Estados</option>
+                <option value="UP_TO_DATE">✅ Al Día</option>
+                <option value="EXPIRING_SOON">⏳ Por Vencer (≤ 5 días)</option>
+                <option value="TRIAL">🕒 Periodo de Prueba</option>
+                <option value="SUSPENDED">⚠️ Suspendidas / En Mora</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Subscriptions Table */}
+          <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40 text-muted-foreground font-semibold">
+                    <th className="py-3 px-4">Comercio</th>
+                    <th className="py-3 px-4">Plan SaaS Actual</th>
+                    <th className="py-3 px-4">Ciclo & Vencimiento</th>
+                    <th className="py-3 px-4">Estado Servicio</th>
+                    <th className="py-3 px-4 text-right">Acciones de Cobro</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {filteredBillingTenants.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-12 text-center text-muted-foreground">
+                        <CreditCard className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                        <p className="font-semibold">No se encontraron comercios con los filtros seleccionados</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredBillingTenants.map((t) => {
+                      const info = getSubscriptionInfo(t);
+                      return (
+                        <tr key={t.id} className="hover:bg-muted/30 transition-colors">
+                          {/* Tenant Info */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-muted border border-border p-1 shrink-0 flex items-center justify-center">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={t.settings?.logo_url || t.logo_url || "/brand/logo.png"}
+                                  alt={t.name}
+                                  className="w-full h-full object-contain"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = "none";
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <p className="font-bold text-foreground text-xs">{t.name}</p>
+                                <p className="text-[11px] text-muted-foreground font-mono">
+                                  {t.slug} • {t.settings?.email || "Sin email"}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Plan */}
+                          <td className="py-3.5 px-4">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-black text-foreground">
+                                  {info.plan.name}
+                                </span>
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-bold">
+                                  ${info.plan.price_usd_monthly}/mes
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">
+                                {info.plan.id === "STARTER" && "1 Sucursal • 100 productos"}
+                                {info.plan.id === "GROWTH" && "3 Sucursales • 1,000 productos"}
+                                {info.plan.id === "ENTERPRISE" && "10 Sucursales • Productos ilimitados"}
+                              </p>
+                            </div>
+                          </td>
+
+                          {/* Period & Expiration */}
+                          <td className="py-3.5 px-4">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5 text-xs text-foreground font-medium">
+                                <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span>
+                                  {info.periodEnd.toLocaleDateString("es-VE", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                  })}
+                                </span>
+                              </div>
+                              <div>
+                                {info.isSuspended ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    <span>Suspendido / Bloqueado</span>
+                                  </span>
+                                ) : info.isTrial ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                                    <Sparkles className="w-3 h-3" />
+                                    <span>Periodo de Prueba ({info.diffDays}d)</span>
+                                  </span>
+                                ) : info.isExpired ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                                    <Clock className="w-3 h-3" />
+                                    <span>Vencido hace {Math.abs(info.diffDays)}d</span>
+                                  </span>
+                                ) : info.isExpiringSoon ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                                    <Clock className="w-3 h-3" />
+                                    <span>Vence en {info.diffDays} días</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                                    <Check className="w-3 h-3" />
+                                    <span>Al Día ({info.diffDays}d restantes)</span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Operational Status */}
+                          <td className="py-3.5 px-4">
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                                t.status === "active"
+                                  ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                                  : t.status === "trial"
+                                  ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                                  : "bg-destructive/10 text-destructive border-destructive/20"
+                              }`}
+                            >
+                              {t.status === "active"
+                                ? "Activo"
+                                : t.status === "trial"
+                                ? "En Prueba"
+                                : "Suspendido"}
+                            </span>
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-2 flex-wrap">
+                              {/* Registrar Cobro / Renovar */}
+                              <button
+                                onClick={() => {
+                                  setRenewingTenant(t);
+                                  setRenewDurationDays(30);
+                                  setRenewReference("");
+                                }}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold transition-all shadow-xs cursor-pointer"
+                                title="Registrar pago o cobro de suscripción y extender tiempo de servicio"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5" />
+                                <span>Renovar / Cobro</span>
+                              </button>
+
+                              {/* Cambiar Plan */}
+                              <button
+                                onClick={() => {
+                                  setChangingPlanTenant(t);
+                                  setSelectedPlanTier((t.subscription?.plan_id || "GROWTH") as SubscriptionPlanTier);
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-border text-foreground hover:bg-muted text-[11px] font-semibold transition-colors cursor-pointer"
+                                title="Actualizar o cambiar nivel de plan SaaS"
+                              >
+                                <Zap className="w-3.5 h-3.5 text-primary" />
+                                <span>Cambiar Plan</span>
+                              </button>
+
+                              {/* Suspender o Reactivar */}
+                              <button
+                                onClick={() => handleBillingToggleStatus(t.id, t.status)}
+                                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                                  t.status === "active"
+                                    ? "border border-destructive/30 text-destructive hover:bg-destructive/10"
+                                    : "bg-emerald-700 text-white hover:bg-emerald-600"
+                                }`}
+                                title={
+                                  t.status === "active"
+                                    ? "Suspender comercio inmediatamente (bloquea catálogo y panel)"
+                                    : "Reactivar comercio y habilitar tienda digital"
+                                }
+                              >
+                                {t.status === "active" ? "Suspender" : "Reactivar"}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: USERS & MULTI-TENANT STAFF DIRECTORY */}
       {activeTab === "USERS" && (
         <div className="space-y-6 animate-in fade-in">
           {/* Feedback Alert Message */}
@@ -2063,6 +2397,259 @@ export function SuperAdminDashboard({
                     </>
                   ) : (
                     <span>Actualizar Acceso</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: REGISTRAR COBRO Y RENOVAR SUSCRIPCIÓN */}
+      {renewingTenant && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-card border border-border w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
+                    <RefreshCw className="w-5 h-5" />
+                  </div>
+                  <h2 className="text-base font-black text-foreground">
+                    Registrar Cobro y Extender Suscripción
+                  </h2>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Comercio: <strong className="text-foreground">{renewingTenant.name}</strong> • Plan:{" "}
+                  <strong className="text-foreground">{renewingTenant.plan?.name || "Growth"}</strong> (${renewingTenant.plan?.price_usd_monthly || 49}/mes)
+                </p>
+              </div>
+              <button
+                onClick={() => setRenewingTenant(null)}
+                className="text-muted-foreground hover:text-foreground p-1.5 rounded-xl hover:bg-muted cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRenewSubscriptionSubmit} className="space-y-4 text-xs">
+              {/* Duration selector presets */}
+              <div className="space-y-1.5">
+                <label className="font-semibold text-foreground">
+                  Duración de Extensión
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { days: 30, label: "30 Días", sub: "1 Mes" },
+                    { days: 60, label: "60 Días", sub: "2 Meses" },
+                    { days: 90, label: "90 Días", sub: "3 Meses" },
+                    { days: 365, label: "1 Año", sub: "15% Desc." },
+                  ].map((preset) => (
+                    <button
+                      key={preset.days}
+                      type="button"
+                      onClick={() => setRenewDurationDays(preset.days)}
+                      className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                        renewDurationDays === preset.days
+                          ? "border-primary bg-primary/10 text-primary font-bold shadow-xs"
+                          : "border-border bg-background hover:bg-muted text-foreground"
+                      }`}
+                    >
+                      <p className="font-bold text-xs">{preset.label}</p>
+                      <p className="text-[10px] text-muted-foreground">{preset.sub}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Amount Breakdown Preview */}
+              {(() => {
+                const monthlyPrice = renewingTenant.plan?.price_usd_monthly || 49;
+                const months = renewDurationDays / 30;
+                const discount = renewDurationDays === 365 ? 0.85 : 1;
+                const amountUsd = Number((monthlyPrice * months * discount).toFixed(2));
+                const bcvRate = exchangeRate?.value || 60;
+                const amountVes = Number((amountUsd * bcvRate).toFixed(2));
+
+                return (
+                  <div className="bg-muted/50 border border-border p-3.5 rounded-2xl space-y-1">
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>Monto de Facturación:</span>
+                      <span className="font-black text-base text-foreground">
+                        ${amountUsd.toFixed(2)} USD
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono">
+                      <span>Equivalente en Bolívares (Tasa BCV {bcvRate.toFixed(2)} Bs/$):</span>
+                      <span className="font-bold text-foreground">Bs. {amountVes.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Payment Method */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">
+                  Método de Cobro Recibido
+                </label>
+                <select
+                  value={renewMethod}
+                  onChange={(e) => setRenewMethod(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background font-semibold focus:ring-2 focus:ring-primary cursor-pointer"
+                >
+                  <option value="PAGO_MOVIL">📲 Pago Móvil (VES)</option>
+                  <option value="ZELLE">💳 Zelle (USD)</option>
+                  <option value="EFECTIVO_USD">💵 Efectivo Divisas USD</option>
+                  <option value="BINANCE_PAY">🪙 Binance Pay (USDT)</option>
+                  <option value="TRANSFERENCIA">🏦 Transferencia Bancaria Nacional (VES)</option>
+                </select>
+              </div>
+
+              {/* Payment Reference */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">
+                  Nro. de Referencia / Comprobante (Opcional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej. Ref: 894120 / Tel: 0414-9876543"
+                  value={renewReference}
+                  onChange={(e) => setRenewReference(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background focus:ring-2 focus:ring-primary font-mono text-xs"
+                />
+              </div>
+
+              {/* Info note */}
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] leading-relaxed">
+                ✨ <strong>Reactivación Automática:</strong> Al confirmar el cobro, el comercio se reactivará de inmediato si estaba suspendido, actualizando el catálogo digital para recibir pedidos al instante.
+              </div>
+
+              {/* Actions */}
+              <div className="pt-3 border-t border-border flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRenewingTenant(null)}
+                  className="px-4 py-2 rounded-xl border border-border text-foreground hover:bg-muted font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={renewLoading}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  {renewLoading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Procesando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Confirmar Cobro y Extender</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CAMBIAR PLAN SAAS */}
+      {changingPlanTenant && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-card border border-border w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                    <Zap className="w-5 h-5" />
+                  </div>
+                  <h2 className="text-base font-black text-foreground">
+                    Cambiar Plan SaaS
+                  </h2>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Comercio: <strong className="text-foreground">{changingPlanTenant.name}</strong> • Plan Actual:{" "}
+                  <strong className="text-foreground">{changingPlanTenant.plan?.name || "Growth"}</strong>
+                </p>
+              </div>
+              <button
+                onClick={() => setChangingPlanTenant(null)}
+                className="text-muted-foreground hover:text-foreground p-1.5 rounded-xl hover:bg-muted cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleChangePlanSubmit} className="space-y-4 text-xs">
+              <div className="space-y-2.5">
+                <label className="font-semibold text-foreground">
+                  Selecciona el Nivel de Suscripción
+                </label>
+                <div className="space-y-2">
+                  {plans.map((p) => {
+                    const isSelected = selectedPlanTier === p.id;
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => setSelectedPlanTier(p.id as SubscriptionPlanTier)}
+                        className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                          isSelected
+                            ? "border-primary bg-primary/5 ring-1 ring-primary/20 shadow-xs"
+                            : "border-border bg-background hover:bg-muted/40"
+                        }`}
+                      >
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-sm text-foreground">
+                              {p.name}
+                            </span>
+                            {p.id === "GROWTH" && (
+                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-primary text-primary-foreground">
+                                Recomendado
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">{p.description}</p>
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground pt-1">
+                            <span>{p.features.slice(0, 2).join(" • ")}</span>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0 pl-3">
+                          <span className="text-lg font-black text-foreground">
+                            ${p.price_usd_monthly}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground block">/mes USD</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-border flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setChangingPlanTenant(null)}
+                  className="px-4 py-2 rounded-xl border border-border text-foreground hover:bg-muted font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={changingPlanLoading}
+                  className="px-4 py-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  {changingPlanLoading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    <span>Guardar Cambio de Plan</span>
                   )}
                 </button>
               </div>
