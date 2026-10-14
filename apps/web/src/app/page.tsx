@@ -11,6 +11,7 @@ import {
   getCachedDeliveryZones,
 } from "../lib/cached-queries";
 import { StorefrontPage } from "../components/storefront-page";
+import { SuspendedStorePage } from "../components/suspended-store-page";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +89,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   const tenant = await getCachedTenant(tenantSlugOrId);
   const activeTenantId = tenant?.id || "shop-market-ca";
+
+  // BLOQUEO INMEDIATO: Si la tienda ha sido suspendida por el Super Admin o está inactiva
+  if (tenant && (tenant.status === "suspended" || tenant.status === "inactive")) {
+    const settings = await getCachedTenantSettings(activeTenantId);
+    return <SuspendedStorePage settings={settings} tenant={tenant} />;
+  }
 
   // Fetch tenant data concurrently from Next.js Edge Data Cache (<15ms latency, 0 Postgres queries on repeat visits)
   const [settings, categories, products, stores, exchangeRate, deliveryZones] =

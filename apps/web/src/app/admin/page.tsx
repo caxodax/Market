@@ -2,6 +2,7 @@ import React from "react";
 import { redirect } from "next/navigation";
 import { MarketOSRepository } from "@marketos/database";
 import { AdminDashboard } from "../../components/admin-dashboard";
+import { SuspendedAdminScreen } from "../../components/suspended-admin-screen";
 import { getCurrentUser } from "../login/actions";
 
 interface AdminPageProps {
@@ -46,6 +47,21 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     targetTenantId = currentUser.tenant_id;
   }
 
+  // Verificar si la tienda está suspendida
+  const targetTenant = await MarketOSRepository.getTenant(targetTenantId);
+
+  // BLOQUEO INMEDIATO: Si la tienda está suspendida y el usuario no es Super Admin de la plataforma
+  if (targetTenant && (targetTenant.status === "suspended" || targetTenant.status === "inactive") && !isSuperAdmin) {
+    const settings = await MarketOSRepository.getTenantSettings(targetTenantId);
+    return (
+      <SuspendedAdminScreen
+        tenant={targetTenant}
+        settings={settings}
+        currentUser={currentUser}
+      />
+    );
+  }
+
   const [
     settings,
     products,
@@ -79,7 +95,24 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   ]);
 
   return (
-    <AdminDashboard
+    <div className="relative">
+      {targetTenant?.status === "suspended" && isSuperAdmin && (
+        <div className="bg-rose-600 text-white text-xs font-bold px-4 py-2.5 flex items-center justify-between sticky top-0 z-50 shadow-md">
+          <div className="flex items-center gap-2">
+            <span className="text-base">⚠️</span>
+            <span>
+              COMERCIO SUSPENDIDO: Este comercio ({targetTenant.name}) se encuentra suspendido. Ni clientes ni empleados tienen acceso al sistema.
+            </span>
+          </div>
+          <a
+            href="/platform"
+            className="px-3 py-1 bg-white text-rose-700 rounded-lg text-xs font-bold hover:bg-neutral-100 transition-colors shadow-xs"
+          >
+            Gestionar en Master Platform
+          </a>
+        </div>
+      )}
+      <AdminDashboard
       settings={settings}
       products={products}
       categories={categories}
@@ -97,5 +130,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       allTenants={allTenants}
       currentStoreId={params?.store}
     />
+  </div>
   );
 }

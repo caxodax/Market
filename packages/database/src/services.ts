@@ -3092,12 +3092,23 @@ export class MarketOSRepository {
     status: "active" | "inactive" | "suspended" | "trial"
   ): Promise<boolean> {
     const supabase = getSupabase();
+    const now = new Date().toISOString();
+
     if (supabase) {
       try {
         await supabase
           .from("tenants")
-          .update({ status, updated_at: new Date().toISOString() })
+          .update({ status, updated_at: now })
           .eq("id", tenantId);
+
+        // Also synchronize subscription status if applicable
+        const subStatus = status === "suspended" ? "past_due" : status === "active" ? "active" : undefined;
+        if (subStatus) {
+          await supabase
+            .from("tenant_subscriptions")
+            .update({ status: subStatus, updated_at: now })
+            .eq("tenant_id", tenantId);
+        }
       } catch (e) {
         console.warn("[Supabase] Update tenant status error:", e);
       }
@@ -3106,10 +3117,211 @@ export class MarketOSRepository {
     const t = state.tenants.find((item) => item.id === tenantId);
     if (t) {
       t.status = status;
-      t.updated_at = new Date().toISOString();
-      return true;
+      t.updated_at = now;
     }
-    return false;
+
+    const sub = state.subscriptions.find((item) => item.tenant_id === tenantId);
+    if (sub) {
+      if (status === "suspended") sub.status = "past_due";
+      else if (status === "active") sub.status = "active";
+      sub.updated_at = now;
+    }
+
+    state.auditLogs.unshift({
+      id: `audit-${Date.now()}`,
+      tenant_id: tenantId,
+      action: status === "suspended" ? "TENANT_SUSPENDED" : "TENANT_ACTIVATED",
+      entity: "tenant",
+      entity_id: tenantId,
+      details: `Estado del comercio cambiado a: ${status.toUpperCase()}`,
+      created_at: now,
+    });
+
+    return true;
+  }
+
+  /**
+   * Renew or extend tenant SaaS subscription
+   */
+  static async renewTenantSubscription(
+    tenantId: string,
+    durationDays: number = 30,
+    paymentMethod: string = "PAGO_MOVIL",
+    reference?: string
+  ): Promise<TenantSubscription> {
+    const supabase = getSupabase();
+    const now = new Date();
+
+    let existingSub = state.subscriptions.find((s) => s.tenant_id === tenantId);
+    if (supabase) {
+      try {
+        const { data } = await supabase
+          .from("tenant_subscriptions")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
+        if (data) {
+          existingSub = data as TenantSubscription;
+        }
+      } catch (e) {
+        console.warn("[Supabase] Fetch subscription for renew error:", e);
+      }
+    }
+
+    // Calculate new period: if current period end is in future, add days to it, else from now
+    let baseDate = now;
+    if (existingSub && existingSub.current_period_end) {
+      const currentEnd = new Date(existingSub.current_period_end);
+      if (currentEnd > now) {
+        baseDate = currentEnd;
+      }
+    }
+
+    const newPeriodEnd = new Date(baseDate.getTime() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+    const newPeriodStart = now.toISOString();
+
+    const updatedSub: TenantSubscription = {
+      id: existingSub?.id || `sub-${Date.now()}`,
+      tenant_id: tenantId,
+      plan_id: existingSub?.plan_id || "GROWTH",
+      status: "active",
+      billing_cycle: existingSub?.billing_cycle || "monthly",
+      current_period_start: newPeriodStart,
+      current_period_end: newPeriodEnd,
+      cancel_at_period_end: false,
+      created_at: existingSub?.created_at || now.toISOString(),
+      updated_at: now.toISOString(),
+    };
+
+    if (supabase) {
+      try {
+        await supabase
+          .from("tenant_subscriptions")
+          .upsert({
+            id: updatedSub.id,
+            tenant_id: updatedSub.tenant_id,
+            plan_id: updatedSub.plan_id,
+            status: updatedSub.status,
+            billing_cycle: updatedSub.billing_cycle,
+            current_period_start: updatedSub.current_period_start,
+            current_period_end: updatedSub.current_period_end,
+            cancel_at_period_end: updatedSub.cancel_at_period_end,
+            updated_at: updatedSub.updated_at,
+          });
+
+        // Ensure tenant itself is reactivated when subscription is renewed
+        await supabase
+          .from("tenants")
+          .update({ status: "active", updated_at: now.toISOString() })
+          .eq("id", tenantId);
+      } catch (e) {
+        console.warn("[Supabase] Renew tenant subscription error:", e);
+      }
+    }
+
+    const subIdx = state.subscriptions.findIndex((s) => s.tenant_id === tenantId);
+    if (subIdx >= 0) {
+      state.subscriptions[subIdx] = updatedSub;
+    } else {
+      state.subscriptions.push(updatedSub);
+    }
+
+    const t = state.tenants.find((item) => item.id === tenantId);
+    if (t) {
+      t.status = "active";
+      t.updated_at = now.toISOString();
+    }
+
+    state.auditLogs.unshift({
+      id: `audit-${Date.now()}`,
+      tenant_id: tenantId,
+      action: "SUBSCRIPTION_RENEWED",
+      entity: "subscription",
+      entity_id: tenantId,
+      details: `Suscripción extendida por ${durationDays} días vía ${paymentMethod}. Ref: ${reference || "N/A"}`,
+      created_at: now.toISOString(),
+    });
+
+    return updatedSub;
+  }
+
+  /**
+   * Change SaaS subscription plan tier for a tenant
+   */
+  static async changeTenantPlan(
+    tenantId: string,
+    planTier: SubscriptionPlanTier
+  ): Promise<TenantSubscription> {
+    const supabase = getSupabase();
+    const now = new Date().toISOString();
+
+    let existingSub = state.subscriptions.find((s) => s.tenant_id === tenantId);
+    if (supabase) {
+      try {
+        const { data } = await supabase
+          .from("tenant_subscriptions")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
+        if (data) {
+          existingSub = data as TenantSubscription;
+        }
+      } catch (e) {
+        console.warn("[Supabase] Fetch subscription for plan change error:", e);
+      }
+    }
+
+    const updatedSub: TenantSubscription = {
+      id: existingSub?.id || `sub-${Date.now()}`,
+      tenant_id: tenantId,
+      plan_id: planTier,
+      status: existingSub?.status || "active",
+      billing_cycle: existingSub?.billing_cycle || "monthly",
+      current_period_start: existingSub?.current_period_start || now,
+      current_period_end: existingSub?.current_period_end || new Date(Date.now() + 30 * 86400000).toISOString(),
+      cancel_at_period_end: existingSub?.cancel_at_period_end || false,
+      created_at: existingSub?.created_at || now,
+      updated_at: now,
+    };
+
+    if (supabase) {
+      try {
+        await supabase
+          .from("tenant_subscriptions")
+          .upsert({
+            id: updatedSub.id,
+            tenant_id: updatedSub.tenant_id,
+            plan_id: updatedSub.plan_id,
+            status: updatedSub.status,
+            billing_cycle: updatedSub.billing_cycle,
+            current_period_start: updatedSub.current_period_start,
+            current_period_end: updatedSub.current_period_end,
+            cancel_at_period_end: updatedSub.cancel_at_period_end,
+            updated_at: updatedSub.updated_at,
+          });
+      } catch (e) {
+        console.warn("[Supabase] Change tenant plan error:", e);
+      }
+    }
+
+    const subIdx = state.subscriptions.findIndex((s) => s.tenant_id === tenantId);
+    if (subIdx >= 0) {
+      state.subscriptions[subIdx] = updatedSub;
+    } else {
+      state.subscriptions.push(updatedSub);
+    }
+
+    state.auditLogs.unshift({
+      id: `audit-${Date.now()}`,
+      tenant_id: tenantId,
+      action: "SUBSCRIPTION_PLAN_CHANGED",
+      entity: "subscription",
+      entity_id: tenantId,
+      details: `Plan cambiado a nivel ${planTier}`,
+      created_at: now,
+    });
+
+    return updatedSub;
   }
 
   // =====================================================================

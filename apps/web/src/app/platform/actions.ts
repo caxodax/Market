@@ -1,8 +1,9 @@
 "use server";
 
 import { MarketOSRepository } from "@marketos/database";
-import { OnboardTenantInput } from "@marketos/types";
+import { OnboardTenantInput, SubscriptionPlanTier } from "@marketos/types";
 import { revalidatePath } from "next/cache";
+import { invalidateTenantCache } from "../../lib/cached-queries";
 
 /**
  * Onboard and automatically provision a new tenant
@@ -25,7 +26,9 @@ export async function onboardTenantAction(input: OnboardTenantInput) {
 }
 
 /**
- * Update tenant status (Active, Suspended, Trial)
+ * Update tenant status (Active, Suspended, Trial, Inactive)
+ * Invalida inmediatamente el Edge Data Cache de Next.js y revalida todas las rutas
+ * para que el bloqueo/activación sea 100% en tiempo real.
  */
 export async function updateTenantStatusAction(
   tenantId: string,
@@ -33,11 +36,68 @@ export async function updateTenantStatusAction(
 ) {
   try {
     const updated = await MarketOSRepository.updateTenantStatus(tenantId, status);
+    // Invalida Next.js Data Cache para este tenant (información, configuración, productos)
+    invalidateTenantCache(tenantId);
+    // Revalidación inmediata de rutas
+    revalidatePath("/");
+    revalidatePath("/admin");
     revalidatePath("/platform");
     return { success: updated };
   } catch (error) {
     console.error("Error updating tenant status:", error);
     return { success: false, error: "Error al actualizar estado del comercio" };
+  }
+}
+
+/**
+ * Renovar o registrar pago de suscripción SaaS de un comercio
+ */
+export async function renewTenantSubscriptionAction(
+  tenantId: string,
+  durationDays: number = 30,
+  paymentMethod: string = "PAGO_MOVIL",
+  reference?: string
+) {
+  try {
+    const subscription = await MarketOSRepository.renewTenantSubscription(
+      tenantId,
+      durationDays,
+      paymentMethod,
+      reference
+    );
+    // Purgar caché y revalidar para que vuelva a estar en línea al instante
+    invalidateTenantCache(tenantId);
+    revalidatePath("/");
+    revalidatePath("/admin");
+    revalidatePath("/platform");
+    return { success: true, subscription };
+  } catch (error) {
+    console.error("Error renewing tenant subscription:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al renovar la suscripción",
+    };
+  }
+}
+
+/**
+ * Cambiar de plan SaaS para un comercio
+ */
+export async function changeTenantPlanAction(
+  tenantId: string,
+  planTier: SubscriptionPlanTier
+) {
+  try {
+    const subscription = await MarketOSRepository.changeTenantPlan(tenantId, planTier);
+    invalidateTenantCache(tenantId);
+    revalidatePath("/platform");
+    return { success: true, subscription };
+  } catch (error) {
+    console.error("Error changing tenant plan:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al cambiar de plan",
+    };
   }
 }
 

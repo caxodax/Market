@@ -169,3 +169,24 @@ export function invalidateDeliveryZonesCache(tenantId: string) {
     // Ignored
   }
 }
+
+/**
+ * Invalidar toda la caché relacionada con un Tenant (estado, suscripción, settings, productos)
+ */
+export function invalidateTenantCache(tenantIdOrSlug: string, optionalSlug?: string) {
+  try {
+    const key = tenantIdOrSlug.toLowerCase();
+    revalidateTag(`tenant-info-${key}`, { expire: 0 });
+    revalidateTag(`tenant-settings-${tenantIdOrSlug}`, { expire: 0 });
+    revalidateTag(`tenant-products-${tenantIdOrSlug}`, { expire: 0 });
+    revalidateTag(`tenant-categories-${tenantIdOrSlug}`, { expire: 0 });
+    revalidateTag(`tenant-stores-${tenantIdOrSlug}`, { expire: 0 });
+    if (optionalSlug && optionalSlug.toLowerCase() !== key) {
+      revalidateTag(`tenant-info-${optionalSlug.toLowerCase()}`, { expire: 0 });
+      revalidateTag(`tenant-settings-${optionalSlug}`, { expire: 0 });
+    }
+  } catch (e) {
+    // Ignored in non-server action contexts
+  }
+}
+

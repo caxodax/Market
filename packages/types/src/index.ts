@@ -544,6 +544,7 @@ export interface AuditLog {
   action: string;
   entity: string;
   entity_id: string;
+  details?: string | null;
   old_data?: Record<string, unknown> | null;
   new_data?: Record<string, unknown> | null;
   created_at: string;

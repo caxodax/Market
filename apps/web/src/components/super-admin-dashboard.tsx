@@ -18,6 +18,8 @@ import {
   createPlatformUserAction,
   updateUserProfileAction,
   deletePlatformUserAction,
+  renewTenantSubscriptionAction,
+  changeTenantPlanAction,
 } from "../app/platform/actions";
 import {
   Building2,
@@ -53,6 +55,12 @@ import {
   Briefcase,
   Crown,
   Key,
+  Calendar,
+  Clock,
+  RefreshCw,
+  Zap,
+  Check,
+  AlertTriangle,
 } from "lucide-react";
 import { logoutUserAction } from "../app/login/actions";
 import { ExchangeRateManager } from "./exchange-rate-manager";
@@ -76,10 +84,38 @@ export function SuperAdminDashboard({
   ratesHistory = [],
   initialProfiles = [],
 }: SuperAdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<"TENANTS" | "USERS" | "RATES">("TENANTS");
+  const [activeTab, setActiveTab] = useState<"TENANTS" | "BILLING" | "USERS" | "RATES">("TENANTS");
   const [tenants, setTenants] = useState<TenantWithDetails[]>(initialTenants);
   const [metrics, setMetrics] = useState<PlatformMetrics>(initialMetrics);
   const [profiles, setProfiles] = useState<UserProfile[]>(initialProfiles);
+
+  // Billing & Subscriptions State
+  const [billingSearchQuery, setBillingSearchQuery] = useState("");
+  const [billingPlanFilter, setBillingPlanFilter] = useState<string>("ALL");
+  const [billingStatusFilter, setBillingStatusFilter] = useState<string>("ALL");
+  const [renewingTenant, setRenewingTenant] = useState<TenantWithDetails | null>(null);
+  const [renewDurationDays, setRenewDurationDays] = useState<number>(30);
+  const [renewMethod, setRenewMethod] = useState<string>("PAGO_MOVIL");
+  const [renewReference, setRenewReference] = useState<string>("");
+  const [renewLoading, setRenewLoading] = useState(false);
+
+  const [changingPlanTenant, setChangingPlanTenant] = useState<TenantWithDetails | null>(null);
+  const [selectedPlanTier, setSelectedPlanTier] = useState<SubscriptionPlanTier>("GROWTH");
+  const [changingPlanLoading, setChangingPlanLoading] = useState(false);
+
+  const [billingAlert, setBillingAlert] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (billingAlert) {
+      const timer = setTimeout(() => {
+        setBillingAlert(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [billingAlert]);
 
   // User Management State
   const [userSearchQuery, setUserSearchQuery] = useState("");
@@ -409,6 +445,238 @@ export function SuperAdminDashboard({
 
     return matchesSearch && matchesStatus;
   });
+
+  // Helper for computing subscription status and expiration
+  const getSubscriptionInfo = (t: TenantWithDetails) => {
+    const sub = t.subscription;
+    const plan = t.plan || plans.find((p) => p.id === (sub?.plan_id || "GROWTH")) || plans[0];
+
+    const periodEnd = sub?.current_period_end
+      ? new Date(sub.current_period_end)
+      : new Date(Date.now() + 30 * 86400000);
+    const now = new Date();
+    const diffMs = periodEnd.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    const isSuspended = t.status === "suspended" || sub?.status === "past_due";
+    const isTrial = t.status === "trial" || sub?.status === "trial";
+    const isExpiringSoon = !isSuspended && diffDays <= 5 && diffDays >= 0;
+    const isExpired = !isSuspended && diffDays < 0;
+
+    return {
+      sub,
+      plan,
+      periodEnd,
+      diffDays,
+      isSuspended,
+      isTrial,
+      isExpiringSoon,
+      isExpired,
+    };
+  };
+
+  // Billing KPIs calculation
+  const billingKpis = React.useMemo(() => {
+    let totalMRR = 0;
+    let upToDateCount = 0;
+    let trialCount = 0;
+    let suspendedCount = 0;
+
+    tenants.forEach((t) => {
+      const info = getSubscriptionInfo(t);
+      if (info.isSuspended) {
+        suspendedCount++;
+      } else if (info.isTrial) {
+        trialCount++;
+        totalMRR += info.plan.price_usd_monthly;
+      } else {
+        upToDateCount++;
+        totalMRR += info.plan.price_usd_monthly;
+      }
+    });
+
+    return { totalMRR, upToDateCount, trialCount, suspendedCount };
+  }, [tenants, plans]);
+
+  // Filtered tenants for billing tab
+  const filteredBillingTenants = tenants.filter((t) => {
+    const matchesSearch =
+      !billingSearchQuery.trim() ||
+      t.name.toLowerCase().includes(billingSearchQuery.toLowerCase()) ||
+      t.slug.toLowerCase().includes(billingSearchQuery.toLowerCase()) ||
+      (t.settings?.email && t.settings.email.toLowerCase().includes(billingSearchQuery.toLowerCase()));
+
+    const info = getSubscriptionInfo(t);
+
+    const matchesPlan =
+      billingPlanFilter === "ALL" || info.plan.id === billingPlanFilter;
+
+    let matchesStatus = true;
+    if (billingStatusFilter === "UP_TO_DATE") {
+      matchesStatus = !info.isSuspended && !info.isTrial && info.diffDays > 5;
+    } else if (billingStatusFilter === "EXPIRING_SOON") {
+      matchesStatus = !info.isSuspended && (info.diffDays <= 5 || info.diffDays < 0);
+    } else if (billingStatusFilter === "TRIAL") {
+      matchesStatus = info.isTrial;
+    } else if (billingStatusFilter === "SUSPENDED") {
+      matchesStatus = info.isSuspended;
+    }
+
+    return matchesSearch && matchesPlan && matchesStatus;
+  });
+
+  // Handle renewal submit
+  const handleRenewSubscriptionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!renewingTenant) return;
+    setRenewLoading(true);
+    setBillingAlert(null);
+
+    try {
+      const res = await renewTenantSubscriptionAction(
+        renewingTenant.id,
+        renewDurationDays,
+        renewMethod,
+        renewReference.trim() || undefined
+      );
+
+      if (!res.success || !res.subscription) {
+        throw new Error(res.error || "No se pudo registrar la renovación");
+      }
+
+      setTenants((prev) =>
+        prev.map((t) => {
+          if (t.id === renewingTenant.id) {
+            return {
+              ...t,
+              status: "active",
+              subscription: res.subscription,
+            };
+          }
+          return t;
+        })
+      );
+
+      setMetrics((prev) => ({
+        ...prev,
+        activeTenants:
+          renewingTenant.status === "suspended" ? prev.activeTenants + 1 : prev.activeTenants,
+      }));
+
+      setBillingAlert({
+        type: "success",
+        text: `¡Suscripción de "${renewingTenant.name}" renovada por ${renewDurationDays} días y comercio reactivado exitosamente!`,
+      });
+      setRenewingTenant(null);
+      setRenewReference("");
+    } catch (err: any) {
+      setBillingAlert({
+        type: "error",
+        text: err.message || "Error al renovar la suscripción",
+      });
+    } finally {
+      setRenewLoading(false);
+    }
+  };
+
+  // Handle plan change submit
+  const handleChangePlanSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!changingPlanTenant) return;
+    setChangingPlanLoading(true);
+    setBillingAlert(null);
+
+    try {
+      const res = await changeTenantPlanAction(
+        changingPlanTenant.id,
+        selectedPlanTier
+      );
+
+      if (!res.success || !res.subscription) {
+        throw new Error(res.error || "No se pudo actualizar el plan");
+      }
+
+      const newPlan = plans.find((p) => p.id === selectedPlanTier) || plans[0];
+
+      setTenants((prev) =>
+        prev.map((t) => {
+          if (t.id === changingPlanTenant.id) {
+            return {
+              ...t,
+              subscription: res.subscription,
+              plan: newPlan,
+            };
+          }
+          return t;
+        })
+      );
+
+      const oldPlan = changingPlanTenant.plan;
+      const priceDiff = newPlan.price_usd_monthly - (oldPlan?.price_usd_monthly || 0);
+      setMetrics((prev) => ({
+        ...prev,
+        mrrUsd: Number((prev.mrrUsd + priceDiff).toFixed(2)),
+      }));
+
+      setBillingAlert({
+        type: "success",
+        text: `¡Plan de "${changingPlanTenant.name}" cambiado exitosamente a ${selectedPlanTier}!`,
+      });
+      setChangingPlanTenant(null);
+    } catch (err: any) {
+      setBillingAlert({
+        type: "error",
+        text: err.message || "Error al cambiar de plan",
+      });
+    } finally {
+      setChangingPlanLoading(false);
+    }
+  };
+
+  // Quick toggle status from billing tab with notification
+  const handleBillingToggleStatus = async (tenantId: string, currentStatus: string) => {
+    const nextStatus = currentStatus === "active" ? "suspended" : "active";
+    try {
+      const res = await updateTenantStatusAction(tenantId, nextStatus as any);
+      if (res.success) {
+        setTenants((prev) =>
+          prev.map((t) => {
+            if (t.id === tenantId) {
+              return {
+                ...t,
+                status: nextStatus,
+                subscription: t.subscription
+                  ? {
+                      ...t.subscription,
+                      status: nextStatus === "active" ? "active" : "past_due",
+                    }
+                  : t.subscription,
+              };
+            }
+            return t;
+          })
+        );
+        setMetrics((prev) => ({
+          ...prev,
+          activeTenants:
+            nextStatus === "active"
+              ? prev.activeTenants + 1
+              : Math.max(0, prev.activeTenants - 1),
+        }));
+
+        setBillingAlert({
+          type: "success",
+          text: `Comercio ${nextStatus === "active" ? "reactivado" : "suspendido"} correctamente. El catálogo y panel ahora están ${nextStatus === "active" ? "habilitados" : "bloqueados"}.`,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      setBillingAlert({
+        type: "error",
+        text: "Error al actualizar estado del comercio",
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
