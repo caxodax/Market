@@ -3457,8 +3457,8 @@ export class MarketOSRepository {
         action: "PROFILE_UPDATED",
         entity: "profiles",
         entityId: userId,
-        oldData: old,
-        newData: state.profiles[idx],
+        oldData: old as unknown as Record<string, unknown>,
+        newData: state.profiles[idx] as unknown as Record<string, unknown>,
       });
 
       return state.profiles[idx];

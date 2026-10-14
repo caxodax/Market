@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   PlatformMetrics,
   TenantWithDetails,
@@ -9,11 +9,15 @@ import {
   ExchangeRate,
   RateHistoryItem,
   UserProfile,
+  UserRole,
 } from "@marketos/types";
 import { formatCurrency, slugify } from "@marketos/utils";
 import {
   onboardTenantAction,
   updateTenantStatusAction,
+  createPlatformUserAction,
+  updateUserProfileAction,
+  deletePlatformUserAction,
 } from "../app/platform/actions";
 import {
   Building2,
@@ -36,6 +40,7 @@ import {
   Cloud,
   Server,
   Users,
+  UserPlus,
   LogOut,
   Landmark,
   Smartphone,
@@ -43,6 +48,11 @@ import {
   Phone,
   ChevronRight,
   Sliders,
+  Trash2,
+  Edit2,
+  Briefcase,
+  Crown,
+  Key,
 } from "lucide-react";
 import { logoutUserAction } from "../app/login/actions";
 import { ExchangeRateManager } from "./exchange-rate-manager";
@@ -54,6 +64,7 @@ interface SuperAdminDashboardProps {
   currentUser?: UserProfile;
   exchangeRate?: ExchangeRate;
   ratesHistory?: RateHistoryItem[];
+  initialProfiles?: UserProfile[];
 }
 
 export function SuperAdminDashboard({
@@ -63,10 +74,217 @@ export function SuperAdminDashboard({
   currentUser,
   exchangeRate,
   ratesHistory = [],
+  initialProfiles = [],
 }: SuperAdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<"TENANTS" | "RATES">("TENANTS");
+  const [activeTab, setActiveTab] = useState<"TENANTS" | "USERS" | "RATES">("TENANTS");
   const [tenants, setTenants] = useState<TenantWithDetails[]>(initialTenants);
   const [metrics, setMetrics] = useState<PlatformMetrics>(initialMetrics);
+  const [profiles, setProfiles] = useState<UserProfile[]>(initialProfiles);
+
+  // User Management State
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [userTenantFilter, setUserTenantFilter] = useState<string>("ALL");
+  const [userRoleFilter, setUserRoleFilter] = useState<string>("ALL");
+  const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [userLoading, setUserLoading] = useState(false);
+  const [userAlert, setUserAlert] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  // Auto-dismiss user alert
+  useEffect(() => {
+    if (userAlert) {
+      const timer = setTimeout(() => {
+        setUserAlert(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [userAlert]);
+
+  // Create User Form State
+  const [newUserName, setNewUserName] = useState("");
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserPhone, setNewUserPhone] = useState("+58 4");
+  const [newUserTenantId, setNewUserTenantId] = useState<string>("");
+  const [newUserRole, setNewUserRole] = useState<UserRole>("TENANT_OWNER");
+
+  // Edit User Form State
+  const [editRole, setEditRole] = useState<UserRole>("TENANT_OWNER");
+  const [editTenantId, setEditTenantId] = useState<string>("");
+
+  const handleOpenEditUser = (user: UserProfile) => {
+    setEditingUser(user);
+    setEditRole(user.role);
+    setEditTenantId(user.tenant_id || "");
+  };
+
+  const handleCreateUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUserLoading(true);
+    setUserAlert(null);
+
+    try {
+      const res = await createPlatformUserAction({
+        fullName: newUserName.trim(),
+        email: newUserEmail.trim(),
+        phone: newUserPhone.trim() || null,
+        tenantId: newUserTenantId.trim() || null,
+        role: newUserRole,
+      });
+
+      if (!res.success || !res.user) {
+        throw new Error(res.error || "No se pudo crear el usuario");
+      }
+
+      setProfiles((prev) => [res.user!, ...prev]);
+      setIsCreateUserOpen(false);
+      setNewUserName("");
+      setNewUserEmail("");
+      setNewUserPhone("+58 4");
+      setUserAlert({
+        type: "success",
+        text: `¡Usuario ${res.user.full_name} (${res.user.role}) registrado exitosamente!`,
+      });
+    } catch (err: any) {
+      setUserAlert({
+        type: "error",
+        text: err.message || "Error al crear usuario",
+      });
+    } finally {
+      setUserLoading(false);
+    }
+  };
+
+  const handleUpdateUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setUserLoading(true);
+
+    try {
+      const res = await updateUserProfileAction(editingUser.id, {
+        role: editRole,
+        tenant_id: editTenantId.trim() || null,
+      });
+
+      if (!res.success || !res.user) {
+        throw new Error(res.error || "No se pudo actualizar el rol");
+      }
+
+      setProfiles((prev) =>
+        prev.map((p) =>
+          p.id === editingUser.id
+            ? { ...p, role: editRole, tenant_id: editTenantId.trim() || null }
+            : p
+        )
+      );
+      setEditingUser(null);
+      setUserAlert({
+        type: "success",
+        text: `¡Rol de ${editingUser.full_name} actualizado a ${editRole}!`,
+      });
+    } catch (err: any) {
+      setUserAlert({
+        type: "error",
+        text: err.message || "Error al actualizar rol",
+      });
+    } finally {
+      setUserLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!confirm(`¿Estás seguro de que deseas revocar el acceso a ${userName}?`)) {
+      return;
+    }
+
+    try {
+      const res = await deletePlatformUserAction(userId);
+      if (res.success) {
+        setProfiles((prev) => prev.filter((p) => p.id !== userId));
+        setUserAlert({
+          type: "success",
+          text: `Acceso revocado para ${userName}`,
+        });
+      } else {
+        throw new Error(res.error || "Error al eliminar usuario");
+      }
+    } catch (err: any) {
+      setUserAlert({
+        type: "error",
+        text: err.message || "Error al revocar acceso",
+      });
+    }
+  };
+
+  const filteredProfiles = profiles.filter((p) => {
+    const matchesSearch =
+      !userSearchQuery.trim() ||
+      p.full_name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+      p.email.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+      (p.phone && p.phone.toLowerCase().includes(userSearchQuery.toLowerCase()));
+
+    const matchesTenant =
+      userTenantFilter === "ALL"
+        ? true
+        : userTenantFilter === "GLOBAL"
+        ? !p.tenant_id
+        : p.tenant_id === userTenantFilter;
+
+    const matchesRole =
+      userRoleFilter === "ALL" ? true : p.role === userRoleFilter;
+
+    return matchesSearch && matchesTenant && matchesRole;
+  });
+
+  const getRoleBadge = (role: UserRole) => {
+    switch (role) {
+      case "PLATFORM_SUPER_ADMIN":
+        return {
+          label: "Super Admin",
+          icon: ShieldCheck,
+          className: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30",
+        };
+      case "TENANT_OWNER":
+        return {
+          label: "Dueño de Tienda",
+          icon: Crown,
+          className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
+        };
+      case "TENANT_MANAGER":
+        return {
+          label: "Gerente",
+          icon: Briefcase,
+          className: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30",
+        };
+      case "TENANT_CASHIER":
+        return {
+          label: "Cajero",
+          icon: DollarSign,
+          className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
+        };
+      case "TENANT_INVENTORY":
+        return {
+          label: "Inventario",
+          icon: Package,
+          className: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30",
+        };
+      case "TENANT_DELIVERY":
+        return {
+          label: "Repartidor",
+          icon: Smartphone,
+          className: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30",
+        };
+      case "CUSTOMER":
+      default:
+        return {
+          label: "Cliente",
+          icon: Users,
+          className: "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30",
+        };
+    }
+  };
 
   const handleLogout = async () => {
     await logoutUserAction();
@@ -361,7 +579,7 @@ export function SuperAdminDashboard({
         <div className="flex border-b border-border gap-2 overflow-x-auto pb-1">
           <button
             onClick={() => setActiveTab("TENANTS")}
-            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
               activeTab === "TENANTS"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -372,8 +590,20 @@ export function SuperAdminDashboard({
           </button>
 
           <button
+            onClick={() => setActiveTab("USERS")}
+            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === "USERS"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Usuarios & Personal ({profiles.length})</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab("RATES")}
-            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
               activeTab === "RATES"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -650,7 +880,340 @@ export function SuperAdminDashboard({
       </div>
     )}
 
-      {/* TAB 2: GLOBAL EXCHANGE RATES & AUDIT LEDGER */}
+      {/* TAB 2: USERS & MULTI-TENANT STAFF DIRECTORY */}
+      {activeTab === "USERS" && (
+        <div className="space-y-6 animate-in fade-in">
+          {/* Feedback Alert Message */}
+          {userAlert && (
+            <div
+              className={`p-3.5 rounded-2xl border text-xs font-semibold flex items-center justify-between shadow-lg transition-all animate-in fade-in slide-in-from-top-2 ${
+                userAlert.type === "success"
+                  ? "bg-emerald-950/80 border-emerald-500/40 text-emerald-200"
+                  : "bg-rose-950/80 border-rose-500/40 text-rose-200"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                {userAlert.type === "success" ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                )}
+                <span>{userAlert.text}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUserAlert(null)}
+                className="p-1 hover:bg-white/10 rounded-lg text-white/70 hover:text-white cursor-pointer"
+                title="Cerrar notificación"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* User Metrics Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-2xl border border-border bg-card shadow-xs">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-[11px] font-semibold">Total Usuarios</span>
+                <Users className="w-4 h-4 text-primary" />
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-foreground">
+                {profiles.length}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">En toda la plataforma</p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl border border-border bg-card shadow-xs">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-[11px] font-semibold">Dueños de Tienda</span>
+                <Crown className="w-4 h-4 text-amber-500" />
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-foreground">
+                {profiles.filter((p) => p.role === "TENANT_OWNER").length}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Titulares de comercios</p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl border border-border bg-card shadow-xs">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-[11px] font-semibold">Staff Operativo</span>
+                <Briefcase className="w-4 h-4 text-sky-500" />
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-foreground">
+                {
+                  profiles.filter(
+                    (p) =>
+                      p.role === "TENANT_MANAGER" ||
+                      p.role === "TENANT_CASHIER" ||
+                      p.role === "TENANT_INVENTORY"
+                  ).length
+                }
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Gerentes, cajas y almacén</p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl border border-border bg-card shadow-xs">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-[11px] font-semibold">Repartidores / Delivery</span>
+                <Smartphone className="w-4 h-4 text-orange-500" />
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-foreground">
+                {profiles.filter((p) => p.role === "TENANT_DELIVERY").length}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Flota de entregas</p>
+            </div>
+          </div>
+
+          {/* Directory Toolbar */}
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-card p-3 rounded-2xl border border-border">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Buscar usuario por nombre, email o teléfono..."
+                value={userSearchQuery}
+                onChange={(e) => setUserSearchQuery(e.target.value)}
+                className="w-full h-10 pl-10 pr-3 rounded-xl border border-input bg-background text-xs focus:ring-2 focus:ring-primary"
+              />
+            </div>
+
+            {/* Filter by Tenant & Create User CTA */}
+            <div className="flex items-center gap-2">
+              <select
+                value={userTenantFilter}
+                onChange={(e) => setUserTenantFilter(e.target.value)}
+                className="h-10 px-3 rounded-xl border border-input bg-background text-xs font-semibold focus:ring-2 focus:ring-primary cursor-pointer max-w-[200px] truncate"
+              >
+                <option value="ALL">Todas las Tiendas</option>
+                <option value="GLOBAL">🛡️ Plataforma Global (Sin Tienda)</option>
+                {tenants.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    🏪 {t.name}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setNewUserName("");
+                  setNewUserEmail("");
+                  setNewUserPhone("+58 4");
+                  setNewUserTenantId(tenants[0]?.id || "");
+                  setNewUserRole("TENANT_OWNER");
+                  setIsCreateUserOpen(true);
+                }}
+                className="h-10 px-4 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Nuevo Usuario</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Role Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+            {[
+              { id: "ALL", label: `Todos (${profiles.length})` },
+              {
+                id: "TENANT_OWNER",
+                label: `Dueños (${profiles.filter((p) => p.role === "TENANT_OWNER").length})`,
+              },
+              {
+                id: "TENANT_MANAGER",
+                label: `Gerentes (${profiles.filter((p) => p.role === "TENANT_MANAGER").length})`,
+              },
+              {
+                id: "TENANT_CASHIER",
+                label: `Cajeros (${profiles.filter((p) => p.role === "TENANT_CASHIER").length})`,
+              },
+              {
+                id: "TENANT_INVENTORY",
+                label: `Inventario (${profiles.filter((p) => p.role === "TENANT_INVENTORY").length})`,
+              },
+              {
+                id: "TENANT_DELIVERY",
+                label: `Repartidores (${profiles.filter((p) => p.role === "TENANT_DELIVERY").length})`,
+              },
+              {
+                id: "PLATFORM_SUPER_ADMIN",
+                label: `Super Admins (${profiles.filter((p) => p.role === "PLATFORM_SUPER_ADMIN").length})`,
+              },
+            ].map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setUserRoleFilter(f.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors whitespace-nowrap cursor-pointer ${
+                  userRoleFilter === f.id
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Users Table */}
+          <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-muted/40 text-muted-foreground border-b border-border font-bold">
+                  <tr>
+                    <th className="py-3 px-4">Usuario / Identidad</th>
+                    <th className="py-3 px-4">Comercio Asignado</th>
+                    <th className="py-3 px-4">Rol en Sistema</th>
+                    <th className="py-3 px-4">Contacto</th>
+                    <th className="py-3 px-4">Fecha Alta</th>
+                    <th className="py-3 px-4 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredProfiles.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-muted-foreground">
+                        <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                        <p className="font-semibold">No se encontraron usuarios con los filtros seleccionados.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredProfiles.map((user) => {
+                      const roleBadge = getRoleBadge(user.role);
+                      const RoleIcon = roleBadge.icon;
+                      const tenant = tenants.find((t) => t.id === user.tenant_id);
+
+                      return (
+                        <tr key={user.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center font-black text-xs text-primary shrink-0">
+                                {user.full_name
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .slice(0, 2)
+                                  .join("")
+                                  .toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-bold text-foreground text-sm truncate flex items-center gap-1.5">
+                                  <span>{user.full_name}</span>
+                                  {user.id === currentUser?.id && (
+                                    <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full bg-primary text-primary-foreground">
+                                      Tú
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-muted-foreground text-xs truncate">
+                                  {user.email}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-4">
+                            {user.tenant_id ? (
+                              <div className="flex items-center gap-1.5">
+                                <Store className="w-3.5 h-3.5 text-primary shrink-0" />
+                                <div>
+                                  <span className="font-semibold text-foreground">
+                                    {tenant ? tenant.name : user.tenant_id}
+                                  </span>
+                                  {tenant && (
+                                    <span className="text-[10px] text-muted-foreground block font-mono">
+                                      {tenant.slug}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                                <ShieldCheck className="w-3 h-3" />
+                                Plataforma Global
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${roleBadge.className}`}
+                            >
+                              <RoleIcon className="w-3.5 h-3.5 shrink-0" />
+                              <span>{roleBadge.label}</span>
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4 text-muted-foreground">
+                            {user.phone ? (
+                              <div className="flex items-center gap-1 text-xs">
+                                <Phone className="w-3 h-3 text-muted-foreground shrink-0" />
+                                <span>{user.phone}</span>
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground/60 italic">Sin teléfono</span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-4 text-xs text-muted-foreground whitespace-nowrap">
+                            {new Date(user.created_at).toLocaleDateString("es-VE", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </td>
+
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Botón Editar Rol */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditUser(user)}
+                                className="px-2.5 py-1.5 rounded-xl border border-border text-foreground hover:bg-muted font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                                title="Cambiar rol o tienda"
+                              >
+                                <Edit2 className="w-3 h-3 text-primary" />
+                                <span>Rol</span>
+                              </button>
+
+                              {/* Botón Administrar Tienda */}
+                              {user.tenant_id && (
+                                <a
+                                  href={`/admin?tenant=${user.tenant_id}`}
+                                  className="px-2.5 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 font-bold text-xs flex items-center gap-1 transition-colors"
+                                  title="Ir al panel de su tienda"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  <span>Panel</span>
+                                </a>
+                              )}
+
+                              {/* Botón Eliminar / Revocar (excepto a uno mismo) */}
+                              {user.id !== currentUser?.id && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteUser(user.id, user.full_name)}
+                                  className="p-1.5 rounded-xl text-rose-500 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 cursor-pointer transition-colors"
+                                  title="Revocar acceso al usuario"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: GLOBAL EXCHANGE RATES & AUDIT LEDGER */}
       {activeTab === "RATES" && (
         <div className="space-y-6 animate-in fade-in">
           <ExchangeRateManager
@@ -998,6 +1561,244 @@ export function SuperAdminDashboard({
                 <span>Entrar al Panel Completo de la Tienda</span>
               </a>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 1: REGISTRAR NUEVO USUARIO */}
+      {isCreateUserOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95">
+            <div className="p-4 border-b border-border flex items-center justify-between bg-muted/20">
+              <div>
+                <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+                  <UserPlus className="w-4 h-4 text-primary" />
+                  Registrar Nuevo Usuario en MarketOS
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Asigna acceso a un comercio específico o como operador global
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateUserOpen(false)}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleCreateUserSubmit}
+              className="p-5 overflow-y-auto space-y-4 text-xs"
+            >
+              {/* Full Name */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">
+                  Nombre y Apellido *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Carlos Mendoza"
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              {/* Email & Phone */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-semibold text-foreground">
+                    Correo Electrónico *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="carlos@negocio.com"
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl border border-input bg-background focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-foreground">
+                    Teléfono / WhatsApp
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="+58 412 1234567"
+                    value={newUserPhone}
+                    onChange={(e) => setNewUserPhone(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl border border-input bg-background focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              </div>
+
+              {/* Assigned Tenant */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">
+                  Comercio / Tienda Asignada
+                </label>
+                <select
+                  value={newUserTenantId}
+                  onChange={(e) => setNewUserTenantId(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background font-semibold focus:ring-2 focus:ring-primary cursor-pointer"
+                >
+                  <option value="">🛡️ Plataforma Global (Sin Tienda / Super Admin)</option>
+                  {tenants.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      🏪 {t.name} ({t.slug})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-muted-foreground">
+                  Selecciona la tienda a la que pertenecerá este usuario o déjalo global si es Super Admin.
+                </p>
+              </div>
+
+              {/* Role */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">
+                  Rol y Nivel de Acceso *
+                </label>
+                <select
+                  value={newUserRole}
+                  onChange={(e) => setNewUserRole(e.target.value as UserRole)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background font-bold focus:ring-2 focus:ring-primary cursor-pointer"
+                >
+                  <option value="TENANT_OWNER">👑 Dueño de Tienda (Acceso total al comercio)</option>
+                  <option value="TENANT_MANAGER">👔 Gerente (Inventario, reportes y ventas)</option>
+                  <option value="TENANT_CASHIER">💵 Cajero (Validación de pagos y pedidos)</option>
+                  <option value="TENANT_INVENTORY">📦 Inventario (Stock y productos)</option>
+                  <option value="TENANT_DELIVERY">🛵 Repartidor (Entregas y rutas)</option>
+                  <option value="PLATFORM_SUPER_ADMIN">🛡️ Super Administrador (Toda la plataforma SaaS)</option>
+                </select>
+              </div>
+
+              <div className="pt-3 border-t border-border flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateUserOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-border text-foreground hover:bg-muted font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={userLoading}
+                  className="px-4 py-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  {userLoading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>Registrar Usuario</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: EDITAR ROL Y ASIGNACIÓN DE USUARIO */}
+      {editingUser && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
+            <div className="p-4 border-b border-border flex items-center justify-between bg-muted/20">
+              <div>
+                <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+                  <Edit2 className="w-4 h-4 text-primary" />
+                  Editar Rol y Acceso
+                </h2>
+                <p className="text-xs text-muted-foreground truncate max-w-xs">
+                  {editingUser.full_name} ({editingUser.email})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingUser(null)}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleUpdateUserSubmit}
+              className="p-5 space-y-4 text-xs"
+            >
+              {/* Rol Selector */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">
+                  Rol de Sistema *
+                </label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value as UserRole)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background font-bold focus:ring-2 focus:ring-primary cursor-pointer"
+                >
+                  <option value="TENANT_OWNER">👑 Dueño de Tienda</option>
+                  <option value="TENANT_MANAGER">👔 Gerente</option>
+                  <option value="TENANT_CASHIER">💵 Cajero</option>
+                  <option value="TENANT_INVENTORY">📦 Inventario</option>
+                  <option value="TENANT_DELIVERY">🛵 Repartidor</option>
+                  <option value="PLATFORM_SUPER_ADMIN">🛡️ Super Administrador</option>
+                  <option value="CUSTOMER">👤 Cliente Registrado</option>
+                </select>
+              </div>
+
+              {/* Tenant Reassignment */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">
+                  Comercio Asignado
+                </label>
+                <select
+                  value={editTenantId}
+                  onChange={(e) => setEditTenantId(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background font-semibold focus:ring-2 focus:ring-primary cursor-pointer"
+                >
+                  <option value="">🛡️ Plataforma Global (Sin Tienda)</option>
+                  {tenants.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      🏪 {t.name} ({t.slug})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="pt-3 border-t border-border flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  className="px-4 py-2 rounded-xl border border-border text-foreground hover:bg-muted font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={userLoading}
+                  className="px-4 py-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  {userLoading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    <span>Actualizar Acceso</span>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
