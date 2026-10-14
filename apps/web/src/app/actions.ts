@@ -5,21 +5,87 @@ import {
   CreateOrderInput,
   SubmitPaymentInput,
 } from "@marketos/database";
+import type { Order } from "@marketos/types";
 import { revalidatePath } from "next/cache";
 
-export async function createOrderAction(input: CreateOrderInput) {
-  try {
-    const order = await MarketOSRepository.createOrder(input);
-    revalidatePath("/");
-    revalidatePath("/admin");
-    return { success: true, order };
-  } catch (error) {
-    console.error("Error creating order:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Error al procesar el pedido",
-    };
+export type CreateOrderResult =
+  | { success: true; order: Order; error?: never }
+  | { success: false; error: string; order?: never };
+
+// In-flight promise map and short-term idempotency cache (Zero Redis Dependency)
+const inFlightOrders = new Map<
+  string,
+  {
+    promise: Promise<CreateOrderResult>;
+    timestamp: number;
+    result?: CreateOrderResult;
   }
+>();
+
+function cleanupInFlightOrders() {
+  const now = Date.now();
+  for (const [key, entry] of inFlightOrders.entries()) {
+    if (now - entry.timestamp > 30_000) {
+      inFlightOrders.delete(key);
+    }
+  }
+}
+
+export async function createOrderAction(input: CreateOrderInput): Promise<CreateOrderResult> {
+  cleanupInFlightOrders();
+
+  // Deduplication key: Tenant + Customer Phone + (idempotencyKey or items signature)
+  const itemsSignature = (input.items || [])
+    .map((i) => `${i.productId}:${i.quantity}`)
+    .sort()
+    .join(",");
+  const cleanPhone = (input.customerPhone || "").replace(/\D/g, "");
+  const dedupKey = input.idempotencyKey
+    ? `${input.tenantId}:${input.idempotencyKey}`
+    : `${input.tenantId}:${cleanPhone}:${itemsSignature}`;
+
+  const existing = inFlightOrders.get(dedupKey);
+
+  // If identical submission was completed in the last 30s, return existing result
+  if (existing?.result) {
+    console.warn(`[createOrderAction] Returning cached order for duplicate submission: ${dedupKey}`);
+    return existing.result;
+  }
+
+  // If identical submission is currently processing in-flight, await the same promise!
+  if (existing?.promise) {
+    console.warn(`[createOrderAction] Piggybacking on in-flight order promise: ${dedupKey}`);
+    return await existing.promise;
+  }
+
+  // Execute order creation
+  const orderPromise: Promise<CreateOrderResult> = (async (): Promise<CreateOrderResult> => {
+    try {
+      const order = await MarketOSRepository.createOrder(input);
+      revalidatePath("/");
+      revalidatePath("/admin");
+      const res: CreateOrderResult = { success: true, order };
+      const current = inFlightOrders.get(dedupKey);
+      if (current) {
+        current.result = res;
+      }
+      return res;
+    } catch (error) {
+      inFlightOrders.delete(dedupKey);
+      console.error("Error creating order:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Error al procesar el pedido",
+      };
+    }
+  })();
+
+  inFlightOrders.set(dedupKey, {
+    promise: orderPromise,
+    timestamp: Date.now(),
+  });
+
+  return await orderPromise;
 }
 
 export async function submitPaymentProofAction(input: SubmitPaymentInput) {

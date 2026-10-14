@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { MarketOSRepository } from "@marketos/database";
+import { invalidateExchangeRateCache } from "@/lib/cached-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,7 @@ export async function GET(request: Request) {
 
     if (tenantIdParam) {
       const rate = await MarketOSRepository.syncBcvRateFromApi(tenantIdParam);
+      invalidateExchangeRateCache(tenantIdParam);
       results.push({
         tenantId: tenantIdParam,
         rate: rate.value,
@@ -42,6 +44,7 @@ export async function GET(request: Request) {
       try {
         const defaultRate =
           await MarketOSRepository.syncBcvRateFromApi(defaultTenantId);
+        invalidateExchangeRateCache(defaultTenantId);
         results.push({
           tenantId: defaultTenantId,
           rate: defaultRate.value,
@@ -56,6 +59,7 @@ export async function GET(request: Request) {
         if (tenant.id === defaultTenantId) continue;
         try {
           const rate = await MarketOSRepository.syncBcvRateFromApi(tenant.id);
+          invalidateExchangeRateCache(tenant.id);
           results.push({
             tenantId: tenant.id,
             rate: rate.value,

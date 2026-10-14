@@ -40,6 +40,7 @@ import {
   PushNotificationLog,
   SendPushBroadcastInput,
   PushStats,
+  CreatePlatformUserInput,
 } from "@marketos/types";
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
 import { fetchBcvRate, convertUsdToVes, getCaracasDateKey, getCaracasRangeBounds } from "@marketos/utils";
@@ -82,6 +83,7 @@ export interface CreateOrderInput {
     unitPriceUsd: number;
   }[];
   notes?: string;
+  idempotencyKey?: string;
 }
 
 export interface SubmitPaymentInput {
@@ -1318,6 +1320,26 @@ export class MarketOSRepository {
             console.warn("[MarketOS] Error registering customer in Supabase:", custErr);
           }
         }
+
+        // Deduplication / Idempotency protection:
+        // Check if identical order was already placed by this customer within the last 8 seconds
+        const eightSecondsAgo = new Date(Date.now() - 8000).toISOString();
+        const { data: recentOrder } = await supabase
+          .from("orders")
+          .select("id, order_number, total_usd, status, created_at")
+          .eq("tenant_id", input.tenantId)
+          .eq("customer_id", customerId)
+          .gte("created_at", eightSecondsAgo)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (recentOrder && Math.abs(Number(recentOrder.total_usd) - finalTotalUsd) < 0.01) {
+          console.warn("[MarketOS] Duplicate order attempt blocked by database threshold check:", recentOrder.id);
+          const allOrders = await this.getTenantOrders(input.tenantId);
+          const matched = allOrders.find((o) => o.id === recentOrder.id);
+          if (matched) return matched;
+        }
       } catch (e) {
         console.warn("[MarketOS] Customer persistence warning:", e);
       }
@@ -1352,6 +1374,19 @@ export class MarketOSRepository {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
+    }
+
+    // In-memory fallback deduplication
+    const memRecentOrder = state.orders.find(
+      (o) =>
+        o.tenant_id === input.tenantId &&
+        o.customer_id === customerId &&
+        Math.abs(o.total_usd - finalTotalUsd) < 0.01 &&
+        Date.now() - new Date(o.created_at).getTime() < 8000
+    );
+    if (memRecentOrder) {
+      console.warn("[MarketOS State] Duplicate order attempt blocked by in-memory check:", memRecentOrder.id);
+      return memRecentOrder;
     }
 
     const newOrder: Order = {
@@ -3307,8 +3342,155 @@ export class MarketOSRepository {
   }
 
   // =====================================================================
-  // STAFF & ROLE ASSIGNMENT
+  // STAFF & ROLE ASSIGNMENT (MULTI-TENANT & PLATFORM)
   // =====================================================================
+
+  /**
+   * Get all user profiles across the entire platform (Super Admin)
+   */
+  static async getAllProfiles(): Promise<UserProfile[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (!error && data && data.length > 0) {
+          return data as UserProfile[];
+        }
+      } catch (e) {
+        console.warn("[Supabase] Get all profiles error:", e);
+      }
+    }
+
+    return state.profiles;
+  }
+
+  /**
+   * Create or invite a new platform or tenant user (Super Admin)
+   */
+  static async createPlatformUser(input: CreatePlatformUserInput): Promise<UserProfile> {
+    const newProfile: UserProfile = {
+      id: `usr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      tenant_id: input.tenantId || null,
+      email: input.email.toLowerCase().trim(),
+      full_name: input.fullName,
+      phone: input.phone || null,
+      avatar_url: null,
+      role: input.role,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .insert({
+            tenant_id: newProfile.tenant_id,
+            email: newProfile.email,
+            full_name: newProfile.full_name,
+            phone: newProfile.phone,
+            role: newProfile.role,
+          })
+          .select("id")
+          .maybeSingle();
+
+        if (data?.id) newProfile.id = data.id;
+      } catch (e) {
+        console.warn("[Supabase] Insert platform user fallback:", e);
+      }
+    }
+
+    state.profiles.unshift(newProfile);
+
+    await MarketOSRepository.recordAuditLog({
+      tenantId: input.tenantId || "platform",
+      action: "PLATFORM_USER_CREATED",
+      entity: "profiles",
+      entityId: newProfile.id,
+      newData: { email: newProfile.email, role: newProfile.role, name: newProfile.full_name },
+    });
+
+    return newProfile;
+  }
+
+  /**
+   * Update a user's profile details (role, tenant, phone, name)
+   */
+  static async updateUserProfile(
+    userId: string,
+    data: Partial<UserProfile>
+  ): Promise<UserProfile | null> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase
+          .from("profiles")
+          .update({
+            ...(data.role && { role: data.role }),
+            ...(data.full_name && { full_name: data.full_name }),
+            ...(data.phone !== undefined && { phone: data.phone }),
+            ...(data.tenant_id !== undefined && { tenant_id: data.tenant_id }),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", userId);
+      } catch (e) {
+        console.warn("[Supabase] Update user profile error:", e);
+      }
+    }
+
+    const idx = state.profiles.findIndex((p) => p.id === userId);
+    if (idx !== -1) {
+      const old = { ...state.profiles[idx] };
+      state.profiles[idx] = {
+        ...state.profiles[idx],
+        ...data,
+        updated_at: new Date().toISOString(),
+      };
+
+      await MarketOSRepository.recordAuditLog({
+        tenantId: state.profiles[idx].tenant_id || "platform",
+        action: "PROFILE_UPDATED",
+        entity: "profiles",
+        entityId: userId,
+        oldData: old,
+        newData: state.profiles[idx],
+      });
+
+      return state.profiles[idx];
+    }
+    return null;
+  }
+
+  /**
+   * Delete or revoke access for a user profile
+   */
+  static async deleteUserProfile(userId: string): Promise<boolean> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase.from("profiles").delete().eq("id", userId);
+      } catch (e) {
+        console.warn("[Supabase] Delete user profile error:", e);
+      }
+    }
+
+    const initialLength = state.profiles.length;
+    state.profiles = state.profiles.filter((p) => p.id !== userId);
+
+    await MarketOSRepository.recordAuditLog({
+      tenantId: "platform",
+      action: "PROFILE_DELETED",
+      entity: "profiles",
+      entityId: userId,
+    });
+
+    return state.profiles.length < initialLength;
+  }
 
   /**
    * Get all staff members and employees for a tenant

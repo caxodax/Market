@@ -1,7 +1,7 @@
 # 🚀 MarketOS • Guía de Despliegue y Puesta en Producción
 
 > **Estado del Sistema:** ✅ Verificado y 100% Listo para Producción.  
-> **Arquitectura:** Next.js 16 (Turbopack) • Supabase PostgreSQL • Upstash Redis • Cloudflare R2 • Vercel Cron.
+> **Arquitectura:** Next.js 16 (Turbopack) • Supabase PostgreSQL • Next.js Edge Data Cache • Cloudflare R2 • Vercel Cron.
 
 ---
 
@@ -73,8 +73,6 @@ En **Vercel Dashboard > Project Settings > Environment Variables**, agrega las s
 | `NEXT_PUBLIC_SUPABASE_URL` | Público | URL del proyecto Supabase | `https://xxxx.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Público | Llave anónima pública de Supabase | `eyJhbGciOi...` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Secreto | Llave maestra para Cron y Auth | `eyJhbGciOi...` |
-| `UPSTASH_REDIS_REST_URL` | Secreto | Endpoint REST de Upstash Redis | `https://xxxx.upstash.io` |
-| `UPSTASH_REDIS_REST_TOKEN` | Secreto | Token de autenticación de Upstash | `AYy0...` |
 | `CLOUDFLARE_ACCOUNT_ID` | Secreto | Account ID de Cloudflare | `e96fb944...` |
 | `R2_ACCESS_KEY_ID` | Secreto | Access Key de Cloudflare R2 | `d8ff...` |
 | `R2_SECRET_ACCESS_KEY` | Secreto | Secret Key de Cloudflare R2 | `1020...` |
@@ -132,8 +130,7 @@ pnpm verify
 
 Este script ejecuta en tiempo real:
 * Test de lectura y RLS de **Supabase PostgreSQL**.
-* Test de lectura/escritura/expiración en **Upstash Redis**.
-* Test de operaciones de objetos en **Cloudflare R2**.
+* Test de operaciones de objetos y subida en **Cloudflare R2**.
 
 ---
 

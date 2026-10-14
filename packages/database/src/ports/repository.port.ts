@@ -68,6 +68,7 @@ import {
   SubscriptionPlanTier,
   TenantStatus,
   PaymentMethodType,
+  CreatePlatformUserInput,
 } from "@marketos/types";
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -94,6 +95,7 @@ export interface CreateOrderInput {
     unitPriceUsd: number;
   }[];
   notes?: string;
+  idempotencyKey?: string;
 }
 
 export interface SubmitPaymentInput {
@@ -463,6 +465,11 @@ export interface IUserRepository {
   getUserProfile(userIdOrEmail: string): Promise<UserProfile | null>;
 
   /**
+   * Listar todos los perfiles de la plataforma (Super Admin)
+   */
+  getAllProfiles(): Promise<UserProfile[]>;
+
+  /**
    * Listar staff del Tenant
    */
   getTenantStaff(tenantId: string): Promise<UserProfile[]>;
@@ -473,6 +480,19 @@ export interface IUserRepository {
   inviteStaffMember(input: InviteStaffInput): Promise<UserProfile>;
 
   /**
+   * Crear o invitar usuario de plataforma / comercio (Super Admin)
+   */
+  createPlatformUser(input: CreatePlatformUserInput): Promise<UserProfile>;
+
+  /**
+   * Actualizar perfil de usuario (rol, datos o asignación de tenant)
+   */
+  updateUserProfile(
+    userId: string,
+    data: Partial<UserProfile>
+  ): Promise<UserProfile | null>;
+
+  /**
    * Cambiar rol de un miembro del staff
    */
   updateStaffRole(
@@ -480,6 +500,11 @@ export interface IUserRepository {
     userId: string,
     newRole: UserRole
   ): Promise<UserProfile | null>;
+
+  /**
+   * Eliminar o revocar acceso de un usuario
+   */
+  deleteUserProfile(userId: string): Promise<boolean>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

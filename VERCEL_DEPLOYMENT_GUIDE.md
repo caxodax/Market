@@ -8,16 +8,19 @@
 ## 1. Diagnóstico de Situación Actual
 
 ### Tu Cuenta Vercel Hobby Compartida
-Actualmente tu cuenta personal gratuita aloja **7 proyectos en producción**:
-* `ksa-sport`, `foxbyte`, `karenbeautynails`, `azucar-cacao`, `presupuesto-servitel`, `laceleste`, `tuttomoda`.
+Actualmente tu cuenta personal aloja **4 proyectos activos en producción**:
+* `market` (`market-sable-iota.vercel.app` - MarketOS ya desplegado).
+* `ksa-sport` (`ksa-sport.vercel.app` - E-commerce deportivo con alto tráfico).
+* `foxbyte` (`foxbyte-chi.vercel.app`).
+* `azucar-cacao` (`azucar-cacao.vercel.app`).
 
 **Cuotas globales consumidas (Últimos 30 días):**
-* **Image Optimization:** `2.4K / 5K` (48% consumido).
-* **Fluid Active CPU:** `1h 5m / 4h` (27% consumido).
+* **Image Optimization:** `2.3K / 5K` (46% consumido - 2.7K libres).
+* **Fluid Active CPU:** `1h 9m / 4h` (Casi 3 horas completas libres).
 * **Functions Storage & Bandwidth:** Saludable (`< 1 GB`).
 
-> [!WARNING] Peligro de Bloqueo Compartido
-> Todos los proyectos de una cuenta Hobby comparten la misma bolsa de recursos mensual. Si MarketOS consume las 2.6K imágenes o las 3 horas de CPU restantes, **los 7 proyectos existentes entrarán en error 429/402 o interrupción de servicio**.
+> [!NOTE] Estrategia de Crecimiento y Multi-Tiendas
+> Para el análisis a largo plazo con múltiples tiendas y alto tráfico (Vercel Pro vs Render vs VPS Hetzner + Coolify), consulta también: [SCALABILITY_ROADMAP.md](file:///home/lmontes/Documentos/Telegram/Market/SCALABILITY_ROADMAP.md).
 
 ---
 
@@ -138,10 +141,6 @@ NEXT_PUBLIC_SUPABASE_URL=https://<tu-id>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<tu-anon-key>
 SUPABASE_SERVICE_ROLE_KEY=<tu-service-role-key>
 
-# Upstash Redis (Cache & Rate Limiting)
-UPSTASH_REDIS_REST_URL=https://<tu-id>.upstash.io
-UPSTASH_REDIS_REST_TOKEN=<tu-token>
-
 # Cloudflare R2 (Storage de Multimedia)
 R2_ACCOUNT_ID=<tu-account-id>
 R2_ACCESS_KEY_ID=<tu-access-key-id>
@@ -163,7 +162,7 @@ DEFAULT_CURRENCY=USD
 ## 6. Checklist de Verificación para la Demo
 
 - [ ] `apps/web/next.config.ts` tiene `images: { unoptimized: true }`.
-- [ ] Ejecutado localmente `pnpm verify` para certificar que Supabase, Upstash Redis y Cloudflare R2 responden en verde.
+- [ ] Ejecutado localmente `pnpm verify` para certificar que Supabase y Cloudflare R2 responden en verde.
 - [ ] Proyecto `marketos-web` creado en Vercel apuntando a `apps/web`.
 - [ ] Proyecto `marketos-admin` creado en Vercel apuntando a `apps/admin`.
 - [ ] Comprobado en Vercel Dashboard que `Image Optimization` se mantiene estable y no sube drásticamente.
@@ -177,4 +176,4 @@ DEFAULT_CURRENCY=USD
 - [ ] Actualizar plan en Vercel a **Pro ($20/mes)**.
 - [ ] Ir a **Settings > Billing > Spend Management** y fijar el Hard Cap en **$20 - $25**.
 - [ ] Asignar dominio comercial definitivo (ej. `mitienda.com` o `admin.mitienda.com`).
-- [ ] Vincular el webhook de producción de Supabase y tasas de cambio en Upstash Redis.
+- [ ] Configurar el cron de sincronización de tasa BCV en Supabase Edge Functions.

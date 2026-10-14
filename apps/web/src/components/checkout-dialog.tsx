@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useId, useEffect } from "react";
+import React, { useState, useId, useEffect, useRef } from "react";
 import { Store, TenantSettings, Order, DeliveryZone } from "@marketos/types";
 import { useCart } from "../context/cart-context";
 import { formatCurrency, convertUsdToVes, compressImage, formatFileSize } from "@marketos/utils";
@@ -55,6 +55,7 @@ export function CheckoutDialog({
   const [step, setStep] = useState<"DETAILS" | "PAYMENT">("DETAILS");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isSubmittingRef = useRef(false);
 
   // Form states
   const [customerName, setCustomerName] = useState(() => {
@@ -285,6 +286,10 @@ export function CheckoutDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading || isSubmittingRef.current) {
+      console.warn("[Checkout] Envío duplicado bloqueado en el cliente");
+      return;
+    }
     setError(null);
 
     if (!customerName.trim() || !customerPhone.trim() || !ciNumber.trim()) {
@@ -305,10 +310,18 @@ export function CheckoutDialog({
       return;
     }
 
+    // Synchronous lock immediately set to prevent double clicks
+    isSubmittingRef.current = true;
     setLoading(true);
 
     try {
-      // 1. Upload proof to Cloudflare R2 if attached
+      // 1. Generate unique idempotency key for this checkout submission
+      const idempotencyKey =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `idemp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+      // 2. Upload proof to Cloudflare R2 if attached
       let proofImageUrl: string | undefined = undefined;
       if (proofFile) {
         const formData = new FormData();
@@ -321,7 +334,7 @@ export function CheckoutDialog({
         }
       }
 
-      // 2. Create order with Phase 2 fields and mandatory CI
+      // 3. Create order with Phase 2 fields, mandatory CI and idempotency protection
       const fullDeliveryAddress =
         deliveryType === "DELIVERY"
           ? `${deliveryAddress} ${deliveryReference ? `(Ref: ${deliveryReference})` : ""} - Zona: ${selectedZone?.name || ""}`
@@ -341,6 +354,7 @@ export function CheckoutDialog({
         deliveryFeeUsd,
         couponCode: appliedCoupon?.code,
         discountUsd,
+        idempotencyKey,
         items: items.map((i) => ({
           productId: i.product.id,
           productName: i.product.name,
@@ -350,7 +364,7 @@ export function CheckoutDialog({
         notes: `Método: ${paymentMethod} | ${deliveryType === "DELIVERY" ? `Zona: ${selectedZone?.name}` : "Retiro en Tienda"}`,
       });
 
-      if (!orderRes.success || !orderRes.order) {
+      if (!orderRes.success) {
         throw new Error(orderRes.error || "No se pudo generar la orden");
       }
 
@@ -414,6 +428,7 @@ export function CheckoutDialog({
     } catch (err: any) {
       setError(err.message || "Error al procesar el pedido. Intenta nuevamente.");
     } finally {
+      isSubmittingRef.current = false;
       setLoading(false);
     }
   };
@@ -1211,8 +1226,8 @@ export function CheckoutDialog({
 
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-2/3 h-11 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-primary/90 transition-transform active:scale-[0.98] disabled:opacity-50"
+                  disabled={loading || isSubmittingRef.current}
+                  className="w-2/3 h-11 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-primary/90 transition-transform active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
                 >
                   {loading ? (
                     <>

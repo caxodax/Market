@@ -18,12 +18,13 @@ export default async function PlatformSuperAdminPage() {
     redirect("/admin");
   }
 
-  const [metrics, tenants, plans, exchangeRate, ratesHistory] = await Promise.all([
+  const [metrics, tenants, plans, exchangeRate, ratesHistory, profiles] = await Promise.all([
     MarketOSRepository.getPlatformMetrics(),
     MarketOSRepository.getAllTenants(),
     MarketOSRepository.getSubscriptionPlans(),
     MarketOSRepository.getExchangeRate("shop-market-ca"),
     MarketOSRepository.getExchangeRateHistory(undefined, 50),
+    MarketOSRepository.getAllProfiles(),
   ]);
 
   return (
@@ -34,6 +35,7 @@ export default async function PlatformSuperAdminPage() {
       currentUser={currentUser}
       exchangeRate={exchangeRate}
       ratesHistory={ratesHistory}
+      initialProfiles={profiles}
     />
   );
 }

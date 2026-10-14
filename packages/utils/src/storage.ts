@@ -76,12 +76,40 @@ export function buildTenantStorageKey(
 }
 
 /**
- * Upload a file directly to Cloudflare R2 or Supabase Storage (High Availability)
+ * Upload a file directly to Cloudflare R2 (Primary) with Supabase Storage fallback
  */
 export async function uploadToR2(input: UploadFileInput): Promise<UploadResult> {
   const key = buildTenantStorageKey(input.tenantId, input.folder, input.fileName);
 
-  // 1. Prioritize Supabase Storage public CDN
+  // 1. Prioritize Cloudflare R2 (Primary Storage - 10GB Free, 0 Egress)
+  try {
+    const client = getR2Client();
+    const bucket = input.bucket || process.env.R2_BUCKET_NAME || DEFAULT_R2_BUCKET_NAME;
+
+    const command = new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: input.body,
+      ContentType: input.contentType,
+      Metadata: {
+        "tenant-id": input.tenantId,
+        "uploaded-at": new Date().toISOString(),
+      },
+    });
+
+    await client.send(command);
+    const publicUrl = getR2FileUrl(key, bucket);
+
+    return {
+      key,
+      url: publicUrl,
+      bucket,
+    };
+  } catch (r2Err) {
+    console.warn("[MarketOS Storage] Cloudflare R2 upload failed, falling back to Supabase Storage:", r2Err);
+  }
+
+  // 2. Supabase Storage Fallback (Resilient Backup)
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || DEFAULT_SUPABASE_SERVICE_ROLE_KEY;
@@ -106,34 +134,12 @@ export async function uploadToR2(input: UploadFileInput): Promise<UploadResult> 
         bucket,
       };
     }
-  } catch (err) {
-    console.warn("[MarketOS Storage] Supabase Storage upload note, falling back to R2:", err);
+  } catch (supabaseErr) {
+    console.error("[MarketOS Storage] Both Cloudflare R2 and Supabase Storage upload failed:", supabaseErr);
+    throw supabaseErr;
   }
 
-  // 2. Cloudflare R2 Fallback
-  const client = getR2Client();
-  const bucket = input.bucket || process.env.R2_BUCKET_NAME || DEFAULT_R2_BUCKET_NAME;
-
-  const command = new PutObjectCommand({
-    Bucket: bucket,
-    Key: key,
-    Body: input.body,
-    ContentType: input.contentType,
-    Metadata: {
-      "tenant-id": input.tenantId,
-      "uploaded-at": new Date().toISOString(),
-    },
-  });
-
-  await client.send(command);
-
-  const publicUrl = getR2FileUrl(key, bucket);
-
-  return {
-    key,
-    url: publicUrl,
-    bucket,
-  };
+  throw new Error("[MarketOS Storage] Failed to upload file to Cloudflare R2 and Supabase Storage fallback.");
 }
 
 /**
@@ -174,11 +180,16 @@ export async function createPresignedUploadUrl(
  * Resolve Public URL for an R2 object key
  */
 export function getR2FileUrl(key: string, bucket = process.env.R2_BUCKET_NAME || DEFAULT_R2_BUCKET_NAME): string {
-  const publicDomain = process.env.R2_PUBLIC_DOMAIN;
-  if (publicDomain) {
-    const cleanDomain = publicDomain.endsWith("/")
-      ? publicDomain.slice(0, -1)
-      : publicDomain;
+  const publicDomain =
+    process.env.R2_PUBLIC_DOMAIN ||
+    process.env.NEXT_PUBLIC_R2_PUBLIC_DOMAIN ||
+    process.env.NEXT_PUBLIC_R2_URL;
+
+  if (publicDomain && publicDomain.trim() !== "") {
+    const cleanDomain = publicDomain
+      .trim()
+      .replace(/^["']|["']$/g, "")
+      .replace(/\/+$/, "");
     return `${cleanDomain}/${key}`;
   }
 

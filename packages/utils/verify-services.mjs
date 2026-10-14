@@ -1,4 +1,3 @@
-import { Redis } from "@upstash/redis";
 import {
   S3Client,
   ListBucketsCommand,
@@ -10,7 +9,6 @@ import {
 // Color helpers for terminal output
 const green = (s) => `\x1b[32m${s}\x1b[0m`;
 const red = (s) => `\x1b[31m${s}\x1b[0m`;
-const yellow = (s) => `\x1b[33m${s}\x1b[0m`;
 const bold = (s) => `\x1b[1m${s}\x1b[0m`;
 const cyan = (s) => `\x1b[36m${s}\x1b[0m`;
 
@@ -20,7 +18,6 @@ console.log(bold("========================================================\n"));
 
 const results = {
   supabase: { status: "PENDING", details: null, latencyMs: 0 },
-  redis: { status: "PENDING", details: null, latencyMs: 0 },
   cloudflareR2: { status: "PENDING", details: null, latencyMs: 0 },
 };
 
@@ -29,7 +26,7 @@ const results = {
 // ----------------------------------------------------
 async function testSupabase() {
   const t0 = performance.now();
-  console.log(cyan("[1/3] Verificando Supabase..."));
+  console.log(cyan("[1/2] Verificando Supabase..."));
   
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -98,62 +95,11 @@ async function testSupabase() {
 }
 
 // ----------------------------------------------------
-// 2. UPSTASH REDIS VERIFICATION
-// ----------------------------------------------------
-async function testRedis() {
-  const t0 = performance.now();
-  console.log(cyan("\n[2/3] Verificando Upstash Redis..."));
-
-  const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
-  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
-
-  if (!redisUrl || !redisToken) {
-    throw new Error("Faltan variables UPSTASH_REDIS_REST_URL o UPSTASH_REDIS_REST_TOKEN");
-  }
-
-  console.log(`  - Endpoint: ${redisUrl}`);
-
-  const redis = new Redis({
-    url: redisUrl,
-    token: redisToken,
-  });
-
-  const testKey = "marketos:healthcheck:ping";
-  const testValue = `ok-${Date.now()}`;
-
-  // 1. SET with 60s TTL
-  await redis.set(testKey, testValue, { ex: 60 });
-
-  // 2. GET
-  const readBack = await redis.get(testKey);
-  if (readBack !== testValue) {
-    throw new Error(`Redis readback mismatch: expected "${testValue}", got "${readBack}"`);
-  }
-
-  // 3. DEL
-  await redis.del(testKey);
-
-  const latency = Math.round(performance.now() - t0);
-  results.redis = {
-    status: "OK",
-    latencyMs: latency,
-    details: {
-      endpoint: redisUrl,
-      writeReadVerify: true,
-    },
-  };
-
-  console.log(green(`  ✓ Upstash Redis CONECTADO EXITOSAMENTE (${latency}ms)`));
-  console.log(`    • Operaciones validadas: SET (ex: 60s) -> GET -> DEL`);
-  console.log(`    • Latencia de respuesta: ${latency}ms`);
-}
-
-// ----------------------------------------------------
-// 3. CLOUDFLARE R2 OBJECT STORAGE VERIFICATION
+// 2. CLOUDFLARE R2 OBJECT STORAGE VERIFICATION
 // ----------------------------------------------------
 async function testCloudflareR2() {
   const t0 = performance.now();
-  console.log(cyan("\n[3/3] Verificando Cloudflare R2..."));
+  console.log(cyan("\n[2/2] Verificando Cloudflare R2..."));
 
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   const accessKeyId = process.env.R2_ACCESS_KEY_ID;
@@ -249,14 +195,6 @@ async function main() {
   }
 
   try {
-    await testRedis();
-  } catch (e) {
-    hasErrors = true;
-    results.redis = { status: "FAILED", error: e.message };
-    console.error(red(`  ✗ Redis ERROR: ${e.message}`));
-  }
-
-  try {
     await testCloudflareR2();
   } catch (e) {
     hasErrors = true;
@@ -269,8 +207,7 @@ async function main() {
   console.log(bold("========================================================"));
 
   console.log(`1. Supabase PostgreSQL:   ${results.supabase.status === "OK" ? green("✓ CONECTADO (" + results.supabase.latencyMs + "ms)") : red("✗ FALLÓ")}`);
-  console.log(`2. Upstash Redis Cache:   ${results.redis.status === "OK" ? green("✓ CONECTADO (" + results.redis.latencyMs + "ms)") : red("✗ FALLÓ")}`);
-  console.log(`3. Cloudflare R2 Storage: ${results.cloudflareR2.status === "OK" ? green("✓ CONECTADO (" + results.cloudflareR2.latencyMs + "ms)") : red("✗ FALLÓ")}`);
+  console.log(`2. Cloudflare R2 Storage: ${results.cloudflareR2.status === "OK" ? green("✓ CONECTADO (" + results.cloudflareR2.latencyMs + "ms)") : red("✗ FALLÓ")}`);
 
   if (!hasErrors) {
     console.log(green(bold("\n>>> TODOS LOS SERVICIOS EXTERNOS ESTÁN 100% OPERATIVOS Y CONECTADOS <<<\n")));

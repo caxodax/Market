@@ -4,6 +4,11 @@ import { MarketOSRepository } from "@marketos/database";
 import { PaymentStatus, CreateProductInput, UpdateProductInput, InviteStaffInput, UserRole, TenantSettings, CreateCouponInput, UpdateCouponInput, Coupon, Store } from "@marketos/types";
 import { revalidatePath } from "next/cache";
 import { sendOrderStatusPushNotification } from "@/lib/pushNotifications";
+import {
+  invalidateProductsCache,
+  invalidateSettingsCache,
+  invalidateExchangeRateCache,
+} from "@/lib/cached-queries";
 
 export async function reviewPaymentAction(
   tenantId: string,
@@ -65,6 +70,7 @@ export async function adjustStockAction(
       delta,
       storeId
     );
+    invalidateProductsCache(tenantId);
     revalidatePath("/admin");
     return { success: true, newStock };
   } catch (error) {
@@ -82,6 +88,7 @@ export async function adjustStockAction(
 export async function syncBcvRateAction(tenantId: string) {
   try {
     const updatedRate = await MarketOSRepository.syncBcvRateFromApi(tenantId);
+    invalidateExchangeRateCache(tenantId);
     revalidatePath("/admin");
     revalidatePath("/");
     return { success: true, rate: updatedRate };
@@ -216,6 +223,7 @@ export async function uploadStoreLogoAction(formData: FormData) {
 export async function createProductAction(input: CreateProductInput) {
   try {
     const product = await MarketOSRepository.createProduct(input);
+    invalidateProductsCache(input.tenantId);
     revalidatePath("/admin");
     revalidatePath("/");
     return { success: true, product };
@@ -231,6 +239,7 @@ export async function createProductAction(input: CreateProductInput) {
 export async function updateProductAction(input: UpdateProductInput) {
   try {
     const product = await MarketOSRepository.updateProduct(input);
+    invalidateProductsCache(input.tenantId);
     revalidatePath("/admin");
     revalidatePath("/");
     return { success: true, product };
@@ -246,6 +255,7 @@ export async function updateProductAction(input: UpdateProductInput) {
 export async function deleteProductAction(tenantId: string, productId: string) {
   try {
     const ok = await MarketOSRepository.deleteProduct(tenantId, productId);
+    invalidateProductsCache(tenantId);
     revalidatePath("/admin");
     revalidatePath("/");
     return { success: ok };
@@ -310,6 +320,7 @@ export async function saveManualRateAction(
       usdt_rate: data.usdt_rate,
       source: "MANUAL",
     });
+    invalidateExchangeRateCache(tenantId);
     revalidatePath("/admin");
     revalidatePath("/platform");
     revalidatePath("/");
@@ -332,6 +343,7 @@ export async function updateTenantSettingsAction(
 ) {
   try {
     const settings = await MarketOSRepository.updateTenantSettings(tenantId, updates);
+    invalidateSettingsCache(tenantId);
     revalidatePath("/admin");
     revalidatePath("/");
     return { success: true, settings };

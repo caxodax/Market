@@ -605,6 +605,14 @@ export interface InviteStaffInput {
   phone?: string;
 }
 
+export interface CreatePlatformUserInput {
+  email: string;
+  fullName: string;
+  role: UserRole;
+  phone?: string | null;
+  tenantId?: string | null;
+}
+
 // ==============================================================================
 // PWA & WEB PUSH NOTIFICATIONS TYPES (MULTI-TENANT)
 // ==============================================================================

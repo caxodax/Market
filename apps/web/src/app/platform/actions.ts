@@ -40,3 +40,57 @@ export async function updateTenantStatusAction(
     return { success: false, error: "Error al actualizar estado del comercio" };
   }
 }
+
+/**
+ * Create a new user profile across the platform or assigned to a tenant
+ */
+export async function createPlatformUserAction(input: import("@marketos/types").CreatePlatformUserInput) {
+  try {
+    const user = await MarketOSRepository.createPlatformUser(input);
+    revalidatePath("/platform");
+    return { success: true, user };
+  } catch (error) {
+    console.error("Error creating platform user:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al registrar usuario",
+    };
+  }
+}
+
+/**
+ * Update user role or tenant assignment
+ */
+export async function updateUserProfileAction(
+  userId: string,
+  data: Partial<import("@marketos/types").UserProfile>
+) {
+  try {
+    const updated = await MarketOSRepository.updateUserProfile(userId, data);
+    revalidatePath("/platform");
+    return { success: !!updated, user: updated };
+  } catch (error) {
+    console.error("Error updating user profile:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al actualizar usuario",
+    };
+  }
+}
+
+/**
+ * Delete or revoke a user profile
+ */
+export async function deletePlatformUserAction(userId: string) {
+  try {
+    const deleted = await MarketOSRepository.deleteUserProfile(userId);
+    revalidatePath("/platform");
+    return { success: deleted };
+  } catch (error) {
+    console.error("Error deleting user profile:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al eliminar usuario",
+    };
+  }
+}

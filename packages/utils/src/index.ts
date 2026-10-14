@@ -1,11 +1,20 @@
 import { CurrencyCode, BcvApiResponse } from "@marketos/types";
-import { cacheGet, cacheSet } from "./redis";
 
-export * from "./redis";
 export * from "./storage";
 export * from "./whatsapp";
 export * from "./image-compressor";
 export * from "./dates";
+
+let memoryBcvCache: {
+  data: {
+    usdRate: number;
+    eurRate?: number;
+    usdtRate?: number;
+    source: string;
+    timestamp: string;
+  };
+  expiresAt: number;
+} | null = null;
 
 /**
  * Currency Formatting Utilities for MarketOS
@@ -47,7 +56,7 @@ export function convertUsdToVes(priceUsd: number, exchangeRate: number): number 
 
 /**
  * Fetch official BCV Rate from https://bcv.today/api/ (Endpoint: /api/v1/rate.json)
- * Optimized with Upstash Redis cache (1 hour TTL)
+ * Optimized with in-memory cache (1 hour TTL)
  */
 export const ALCAMBIO_GRAPHQL_URL = "https://api.alcambio.app/graphql";
 export const BCV_API_URL = "https://bcv.today/api/v1/rate.json";
@@ -57,21 +66,9 @@ export async function fetchBcvRate(): Promise<{
   source: string;
   timestamp: string;
 }> {
-  const CACHE_KEY = "marketos:bcv:rate";
-
-  // 1. Try Upstash Redis cache first (sub-millisecond latency)
-  try {
-    const cached = await cacheGet<{
-      usdRate: number;
-      source: string;
-      timestamp: string;
-    }>(CACHE_KEY);
-
-    if (cached && typeof cached.usdRate === "number" && cached.usdRate > 0) {
-      return cached;
-    }
-  } catch (e) {
-    console.warn("[Redis Cache] Error checking BCV rate cache:", e);
+  // 1. Try in-memory cache first (sub-millisecond, zero external dependencies)
+  if (memoryBcvCache && Date.now() < memoryBcvCache.expiresAt) {
+    return memoryBcvCache.data;
   }
 
   // 2. Primary Source: AlCambio.app GraphQL API (Reliable & fast, same as KsaSport)
@@ -158,8 +155,11 @@ export async function fetchBcvRate(): Promise<{
           timestamp: new Date().toISOString(),
         };
 
-        // Cache in Upstash Redis asynchronously
-        cacheSet(CACHE_KEY, result, 3600).catch(() => {});
+        // Cache in-memory for 1 hour
+        memoryBcvCache = {
+          data: result,
+          expiresAt: Date.now() + 3600 * 1000,
+        };
         return result;
       }
     }
@@ -196,7 +196,10 @@ export async function fetchBcvRate(): Promise<{
           source: "bcv.today",
           timestamp: data.updated_at || new Date().toISOString(),
         };
-        cacheSet(CACHE_KEY, result, 3600).catch(() => {});
+        memoryBcvCache = {
+          data: result,
+          expiresAt: Date.now() + 3600 * 1000,
+        };
         return result;
       }
     }

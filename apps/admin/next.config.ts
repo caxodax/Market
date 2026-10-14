@@ -37,11 +37,6 @@ const nextConfig: NextConfig = {
       process.env.R2_SECRET_ACCESS_KEY ||
       "da39b83a69bcd9080f03c4000bbb2f3011dc2816952c479d05a9b9866258ee53",
     R2_BUCKET_NAME: process.env.R2_BUCKET_NAME || "marketos-media",
-    UPSTASH_REDIS_REST_URL:
-      process.env.UPSTASH_REDIS_REST_URL || "https://neutral-imp-197913.upstash.io",
-    UPSTASH_REDIS_REST_TOKEN:
-      process.env.UPSTASH_REDIS_REST_TOKEN ||
-      "gQAAAAAAAwUZAAIgcDE3M2ZiMjczOGQyOGQ0NDJlOWNlMDZhMTBiYmFmZjY0Mw",
   },
 };
 

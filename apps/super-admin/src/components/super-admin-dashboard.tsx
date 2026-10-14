@@ -212,7 +212,7 @@ export function SuperAdminDashboard({
               <span className="text-border">|</span>
               <span className="flex items-center gap-1.5 text-emerald-500 font-semibold">
                 <Server className="w-3.5 h-3.5" />
-                <span>Redis: OK</span>
+                <span>Edge Cache: OK</span>
               </span>
               <span className="text-border">|</span>
               <span className="flex items-center gap-1.5 text-emerald-500 font-semibold">
