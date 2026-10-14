@@ -43,6 +43,7 @@ import { CouponManager } from "./coupon-manager";
 import { PushNotificationsManager } from "./push-notifications-manager";
 import { OrderDetailsModal } from "./order-details-modal";
 import { SalesReportsTab } from "./sales-reports-tab";
+import { DeliveryManager } from "./delivery-manager";
 import {
   PackageCheck,
   Boxes,
@@ -1864,67 +1865,12 @@ export function AdminDashboard({
 
         {/* TAB 4: DELIVERY & DRIVERS */}
         {activeTab === "DELIVERY" && (
-          <div className="space-y-6 animate-in fade-in">
-            {/* Zones */}
-            <div className="space-y-3">
-              <h2 className="text-sm font-bold text-foreground">
-                Zonas de Cobertura y Tarifas de Delivery
-              </h2>
-
-              <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {deliveryZones.map((zone) => (
-                  <div
-                    key={zone.id}
-                    className="p-3.5 rounded-2xl border border-border bg-card space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-foreground">
-                        {zone.name}
-                      </span>
-                      <span className="font-mono text-xs font-black text-primary">
-                        {zone.price_usd === 0 ? "GRATIS" : `$${zone.price_usd.toFixed(2)}`}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">
-                      Tiempo estimado: <strong>{zone.estimated_time}</strong>
-                    </p>
-                    {zone.coverage_description && (
-                      <p className="text-[10px] text-muted-foreground opacity-80">
-                        {zone.coverage_description}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Drivers */}
-            <div className="space-y-3">
-              <h2 className="text-sm font-bold text-foreground">
-                Repartidores Registrados
-              </h2>
-
-              <div className="grid sm:grid-cols-2 gap-3">
-                {drivers.map((drv) => (
-                  <div
-                    key={drv.id}
-                    className="p-3.5 rounded-2xl border border-border bg-card flex items-center justify-between gap-3"
-                  >
-                    <div>
-                      <p className="text-xs font-bold text-foreground">{drv.name}</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        Tel: {drv.phone} • {drv.vehicle_type} (Placa: {drv.plate_number || "N/A"})
-                      </p>
-                    </div>
-
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                      Activo
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <DeliveryManager
+            tenantId={settings.tenant_id}
+            initialDeliveryZones={deliveryZones}
+            initialDrivers={drivers}
+            exchangeRate={rate}
+          />
         )}
 
         {/* TAB 5: DISCOUNT COUPONS */}

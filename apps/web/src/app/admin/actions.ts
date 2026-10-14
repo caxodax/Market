@@ -1,13 +1,31 @@
 "use server";
 
 import { MarketOSRepository } from "@marketos/database";
-import { PaymentStatus, CreateProductInput, UpdateProductInput, InviteStaffInput, UserRole, TenantSettings, CreateCouponInput, UpdateCouponInput, Coupon, Store } from "@marketos/types";
+import {
+  PaymentStatus,
+  CreateProductInput,
+  UpdateProductInput,
+  InviteStaffInput,
+  UserRole,
+  TenantSettings,
+  CreateCouponInput,
+  UpdateCouponInput,
+  Coupon,
+  Store,
+  DeliveryZone,
+  Driver,
+  CreateDeliveryZoneInput,
+  UpdateDeliveryZoneInput,
+  CreateDriverInput,
+  UpdateDriverInput,
+} from "@marketos/types";
 import { revalidatePath } from "next/cache";
 import { sendOrderStatusPushNotification } from "@/lib/pushNotifications";
 import {
   invalidateProductsCache,
   invalidateSettingsCache,
   invalidateExchangeRateCache,
+  invalidateDeliveryZonesCache,
 } from "@/lib/cached-queries";
 
 export async function reviewPaymentAction(
@@ -547,6 +565,130 @@ export async function updateTenantCustomDomainAction(
     return {
       success: false,
       error: error.message || "No se pudo vincular el dominio personalizado",
+    };
+  }
+}
+
+/**
+ * Create a new delivery zone
+ */
+export async function createDeliveryZoneAction(input: CreateDeliveryZoneInput) {
+  try {
+    const zone = await MarketOSRepository.createDeliveryZone(input);
+    invalidateDeliveryZonesCache(input.tenantId);
+    revalidatePath("/admin");
+    revalidatePath("/");
+    return { success: true, zone };
+  } catch (error: any) {
+    console.error("Error creating delivery zone:", error);
+    return {
+      success: false,
+      error: error.message || "Error al crear la zona de delivery",
+    };
+  }
+}
+
+/**
+ * Update an existing delivery zone
+ */
+export async function updateDeliveryZoneAction(input: UpdateDeliveryZoneInput) {
+  try {
+    const zone = await MarketOSRepository.updateDeliveryZone(input);
+    invalidateDeliveryZonesCache(input.tenantId);
+    revalidatePath("/admin");
+    revalidatePath("/");
+    return { success: !!zone, zone };
+  } catch (error: any) {
+    console.error("Error updating delivery zone:", error);
+    return {
+      success: false,
+      error: error.message || "Error al actualizar la zona de delivery",
+    };
+  }
+}
+
+/**
+ * Soft delete (deactivate) or reactivate a delivery zone
+ */
+export async function toggleDeliveryZoneStatusAction(
+  tenantId: string,
+  zoneId: string,
+  isActive: boolean
+) {
+  try {
+    const success = await MarketOSRepository.toggleDeliveryZoneStatus(
+      tenantId,
+      zoneId,
+      isActive
+    );
+    invalidateDeliveryZonesCache(tenantId);
+    revalidatePath("/admin");
+    revalidatePath("/");
+    return { success };
+  } catch (error: any) {
+    console.error("Error toggling delivery zone status:", error);
+    return {
+      success: false,
+      error: error.message || "Error al cambiar estado de la zona",
+    };
+  }
+}
+
+/**
+ * Create a new delivery driver
+ */
+export async function createDriverAction(input: CreateDriverInput) {
+  try {
+    const driver = await MarketOSRepository.createDriver(input);
+    revalidatePath("/admin");
+    return { success: true, driver };
+  } catch (error: any) {
+    console.error("Error creating driver:", error);
+    return {
+      success: false,
+      error: error.message || "Error al registrar el repartidor",
+    };
+  }
+}
+
+/**
+ * Update an existing driver
+ */
+export async function updateDriverAction(input: UpdateDriverInput) {
+  try {
+    const driver = await MarketOSRepository.updateDriver(input);
+    revalidatePath("/admin");
+    return { success: !!driver, driver };
+  } catch (error: any) {
+    console.error("Error updating driver:", error);
+    return {
+      success: false,
+      error: error.message || "Error al actualizar el repartidor",
+    };
+  }
+}
+
+/**
+ * Soft delete (deactivate) or reactivate a driver
+ */
+export async function toggleDriverStatusAction(
+  tenantId: string,
+  driverId: string,
+  isActive: boolean
+) {
+  try {
+    const success = await MarketOSRepository.toggleDriverStatus(
+      tenantId,
+      driverId,
+      isActive
+    );
+    revalidatePath("/admin");
+    return { success };
+  } catch (error: any) {
+    console.error("Error toggling driver status:", error);
+    return {
+      success: false,
+      error: error.message || "Error al cambiar estado del repartidor",
     };
   }
 }

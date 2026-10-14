@@ -209,6 +209,28 @@ export interface DeliveryZone {
   is_active: boolean;
   sort_order: number;
   created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateDeliveryZoneInput {
+  tenantId: string;
+  name: string;
+  priceUsd: number;
+  estimatedTime?: string;
+  coverageDescription?: string | null;
+  isActive?: boolean;
+  sortOrder?: number;
+}
+
+export interface UpdateDeliveryZoneInput {
+  tenantId: string;
+  zoneId: string;
+  name?: string;
+  priceUsd?: number;
+  estimatedTime?: string;
+  coverageDescription?: string | null;
+  isActive?: boolean;
+  sortOrder?: number;
 }
 
 export interface CustomerAddress {
@@ -280,6 +302,28 @@ export interface Driver {
   plate_number?: string | null;
   is_active: boolean;
   created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateDriverInput {
+  tenantId: string;
+  storeId?: string | null;
+  name: string;
+  phone: string;
+  vehicleType: "MOTO" | "CARRO" | "BICICLETA";
+  plateNumber?: string | null;
+  isActive?: boolean;
+}
+
+export interface UpdateDriverInput {
+  tenantId: string;
+  driverId: string;
+  storeId?: string | null;
+  name?: string;
+  phone?: string;
+  vehicleType?: "MOTO" | "CARRO" | "BICICLETA";
+  plateNumber?: string | null;
+  isActive?: boolean;
 }
 
 export interface LoyaltyTransaction {

@@ -70,6 +70,10 @@ import {
   PaymentMethodType,
   CreatePlatformUserInput,
   TenantSubscription,
+  CreateDeliveryZoneInput,
+  UpdateDeliveryZoneInput,
+  CreateDriverInput,
+  UpdateDriverInput,
 } from "@marketos/types";
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -276,9 +280,28 @@ export interface IExchangeRateRepository {
 
 export interface IDeliveryZoneRepository {
   /**
-   * Listar zonas de entrega activas del Tenant
+   * Listar zonas de entrega del Tenant (por defecto sólo activas, o todas si includeInactive = true)
    */
-  getDeliveryZones(tenantId: string): Promise<DeliveryZone[]>;
+  getDeliveryZones(tenantId: string, includeInactive?: boolean): Promise<DeliveryZone[]>;
+
+  /**
+   * Crear nueva zona de entrega
+   */
+  createDeliveryZone(input: CreateDeliveryZoneInput): Promise<DeliveryZone>;
+
+  /**
+   * Actualizar datos y tarifa de zona de entrega
+   */
+  updateDeliveryZone(input: UpdateDeliveryZoneInput): Promise<DeliveryZone | null>;
+
+  /**
+   * Desactivar (soft-delete) o reactivar zona de entrega
+   */
+  toggleDeliveryZoneStatus(
+    tenantId: string,
+    zoneId: string,
+    isActive: boolean
+  ): Promise<boolean>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -336,9 +359,28 @@ export interface ICouponRepository {
 
 export interface IDriverRepository {
   /**
-   * Listar repartidores activos del Tenant
+   * Listar repartidores del Tenant (por defecto sólo activos, o todos si includeInactive = true)
    */
-  getDrivers(tenantId: string): Promise<Driver[]>;
+  getDrivers(tenantId: string, includeInactive?: boolean): Promise<Driver[]>;
+
+  /**
+   * Registrar nuevo repartidor
+   */
+  createDriver(input: CreateDriverInput): Promise<Driver>;
+
+  /**
+   * Actualizar datos del repartidor
+   */
+  updateDriver(input: UpdateDriverInput): Promise<Driver | null>;
+
+  /**
+   * Desactivar (soft-delete) o reactivar repartidor
+   */
+  toggleDriverStatus(
+    tenantId: string,
+    driverId: string,
+    isActive: boolean
+  ): Promise<boolean>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
