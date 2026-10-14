@@ -69,6 +69,7 @@ import {
   TenantStatus,
   PaymentMethodType,
   CreatePlatformUserInput,
+  TenantSubscription,
 } from "@marketos/types";
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -589,6 +590,24 @@ export interface IPlatformRepository {
     status: TenantStatus,
     actorId?: string
   ): Promise<Tenant | null>;
+
+  /**
+   * Renovar o registrar pago de suscripción de un tenant
+   */
+  renewTenantSubscription(
+    tenantId: string,
+    durationDays: number,
+    paymentMethod: string,
+    reference?: string
+  ): Promise<TenantSubscription>;
+
+  /**
+   * Cambiar plan de suscripción de un tenant
+   */
+  changeTenantPlan(
+    tenantId: string,
+    planTier: SubscriptionPlanTier
+  ): Promise<TenantSubscription>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

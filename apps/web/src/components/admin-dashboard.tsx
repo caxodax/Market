@@ -90,6 +90,10 @@ import {
   Layers,
   Building2,
   Phone,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ChevronRight,
 } from "lucide-react";
 
 interface AdminDashboardProps {
@@ -175,6 +179,7 @@ export function AdminDashboard({
   const [syncingBcv, setSyncingBcv] = useState(false);
   const [bcvMessage, setBcvMessage] = useState<string | null>(null);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [refreshingOrders, setRefreshingOrders] = useState(false);
 
   // Reactive Toast Notification with Countdown Progress Bar
@@ -594,31 +599,102 @@ export function AdminDashboard({
 
   const pendingPaymentsCount = payments.filter((p) => p.status === "PENDING").length;
 
-  const modulesList = [
+  type ModuleCategory = "OPERATIONS" | "CATALOG" | "FINANCE" | "MANAGEMENT";
+
+  interface ModuleItem {
+    id: "PAYMENTS" | "ORDERS" | "REPORTS" | "INVENTORY" | "DELIVERY" | "COUPONS" | "PUSH" | "RATES" | "AUDIT" | "STAFF" | "SETTINGS" | "STORES";
+    category: ModuleCategory;
+    label: string;
+    shortLabel: string;
+    description: string;
+    icon: React.ReactNode;
+    badge: string | null;
+    badgeClassName: string;
+  }
+
+  const moduleCategories: {
+    id: ModuleCategory;
+    title: string;
+  }[] = [
+    { id: "OPERATIONS", title: "Operaciones" },
+    { id: "CATALOG", title: "Catálogo & Marketing" },
+    { id: "FINANCE", title: "Finanzas" },
+    { id: "MANAGEMENT", title: "Administración" },
+  ];
+
+  const modulesList: ModuleItem[] = [
+    // 1. Operaciones
     {
-      id: "PAYMENTS" as const,
+      id: "PAYMENTS",
+      category: "OPERATIONS",
       label: "Validación de Pagos",
       shortLabel: "Pagos",
       description: "Pago Móvil, Zelle y transferencias",
-      icon: <FileCheck2 className="w-4 h-4" />,
+      icon: <FileCheck2 className="w-4 h-4 shrink-0" />,
       badge: pendingPaymentsCount > 0 ? `${pendingPaymentsCount}` : null,
       badgeClassName: "bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-black",
     },
     {
-      id: "ORDERS" as const,
+      id: "ORDERS",
+      category: "OPERATIONS",
       label: `Gestión y Despacho (${orders.length})`,
       shortLabel: `Pedidos (${orders.length})`,
       description: "Estados, rutas y contacto WhatsApp",
-      icon: <PackageCheck className="w-4 h-4" />,
+      icon: <PackageCheck className="w-4 h-4 shrink-0" />,
       badge: orders.length > 0 ? `${orders.length}` : null,
       badgeClassName: "bg-primary/10 text-primary text-[10px] px-1.5 py-0.5 rounded-full font-bold",
     },
     {
-      id: "REPORTS" as const,
+      id: "DELIVERY",
+      category: "OPERATIONS",
+      label: "Delivery y Repartidores",
+      shortLabel: "Delivery",
+      description: "Zonas, tarifas y motorizados",
+      icon: <Truck className="w-4 h-4 shrink-0" />,
+      badge: deliveryZones.length > 0 ? `${deliveryZones.length}` : null,
+      badgeClassName: "bg-blue-500/10 text-blue-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+    },
+
+    // 2. Catálogo & Marketing
+    {
+      id: "INVENTORY",
+      category: "CATALOG",
+      label: `Inventario en Tienda (${products.length})`,
+      shortLabel: `Inventario (${products.length})`,
+      description: "Productos, precios y existencias",
+      icon: <Boxes className="w-4 h-4 shrink-0" />,
+      badge: `${products.length}`,
+      badgeClassName: "bg-muted text-muted-foreground text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+    },
+    {
+      id: "COUPONS",
+      category: "CATALOG",
+      label: `Cupones de Descuento (${initialCoupons.length})`,
+      shortLabel: `Cupones (${initialCoupons.length})`,
+      description: "Descuentos en $ o % y fechas límite",
+      icon: <Ticket className="w-4 h-4 shrink-0" />,
+      badge: initialCoupons.length > 0 ? `${initialCoupons.length}` : null,
+      badgeClassName: "bg-purple-500/10 text-purple-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+    },
+    {
+      id: "PUSH",
+      category: "CATALOG",
+      label: "Notificaciones Push",
+      shortLabel: "Push",
+      description: "Difusiones Web Push a móviles",
+      icon: <BellRing className="w-4 h-4 shrink-0" />,
+      badge: "PWA",
+      badgeClassName: "bg-amber-500/10 text-amber-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+    },
+
+    // 3. Finanzas
+    {
+      id: "REPORTS",
+      category: "FINANCE",
       label: "Reportes & Ventas",
       shortLabel: "Reportes",
       description: "Ingresos en $ y Bs, métodos y top ventas",
-      icon: <BarChart3 className="w-4 h-4" />,
+      icon: <BarChart3 className="w-4 h-4 shrink-0" />,
       badge:
         orders.length > 0
           ? formatCurrency(
@@ -641,83 +717,54 @@ export function AdminDashboard({
       badgeClassName: "bg-emerald-500/10 text-emerald-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
     },
     {
-      id: "INVENTORY" as const,
-      label: `Inventario en Tienda (${products.length})`,
-      shortLabel: `Inventario (${products.length})`,
-      description: "Productos, precios y existencias",
-      icon: <Boxes className="w-4 h-4" />,
-      badge: `${products.length}`,
-      badgeClassName: "bg-muted text-muted-foreground text-[10px] px-1.5 py-0.5 rounded-full font-bold",
-    },
-    {
-      id: "DELIVERY" as const,
-      label: "Delivery y Repartidores",
-      shortLabel: "Delivery",
-      description: "Zonas, tarifas y motorizados",
-      icon: <Truck className="w-4 h-4" />,
-      badge: deliveryZones.length > 0 ? `${deliveryZones.length}` : null,
-      badgeClassName: "bg-blue-500/10 text-blue-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
-    },
-    {
-      id: "COUPONS" as const,
-      label: `Cupones de Descuento (${initialCoupons.length})`,
-      shortLabel: `Cupones (${initialCoupons.length})`,
-      description: "Descuentos en $ o % y fechas límite",
-      icon: <Ticket className="w-4 h-4" />,
-      badge: initialCoupons.length > 0 ? `${initialCoupons.length}` : null,
-      badgeClassName: "bg-purple-500/10 text-purple-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
-    },
-    {
-      id: "PUSH" as const,
-      label: "Notificaciones Push",
-      shortLabel: "Push",
-      description: "Difusiones Web Push a móviles",
-      icon: <BellRing className="w-4 h-4" />,
-      badge: "PWA",
-      badgeClassName: "bg-amber-500/10 text-amber-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
-    },
-    {
-      id: "RATES" as const,
+      id: "RATES",
+      category: "FINANCE",
       label: `Tasas y Divisas (${ratesHistory.length})`,
       shortLabel: "Tasas & BCV",
       description: "Monitor oficial BCV e histórico",
-      icon: <Landmark className="w-4 h-4" />,
+      icon: <Landmark className="w-4 h-4 shrink-0" />,
       badge: `Bs. ${rate.value.toFixed(2)}`,
       badgeClassName: "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold",
     },
+
+    // 4. Administración
     {
-      id: "AUDIT" as const,
-      label: `Auditoría & Logs (${auditLogs.length})`,
-      shortLabel: `Auditoría (${auditLogs.length})`,
-      description: "Registro cronológico inmutable",
-      icon: <History className="w-4 h-4" />,
-      badge: auditLogs.length > 0 ? `${auditLogs.length}` : null,
-      badgeClassName: "bg-muted text-muted-foreground text-[10px] px-1.5 py-0.5 rounded-full font-bold",
-    },
-    {
-      id: "STAFF" as const,
-      label: `Equipo y Roles (${staff.length})`,
-      shortLabel: `Equipo (${staff.length})`,
-      description: "Colaboradores y permisos RBAC",
-      icon: <ShieldCheck className="w-4 h-4" />,
-      badge: `${staff.length}`,
-      badgeClassName: "bg-emerald-500/10 text-emerald-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
-    },
-    {
-      id: "STORES" as const,
+      id: "STORES",
+      category: "MANAGEMENT",
       label: `Sucursales (${stores.length})`,
       shortLabel: `Sucursales (${stores.length})`,
       description: "Sedes físicas y puntos de despacho",
-      icon: <Building2 className="w-4 h-4" />,
+      icon: <Building2 className="w-4 h-4 shrink-0" />,
       badge: stores.length > 0 ? `${stores.length}` : null,
       badgeClassName: "bg-indigo-500/10 text-indigo-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
     },
     {
-      id: "SETTINGS" as const,
+      id: "STAFF",
+      category: "MANAGEMENT",
+      label: `Equipo y Roles (${staff.length})`,
+      shortLabel: `Equipo (${staff.length})`,
+      description: "Colaboradores y permisos RBAC",
+      icon: <ShieldCheck className="w-4 h-4 shrink-0" />,
+      badge: `${staff.length}`,
+      badgeClassName: "bg-emerald-500/10 text-emerald-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+    },
+    {
+      id: "AUDIT",
+      category: "MANAGEMENT",
+      label: `Auditoría & Logs (${auditLogs.length})`,
+      shortLabel: `Auditoría (${auditLogs.length})`,
+      description: "Registro cronológico inmutable",
+      icon: <History className="w-4 h-4 shrink-0" />,
+      badge: auditLogs.length > 0 ? `${auditLogs.length}` : null,
+      badgeClassName: "bg-muted text-muted-foreground text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+    },
+    {
+      id: "SETTINGS",
+      category: "MANAGEMENT",
       label: "Configuración & Marca",
       shortLabel: "Ajustes",
       description: "Dirección, cuentas, pagos y diseño",
-      icon: <Sliders className="w-4 h-4" />,
+      icon: <Sliders className="w-4 h-4 shrink-0" />,
       badge: "Tienda",
       badgeClassName: "bg-primary/10 text-primary text-[10px] px-1.5 py-0.5 rounded-full font-bold",
     },
