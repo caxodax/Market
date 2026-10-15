@@ -580,18 +580,88 @@ export interface OnboardTenantInput {
 // PHASE 4: PRODUCTION HARDENING, AUDIT TRAILS & LOYALTY TYPES
 // =====================================================================
 
+export type AuditActionType =
+  | "PRICE_CHANGED"
+  | "PRODUCT_CREATED"
+  | "PRODUCT_UPDATED"
+  | "PRODUCT_DELETED"
+  | "PAYMENT_APPROVED"
+  | "PAYMENT_REJECTED"
+  | "ORDER_CANCELLED"
+  | "ORDER_STATUS_CHANGED"
+  | "STOCK_ADJUSTED"
+  | "BCV_RATE_SYNCED"
+  | "BCV_RATE_MANUAL_CHANGED"
+  | "COUPON_CREATED"
+  | "COUPON_UPDATED"
+  | "COUPON_DELETED"
+  | "COUPON_TOGGLED"
+  | "DELIVERY_ZONE_CREATED"
+  | "DELIVERY_ZONE_UPDATED"
+  | "DELIVERY_ZONE_STATUS_CHANGED"
+  | "DRIVER_CREATED"
+  | "DRIVER_UPDATED"
+  | "DRIVER_STATUS_CHANGED"
+  | "STORE_CREATED"
+  | "STORE_UPDATED"
+  | "TENANT_STATUS_CHANGED"
+  | "SUBSCRIPTION_RENEWED"
+  | "SUBSCRIPTION_PLAN_CHANGED"
+  | "USER_LOGIN"
+  | "STAFF_INVITED"
+  | "STAFF_ROLE_UPDATED"
+  | (string & {});
+
+export interface AuditActor {
+  id?: string | null;
+  name: string;
+  email?: string | null;
+  role?: UserRole | string | null;
+}
+
 export interface AuditLog {
   id: string;
   tenant_id: string;
+  tenant_name?: string | null;
   actor_id?: string | null;
   actor_name?: string | null;
-  action: string;
+  actor_email?: string | null;
+  actor_role?: string | null;
+  action: AuditActionType;
   entity: string;
   entity_id: string;
   details?: string | null;
   old_data?: Record<string, unknown> | null;
   new_data?: Record<string, unknown> | null;
   created_at: string;
+}
+
+export interface RecordAuditLogInput {
+  tenantId: string;
+  tenantName?: string | null;
+  actorId?: string | null;
+  actorName?: string | null;
+  actorEmail?: string | null;
+  actorRole?: string | null;
+  action: AuditActionType;
+  entity: string;
+  entityId: string;
+  details?: string | null;
+  oldData?: Record<string, unknown> | null;
+  newData?: Record<string, unknown> | null;
+}
+
+export interface AuditLogFilters {
+  tenantId?: string;
+  action?: string;
+  entity?: string;
+  actorId?: string;
+  search?: string;
+  searchQuery?: string;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  offset?: number;
 }
 
 export interface InventoryMovement {
@@ -625,6 +695,10 @@ export interface CreateProductInput {
   imageUrl?: string;
   initialStock?: number;
   storeId?: string;
+  actorId?: string | null;
+  actorName?: string | null;
+  actorEmail?: string | null;
+  actorRole?: string | null;
 }
 
 export interface UpdateProductInput {
@@ -640,6 +714,10 @@ export interface UpdateProductInput {
   stock?: number;
   isActive?: boolean;
   storeId?: string;
+  actorId?: string | null;
+  actorName?: string | null;
+  actorEmail?: string | null;
+  actorRole?: string | null;
 }
 
 export interface InviteStaffInput {

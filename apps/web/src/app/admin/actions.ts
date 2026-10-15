@@ -18,6 +18,8 @@ import {
   UpdateDeliveryZoneInput,
   CreateDriverInput,
   UpdateDriverInput,
+  AuditActor,
+  AuditLogFilters,
 } from "@marketos/types";
 import { revalidatePath } from "next/cache";
 import { sendOrderStatusPushNotification } from "@/lib/pushNotifications";
@@ -27,6 +29,25 @@ import {
   invalidateExchangeRateCache,
   invalidateDeliveryZonesCache,
 } from "@/lib/cached-queries";
+import { getCurrentUser } from "../login/actions";
+
+async function getAuditActor(): Promise<AuditActor> {
+  const user = await getCurrentUser();
+  if (user) {
+    return {
+      id: user.id,
+      name: user.full_name,
+      email: user.email,
+      role: user.role,
+    };
+  }
+  return {
+    id: null,
+    name: "Admin Operativo",
+    email: null,
+    role: "OPERATOR",
+  };
+}
 
 export async function reviewPaymentAction(
   tenantId: string,
@@ -35,11 +56,13 @@ export async function reviewPaymentAction(
   rejectionReason?: string
 ) {
   try {
+    const actor = await getAuditActor();
     const updated = await MarketOSRepository.reviewPayment(
       tenantId,
       paymentId,
       status,
-      rejectionReason
+      rejectionReason,
+      actor
     );
 
     // Enviar notificación push al cliente si tiene alertas activas en su dispositivo
@@ -82,11 +105,13 @@ export async function adjustStockAction(
   storeId?: string
 ) {
   try {
+    const actor = await getAuditActor();
     const newStock = await MarketOSRepository.adjustStock(
       tenantId,
       productId,
       delta,
-      storeId
+      storeId,
+      actor
     );
     invalidateProductsCache(tenantId);
     revalidatePath("/admin");
@@ -126,14 +151,18 @@ export async function updateOrderStatusAction(
   tenantId: string,
   orderId: string,
   status: any,
-  driverId?: string
+  driverId?: string,
+  cancellationReason?: string
 ) {
   try {
+    const actor = await getAuditActor();
     const order = await MarketOSRepository.updateOrderStatus(
       tenantId,
       orderId,
       status,
-      driverId
+      driverId,
+      actor,
+      cancellationReason
     );
     if (!order) throw new Error("Orden no encontrada");
 
@@ -240,7 +269,14 @@ export async function uploadStoreLogoAction(formData: FormData) {
 
 export async function createProductAction(input: CreateProductInput) {
   try {
-    const product = await MarketOSRepository.createProduct(input);
+    const actor = await getAuditActor();
+    const product = await MarketOSRepository.createProduct({
+      ...input,
+      actorId: actor.id,
+      actorName: actor.name,
+      actorEmail: actor.email,
+      actorRole: actor.role,
+    });
     invalidateProductsCache(input.tenantId);
     revalidatePath("/admin");
     revalidatePath("/");
@@ -256,7 +292,14 @@ export async function createProductAction(input: CreateProductInput) {
 
 export async function updateProductAction(input: UpdateProductInput) {
   try {
-    const product = await MarketOSRepository.updateProduct(input);
+    const actor = await getAuditActor();
+    const product = await MarketOSRepository.updateProduct({
+      ...input,
+      actorId: actor.id,
+      actorName: actor.name,
+      actorEmail: actor.email,
+      actorRole: actor.role,
+    });
     invalidateProductsCache(input.tenantId);
     revalidatePath("/admin");
     revalidatePath("/");
@@ -272,7 +315,8 @@ export async function updateProductAction(input: UpdateProductInput) {
 
 export async function deleteProductAction(tenantId: string, productId: string) {
   try {
-    const ok = await MarketOSRepository.deleteProduct(tenantId, productId);
+    const actor = await getAuditActor();
+    const ok = await MarketOSRepository.deleteProduct(tenantId, productId, actor);
     invalidateProductsCache(tenantId);
     revalidatePath("/admin");
     revalidatePath("/");
@@ -331,13 +375,18 @@ export async function saveManualRateAction(
   }
 ) {
   try {
-    const updatedRate = await MarketOSRepository.saveManualExchangeRate(tenantId, {
-      date_rate: data.date_rate,
-      usd_rate: data.usd_rate,
-      eur_rate: data.eur_rate,
-      usdt_rate: data.usdt_rate,
-      source: "MANUAL",
-    });
+    const actor = await getAuditActor();
+    const updatedRate = await MarketOSRepository.saveManualExchangeRate(
+      tenantId,
+      {
+        date_rate: data.date_rate,
+        usd_rate: data.usd_rate,
+        eur_rate: data.eur_rate,
+        usdt_rate: data.usdt_rate,
+        source: "MANUAL",
+      },
+      actor
+    );
     invalidateExchangeRateCache(tenantId);
     revalidatePath("/admin");
     revalidatePath("/platform");
@@ -348,6 +397,23 @@ export async function saveManualRateAction(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Error al guardar tasa manual",
+    };
+  }
+}
+
+/**
+ * Fetch fresh audit logs for tenant
+ */
+export async function getAuditLogsAction(tenantId: string, limit = 100) {
+  try {
+    const logs = await MarketOSRepository.getAuditLogs(tenantId, limit);
+    return { success: true, logs };
+  } catch (error) {
+    console.error("Error fetching audit logs:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al obtener bitácora",
+      logs: [],
     };
   }
 }

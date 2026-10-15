@@ -10,6 +10,7 @@ import {
   RateHistoryItem,
   UserProfile,
   UserRole,
+  AuditLog,
 } from "@marketos/types";
 import { formatCurrency, slugify } from "@marketos/utils";
 import {
@@ -21,6 +22,7 @@ import {
   renewTenantSubscriptionAction,
   changeTenantPlanAction,
 } from "../app/platform/actions";
+import { AuditTrailViewer } from "./audit-trail-viewer";
 import {
   Building2,
   DollarSign,
@@ -73,6 +75,7 @@ interface SuperAdminDashboardProps {
   exchangeRate?: ExchangeRate;
   ratesHistory?: RateHistoryItem[];
   initialProfiles?: UserProfile[];
+  initialAuditLogs?: AuditLog[];
 }
 
 export function SuperAdminDashboard({
@@ -83,8 +86,9 @@ export function SuperAdminDashboard({
   exchangeRate,
   ratesHistory = [],
   initialProfiles = [],
+  initialAuditLogs = [],
 }: SuperAdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<"TENANTS" | "BILLING" | "USERS" | "RATES">("TENANTS");
+  const [activeTab, setActiveTab] = useState<"TENANTS" | "BILLING" | "USERS" | "RATES" | "AUDIT">("TENANTS");
   const [tenants, setTenants] = useState<TenantWithDetails[]>(initialTenants);
   const [metrics, setMetrics] = useState<PlatformMetrics>(initialMetrics);
   const [profiles, setProfiles] = useState<UserProfile[]>(initialProfiles);
@@ -891,6 +895,18 @@ export function SuperAdminDashboard({
           >
             <Landmark className="w-4 h-4" />
             <span>Tasas Globales e Histórico ({ratesHistory.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("AUDIT")}
+            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === "AUDIT"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Auditoría Global (Audit Trail)</span>
           </button>
         </div>
 
@@ -1833,6 +1849,17 @@ export function SuperAdminDashboard({
             }
             initialHistory={ratesHistory}
             isSuperAdmin={true}
+          />
+        </div>
+      )}
+
+      {/* TAB 5: GLOBAL AUDIT TRAIL */}
+      {activeTab === "AUDIT" && (
+        <div className="space-y-6 animate-in fade-in">
+          <AuditTrailViewer
+            initialLogs={initialAuditLogs}
+            isSuperAdmin={true}
+            allTenants={tenants}
           />
         </div>
       )}

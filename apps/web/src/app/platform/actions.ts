@@ -1,9 +1,10 @@
 "use server";
 
 import { MarketOSRepository } from "@marketos/database";
-import { OnboardTenantInput, SubscriptionPlanTier } from "@marketos/types";
+import { OnboardTenantInput, SubscriptionPlanTier, AuditLogFilters } from "@marketos/types";
 import { revalidatePath } from "next/cache";
 import { invalidateTenantCache } from "../../lib/cached-queries";
+import { getCurrentUser } from "../login/actions";
 
 /**
  * Onboard and automatically provision a new tenant
@@ -11,6 +12,19 @@ import { invalidateTenantCache } from "../../lib/cached-queries";
 export async function onboardTenantAction(input: OnboardTenantInput) {
   try {
     const tenant = await MarketOSRepository.onboardTenant(input);
+    const currentUser = await getCurrentUser();
+    await MarketOSRepository.recordAuditLog({
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      actorId: currentUser?.id,
+      actorName: currentUser?.full_name,
+      actorEmail: currentUser?.email,
+      actorRole: currentUser?.role,
+      action: "TENANT_ONBOARDED",
+      entity: "tenants",
+      entityId: tenant.id,
+      newData: { name: tenant.name, slug: tenant.slug },
+    });
     revalidatePath("/platform");
     return { success: true, tenant };
   } catch (error) {
@@ -36,6 +50,18 @@ export async function updateTenantStatusAction(
 ) {
   try {
     const updated = await MarketOSRepository.updateTenantStatus(tenantId, status);
+    const currentUser = await getCurrentUser();
+    await MarketOSRepository.recordAuditLog({
+      tenantId,
+      actorId: currentUser?.id,
+      actorName: currentUser?.full_name,
+      actorEmail: currentUser?.email,
+      actorRole: currentUser?.role,
+      action: "TENANT_STATUS_CHANGED",
+      entity: "tenants",
+      entityId: tenantId,
+      newData: { status },
+    });
     // Invalida Next.js Data Cache para este tenant (información, configuración, productos)
     invalidateTenantCache(tenantId);
     // Revalidación inmediata de rutas
@@ -65,6 +91,18 @@ export async function renewTenantSubscriptionAction(
       paymentMethod,
       reference
     );
+    const currentUser = await getCurrentUser();
+    await MarketOSRepository.recordAuditLog({
+      tenantId,
+      actorId: currentUser?.id,
+      actorName: currentUser?.full_name,
+      actorEmail: currentUser?.email,
+      actorRole: currentUser?.role,
+      action: "SUBSCRIPTION_RENEWED",
+      entity: "subscriptions",
+      entityId: tenantId,
+      newData: { durationDays, paymentMethod, reference },
+    });
     // Purgar caché y revalidar para que vuelva a estar en línea al instante
     invalidateTenantCache(tenantId);
     revalidatePath("/");
@@ -89,6 +127,18 @@ export async function changeTenantPlanAction(
 ) {
   try {
     const subscription = await MarketOSRepository.changeTenantPlan(tenantId, planTier);
+    const currentUser = await getCurrentUser();
+    await MarketOSRepository.recordAuditLog({
+      tenantId,
+      actorId: currentUser?.id,
+      actorName: currentUser?.full_name,
+      actorEmail: currentUser?.email,
+      actorRole: currentUser?.role,
+      action: "SUBSCRIPTION_PLAN_CHANGED",
+      entity: "subscriptions",
+      entityId: tenantId,
+      newData: { planTier },
+    });
     invalidateTenantCache(tenantId);
     revalidatePath("/platform");
     return { success: true, subscription };
@@ -97,6 +147,23 @@ export async function changeTenantPlanAction(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Error al cambiar de plan",
+    };
+  }
+}
+
+/**
+ * Fetch Global Audit Logs with full multi-tenant filtering (Super Admin)
+ */
+export async function getGlobalAuditLogsAction(filters?: AuditLogFilters) {
+  try {
+    const logs = await MarketOSRepository.getGlobalAuditLogs(filters);
+    return { success: true, logs };
+  } catch (error) {
+    console.error("Error fetching global audit logs:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al obtener registros de auditoría",
+      logs: [],
     };
   }
 }

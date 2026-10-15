@@ -45,6 +45,10 @@ import {
   UpdateDeliveryZoneInput,
   CreateDriverInput,
   UpdateDriverInput,
+  RecordAuditLogInput,
+  AuditLogFilters,
+  AuditActor,
+  AuditActionType,
 } from "@marketos/types";
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
 import { fetchBcvRate, convertUsdToVes, getCaracasDateKey, getCaracasRangeBounds } from "@marketos/utils";
@@ -750,7 +754,8 @@ export class MarketOSRepository {
       eur_rate?: number;
       usdt_rate?: number;
       source?: string;
-    }
+    },
+    actor?: AuditActor | null
   ): Promise<ExchangeRate> {
     const source = data.source || "MANUAL";
     const nowIso = new Date().toISOString();
@@ -803,6 +808,10 @@ export class MarketOSRepository {
 
         await MarketOSRepository.recordAuditLog({
           tenantId,
+          actorId: actor?.id,
+          actorName: actor?.name,
+          actorEmail: actor?.email,
+          actorRole: actor?.role,
           action: "MANUAL_RATE_SAVED",
           entity: "exchange_rates",
           entityId: tenantId,
@@ -2243,21 +2252,35 @@ export class MarketOSRepository {
     paymentId: string,
     status: PaymentStatus,
     rejectionReason?: string,
-    actorId?: string
+    actor?: AuditActor | string | null
   ): Promise<PaymentProof | null> {
+    const actorObj: AuditActor =
+      typeof actor === "string"
+        ? { id: actor, name: "Admin Operativo", email: null, role: "ADMIN" }
+        : actor || { id: null, name: "Admin Operativo", email: null, role: "ADMIN" };
+
     const supabase = getSupabase();
     let orderIdToUpdate: string | null = null;
+    let paymentCurrency = "VES";
+    let paymentAmount = 0;
+    let paymentMethod = "";
+    let paymentRef = "";
+    let orderNumber = "";
 
     if (supabase) {
       try {
         const { data: paymentRow } = await supabase
           .from("payments")
-          .select("order_id, currency")
+          .select("order_id, currency, amount, method, reference_number")
           .eq("id", paymentId)
           .eq("tenant_id", tenantId)
           .maybeSingle();
 
         orderIdToUpdate = paymentRow?.order_id || null;
+        if (paymentRow?.currency) paymentCurrency = paymentRow.currency;
+        if (paymentRow?.amount) paymentAmount = Number(paymentRow.amount);
+        if (paymentRow?.method) paymentMethod = paymentRow.method;
+        if (paymentRow?.reference_number) paymentRef = paymentRow.reference_number;
 
         await supabase
           .from("payments")
@@ -2284,6 +2307,7 @@ export class MarketOSRepository {
                   .eq("id", orderIdToUpdate)
                   .maybeSingle();
 
+                if (ordRow?.order_number) orderNumber = ordRow.order_number;
                 const totUsd = Number(ordRow?.total_usd || 0);
                 const exRate = Number(ordRow?.exchange_rate_applied || 1);
                 const ivaRate = (settings.billing_settings.default_iva_rate || 16) / 100;
@@ -2291,7 +2315,7 @@ export class MarketOSRepository {
                 const ivaUsd = Number((totUsd - baseImponible).toFixed(2));
                 const ivaVes = Number((ivaUsd * exRate).toFixed(2));
 
-                const isForeignPayment = paymentRow?.currency === "USD";
+                const isForeignPayment = paymentCurrency === "USD";
                 let igtfUsd = 0;
                 let igtfVes = 0;
                 if (settings.billing_settings.apply_igtf && isForeignPayment) {
@@ -2349,9 +2373,14 @@ export class MarketOSRepository {
       payment.status = status;
       payment.reviewed_at = new Date().toISOString();
       if (rejectionReason) payment.rejection_reason = rejectionReason;
+      if (payment.currency) paymentCurrency = payment.currency;
+      if (payment.amount) paymentAmount = payment.amount;
+      if (payment.method) paymentMethod = payment.method;
+      if (payment.reference_number) paymentRef = payment.reference_number;
 
       const order = state.orders.find((o) => o.id === payment.order_id);
       if (order) {
+        if (!orderNumber && order.order_number) orderNumber = order.order_number;
         if (status === "APPROVED") {
           order.status = "PREPARING";
           const settings = state.settings.find((s) => s.tenant_id === tenantId);
@@ -2398,16 +2427,30 @@ export class MarketOSRepository {
       }
     }
 
+    const targetOrderId = orderIdToUpdate || payment?.order_id || "";
+    if (!orderNumber && targetOrderId) {
+      const ord = state.orders.find((o) => o.id === targetOrderId);
+      if (ord) orderNumber = ord.order_number;
+    }
+
     await MarketOSRepository.recordAuditLog({
       tenantId,
-      actorId,
+      actorId: actorObj.id,
+      actorName: actorObj.name,
+      actorEmail: actorObj.email,
+      actorRole: actorObj.role,
       action: status === "APPROVED" ? "PAYMENT_APPROVED" : "PAYMENT_REJECTED",
       entity: "payments",
       entityId: paymentId,
       newData: {
         status,
-        rejectionReason: rejectionReason || null,
-        orderId: orderIdToUpdate || payment?.order_id,
+        rejection_reason: rejectionReason || null,
+        order_id: targetOrderId,
+        order_number: orderNumber || "N/A",
+        amount: paymentAmount,
+        currency: paymentCurrency,
+        method: paymentMethod,
+        reference_number: paymentRef,
       },
     });
 
@@ -2499,9 +2542,20 @@ export class MarketOSRepository {
     orderId: string,
     status: OrderStatus,
     driverId?: string,
-    actorId?: string
+    actor?: AuditActor | string | null,
+    cancellationReason?: string
   ): Promise<Order | null> {
+    const actorObj: AuditActor =
+      typeof actor === "string"
+        ? { id: actor, name: "Admin Operativo", email: null, role: "ADMIN" }
+        : actor || { id: null, name: "Admin Operativo", email: null, role: "ADMIN" };
+
     const supabase = getSupabase();
+    let orderNum = "";
+    let custName = "";
+    let custPhone = "";
+    let totalUsd = 0;
+
     if (supabase) {
       try {
         const updateData: Record<string, unknown> = {
@@ -2509,6 +2563,20 @@ export class MarketOSRepository {
           updated_at: new Date().toISOString(),
         };
         if (driverId) updateData.driver_id = driverId;
+
+        const { data: ordRow } = await supabase
+          .from("orders")
+          .select("order_number, customer_name, customer_phone, total_usd")
+          .eq("id", orderId)
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
+
+        if (ordRow) {
+          orderNum = ordRow.order_number || "";
+          custName = ordRow.customer_name || "";
+          custPhone = ordRow.customer_phone || "";
+          totalUsd = Number(ordRow.total_usd || 0);
+        }
 
         await supabase
           .from("orders")
@@ -2533,18 +2601,42 @@ export class MarketOSRepository {
       if (driverId) order.driver_id = driverId;
       order.updated_at = new Date().toISOString();
 
+      if (!orderNum && order.order_number) orderNum = order.order_number;
+      if (!custName && order.customer_name) custName = order.customer_name;
+      if (!custPhone && order.customer_phone) custPhone = order.customer_phone;
+      if (!totalUsd && order.total_usd) totalUsd = order.total_usd;
+
       if (status === "CANCELLED" && oldStatus !== "CANCELLED") {
         await MarketOSRepository.restoreOrderInventoryStock(tenantId, orderId);
       }
 
+      const isCancellation = status === "CANCELLED";
+
       await MarketOSRepository.recordAuditLog({
         tenantId,
-        actorId,
-        action: "ORDER_STATUS_CHANGED",
+        actorId: actorObj.id,
+        actorName: actorObj.name,
+        actorEmail: actorObj.email,
+        actorRole: actorObj.role,
+        action: isCancellation ? "ORDER_CANCELLED" : "ORDER_STATUS_CHANGED",
         entity: "orders",
         entityId: orderId,
         oldData: { status: oldStatus },
-        newData: { status, driver_id: driverId },
+        newData: {
+          status,
+          driver_id: driverId,
+          order_number: orderNum || orderId,
+          customer_name: custName,
+          customer_phone: custPhone,
+          total_usd: totalUsd,
+          ...(isCancellation
+            ? {
+                cancellation_reason:
+                  cancellationReason || "Anulación administrativa de orden",
+                inventory_restored: true,
+              }
+            : {}),
+        },
       });
       return order;
     }
@@ -2560,8 +2652,13 @@ export class MarketOSRepository {
     productId: string,
     delta: number,
     storeId?: string,
-    actorId?: string
+    actor?: AuditActor | string | null
   ): Promise<number> {
+    const actorObj: AuditActor =
+      typeof actor === "string"
+        ? { id: actor, name: "Admin Operativo", email: null, role: "ADMIN" }
+        : actor || { id: null, name: "Admin Operativo", email: null, role: "ADMIN" };
+
     const targetStoreId =
       storeId || state.stores.find((s) => s.tenant_id === tenantId)?.id;
     const supabase = getSupabase();
@@ -2594,7 +2691,10 @@ export class MarketOSRepository {
 
           await MarketOSRepository.recordAuditLog({
             tenantId,
-            actorId,
+            actorId: actorObj.id,
+            actorName: actorObj.name,
+            actorEmail: actorObj.email,
+            actorRole: actorObj.role,
             action: "STOCK_ADJUSTED",
             entity: "inventory",
             entityId: productId,
@@ -2618,7 +2718,10 @@ export class MarketOSRepository {
 
       await MarketOSRepository.recordAuditLog({
         tenantId,
-        actorId,
+        actorId: actorObj.id,
+        actorName: actorObj.name,
+        actorEmail: actorObj.email,
+        actorRole: actorObj.role,
         action: "STOCK_ADJUSTED",
         entity: "inventory",
         entityId: productId,
@@ -2634,40 +2737,72 @@ export class MarketOSRepository {
   /**
    * Record Audit Log in Supabase & memory state
    */
-  static async recordAuditLog(input: {
-    tenantId: string;
-    actorId?: string | null;
-    actorName?: string | null;
-    action: string;
-    entity: string;
-    entityId: string;
-    oldData?: Record<string, unknown> | null;
-    newData?: Record<string, unknown> | null;
-  }): Promise<AuditLog> {
+  static async recordAuditLog(input: RecordAuditLogInput): Promise<AuditLog> {
+    const tenantName =
+      input.tenantName ||
+      state.tenants.find((t) => t.id === input.tenantId)?.name ||
+      (input.tenantId === "platform" ? "Plataforma Central" : undefined);
+
+    const actorDetails = {
+      id: input.actorId || null,
+      name: input.actorName || "Admin Operativo",
+      email: input.actorEmail || null,
+      role: input.actorRole || "OPERATOR",
+    };
+
+    const enrichedNewData: Record<string, unknown> = {
+      ...(input.newData || {}),
+      _actor: actorDetails,
+      ...(tenantName ? { _tenant_name: tenantName } : {}),
+    };
+
     const auditLog: AuditLog = {
       id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       tenant_id: input.tenantId,
+      tenant_name: tenantName || null,
       actor_id: input.actorId || null,
       actor_name: input.actorName || "Admin Operativo",
+      actor_email: input.actorEmail || null,
+      actor_role: input.actorRole || "OPERATOR",
       action: input.action,
       entity: input.entity,
       entity_id: input.entityId,
       old_data: input.oldData || null,
-      new_data: input.newData || null,
+      new_data: enrichedNewData,
       created_at: new Date().toISOString(),
     };
 
     const supabase = getSupabase();
     if (supabase) {
       try {
-        await supabase.from("audit_logs").insert({
+        const actorUuid = input.actorId && isUuid(input.actorId) ? input.actorId : null;
+        const insertPayload: Record<string, unknown> = {
           tenant_id: auditLog.tenant_id,
           action: auditLog.action,
           entity: auditLog.entity,
           entity_id: auditLog.entity_id,
           old_data: auditLog.old_data,
-          new_data: auditLog.new_data,
-        });
+          new_data: enrichedNewData,
+          actor_id: actorUuid,
+        };
+        if (input.actorName) insertPayload.actor_name = input.actorName;
+        if (input.actorEmail) insertPayload.actor_email = input.actorEmail;
+        if (input.actorRole) insertPayload.actor_role = input.actorRole;
+        if (tenantName) insertPayload.tenant_name = tenantName;
+
+        const { error: insertErr } = await supabase.from("audit_logs").insert(insertPayload);
+        if (insertErr) {
+          // Fallback to base columns if schema hasn't reloaded
+          await supabase.from("audit_logs").insert({
+            tenant_id: auditLog.tenant_id,
+            action: auditLog.action,
+            entity: auditLog.entity,
+            entity_id: auditLog.entity_id,
+            old_data: auditLog.old_data,
+            new_data: enrichedNewData,
+            actor_id: actorUuid,
+          });
+        }
       } catch (e) {
         console.warn("[MarketOS] Error recording audit log in Supabase:", e);
       }
@@ -2681,38 +2816,131 @@ export class MarketOSRepository {
    * Get Audit Logs for Tenant Admin
    */
   static async getAuditLogs(tenantId: string, limit = 50): Promise<AuditLog[]> {
+    return MarketOSRepository.getGlobalAuditLogs({ tenantId, limit });
+  }
+
+  /**
+   * Get Global Audit Logs across all tenants (Super Admin) or with filters
+   */
+  static async getGlobalAuditLogs(filters?: AuditLogFilters): Promise<AuditLog[]> {
+    const limit = filters?.limit || 100;
     const supabase = getSupabase();
+
+    const tenantMap = new Map<string, string>();
+    state.tenants.forEach((t) => tenantMap.set(t.id, t.name));
+
     if (supabase) {
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from("audit_logs")
           .select("*")
-          .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false })
           .limit(limit);
 
+        if (filters?.tenantId && filters.tenantId !== "ALL") {
+          query = query.eq("tenant_id", filters.tenantId);
+        }
+        if (filters?.action && filters.action !== "ALL") {
+          query = query.eq("action", filters.action);
+        }
+        if (filters?.actorId) {
+          query = query.eq("actor_id", filters.actorId);
+        }
+        if (filters?.startDate) {
+          query = query.gte("created_at", filters.startDate);
+        }
+        if (filters?.endDate) {
+          query = query.lte("created_at", filters.endDate);
+        }
+
+        const { data, error } = await query;
+
         if (!error && data && data.length > 0) {
-          return data.map((d: any) => ({
-            id: d.id,
-            tenant_id: d.tenant_id,
-            actor_id: d.actor_id,
-            actor_name: d.actor_name || "Admin Operativo",
-            action: d.action,
-            entity: d.entity,
-            entity_id: d.entity_id,
-            old_data: d.old_data,
-            new_data: d.new_data,
-            created_at: d.created_at,
-          }));
+          const mapped: AuditLog[] = data.map((d: any) => {
+            const actorFromMeta =
+              (d.new_data && typeof d.new_data === "object" && d.new_data._actor) || {};
+            const tName =
+              d.tenant_name ||
+              (d.new_data && d.new_data._tenant_name) ||
+              tenantMap.get(d.tenant_id) ||
+              (d.tenant_id === "platform" ? "Plataforma Central" : "Tienda");
+
+            return {
+              id: d.id,
+              tenant_id: d.tenant_id,
+              tenant_name: tName,
+              actor_id: d.actor_id || actorFromMeta.id || null,
+              actor_name: d.actor_name || actorFromMeta.name || "Admin Operativo",
+              actor_email: d.actor_email || actorFromMeta.email || null,
+              actor_role: d.actor_role || actorFromMeta.role || null,
+              action: d.action,
+              entity: d.entity,
+              entity_id: d.entity_id,
+              old_data: d.old_data,
+              new_data: d.new_data,
+              created_at: d.created_at,
+            };
+          });
+
+          if (filters?.search && filters.search.trim()) {
+            const term = filters.search.trim().toLowerCase();
+            return mapped.filter(
+              (l) =>
+                (l.actor_name && l.actor_name.toLowerCase().includes(term)) ||
+                (l.actor_email && l.actor_email.toLowerCase().includes(term)) ||
+                (l.action && l.action.toLowerCase().includes(term)) ||
+                (l.entity_id && l.entity_id.toLowerCase().includes(term)) ||
+                (l.tenant_name && l.tenant_name.toLowerCase().includes(term)) ||
+                JSON.stringify(l.new_data || {}).toLowerCase().includes(term)
+            );
+          }
+
+          return mapped;
         }
       } catch (e) {
-        console.warn("[MarketOS] Error fetching audit logs from Supabase:", e);
+        console.warn("[MarketOS] Error fetching global audit logs from Supabase:", e);
       }
     }
 
-    return state.auditLogs
-      .filter((l) => l.tenant_id === tenantId)
-      .slice(0, limit);
+    // Fallback to in-memory state
+    let results = [...state.auditLogs];
+
+    if (filters?.tenantId && filters.tenantId !== "ALL") {
+      results = results.filter((l) => l.tenant_id === filters.tenantId);
+    }
+    if (filters?.action && filters.action !== "ALL") {
+      results = results.filter((l) => l.action === filters.action);
+    }
+    if (filters?.actorId) {
+      results = results.filter((l) => l.actor_id === filters.actorId);
+    }
+    if (filters?.startDate) {
+      results = results.filter((l) => l.created_at >= filters.startDate!);
+    }
+    if (filters?.endDate) {
+      results = results.filter((l) => l.created_at <= filters.endDate!);
+    }
+    if (filters?.search && filters.search.trim()) {
+      const term = filters.search.trim().toLowerCase();
+      results = results.filter(
+        (l) =>
+          (l.actor_name && l.actor_name.toLowerCase().includes(term)) ||
+          (l.actor_email && l.actor_email.toLowerCase().includes(term)) ||
+          (l.action && l.action.toLowerCase().includes(term)) ||
+          (l.entity_id && l.entity_id.toLowerCase().includes(term)) ||
+          (tenantMap.get(l.tenant_id) &&
+            tenantMap.get(l.tenant_id)!.toLowerCase().includes(term)) ||
+          JSON.stringify(l.new_data || {}).toLowerCase().includes(term)
+      );
+    }
+
+    return results.slice(0, limit).map((l) => ({
+      ...l,
+      tenant_name:
+        l.tenant_name ||
+        tenantMap.get(l.tenant_id) ||
+        (l.tenant_id === "platform" ? "Plataforma Central" : "Tienda"),
+    }));
   }
 
   /**
@@ -3728,6 +3956,10 @@ export class MarketOSRepository {
 
     await MarketOSRepository.recordAuditLog({
       tenantId: input.tenantId,
+      actorId: input.actorId,
+      actorName: input.actorName,
+      actorEmail: input.actorEmail,
+      actorRole: input.actorRole,
       action: "PRODUCT_CREATED",
       entity: "products",
       entityId: createdProduct.id,
@@ -3820,8 +4052,47 @@ export class MarketOSRepository {
       if (input.stock !== undefined) prod.stock = input.stock;
       prod.updated_at = new Date().toISOString();
 
+      // Check if price changed -> record surgical PRICE_CHANGED audit event
+      if (
+        input.priceUsd !== undefined &&
+        oldData.price_usd !== undefined &&
+        Number(input.priceUsd) !== Number(oldData.price_usd)
+      ) {
+        const oP = Number(oldData.price_usd);
+        const nP = Number(input.priceUsd);
+        const diff = Number((nP - oP).toFixed(2));
+        const pct = oP > 0 ? Number(((diff / oP) * 100).toFixed(1)) : 0;
+
+        await MarketOSRepository.recordAuditLog({
+          tenantId: input.tenantId,
+          actorId: input.actorId,
+          actorName: input.actorName,
+          actorEmail: input.actorEmail,
+          actorRole: input.actorRole,
+          action: "PRICE_CHANGED",
+          entity: "products",
+          entityId: input.productId,
+          oldData: {
+            price_usd: oP,
+            price_formatted: `$${oP.toFixed(2)}`,
+            name: prod.name,
+          },
+          newData: {
+            price_usd: nP,
+            price_formatted: `$${nP.toFixed(2)}`,
+            diff_usd: diff,
+            percentage_change: pct,
+            name: prod.name,
+          },
+        });
+      }
+
       await MarketOSRepository.recordAuditLog({
         tenantId: input.tenantId,
+        actorId: input.actorId,
+        actorName: input.actorName,
+        actorEmail: input.actorEmail,
+        actorRole: input.actorRole,
         action: "PRODUCT_UPDATED",
         entity: "products",
         entityId: input.productId,
@@ -3838,7 +4109,11 @@ export class MarketOSRepository {
   /**
    * Delete / Deactivate a product
    */
-  static async deleteProduct(tenantId: string, productId: string): Promise<boolean> {
+  static async deleteProduct(
+    tenantId: string,
+    productId: string,
+    actor?: AuditActor | null
+  ): Promise<boolean> {
     const supabase = getSupabase();
     if (supabase) {
       try {
@@ -3861,10 +4136,14 @@ export class MarketOSRepository {
 
       await MarketOSRepository.recordAuditLog({
         tenantId,
+        actorId: actor?.id,
+        actorName: actor?.name,
+        actorEmail: actor?.email,
+        actorRole: actor?.role,
         action: "PRODUCT_DELETED",
         entity: "products",
         entityId: productId,
-        newData: { is_active: false },
+        newData: { is_active: false, name: prod.name },
       });
       return true;
     }

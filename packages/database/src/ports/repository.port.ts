@@ -51,6 +51,8 @@ import {
   Customer,
   CustomerAccountSummary,
   AuditLog,
+  RecordAuditLogInput,
+  AuditLogFilters,
   InventoryMovement,
   UserProfile,
   UserRole,
@@ -480,21 +482,17 @@ export interface IAuditLogRepository {
   /**
    * Registrar evento de auditoría
    */
-  recordAuditLog(input: {
-    tenantId: string;
-    actorId?: string | null;
-    actorName?: string | null;
-    action: string;
-    entity: string;
-    entityId: string;
-    oldData?: Record<string, unknown> | null;
-    newData?: Record<string, unknown> | null;
-  }): Promise<AuditLog>;
+  recordAuditLog(input: RecordAuditLogInput): Promise<AuditLog>;
 
   /**
    * Listar logs de auditoría del Tenant
    */
   getAuditLogs(tenantId: string, limit?: number): Promise<AuditLog[]>;
+
+  /**
+   * Listar logs de auditoría globales de toda la red con filtros avanzados
+   */
+  getGlobalAuditLogs(filters?: AuditLogFilters): Promise<AuditLog[]>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

@@ -44,6 +44,7 @@ import { PushNotificationsManager } from "./push-notifications-manager";
 import { OrderDetailsModal } from "./order-details-modal";
 import { SalesReportsTab } from "./sales-reports-tab";
 import { DeliveryManager } from "./delivery-manager";
+import { AuditTrailViewer } from "./audit-trail-viewer";
 import {
   PackageCheck,
   Boxes,
@@ -1903,119 +1904,13 @@ export function AdminDashboard({
 
         {/* TAB 6: AUDIT LOGS & TRACEABILITY */}
         {activeTab === "AUDIT" && (
-          <div className="space-y-4 animate-in fade-in">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-bold text-foreground">
-                  Registro de Auditoría y Trazabilidad Operativa
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  Historial inmutable de cambios de inventario, aprobación de pagos, estados de pedidos y tasa BCV.
-                </p>
-              </div>
-
-              {/* Filter pills */}
-              <div className="flex flex-wrap gap-1.5">
-                {["ALL", "PAYMENT", "ORDER", "STOCK", "BCV"].map((f) => (
-                  <button
-                    key={f}
-                    onClick={() => setAuditFilter(f)}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
-                      auditFilter === f
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-card text-muted-foreground border-border hover:bg-muted"
-                    }`}
-                  >
-                    {f === "ALL"
-                      ? "Todos"
-                      : f === "PAYMENT"
-                      ? "Pagos"
-                      : f === "ORDER"
-                      ? "Pedidos"
-                      : f === "STOCK"
-                      ? "Inventario"
-                      : "Tasa BCV"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {auditLogs.length === 0 ? (
-              <div className="p-8 text-center rounded-2xl border border-dashed border-border bg-card">
-                <ShieldCheck className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-50" />
-                <p className="text-xs text-muted-foreground">
-                  Aún no se han registrado eventos de auditoría en la plataforma.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {auditLogs
-                  .filter((log) => {
-                    if (auditFilter === "ALL") return true;
-                    if (auditFilter === "PAYMENT") return log.action.includes("PAYMENT");
-                    if (auditFilter === "ORDER") return log.action.includes("ORDER");
-                    if (auditFilter === "STOCK") return log.action.includes("STOCK");
-                    if (auditFilter === "BCV") return log.action.includes("BCV");
-                    return true;
-                  })
-                  .map((log) => {
-                    const getBadgeColor = (action: string) => {
-                      if (action.includes("APPROVED"))
-                        return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
-                      if (action.includes("REJECTED"))
-                        return "bg-destructive/10 text-destructive border-destructive/20";
-                      if (action.includes("STOCK"))
-                        return "bg-amber-500/10 text-amber-600 border-amber-500/20";
-                      if (action.includes("BCV"))
-                        return "bg-purple-500/10 text-purple-600 border-purple-500/20";
-                      return "bg-blue-500/10 text-blue-600 border-blue-500/20";
-                    };
-
-                    return (
-                      <div
-                        key={log.id}
-                        className="p-3.5 rounded-xl border border-border bg-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
-                      >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`px-2 py-0.5 rounded-md font-mono text-[10px] font-black border ${getBadgeColor(
-                                log.action
-                              )}`}
-                            >
-                              {log.action}
-                            </span>
-                            <span className="font-semibold text-foreground">
-                              {log.entity} •{" "}
-                              <span className="font-mono text-muted-foreground">
-                                {log.entity_id}
-                              </span>
-                            </span>
-                          </div>
-
-                          <div className="text-[11px] text-muted-foreground">
-                            <span>
-                              Actor: <strong>{log.actor_name || "Admin Operativo"}</strong>
-                            </span>
-                            {log.new_data && (
-                              <span className="ml-2 font-mono text-[10px] text-foreground/80 bg-muted px-1.5 py-0.5 rounded">
-                                {JSON.stringify(log.new_data)}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="text-[11px] text-muted-foreground sm:text-right shrink-0">
-                          <Clock className="w-3 h-3 inline mr-1 text-muted-foreground/70" />
-                          <span>
-                            {new Date(log.created_at).toLocaleString("es-VE")}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
+          <div className="animate-in fade-in">
+            <AuditTrailViewer
+              initialLogs={auditLogs}
+              tenantId={settings.tenant_id}
+              isSuperAdmin={currentUser?.role === "PLATFORM_SUPER_ADMIN"}
+              allTenants={allTenants as any}
+            />
           </div>
         )}
 
