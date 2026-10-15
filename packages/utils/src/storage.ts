@@ -80,12 +80,12 @@ export function buildTenantStorageKey(
  */
 export async function uploadToR2(input: UploadFileInput): Promise<UploadResult> {
   const key = buildTenantStorageKey(input.tenantId, input.folder, input.fileName);
+  const bucket = input.bucket || process.env.R2_BUCKET_NAME || DEFAULT_R2_BUCKET_NAME;
 
-  // 1. Prioritize Cloudflare R2 (Primary Storage - 10GB Free, 0 Egress)
+  // 1. Primary: Cloudflare R2 (10GB Free, 0 Egress)
+  let r2Success = false;
   try {
     const client = getR2Client();
-    const bucket = input.bucket || process.env.R2_BUCKET_NAME || DEFAULT_R2_BUCKET_NAME;
-
     const command = new PutObjectCommand({
       Bucket: bucket,
       Key: key,
@@ -98,24 +98,18 @@ export async function uploadToR2(input: UploadFileInput): Promise<UploadResult> 
     });
 
     await client.send(command);
-    const publicUrl = getR2FileUrl(key, bucket);
-
-    return {
-      key,
-      url: publicUrl,
-      bucket,
-    };
+    r2Success = true;
   } catch (r2Err) {
-    console.warn("[MarketOS Storage] Cloudflare R2 upload failed, falling back to Supabase Storage:", r2Err);
+    console.warn("[MarketOS Storage] Cloudflare R2 upload warning:", r2Err);
   }
 
-  // 2. Supabase Storage Fallback (Resilient Backup)
+  // 2. Resilient Replica: Supabase Storage
+  let supabaseSuccess = false;
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || DEFAULT_SUPABASE_SERVICE_ROLE_KEY;
-    const bucket = "marketos-media";
 
-    const uploadRes = await fetch(`${supabaseUrl}/storage/v1/object/${bucket}/${key}`, {
+    const uploadRes = await fetch(`${supabaseUrl}/storage/v1/object/marketos-media/${key}`, {
       method: "POST",
       headers: {
         apikey: serviceKey,
@@ -127,19 +121,23 @@ export async function uploadToR2(input: UploadFileInput): Promise<UploadResult> 
     });
 
     if (uploadRes.ok) {
-      const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${key}`;
-      return {
-        key,
-        url: publicUrl,
-        bucket,
-      };
+      supabaseSuccess = true;
     }
   } catch (supabaseErr) {
-    console.error("[MarketOS Storage] Both Cloudflare R2 and Supabase Storage upload failed:", supabaseErr);
-    throw supabaseErr;
+    console.warn("[MarketOS Storage] Supabase Storage replica warning:", supabaseErr);
   }
 
-  throw new Error("[MarketOS Storage] Failed to upload file to Cloudflare R2 and Supabase Storage fallback.");
+  if (!r2Success && !supabaseSuccess) {
+    throw new Error("[MarketOS Storage] Failed to upload file to both Cloudflare R2 and Supabase Storage.");
+  }
+
+  const publicUrl = getR2FileUrl(key, bucket);
+
+  return {
+    key,
+    url: publicUrl,
+    bucket,
+  };
 }
 
 /**
@@ -193,9 +191,8 @@ export function getR2FileUrl(key: string, bucket = process.env.R2_BUCKET_NAME ||
     return `${cleanDomain}/${key}`;
   }
 
-  // Fallback to S3 endpoint format or dev URL
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || DEFAULT_CLOUDFLARE_ACCOUNT_ID;
-  return `https://${accountId}.r2.cloudflarestorage.com/${bucket}/${key}`;
+  // Fallback to streaming media proxy route (which reads directly from Cloudflare R2)
+  return `/api/media/${key}`;
 }
 
 /**

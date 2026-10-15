@@ -30,8 +30,11 @@ import {
   RotateCcw,
   Heart,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Check,
   X,
+  LayoutGrid,
 } from "lucide-react";
 
 interface CatalogViewProps {
@@ -146,6 +149,22 @@ export function CatalogView({
 
   const activeFiltersCount = selectedCategoryIds.length + (isFavoritesOnly ? 1 : 0);
 
+  // User-Selectable Pagination State (10, 20, 50)
+  const [pageSize, setPageSize] = useState<number>(20);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
+  // Automatically reset to page 1 whenever any filter or page size changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategoryIds, isFavoritesOnly, pageSize]);
+
+  const totalProducts = filteredProducts.length;
+  const totalPages = Math.max(1, Math.ceil(totalProducts / pageSize));
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredProducts.slice(startIndex, startIndex + pageSize);
+  }, [filteredProducts, currentPage, pageSize]);
+
   return (
     <div
       className={`min-h-screen bg-background transition-all ${
@@ -154,181 +173,270 @@ export function CatalogView({
     >
       {/* Search and Category Combobox Bar - Sticky under StoreHeader */}
       <div className="bg-background/95 backdrop-blur border-b border-border sticky top-[92px] sm:top-[102px] z-20 shadow-xs">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3 space-y-2.5">
-          {/* Main Search and Combobox Row */}
-          <div className="flex items-center gap-2">
-            {/* Search Input */}
-            <div className="relative flex-1 min-w-0">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Buscar productos (ej. Harina, Queso, Café)..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-10 sm:h-11 pl-9 sm:pl-10 pr-9 sm:pr-14 rounded-xl border border-input bg-muted/30 text-xs sm:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-muted transition-colors cursor-pointer"
-                  title="Limpiar búsqueda"
-                  aria-label="Limpiar búsqueda"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-
-            {/* Category Combobox Dropdown Trigger */}
-            <div className="relative shrink-0">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-2.5 space-y-2">
+          {/* STEP 1: CATEGORÍAS (Explicitly ABOVE the search bar for both Mobile and Desktop) */}
+          <div className="relative">
+            <div className="flex items-center gap-2">
+              {/* Category Dropdown Trigger Button - Always clearly shows the word 'Categorías' */}
               <button
                 type="button"
                 onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-                className={`h-10 sm:h-11 px-3 sm:px-3.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer shadow-xs active:scale-95 ${
+                className={`flex-1 sm:flex-initial flex items-center justify-between gap-2.5 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-xs active:scale-[0.99] ${
                   activeFiltersCount > 0
                     ? "bg-primary text-primary-foreground border-primary ring-2 ring-primary/20"
                     : "bg-card hover:bg-muted text-foreground border-border"
                 }`}
                 aria-expanded={isCategoryDropdownOpen}
-                aria-label="Filtrar por categorías"
+                aria-label="Seleccionar Categorías"
               >
-                <SlidersHorizontal className="w-3.5 h-3.5 shrink-0" />
-                <span className="hidden xs:inline">
-                  {isFavoritesOnly
-                    ? "Favoritos"
-                    : selectedCategoryIds.length === 0
-                    ? "Categorías"
-                    : selectedCategoryIds.length === 1
-                    ? categories.find((c) => c.id === selectedCategoryIds[0])?.name || "1 Categoría"
-                    : `${selectedCategoryIds.length} Categorías`}
-                </span>
-                {activeFiltersCount > 0 && (
+                <div className="flex items-center gap-2 min-w-0">
+                  <LayoutGrid
+                    className={`w-4 h-4 shrink-0 ${
+                      activeFiltersCount > 0 ? "text-primary-foreground" : "text-primary"
+                    }`}
+                  />
                   <span
-                    className={`text-[10px] font-black h-4.5 min-w-4.5 px-1 rounded-full flex items-center justify-center shrink-0 ${
-                      activeFiltersCount > 0
-                        ? "bg-white text-primary"
-                        : "bg-primary text-white"
+                    className={`text-[11px] sm:text-xs font-black uppercase tracking-wider ${
+                      activeFiltersCount > 0 ? "text-primary-foreground/90" : "text-muted-foreground"
                     }`}
                   >
-                    {isFavoritesOnly ? "★" : selectedCategoryIds.length}
+                    Categorías:
                   </span>
-                )}
-                <ChevronDown
-                  className={`w-3.5 h-3.5 opacity-70 transition-transform ${
-                    isCategoryDropdownOpen ? "rotate-180" : ""
-                  }`}
-                />
+                  <span className="truncate font-black">
+                    {isFavoritesOnly
+                      ? "Favoritos ❤️"
+                      : selectedCategoryIds.length === 0
+                      ? "Todas las categorías"
+                      : selectedCategoryIds.length === 1
+                      ? categories.find((c) => c.id === selectedCategoryIds[0])?.name || "1 Categoría"
+                      : `${selectedCategoryIds.length} Categorías`}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0 ml-auto sm:ml-2">
+                  {activeFiltersCount > 0 && (
+                    <span className="text-[10px] font-black h-5 min-w-5 px-1.5 rounded-full flex items-center justify-center bg-white text-primary">
+                      {isFavoritesOnly ? "★" : selectedCategoryIds.length}
+                    </span>
+                  )}
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform duration-200 ${
+                      isCategoryDropdownOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </div>
               </button>
 
-              {/* Multi-Category Dropdown / Combobox Menu */}
-              {isCategoryDropdownOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setIsCategoryDropdownOpen(false)}
-                  />
-                  <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-2xl bg-card text-foreground border border-border shadow-2xl p-3 z-50 animate-in fade-in zoom-in-95 space-y-2">
-                    <div className="flex items-center justify-between pb-2 border-b border-border">
-                      <span className="text-xs font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                        <Tag className="w-3.5 h-3.5 text-primary" />
-                        <span>Filtro de Categorías</span>
-                      </span>
-                      {activeFiltersCount > 0 && (
-                        <button
-                          type="button"
-                          onClick={selectAllCategories}
-                          className="text-[11px] font-bold text-primary hover:underline cursor-pointer"
-                        >
-                          Limpiar todo
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Quick Favorites Option */}
+              {/* Quick 1-tap category chips (Scrollable) */}
+              <div className="hidden sm:flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                <button
+                  type="button"
+                  onClick={selectAllCategories}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                    selectedCategoryIds.length === 0 && !isFavoritesOnly
+                      ? "bg-primary text-primary-foreground shadow-2xs"
+                      : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  Todas
+                </button>
+                {categories.slice(0, 5).map((cat) => {
+                  const isSelected = selectedCategoryIds.includes(cat.id);
+                  return (
                     <button
+                      key={cat.id}
                       type="button"
-                      onClick={() => {
-                        setIsFavoritesOnly(!isFavoritesOnly);
-                        if (!isFavoritesOnly) setSelectedCategoryIds([]);
-                      }}
-                      className={`w-full flex items-center justify-between p-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
-                        isFavoritesOnly
-                          ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30"
-                          : "hover:bg-muted text-foreground"
+                      onClick={() => toggleCategory(cat.id)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer ${
+                        isSelected
+                          ? "bg-primary text-primary-foreground font-bold shadow-2xs"
+                          : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted"
                       }`}
                     >
-                      <div className="flex items-center gap-2">
-                        <Heart
-                          className={`w-4 h-4 ${
-                            isFavoritesOnly ? "fill-rose-500 text-rose-500" : "text-muted-foreground"
-                          }`}
-                        />
-                        <span>Solo Mis Favoritos</span>
-                      </div>
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-muted font-bold text-muted-foreground">
-                        {favoritesCount}
-                      </span>
+                      {cat.name}
                     </button>
+                  );
+                })}
+                {categories.length > 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsCategoryDropdownOpen(true)}
+                    className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-primary hover:bg-primary/10 shrink-0 cursor-pointer"
+                  >
+                    +{categories.length - 5} más
+                  </button>
+                )}
+              </div>
+            </div>
 
-                    {/* Categories Checkboxes List */}
-                    <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
-                      {categories.map((cat) => {
-                        const isSelected = selectedCategoryIds.includes(cat.id);
-                        const count = products.filter((p) => p.category_id === cat.id).length;
-
-                        return (
-                          <button
-                            key={cat.id}
-                            type="button"
-                            onClick={() => toggleCategory(cat.id)}
-                            className={`w-full flex items-center justify-between p-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                              isSelected
-                                ? "bg-primary/10 text-primary font-bold border border-primary/20"
-                                : "hover:bg-muted text-foreground"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div
-                                className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
-                                  isSelected
-                                    ? "bg-primary border-primary text-primary-foreground"
-                                    : "border-muted-foreground/40 bg-background"
-                                }`}
-                              >
-                                {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                              </div>
-                              <span className="truncate">{cat.name}</span>
-                            </div>
-                            <span className="text-[10px] font-mono text-muted-foreground ml-2 shrink-0">
-                              {count}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Action Footer */}
-                    <div className="pt-2 border-t border-border flex items-center justify-between gap-2">
+            {/* Category Dropdown Modal / Popover */}
+            {isCategoryDropdownOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40 bg-black/20 backdrop-blur-2xs sm:bg-transparent sm:backdrop-blur-none"
+                  onClick={() => setIsCategoryDropdownOpen(false)}
+                />
+                <div className="absolute left-0 top-full mt-2 w-full sm:w-88 rounded-2xl bg-card text-foreground border border-border shadow-2xl p-3 z-50 animate-in fade-in zoom-in-95 space-y-2">
+                  <div className="flex items-center justify-between pb-2 border-b border-border">
+                    <span className="text-xs font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <LayoutGrid className="w-3.5 h-3.5 text-primary" />
+                      <span>Elige una categoría</span>
+                    </span>
+                    {activeFiltersCount > 0 && (
                       <button
                         type="button"
                         onClick={selectAllCategories}
-                        className="flex-1 py-2 rounded-xl border border-border text-foreground hover:bg-muted text-xs font-semibold cursor-pointer"
+                        className="text-[11px] font-bold text-primary hover:underline cursor-pointer"
                       >
-                        Ver Todas
+                        Limpiar todo
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsCategoryDropdownOpen(false)}
-                        className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 cursor-pointer shadow-xs"
-                      >
-                        Aplicar ({filteredProducts.length})
-                      </button>
-                    </div>
+                    )}
                   </div>
-                </>
-              )}
-            </div>
+
+                  {/* Todas las categorías (Opción por defecto) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      selectAllCategories();
+                      setIsCategoryDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between p-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                      selectedCategoryIds.length === 0 && !isFavoritesOnly
+                        ? "bg-primary/10 text-primary font-bold border border-primary/20"
+                        : "hover:bg-muted text-foreground"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
+                          selectedCategoryIds.length === 0 && !isFavoritesOnly
+                            ? "bg-primary border-primary text-primary-foreground"
+                            : "border-muted-foreground/40 bg-background"
+                        }`}
+                      >
+                        {selectedCategoryIds.length === 0 && !isFavoritesOnly && (
+                          <Check className="w-3 h-3 stroke-[3]" />
+                        )}
+                      </div>
+                      <span className="font-bold">Todas las categorías</span>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold text-muted-foreground">
+                      {products.length}
+                    </span>
+                  </button>
+
+                  {/* Quick Favorites Option */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsFavoritesOnly(!isFavoritesOnly);
+                      if (!isFavoritesOnly) setSelectedCategoryIds([]);
+                    }}
+                    className={`w-full flex items-center justify-between p-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                      isFavoritesOnly
+                        ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30"
+                        : "hover:bg-muted text-foreground"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Heart
+                        className={`w-4 h-4 ${
+                          isFavoritesOnly ? "fill-rose-500 text-rose-500" : "text-muted-foreground"
+                        }`}
+                      />
+                      <span>Solo Mis Favoritos</span>
+                    </div>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-muted font-bold text-muted-foreground">
+                      {favoritesCount}
+                    </span>
+                  </button>
+
+                  {/* Categories List with Checkboxes */}
+                  <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
+                    {categories.map((cat) => {
+                      const isSelected = selectedCategoryIds.includes(cat.id);
+                      const count = products.filter((p) => p.category_id === cat.id).length;
+
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => toggleCategory(cat.id)}
+                          className={`w-full flex items-center justify-between p-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                            isSelected
+                              ? "bg-primary/10 text-primary font-bold border border-primary/20"
+                              : "hover:bg-muted text-foreground"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div
+                              className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
+                                isSelected
+                                  ? "bg-primary border-primary text-primary-foreground"
+                                  : "border-muted-foreground/40 bg-background"
+                              }`}
+                            >
+                              {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                            </div>
+                            <span className="truncate">{cat.name}</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-muted-foreground ml-2 shrink-0">
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Action Footer */}
+                  <div className="pt-2 border-t border-border flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        selectAllCategories();
+                        setIsCategoryDropdownOpen(false);
+                      }}
+                      className="flex-1 py-2 rounded-xl border border-border text-foreground hover:bg-muted text-xs font-semibold cursor-pointer"
+                    >
+                      Ver Todas
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsCategoryDropdownOpen(false)}
+                      className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 cursor-pointer shadow-xs"
+                    >
+                      Listo ({filteredProducts.length})
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* STEP 2: BUSCADOR (Directly UNDER Categories) */}
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              placeholder={
+                selectedCategoryIds.length === 1
+                  ? `Buscar en ${categories.find((c) => c.id === selectedCategoryIds[0])?.name || "esta categoría"}...`
+                  : "Buscar productos (ej. Harina, Queso, Café)..."
+              }
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-10 sm:h-11 pl-9 sm:pl-10 pr-9 sm:pr-14 rounded-xl border border-input bg-muted/30 text-xs sm:text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-muted transition-colors cursor-pointer"
+                title="Limpiar búsqueda"
+                aria-label="Limpiar búsqueda"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Active Filter Removable Chips */}
@@ -411,7 +519,7 @@ export function CatalogView({
         </div>
 
         {/* Section Heading with Counter */}
-        <div className="flex items-center justify-between mb-3 sm:mb-4">
+        <div id="catalog-section" className="flex items-center justify-between mb-3 sm:mb-4 scroll-mt-28">
           <h2 className="text-xs sm:text-sm font-black tracking-tight text-foreground flex items-center gap-1.5">
             {isFavoritesOnly ? (
               <>
@@ -435,7 +543,7 @@ export function CatalogView({
               </>
             )}
             <span className="text-[11px] sm:text-xs text-muted-foreground font-semibold">
-              ({filteredProducts.length} {filteredProducts.length === 1 ? "producto" : "productos"})
+              ({totalProducts} {totalProducts === 1 ? "producto" : "productos"})
             </span>
           </h2>
 
@@ -451,7 +559,7 @@ export function CatalogView({
 
         {/* Products Grid with Reactive Section Transition */}
         <div
-          key={`${selectedCategoryIds.join("-")}-${isFavoritesOnly}-${searchQuery}`}
+          key={`${selectedCategoryIds.join("-")}-${isFavoritesOnly}-${searchQuery}-${currentPage}-${pageSize}`}
           className="animate-in fade-in duration-200"
         >
           {filteredProducts.length === 0 ? (
@@ -495,15 +603,100 @@ export function CatalogView({
               </div>
             )
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-4">
-              {filteredProducts.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  exchangeRate={exchangeRate.value}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-4">
+                {paginatedProducts.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    exchangeRate={exchangeRate.value}
+                  />
+                ))}
+              </div>
+
+              {/* Responsive User-Selectable Pagination Bar */}
+              {totalProducts > 0 && (
+                <div className="mt-8 mb-4 p-3.5 sm:p-4 rounded-2xl bg-card border border-border flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 shadow-xs">
+                  {/* Page Size Selector (10, 20, 50) */}
+                  <div className="flex items-center gap-2 text-xs w-full sm:w-auto justify-between sm:justify-start">
+                    <span className="font-bold text-muted-foreground whitespace-nowrap">
+                      Por página:
+                    </span>
+                    <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/50">
+                      {[10, 20, 50].map((size) => (
+                        <button
+                          key={size}
+                          type="button"
+                          onClick={() => {
+                            setPageSize(size);
+                            const el = document.getElementById("catalog-section");
+                            if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                          }}
+                          className={`px-2.5 py-1 rounded-lg font-black text-xs transition-all cursor-pointer ${
+                            pageSize === size
+                              ? "bg-primary text-primary-foreground shadow-2xs"
+                              : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                          }`}
+                        >
+                          {size}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Range Counter */}
+                  <div className="text-xs text-muted-foreground font-semibold text-center order-last sm:order-none">
+                    Mostrando{" "}
+                    <span className="font-bold text-foreground">
+                      {(currentPage - 1) * pageSize + 1}
+                    </span>{" "}
+                    -{" "}
+                    <span className="font-bold text-foreground">
+                      {Math.min(currentPage * pageSize, totalProducts)}
+                    </span>{" "}
+                    de{" "}
+                    <span className="font-bold text-foreground">{totalProducts}</span> productos
+                  </div>
+
+                  {/* Page Navigation Buttons */}
+                  <div className="flex items-center gap-1.5 w-full sm:w-auto justify-center sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCurrentPage((p) => Math.max(1, p - 1));
+                        const el = document.getElementById("catalog-section");
+                        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }}
+                      disabled={currentPage === 1}
+                      className="h-9 px-3 rounded-xl border border-border bg-card hover:bg-muted text-xs font-bold text-foreground disabled:opacity-40 disabled:pointer-events-none transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                      aria-label="Página anterior"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      <span>Anterior</span>
+                    </button>
+
+                    <div className="px-3 py-1.5 rounded-xl bg-muted/60 border border-border/50 text-xs font-black text-foreground min-w-[70px] text-center">
+                      {currentPage} / {totalPages}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCurrentPage((p) => Math.min(totalPages, p + 1));
+                        const el = document.getElementById("catalog-section");
+                        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }}
+                      disabled={currentPage === totalPages}
+                      className="h-9 px-3 rounded-xl border border-border bg-card hover:bg-muted text-xs font-bold text-foreground disabled:opacity-40 disabled:pointer-events-none transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                      aria-label="Página siguiente"
+                    >
+                      <span>Siguiente</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>
