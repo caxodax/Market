@@ -77,6 +77,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     coupons,
     stores,
     allTenants,
+    planLimits,
   ] = await Promise.all([
     MarketOSRepository.getTenantSettings(targetTenantId),
     MarketOSRepository.getProducts(targetTenantId),
@@ -92,6 +93,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     MarketOSRepository.getCoupons(targetTenantId),
     MarketOSRepository.getStores(targetTenantId, true),
     isSuperAdmin ? MarketOSRepository.getAllTenants() : Promise.resolve([]),
+    MarketOSRepository.getTenantPlanLimits(targetTenantId),
   ]);
 
   return (
@@ -113,23 +115,24 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </div>
       )}
       <AdminDashboard
-      settings={settings}
-      products={products}
-      categories={categories}
-      orders={orders}
-      payments={payments}
-      exchangeRate={exchangeRate}
-      ratesHistory={ratesHistory}
-      deliveryZones={deliveryZones}
-      drivers={drivers}
-      auditLogs={auditLogs}
-      currentUser={currentUser}
-      staffMembers={staffMembers}
-      coupons={coupons}
-      stores={stores}
-      allTenants={allTenants}
-      currentStoreId={params?.store}
-    />
-  </div>
+        settings={settings}
+        products={products}
+        categories={categories}
+        orders={orders}
+        payments={payments}
+        exchangeRate={exchangeRate}
+        ratesHistory={ratesHistory}
+        deliveryZones={deliveryZones}
+        drivers={drivers}
+        auditLogs={auditLogs}
+        currentUser={currentUser}
+        staffMembers={staffMembers}
+        coupons={coupons}
+        stores={stores}
+        allTenants={allTenants}
+        currentStoreId={params?.store}
+        planLimits={planLimits}
+      />
+    </div>
   );
 }

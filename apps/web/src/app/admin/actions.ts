@@ -20,6 +20,7 @@ import {
   UpdateDriverInput,
   AuditActor,
   AuditLogFilters,
+  TenantPlanLimits,
 } from "@marketos/types";
 import { revalidatePath } from "next/cache";
 import { sendOrderStatusPushNotification } from "@/lib/pushNotifications";
@@ -283,9 +284,26 @@ export async function createProductAction(input: CreateProductInput) {
     return { success: true, product };
   } catch (error) {
     console.error("Error creating product:", error);
+    const rawMsg = error instanceof Error ? error.message : "Error al crear producto";
+    const isQuota = rawMsg.includes("PLAN_QUOTA_EXCEEDED");
+    let limits: TenantPlanLimits | undefined = undefined;
+    if (isQuota) {
+      try {
+        limits = await MarketOSRepository.getTenantPlanLimits(input.tenantId);
+      } catch (e) {
+        console.warn("Could not fetch limits after quota hit:", e);
+      }
+    }
+    const cleanError = rawMsg
+      .replace(/^Error:\s*PLAN_QUOTA_EXCEEDED:\s*/i, "")
+      .replace(/^PLAN_QUOTA_EXCEEDED:\s*/i, "");
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Error al crear producto",
+      quotaExceeded: isQuota,
+      quotaType: isQuota ? ("products" as const) : undefined,
+      limits,
+      error: cleanError,
     };
   }
 }
@@ -451,9 +469,16 @@ export async function createCouponAction(input: CreateCouponInput) {
     return { success: true, coupon };
   } catch (error) {
     console.error("Error creating coupon:", error);
+    const rawMsg = error instanceof Error ? error.message : "Error al crear el cupón";
+    const isLocked = rawMsg.includes("PLAN_FEATURE_LOCKED");
+    const cleanError = rawMsg
+      .replace(/^Error:\s*PLAN_FEATURE_LOCKED:\s*/i, "")
+      .replace(/^PLAN_FEATURE_LOCKED:\s*/i, "");
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Error al crear el cupón",
+      featureLocked: isLocked,
+      error: cleanError,
     };
   }
 }
@@ -576,7 +601,27 @@ export async function createStoreAction(input: {
     return { success: true, store };
   } catch (error) {
     console.error("Error creating store:", error);
-    return { success: false, error: "No se pudo crear la sucursal" };
+    const rawMsg = error instanceof Error ? error.message : "No se pudo crear la sucursal";
+    const isQuota = rawMsg.includes("PLAN_QUOTA_EXCEEDED");
+    let limits: TenantPlanLimits | undefined = undefined;
+    if (isQuota) {
+      try {
+        limits = await MarketOSRepository.getTenantPlanLimits(input.tenantId);
+      } catch (e) {
+        console.warn("Could not fetch limits after quota hit:", e);
+      }
+    }
+    const cleanError = rawMsg
+      .replace(/^Error:\s*PLAN_QUOTA_EXCEEDED:\s*/i, "")
+      .replace(/^PLAN_QUOTA_EXCEEDED:\s*/i, "");
+
+    return {
+      success: false,
+      quotaExceeded: isQuota,
+      quotaType: isQuota ? ("stores" as const) : undefined,
+      limits,
+      error: cleanError,
+    };
   }
 }
 
@@ -710,9 +755,16 @@ export async function createDriverAction(input: CreateDriverInput) {
     return { success: true, driver };
   } catch (error: any) {
     console.error("Error creating driver:", error);
+    const rawMsg = error instanceof Error ? error.message : "Error al registrar el repartidor";
+    const isLocked = rawMsg.includes("PLAN_FEATURE_LOCKED");
+    const cleanError = rawMsg
+      .replace(/^Error:\s*PLAN_FEATURE_LOCKED:\s*/i, "")
+      .replace(/^PLAN_FEATURE_LOCKED:\s*/i, "");
+
     return {
       success: false,
-      error: error.message || "Error al registrar el repartidor",
+      featureLocked: isLocked,
+      error: cleanError,
     };
   }
 }
@@ -758,3 +810,20 @@ export async function toggleDriverStatusAction(
     };
   }
 }
+
+/**
+ * Fetch active plan, limits, and quotas for tenant
+ */
+export async function getTenantPlanLimitsAction(tenantId: string) {
+  try {
+    const limits = await MarketOSRepository.getTenantPlanLimits(tenantId);
+    return { success: true, limits };
+  } catch (error) {
+    console.error("Error fetching tenant plan limits:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al obtener límites del plan",
+    };
+  }
+}
+

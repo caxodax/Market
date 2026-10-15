@@ -141,6 +141,7 @@ export async function changeTenantPlanAction(
     });
     invalidateTenantCache(tenantId);
     revalidatePath("/platform");
+    revalidatePath("/admin");
     return { success: true, subscription };
   } catch (error) {
     console.error("Error changing tenant plan:", error);

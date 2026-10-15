@@ -18,6 +18,8 @@ import {
   Coupon,
   Store as StoreType,
   TenantWithDetails,
+  TenantPlanLimits,
+  SubscriptionPlanTier,
 } from "@marketos/types";
 import {
   formatCurrency,
@@ -45,6 +47,7 @@ import { OrderDetailsModal } from "./order-details-modal";
 import { SalesReportsTab } from "./sales-reports-tab";
 import { DeliveryManager } from "./delivery-manager";
 import { AuditTrailViewer } from "./audit-trail-viewer";
+import { PlanUpgradeModal } from "./plan-upgrade-modal";
 import {
   PackageCheck,
   Boxes,
@@ -96,6 +99,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ChevronRight,
+  Zap,
+  Crown,
 } from "lucide-react";
 
 interface AdminDashboardProps {
@@ -115,6 +120,7 @@ interface AdminDashboardProps {
   stores?: StoreType[];
   allTenants?: TenantWithDetails[];
   currentStoreId?: string;
+  planLimits?: TenantPlanLimits;
 }
 
 interface AdminToast {
@@ -153,6 +159,7 @@ export function AdminDashboard({
   stores: initialStores = [],
   allTenants = [],
   currentStoreId,
+  planLimits,
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<
     "PAYMENTS" | "ORDERS" | "REPORTS" | "INVENTORY" | "DELIVERY" | "COUPONS" | "PUSH" | "RATES" | "AUDIT" | "STAFF" | "SETTINGS" | "STORES"
@@ -176,6 +183,20 @@ export function AdminDashboard({
   const [newStoreAddress, setNewStoreAddress] = useState("");
   const [newStorePhone, setNewStorePhone] = useState("");
   const [savingStore, setSavingStore] = useState(false);
+
+  // SaaS Plan Limits & Quota Control State
+  const [planLimitsState, setPlanLimitsState] = useState<TenantPlanLimits | undefined>(planLimits);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [upgradeModalQuotaType, setUpgradeModalQuotaType] = useState<
+    "products" | "stores" | "coupons" | "drivers" | "custom_domain" | "general"
+  >("general");
+
+  const triggerUpgradeModal = (
+    type: "products" | "stores" | "coupons" | "drivers" | "custom_domain" | "general" = "general"
+  ) => {
+    setUpgradeModalQuotaType(type);
+    setIsUpgradeModalOpen(true);
+  };
 
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [syncingBcv, setSyncingBcv] = useState(false);
@@ -345,9 +366,13 @@ export function AdminDashboard({
           message: `La sucursal "${res.store.name}" fue creada y registrada exitosamente.`,
         });
       } else {
+        if (res.quotaExceeded) {
+          setIsStoreModalOpen(false);
+          triggerUpgradeModal("stores");
+        }
         showToast({
           type: "error",
-          title: "Error al crear sucursal",
+          title: res.quotaExceeded ? "Límite de Sucursales Alcanzado" : "Error al crear sucursal",
           message: res.error || "No se pudo registrar la sucursal.",
         });
       }
@@ -810,6 +835,29 @@ export function AdminDashboard({
                       {settingsState.tenant_id}
                     </span>
                   </div>
+                  <div className="mt-1.5">
+                    <button
+                      type="button"
+                      onClick={() => triggerUpgradeModal("general")}
+                      className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-xs ${
+                        planLimitsState?.plan.id === "ENTERPRISE"
+                          ? "bg-purple-500/10 text-purple-600 border-purple-500/30"
+                          : planLimitsState?.plan.id === "GROWTH"
+                          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                          : "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                      }`}
+                      title="Plan SaaS Activo - Clic para ver cuotas y planes"
+                    >
+                      {planLimitsState?.plan.id === "ENTERPRISE" ? (
+                        <Crown className="w-3 h-3 text-purple-500" />
+                      ) : planLimitsState?.plan.id === "GROWTH" ? (
+                        <Sparkles className="w-3 h-3 text-emerald-500" />
+                      ) : (
+                        <Zap className="w-3 h-3 text-amber-500" />
+                      )}
+                      <span>{planLimitsState?.plan.name || "Plan Starter"}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
               <button
@@ -1094,8 +1142,31 @@ export function AdminDashboard({
               </div>
             </div>
 
-            {/* Right: Quick actions (BCV, Sonido, Sync, Refresh, User, Logout) */}
+            {/* Right: Quick actions (Plan SaaS, BCV, Sonido, Sync, Refresh, User, Logout) */}
             <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+              {/* SaaS Plan Tier Indicator Button */}
+              <button
+                type="button"
+                onClick={() => triggerUpgradeModal("general")}
+                className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-xs ${
+                  planLimitsState?.plan.id === "ENTERPRISE"
+                    ? "bg-purple-500/10 text-purple-600 border-purple-500/30 dark:text-purple-400"
+                    : planLimitsState?.plan.id === "GROWTH"
+                    ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30 dark:text-emerald-400"
+                    : "bg-amber-500/10 text-amber-600 border-amber-500/30 dark:text-amber-400"
+                }`}
+                title="Límites y Cuotas de tu Plan SaaS - Clic para ver opciones"
+              >
+                {planLimitsState?.plan.id === "ENTERPRISE" ? (
+                  <Crown className="w-3.5 h-3.5 text-purple-500" />
+                ) : planLimitsState?.plan.id === "GROWTH" ? (
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                ) : (
+                  <Zap className="w-3.5 h-3.5 text-amber-500" />
+                )}
+                <span>{planLimitsState?.plan.name || "Plan Starter"}</span>
+              </button>
+
               <button
                 onClick={() => setActiveTab("RATES")}
                 className="hidden md:flex items-center gap-1.5 text-xs bg-muted/60 hover:bg-muted border border-border px-2.5 py-1.5 rounded-xl font-mono transition-colors cursor-pointer"
@@ -1727,32 +1798,138 @@ export function AdminDashboard({
         )}
 
         {/* TAB 3: INVENTORY */}
-        {activeTab === "INVENTORY" && (
-          <div className="space-y-4 animate-in fade-in">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card p-4 rounded-2xl border border-border">
-              <div>
-                <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-                  <Boxes className="w-4 h-4 text-primary" />
-                  Catálogo & Control de Inventario
-                </h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Subida directa a Cloudflare R2 con compresión WebP sin pérdida visual.
-                </p>
+        {activeTab === "INVENTORY" && (() => {
+          const maxProducts = planLimitsState?.plan.max_products || 60;
+          const currentProductsCount = products.length;
+          const isAtCapacity = currentProductsCount >= maxProducts;
+          const productUsagePct = Math.min(100, Math.round((currentProductsCount / maxProducts) * 100));
+
+          return (
+            <div className="space-y-4 animate-in fade-in">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card p-4 rounded-2xl border border-border">
+                <div>
+                  <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <Boxes className="w-4 h-4 text-primary" />
+                    Catálogo & Control de Inventario
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Subida directa a Cloudflare R2 con compresión WebP sin pérdida visual.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (isAtCapacity) {
+                      triggerUpgradeModal("products");
+                      return;
+                    }
+                    setEditingProduct(null);
+                    setIsProductModalOpen(true);
+                  }}
+                  className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold shadow-sm cursor-pointer transition-all shrink-0 ${
+                    isAtCapacity
+                      ? "bg-rose-600 hover:bg-rose-500 text-white ring-2 ring-rose-500/30"
+                      : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white"
+                  }`}
+                  title={isAtCapacity ? "Cupo máximo alcanzado. Clic para actualizar plan" : "Registrar nuevo producto"}
+                >
+                  {isAtCapacity ? (
+                    <>
+                      <Zap className="w-4 h-4" />
+                      <span>Límite Alcanzado (Mejorar Plan)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      <span>+ Nuevo Producto</span>
+                    </>
+                  )}
+                </button>
               </div>
 
-              <button
-                onClick={() => {
-                  setEditingProduct(null);
-                  setIsProductModalOpen(true);
-                }}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-sm cursor-pointer transition-all shrink-0"
+              {/* SaaS Catalog Quota Indicator Card */}
+              <div
+                className={`p-4 rounded-2xl border transition-all ${
+                  isAtCapacity
+                    ? "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
+                    : productUsagePct >= 80
+                    ? "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400"
+                    : "bg-card border-border text-foreground"
+                }`}
               >
-                <Plus className="w-4 h-4" />
-                <span>+ Nuevo Producto</span>
-              </button>
-            </div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        isAtCapacity
+                          ? "bg-rose-500/20 text-rose-500"
+                          : productUsagePct >= 80
+                          ? "bg-amber-500/20 text-amber-500"
+                          : "bg-primary/10 text-primary"
+                      }`}
+                    >
+                      <Boxes className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-sm text-foreground">
+                          Capacidad de Catálogo ({currentProductsCount} / {maxProducts} productos)
+                        </span>
+                        <span
+                          className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                            isAtCapacity
+                              ? "bg-rose-500 text-white"
+                              : productUsagePct >= 80
+                              ? "bg-amber-500 text-white"
+                              : "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                          }`}
+                        >
+                          {isAtCapacity
+                            ? "Límite Alcanzado (100%)"
+                            : productUsagePct >= 80
+                            ? `${productUsagePct}% En Uso (Cerca del Límite)`
+                            : `${productUsagePct}% En Uso`}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Plan actual: <strong className="text-foreground">{planLimitsState?.plan.name || "Starter"}</strong>.
+                        {isAtCapacity
+                          ? " Has alcanzado el cupo máximo de tu plan. No podrás agregar más artículos hasta actualizar a un plan superior."
+                          : ` Te quedan ${maxProducts - currentProductsCount} espacios para nuevos productos en tu catálogo.`}
+                      </p>
+                    </div>
+                  </div>
 
-            <div className="grid gap-3">
+                  <button
+                    type="button"
+                    onClick={() => triggerUpgradeModal("products")}
+                    className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                      isAtCapacity
+                        ? "bg-rose-600 hover:bg-rose-500 text-white shadow-sm hover:scale-105 active:scale-95"
+                        : "bg-muted hover:bg-muted/80 text-foreground border border-border"
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{isAtCapacity ? "Actualizar Plan Ahora" : "Ver Opciones de Upgrade"}</span>
+                  </button>
+                </div>
+
+                {/* Progress bar */}
+                <div className="mt-3 w-full h-2 rounded-full bg-muted overflow-hidden border border-border/50">
+                  <div
+                    className={`h-full transition-all duration-500 rounded-full ${
+                      isAtCapacity
+                        ? "bg-rose-500"
+                        : productUsagePct >= 80
+                        ? "bg-amber-500"
+                        : "bg-gradient-to-r from-emerald-500 to-teal-500"
+                    }`}
+                    style={{ width: `${productUsagePct}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-3">
               {products.map((prod) => {
                 const categoryName =
                   categories.find((c) => c.id === prod.category_id)?.name ||
@@ -1862,7 +2039,7 @@ export function AdminDashboard({
               })}
             </div>
           </div>
-        )}
+        ); })()}
 
         {/* TAB 4: DELIVERY & DRIVERS */}
         {activeTab === "DELIVERY" && (
@@ -1876,10 +2053,41 @@ export function AdminDashboard({
 
         {/* TAB 5: DISCOUNT COUPONS */}
         {activeTab === "COUPONS" && (
-          <CouponManager
-            tenantId={settings.tenant_id}
-            initialCoupons={initialCoupons}
-          />
+          <div className="space-y-4">
+            {planLimitsState?.plan.id === "STARTER" && (
+              <div className="p-4 sm:p-5 rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0">
+                    <Ticket className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-sm text-foreground flex items-center gap-2">
+                      <span>Módulo de Cupones Exclusivo de Growth & Enterprise</span>
+                      <span className="text-[10px] font-black uppercase tracking-wider bg-amber-500 text-white px-2 py-0.5 rounded-full">
+                        Premium
+                      </span>
+                    </h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Tu plan actual ({planLimitsState.plan.name}) no incluye campañas de cupones ni promociones con descuento. Pasa a Growth ($49/mes) para activar cupones ilimitados.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => triggerUpgradeModal("coupons")}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-sm transition-all shrink-0 cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Desbloquear con Growth</span>
+                </button>
+              </div>
+            )}
+            <CouponManager
+              tenantId={settings.tenant_id}
+              initialCoupons={initialCoupons}
+            />
+          </div>
         )}
 
         {/* TAB 6: WEB PUSH NOTIFICATIONS BROADCAST HUB */}
@@ -2068,48 +2276,162 @@ export function AdminDashboard({
         )}
 
         {/* TAB: STORES & BRANCH MANAGEMENT */}
-        {activeTab === "STORES" && (
-          <div className="space-y-6 animate-in fade-in">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card p-4 rounded-2xl border border-border">
-              <div>
-                <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-primary" />
-                  Sucursales y Sedes de Despacho ({stores.length})
-                </h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Gestiona las sedes físicas de este comercio para zonificación de inventario y despacho de pedidos.
-                </p>
-              </div>
+        {activeTab === "STORES" && (() => {
+          const maxStores = planLimitsState?.plan.max_stores || 1;
+          const currentStoresCount = stores.length;
+          const isAtCapacity = currentStoresCount >= maxStores;
+          const storeUsagePct = Math.min(100, Math.round((currentStoresCount / maxStores) * 100));
 
-              <button
-                type="button"
-                onClick={() => setIsStoreModalOpen(true)}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold shadow-sm cursor-pointer transition-all shrink-0"
-              >
-                <Plus className="w-4 h-4" />
-                <span>+ Registrar Nueva Sucursal</span>
-              </button>
-            </div>
-
-            {stores.length === 0 ? (
-              <div className="p-12 text-center rounded-2xl border border-dashed border-border bg-card space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
-                  <Building2 className="w-6 h-6" />
+          return (
+            <div className="space-y-6 animate-in fade-in">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card p-4 rounded-2xl border border-border">
+                <div>
+                  <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-primary" />
+                    Sucursales y Sedes de Despacho ({stores.length})
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Gestiona las sedes físicas de este comercio para zonificación de inventario y despacho de pedidos.
+                  </p>
                 </div>
-                <h3 className="font-bold text-foreground text-sm">No hay sucursales registradas aún</h3>
-                <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                  Registra la primera sede física de este comercio (ej: Sede Principal, Sucursal Este, etc.) para asociar inventario y pedidos.
-                </p>
+
                 <button
                   type="button"
-                  onClick={() => setIsStoreModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold shadow-sm hover:bg-primary/90 transition-colors cursor-pointer"
+                  onClick={() => {
+                    if (isAtCapacity) {
+                      triggerUpgradeModal("stores");
+                      return;
+                    }
+                    setIsStoreModalOpen(true);
+                  }}
+                  className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold shadow-sm cursor-pointer transition-all shrink-0 ${
+                    isAtCapacity
+                      ? "bg-rose-600 hover:bg-rose-500 text-white ring-2 ring-rose-500/30"
+                      : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                  }`}
+                  title={isAtCapacity ? "Cupo máximo alcanzado. Clic para actualizar plan" : "Registrar nueva sucursal"}
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>Crear Primera Sucursal</span>
+                  {isAtCapacity ? (
+                    <>
+                      <Zap className="w-4 h-4" />
+                      <span>Límite de Sedes Alcanzado</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      <span>+ Registrar Nueva Sucursal</span>
+                    </>
+                  )}
                 </button>
               </div>
-            ) : (
+
+              {/* SaaS Store Quota Card */}
+              <div
+                className={`p-4 rounded-2xl border transition-all ${
+                  isAtCapacity
+                    ? "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
+                    : storeUsagePct >= 80
+                    ? "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400"
+                    : "bg-card border-border text-foreground"
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        isAtCapacity
+                          ? "bg-rose-500/20 text-rose-500"
+                          : storeUsagePct >= 80
+                          ? "bg-amber-500/20 text-amber-500"
+                          : "bg-primary/10 text-primary"
+                      }`}
+                    >
+                      <Building2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-sm text-foreground">
+                          Límite de Sedes Físicas ({currentStoresCount} / {maxStores} sucursales)
+                        </span>
+                        <span
+                          className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                            isAtCapacity
+                              ? "bg-rose-500 text-white"
+                              : storeUsagePct >= 80
+                              ? "bg-amber-500 text-white"
+                              : "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                          }`}
+                        >
+                          {isAtCapacity
+                            ? "Límite Alcanzado (100%)"
+                            : storeUsagePct >= 80
+                            ? `${storeUsagePct}% En Uso`
+                            : `${storeUsagePct}% En Uso`}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Plan actual: <strong className="text-foreground">{planLimitsState?.plan.name || "Starter"}</strong>.
+                        {isAtCapacity
+                          ? " Has alcanzado el límite máximo de sucursales permitido por tu suscripción actual. Actualiza a Growth (hasta 3) o Enterprise (hasta 10) para abrir nuevas sedes."
+                          : ` Puedes registrar ${maxStores - currentStoresCount} sucursales adicionales en tu plan.`}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => triggerUpgradeModal("stores")}
+                    className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                      isAtCapacity
+                        ? "bg-rose-600 hover:bg-rose-500 text-white shadow-sm hover:scale-105 active:scale-95"
+                        : "bg-muted hover:bg-muted/80 text-foreground border border-border"
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{isAtCapacity ? "Aumentar Límite de Sedes" : "Ver Planes SaaS"}</span>
+                  </button>
+                </div>
+
+                {/* Progress bar */}
+                <div className="mt-3 w-full h-2 rounded-full bg-muted overflow-hidden border border-border/50">
+                  <div
+                    className={`h-full transition-all duration-500 rounded-full ${
+                      isAtCapacity
+                        ? "bg-rose-500"
+                        : storeUsagePct >= 80
+                        ? "bg-amber-500"
+                        : "bg-gradient-to-r from-emerald-500 to-teal-500"
+                    }`}
+                    style={{ width: `${storeUsagePct}%` }}
+                  />
+                </div>
+              </div>
+
+              {stores.length === 0 ? (
+                <div className="p-12 text-center rounded-2xl border border-dashed border-border bg-card space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                    <Building2 className="w-6 h-6" />
+                  </div>
+                  <h3 className="font-bold text-foreground text-sm">No hay sucursales registradas aún</h3>
+                  <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                    Registra la primera sede física de este comercio (ej: Sede Principal, Sucursal Este, etc.) para asociar inventario y pedidos.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isAtCapacity) {
+                        triggerUpgradeModal("stores");
+                        return;
+                      }
+                      setIsStoreModalOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold shadow-sm hover:bg-primary/90 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Crear Primera Sucursal</span>
+                  </button>
+                </div>
+              ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {stores.map((st) => {
                   const branchOrdersCount = orders.filter((o) => o.store_id === st.id).length;
@@ -2198,7 +2520,7 @@ export function AdminDashboard({
               </div>
             )}
           </div>
-        )}
+        ); })()}
 
         {/* TAB 8: STORE SETTINGS & BRANDING */}
         {activeTab === "SETTINGS" && (
@@ -2222,6 +2544,7 @@ export function AdminDashboard({
         }}
         onSaved={handleProductSaved}
         onDeleted={handleProductDeleted}
+        onQuotaExceeded={() => triggerUpgradeModal("products")}
       />
 
       {/* Staff Invitation & Role Assignment Modal */}
@@ -2350,6 +2673,30 @@ export function AdminDashboard({
             </form>
           </div>
         </div>
+      )}
+
+      {/* SaaS Plan Quota & Upgrade Modal */}
+      {planLimitsState && (
+        <PlanUpgradeModal
+          isOpen={isUpgradeModalOpen}
+          onClose={() => setIsUpgradeModalOpen(false)}
+          tenantName={settingsState.business_name}
+          tenantId={settingsState.tenant_id}
+          planLimits={planLimitsState}
+          quotaType={upgradeModalQuotaType}
+          isSuperAdmin={currentUser?.role === "PLATFORM_SUPER_ADMIN"}
+          whatsappContact={settingsState.whatsapp_number || settingsState.phone}
+          onPlanChanged={(newTier) => {
+            showToast({
+              type: "success",
+              title: "Plan Actualizado",
+              message: `El comercio ahora está en el plan ${newTier}. Actualizando cuotas...`,
+            });
+            setTimeout(() => {
+              window.location.reload();
+            }, 1000);
+          }}
+        />
       )}
 
       {/* Reactive Alert Toast with Countdown Progress Bar */}

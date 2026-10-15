@@ -72,6 +72,8 @@ import {
   PaymentMethodType,
   CreatePlatformUserInput,
   TenantSubscription,
+  TenantPlanLimits,
+  QuotaCheckResult,
   CreateDeliveryZoneInput,
   UpdateDeliveryZoneInput,
   CreateDriverInput,
@@ -138,6 +140,16 @@ export interface ITenantRepository {
     tenantId: string,
     updates: Partial<TenantSettings>
   ): Promise<TenantSettings>;
+
+  /**
+   * Obtener suscripción activa del Tenant
+   */
+  getTenantSubscription(tenantId: string): Promise<TenantSubscription | null>;
+
+  /**
+   * Obtener plan, límites y cuotas operativas del Tenant
+   */
+  getTenantPlanLimits(tenantId: string): Promise<TenantPlanLimits>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -648,6 +660,16 @@ export interface IPlatformRepository {
     tenantId: string,
     planTier: SubscriptionPlanTier
   ): Promise<TenantSubscription>;
+
+  /**
+   * Obtener suscripción de un tenant
+   */
+  getTenantSubscription(tenantId: string): Promise<TenantSubscription | null>;
+
+  /**
+   * Obtener límites y cuotas operativas de un tenant
+   */
+  getTenantPlanLimits(tenantId: string): Promise<TenantPlanLimits>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

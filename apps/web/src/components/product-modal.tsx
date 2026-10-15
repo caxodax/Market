@@ -30,6 +30,7 @@ interface ProductModalProps {
   onClose: () => void;
   onSaved: (product: Product & { stock: number }) => void;
   onDeleted?: (productId: string) => void;
+  onQuotaExceeded?: (quotaType: "products") => void;
 }
 
 export function ProductModal({
@@ -40,6 +41,7 @@ export function ProductModal({
   onClose,
   onSaved,
   onDeleted,
+  onQuotaExceeded,
 }: ProductModalProps) {
   const isEditing = Boolean(product);
 
@@ -172,6 +174,13 @@ export function ProductModal({
         });
 
         if (!res.success || !res.product) {
+          if (res.quotaExceeded) {
+            if (onQuotaExceeded) {
+              onClose();
+              onQuotaExceeded("products");
+              return;
+            }
+          }
           throw new Error(res.error || "Error al crear el producto");
         }
         onSaved(res.product);

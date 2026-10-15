@@ -539,6 +539,39 @@ export interface TenantSubscription {
   updated_at?: string;
 }
 
+export interface TenantPlanLimits {
+  tenantId: string;
+  plan: SubscriptionPlan;
+  subscription: TenantSubscription | null;
+  usage: {
+    productsCount: number;
+    storesCount: number;
+    ordersCount: number;
+  };
+  canAddProduct: boolean;
+  canAddStore: boolean;
+  productUsagePercent: number;
+  storeUsagePercent: number;
+  features: {
+    customDomain: boolean;
+    coupons: boolean;
+    drivers: boolean;
+    r2Uploads: boolean;
+    unlimitedProducts: boolean;
+    unlimitedStores: boolean;
+  };
+}
+
+export interface QuotaCheckResult {
+  allowed: boolean;
+  quotaType?: "products" | "stores" | "coupons" | "drivers" | "custom_domain";
+  currentCount?: number;
+  maxLimit?: number;
+  currentPlan?: SubscriptionPlan;
+  upgradePlan?: SubscriptionPlan;
+  message?: string;
+}
+
 export interface TenantWithDetails extends Tenant {
   settings?: TenantSettings | null;
   stores?: Store[];

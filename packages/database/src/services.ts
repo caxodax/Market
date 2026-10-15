@@ -49,6 +49,8 @@ import {
   AuditLogFilters,
   AuditActor,
   AuditActionType,
+  TenantPlanLimits,
+  QuotaCheckResult,
 } from "@marketos/types";
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
 import { fetchBcvRate, convertUsdToVes, getCaracasDateKey, getCaracasRangeBounds } from "@marketos/utils";
@@ -362,6 +364,14 @@ export class MarketOSRepository {
     phone?: string;
     isActive?: boolean;
   }): Promise<Store> {
+    // 🔒 ENFORCE SAAS QUOTA: Maximum stores allowed for tenant's plan
+    const limits = await this.getTenantPlanLimits(storeInput.tenantId);
+    if (!limits.canAddStore) {
+      throw new Error(
+        `PLAN_QUOTA_EXCEEDED: Has alcanzado el límite de ${limits.plan.max_stores} sucursal(es) de tu plan ${limits.plan.name} (${limits.usage.storesCount}/${limits.plan.max_stores}). Actualiza a un plan superior para registrar nuevas sucursales.`
+      );
+    }
+
     const supabase = getSupabase();
     const newStore: Store = {
       id: generateUuid(),
@@ -1184,6 +1194,14 @@ export class MarketOSRepository {
    * Create a new Coupon with discount amount, start date & expiration date
    */
   static async createCoupon(input: CreateCouponInput): Promise<Coupon> {
+    // 🔒 FEATURE FLAG: Coupons & promotions are unlocked on Growth & Enterprise plans
+    const limits = await this.getTenantPlanLimits(input.tenantId);
+    if (!limits.features.coupons) {
+      throw new Error(
+        `PLAN_FEATURE_LOCKED: El módulo de cupones y promociones requiere el plan Growth o Enterprise. Tu plan actual (${limits.plan.name}) no incluye esta funcionalidad.`
+      );
+    }
+
     const cleanCode = input.code.trim().toUpperCase();
     const newCoupon: Coupon = {
       id: `coupon-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -1386,6 +1404,14 @@ export class MarketOSRepository {
    * Create a new driver
    */
   static async createDriver(input: CreateDriverInput): Promise<Driver> {
+    // 🔒 FEATURE FLAG: Drivers module is unlocked on Growth & Enterprise plans
+    const limits = await this.getTenantPlanLimits(input.tenantId);
+    if (!limits.features.drivers) {
+      throw new Error(
+        `PLAN_FEATURE_LOCKED: El módulo de repartidores y motoristas dedicados requiere el plan Growth o Enterprise. Tu plan actual (${limits.plan.name}) no incluye esta funcionalidad.`
+      );
+    }
+
     const supabase = getSupabase();
     const id = generateUuid();
     const now = new Date().toISOString();
@@ -3870,6 +3896,99 @@ export class MarketOSRepository {
     return updatedSub;
   }
 
+  /**
+   * Get tenant subscription
+   */
+  static async getTenantSubscription(
+    tenantId: string
+  ): Promise<TenantSubscription | null> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("tenant_subscriptions")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
+
+        if (!error && data) {
+          return data as TenantSubscription;
+        }
+      } catch (e) {
+        console.warn("[MarketOS] getTenantSubscription error:", e);
+      }
+    }
+
+    const sub = state.subscriptions.find((s) => s.tenant_id === tenantId);
+    return sub || null;
+  }
+
+  /**
+   * Get active subscription plan for a tenant
+   */
+  static async getTenantPlan(tenantId: string): Promise<SubscriptionPlan> {
+    const plans = await this.getSubscriptionPlans();
+    const sub = await this.getTenantSubscription(tenantId);
+    const planId = sub?.plan_id || "STARTER";
+    const plan = plans.find((p) => p.id === planId);
+    return plan || plans[0];
+  }
+
+  /**
+   * Calculate tenant SaaS plan limits, current usage and available feature flags
+   */
+  static async getTenantPlanLimits(tenantId: string): Promise<TenantPlanLimits> {
+    const [plan, sub, products, stores, orders] = await Promise.all([
+      this.getTenantPlan(tenantId),
+      this.getTenantSubscription(tenantId),
+      this.getProducts(tenantId),
+      this.getStores(tenantId, true),
+      this.getTenantOrders(tenantId),
+    ]);
+
+    const productsCount = products.length;
+    const storesCount = stores.length;
+    const ordersCount = orders.length;
+
+    const canAddProduct = productsCount < plan.max_products;
+    const canAddStore = storesCount < plan.max_stores;
+
+    const productUsagePercent = Math.min(
+      100,
+      Math.round((productsCount / Math.max(1, plan.max_products)) * 100)
+    );
+    const storeUsagePercent = Math.min(
+      100,
+      Math.round((storesCount / Math.max(1, plan.max_stores)) * 100)
+    );
+
+    const hasDrivers = plan.id !== "STARTER";
+    const hasCoupons = plan.id !== "STARTER";
+
+    return {
+      tenantId,
+      plan,
+      subscription: sub,
+      usage: {
+        productsCount,
+        storesCount,
+        ordersCount,
+      },
+      canAddProduct,
+      canAddStore,
+      productUsagePercent,
+      storeUsagePercent,
+      features: {
+        customDomain: Boolean(plan.custom_domain_allowed),
+        coupons: hasCoupons,
+        drivers: hasDrivers,
+        r2Uploads: true,
+        unlimitedProducts: plan.max_products >= 2000,
+        unlimitedStores: plan.max_stores >= 10,
+      },
+    };
+  }
+
   // =====================================================================
   // PRODUCT MANAGEMENT WITH CLOUDFLARE R2 IMAGES
   // =====================================================================
@@ -3880,6 +3999,14 @@ export class MarketOSRepository {
   static async createProduct(
     input: CreateProductInput
   ): Promise<Product & { stock: number }> {
+    // 🔒 ENFORCE SAAS QUOTA: Maximum products allowed for tenant's plan
+    const limits = await this.getTenantPlanLimits(input.tenantId);
+    if (!limits.canAddProduct) {
+      throw new Error(
+        `PLAN_QUOTA_EXCEEDED: Has alcanzado el límite de ${limits.plan.max_products} productos de tu plan ${limits.plan.name} (${limits.usage.productsCount}/${limits.plan.max_products}). Actualiza a un plan superior para seguir agregando productos.`
+      );
+    }
+
     const supabase = getSupabase();
     const slug = `${input.name.toLowerCase().trim().replace(/[^a-z0-9]/g, "-")}-${Date.now().toString().slice(-4)}`;
     const storeId =
