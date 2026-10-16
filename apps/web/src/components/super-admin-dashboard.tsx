@@ -12,6 +12,7 @@ import {
   UserRole,
   AuditLog,
   PlatformBiAnalytics,
+  PlatformStorageTelemetry,
 } from "@marketos/types";
 import { formatCurrency, slugify } from "@marketos/utils";
 import {
@@ -27,6 +28,7 @@ import {
 } from "../app/platform/actions";
 import { AuditTrailViewer } from "./audit-trail-viewer";
 import { PlatformBiAnalyticsTab } from "./platform-bi-analytics-tab";
+import { PlatformStorageTab } from "./platform-storage-tab";
 import {
   Building2,
   DollarSign,
@@ -82,6 +84,7 @@ interface SuperAdminDashboardProps {
   initialProfiles?: UserProfile[];
   initialAuditLogs?: AuditLog[];
   initialBiAnalytics?: PlatformBiAnalytics;
+  initialStorageTelemetry?: PlatformStorageTelemetry;
 }
 
 export function SuperAdminDashboard({
@@ -94,13 +97,17 @@ export function SuperAdminDashboard({
   initialProfiles = [],
   initialAuditLogs = [],
   initialBiAnalytics,
+  initialStorageTelemetry,
 }: SuperAdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<
-    "TENANTS" | "BILLING" | "BI" | "USERS" | "RATES" | "AUDIT"
+    "TENANTS" | "BILLING" | "BI" | "STORAGE" | "USERS" | "RATES" | "AUDIT"
   >("TENANTS");
   const [tenants, setTenants] = useState<TenantWithDetails[]>(initialTenants);
   const [metrics, setMetrics] = useState<PlatformMetrics>(initialMetrics);
   const [profiles, setProfiles] = useState<UserProfile[]>(initialProfiles);
+  const [storageTelemetry, setStorageTelemetry] = useState<PlatformStorageTelemetry | undefined>(
+    initialStorageTelemetry
+  );
 
   // Billing & Subscriptions State
   const [billingSearchQuery, setBillingSearchQuery] = useState("");
@@ -975,6 +982,23 @@ export function SuperAdminDashboard({
           </button>
 
           <button
+            onClick={() => setActiveTab("STORAGE")}
+            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === "STORAGE"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Cloud className="w-4 h-4 text-orange-500" />
+            <span>Telemetría R2 ({storageTelemetry?.totalBucketSizeFormatted || "0 MB"})</span>
+            {storageTelemetry?.quotaAlerts && storageTelemetry.quotaAlerts.length > 0 && (
+              <span className="bg-amber-500/20 text-amber-500 text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                {storageTelemetry.quotaAlerts.length}
+              </span>
+            )}
+          </button>
+
+          <button
             onClick={() => setActiveTab("USERS")}
             className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
               activeTab === "USERS"
@@ -1140,6 +1164,25 @@ export function SuperAdminDashboard({
                             <p className="text-[11px] text-muted-foreground">
                               {tenant.productsCount} Productos
                             </p>
+                            {(() => {
+                              const st = storageTelemetry?.tenants.find(
+                                (t) =>
+                                  t.tenantId.toLowerCase() === tenant.id.toLowerCase() ||
+                                  t.tenantSlug.toLowerCase() === tenant.slug.toLowerCase()
+                              );
+                              if (!st) return null;
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveTab("STORAGE")}
+                                  className="inline-flex items-center gap-1 text-[10px] font-semibold text-orange-600 dark:text-orange-400 bg-orange-500/10 hover:bg-orange-500/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer mt-0.5"
+                                  title={`Ver telemetría R2 de ${tenant.name} (${st.totalSizeFormatted} / ${st.quotaFormatted})`}
+                                >
+                                  <Cloud className="w-2.5 h-2.5 text-orange-500" />
+                                  <span>R2: {st.totalSizeFormatted} ({st.percentUsed}%)</span>
+                                </button>
+                              );
+                            })()}
                           </div>
                         </td>
 
@@ -1641,6 +1684,17 @@ export function SuperAdminDashboard({
       {/* TAB: BI ANALYTICS & GLOBAL INTELLIGENCE */}
       {activeTab === "BI" && (
         <PlatformBiAnalyticsTab initialAnalytics={initialBiAnalytics} />
+      )}
+
+      {/* TAB: CLOUDFLARE R2 STORAGE TELEMETRY */}
+      {activeTab === "STORAGE" && (
+        <PlatformStorageTab
+          initialTelemetry={storageTelemetry}
+          onImpersonateTenant={(targetId) => {
+            const targetTenant = tenants.find((item) => item.id === targetId);
+            if (targetTenant) handleLoginAs(targetTenant);
+          }}
+        />
       )}
 
       {/* TAB 3: USERS & MULTI-TENANT STAFF DIRECTORY */}

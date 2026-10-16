@@ -76,6 +76,8 @@ import {
   QuotaCheckResult,
   PlatformBiAnalytics,
   PlatformBiAnalyticsFilter,
+  PlatformStorageTelemetry,
+  TenantStorageTelemetry,
   CreateDeliveryZoneInput,
   UpdateDeliveryZoneInput,
   CreateDriverInput,
@@ -632,6 +634,16 @@ export interface IPlatformRepository {
   getPlatformBiAnalytics(
     filter?: PlatformBiAnalyticsFilter | "today" | "week" | "month" | "all"
   ): Promise<PlatformBiAnalytics>;
+
+  /**
+   * Obtener telemetría de almacenamiento Cloudflare R2 por tienda y consolidado de red
+   */
+  getPlatformStorageTelemetry(forceRefresh?: boolean): Promise<PlatformStorageTelemetry>;
+
+  /**
+   * Obtener telemetría de almacenamiento Cloudflare R2 para una tienda específica
+   */
+  getTenantStorageTelemetry(tenantId: string, forceRefresh?: boolean): Promise<TenantStorageTelemetry>;
 
   /**
    * Obtener planes de suscripción disponibles

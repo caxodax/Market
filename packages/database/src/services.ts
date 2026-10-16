@@ -58,9 +58,18 @@ import {
   TenantGmvRankingItem,
   ConsolidatedPaymentMethodStat,
   PlatformDailyTrendItem,
+  PlatformStorageTelemetry,
+  TenantStorageTelemetry,
 } from "@marketos/types";
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
-import { fetchBcvRate, convertUsdToVes, getCaracasDateKey, getCaracasRangeBounds } from "@marketos/utils";
+import {
+  fetchBcvRate,
+  convertUsdToVes,
+  getCaracasDateKey,
+  getCaracasRangeBounds,
+  scanR2PlatformStorage,
+  scanR2TenantStorage,
+} from "@marketos/utils";
 import { createServerComponentClient } from "./server";
 import { isSupabaseOffline } from "./circuit-breaker";
 
@@ -3522,6 +3531,57 @@ export class MarketOSRepository {
     };
   }
 
+  // Storage Telemetry In-Memory Cache (TTL: 3 minutes)
+  private static cachedStorageTelemetry: { data: PlatformStorageTelemetry; timestamp: number } | null = null;
+
+  /**
+   * Obtener telemetría de almacenamiento Cloudflare R2 consolidada y por tienda
+   */
+  static async getPlatformStorageTelemetry(forceRefresh = false): Promise<PlatformStorageTelemetry> {
+    const now = Date.now();
+    if (!forceRefresh && this.cachedStorageTelemetry && now - this.cachedStorageTelemetry.timestamp < 180000) {
+      return this.cachedStorageTelemetry.data;
+    }
+
+    const allTenants = await this.getAllTenants();
+    const metaList = allTenants.map((t) => ({
+      id: t.id,
+      name: t.name,
+      slug: t.slug,
+      planId: (t.subscription?.plan_id || t.plan?.id || "GROWTH") as SubscriptionPlanTier,
+      planName: t.plan?.name || "MarketOS Growth",
+      subscription: t.subscription,
+      plan: t.plan,
+    }));
+
+    const telemetry = await scanR2PlatformStorage(metaList);
+    this.cachedStorageTelemetry = { data: telemetry, timestamp: now };
+    return telemetry;
+  }
+
+  /**
+   * Obtener telemetría de almacenamiento Cloudflare R2 para una tienda específica
+   */
+  static async getTenantStorageTelemetry(tenantId: string, forceRefresh = false): Promise<TenantStorageTelemetry> {
+    const platformTelemetry = await this.getPlatformStorageTelemetry(forceRefresh);
+    const tenantTelemetry = platformTelemetry.tenants.find(
+      (t) => t.tenantId.toLowerCase() === tenantId.toLowerCase() || t.tenantSlug.toLowerCase() === tenantId.toLowerCase()
+    );
+
+    if (tenantTelemetry) {
+      return tenantTelemetry;
+    }
+
+    const tenant = await this.getTenant(tenantId);
+    const sub = await this.getTenantSubscription(tenantId);
+    return scanR2TenantStorage(
+      tenantId,
+      tenant?.name || "Comercio",
+      tenant?.slug || "tienda",
+      sub?.plan_id || "GROWTH"
+    );
+  }
+
   /**
    * Get Platform Business Intelligence & Global Analytics (BI Analytics)
    * Ranking de tiendas por GMV, Ticket Promedio Global de la Red,
@@ -4470,6 +4530,8 @@ export class MarketOSRepository {
     const hasDrivers = plan.id !== "STARTER";
     const hasCoupons = plan.id !== "STARTER";
 
+    const storageTelemetry = await this.getTenantStorageTelemetry(tenantId);
+
     return {
       tenantId,
       plan,
@@ -4490,6 +4552,13 @@ export class MarketOSRepository {
         r2Uploads: true,
         unlimitedProducts: plan.max_products >= 2000,
         unlimitedStores: plan.max_stores >= 10,
+      },
+      storageUsage: {
+        usedBytes: storageTelemetry.totalSizeBytes,
+        usedFormatted: storageTelemetry.totalSizeFormatted,
+        quotaBytes: storageTelemetry.quotaBytes,
+        quotaFormatted: storageTelemetry.quotaFormatted,
+        percentUsed: storageTelemetry.percentUsed,
       },
     };
   }

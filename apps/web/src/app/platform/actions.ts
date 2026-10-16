@@ -390,3 +390,59 @@ export async function stopImpersonationAction() {
   }
 }
 
+/**
+ * Forzar sincronización y escaneo en vivo de la telemetría de almacenamiento Cloudflare R2
+ */
+export async function refreshStorageTelemetryAction() {
+  try {
+    const user = await getCurrentUser();
+    if (!user || user.role !== "PLATFORM_SUPER_ADMIN") {
+      return { success: false, error: "No autorizado. Solo Super Admin puede refrescar telemetría R2." };
+    }
+
+    const telemetry = await MarketOSRepository.getPlatformStorageTelemetry(true);
+    revalidatePath("/platform");
+
+    return {
+      success: true,
+      telemetry,
+    };
+  } catch (error) {
+    console.error("Error refreshing Cloudflare R2 telemetry:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al sincronizar con Cloudflare R2",
+    };
+  }
+}
+
+/**
+ * Obtener detalle y lista de archivos de Cloudflare R2 para una tienda específica
+ */
+export async function getTenantStorageDetailsAction(tenantId: string) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return { success: false, error: "No autenticado" };
+    }
+
+    if (user.role !== "PLATFORM_SUPER_ADMIN" && user.tenant_id !== tenantId) {
+      return { success: false, error: "No autorizado para ver archivos de esta tienda" };
+    }
+
+    const telemetry = await MarketOSRepository.getTenantStorageTelemetry(tenantId, false);
+
+    return {
+      success: true,
+      telemetry,
+    };
+  } catch (error) {
+    console.error("Error fetching tenant storage details:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al consultar archivos en Cloudflare R2",
+    };
+  }
+}
+
+

@@ -538,6 +538,7 @@ export interface SubscriptionPlan {
   price_usd_yearly: number;
   max_stores: number;
   max_products: number;
+  max_storage_mb?: number;
   custom_domain_allowed: boolean;
   transaction_fee_percent: number;
   features: string[];
@@ -578,6 +579,13 @@ export interface TenantPlanLimits {
     unlimitedProducts: boolean;
     unlimitedStores: boolean;
   };
+  storageUsage?: {
+    usedBytes: number;
+    usedFormatted: string;
+    quotaBytes: number;
+    quotaFormatted: string;
+    percentUsed: number;
+  };
 }
 
 export interface QuotaCheckResult {
@@ -599,6 +607,7 @@ export interface TenantWithDetails extends Tenant {
   totalRevenueUsd: number;
   subscription?: TenantSubscription | null;
   plan?: SubscriptionPlan | null;
+  storageTelemetry?: TenantStorageTelemetry | null;
 }
 
 export interface PlatformMetrics {
@@ -954,6 +963,70 @@ export interface PlatformBiAnalytics {
   tenantRankings: TenantGmvRankingItem[];
   paymentMethodsConsolidated: ConsolidatedPaymentMethodStat[];
   dailyTrend: PlatformDailyTrendItem[];
+}
+
+// =====================================================================
+// CLOUDFLARE R2 STORAGE TELEMETRY & QUOTA TYPES
+// =====================================================================
+
+export type StorageFolder = "products" | "proofs" | "branding" | "documents";
+
+export interface StorageFolderTelemetry {
+  folder: StorageFolder | "other";
+  folderName: string;
+  sizeBytes: number;
+  sizeFormatted: string;
+  count: number;
+  percentage: number;
+}
+
+export interface TenantR2FileItem {
+  key: string;
+  folder: StorageFolder | "other";
+  fileName: string;
+  sizeBytes: number;
+  sizeFormatted: string;
+  lastModified?: string;
+  url: string;
+}
+
+export interface TenantStorageTelemetry {
+  tenantId: string;
+  tenantName: string;
+  tenantSlug: string;
+  planId: SubscriptionPlanTier;
+  planName: string;
+  totalSizeBytes: number;
+  totalSizeFormatted: string;
+  quotaBytes: number;
+  quotaFormatted: string;
+  percentUsed: number;
+  status: "normal" | "warning" | "critical" | "exceeded";
+  totalFiles: number;
+  byFolder: Record<StorageFolder | "other", StorageFolderTelemetry>;
+  recentFiles: TenantR2FileItem[];
+  lastUpdated: string;
+}
+
+export interface PlatformStorageTelemetry {
+  totalBucketSizeBytes: number;
+  totalBucketSizeFormatted: string;
+  totalBucketObjects: number;
+  cloudflareFreeTierBytes: number; // 10 GB = 10 * 1024 * 1024 * 1024
+  cloudflareFreeTierFormatted: string; // "10.00 GB"
+  cloudflareFreeTierPercentUsed: number;
+  estimatedMonthlyCostUsd: number;
+  folderTotals: {
+    products: { sizeBytes: number; sizeFormatted: string; count: number };
+    proofs: { sizeBytes: number; sizeFormatted: string; count: number };
+    branding: { sizeBytes: number; sizeFormatted: string; count: number };
+    other: { sizeBytes: number; sizeFormatted: string; count: number };
+  };
+  tenants: TenantStorageTelemetry[];
+  topConsumers: TenantStorageTelemetry[];
+  quotaAlerts: TenantStorageTelemetry[];
+  scannedAt: string;
+  source: "r2_live" | "cached_fallback";
 }
 
 

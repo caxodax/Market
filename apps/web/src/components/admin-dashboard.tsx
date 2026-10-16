@@ -20,6 +20,7 @@ import {
   TenantWithDetails,
   TenantPlanLimits,
   SubscriptionPlanTier,
+  TenantStorageTelemetry,
 } from "@marketos/types";
 import {
   formatCurrency,
@@ -102,6 +103,7 @@ import {
   ChevronRight,
   Zap,
   Crown,
+  Cloud,
 } from "lucide-react";
 
 interface AdminDashboardProps {
@@ -122,6 +124,7 @@ interface AdminDashboardProps {
   allTenants?: TenantWithDetails[];
   currentStoreId?: string;
   planLimits?: TenantPlanLimits;
+  storageTelemetry?: TenantStorageTelemetry;
 }
 
 interface AdminToast {
@@ -161,6 +164,7 @@ export function AdminDashboard({
   allTenants = [],
   currentStoreId,
   planLimits,
+  storageTelemetry,
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<
     "PAYMENTS" | "ORDERS" | "REPORTS" | "INVENTORY" | "DELIVERY" | "COUPONS" | "PUSH" | "RATES" | "AUDIT" | "STAFF" | "SETTINGS" | "STORES"
@@ -188,6 +192,7 @@ export function AdminDashboard({
   // SaaS Plan Limits & Quota Control State
   const [planLimitsState, setPlanLimitsState] = useState<TenantPlanLimits | undefined>(planLimits);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [isStorageModalOpen, setIsStorageModalOpen] = useState(false);
   const [upgradeModalQuotaType, setUpgradeModalQuotaType] = useState<
     "products" | "stores" | "coupons" | "drivers" | "custom_domain" | "general"
   >("general");
@@ -1248,6 +1253,36 @@ export function AdminDashboard({
                 />
                 <span className="hidden sm:inline">Actualizar</span>
               </button>
+
+              {/* Cloudflare R2 Storage Usage Meter */}
+              {storageTelemetry && (
+                <button
+                  type="button"
+                  onClick={() => setIsStorageModalOpen(true)}
+                  className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-border bg-card hover:bg-muted/60 text-foreground transition-all shadow-xs cursor-pointer"
+                  title={`Almacenamiento Cloudflare R2: ${storageTelemetry.totalSizeFormatted} de ${storageTelemetry.quotaFormatted} (${storageTelemetry.percentUsed}% en uso). Clic para ver desglose.`}
+                >
+                  <Cloud className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                  <div className="flex flex-col text-left">
+                    <div className="flex items-center gap-1 font-bold text-[11px] leading-tight">
+                      <span>R2: {storageTelemetry.totalSizeFormatted}</span>
+                      <span className="text-muted-foreground font-normal">/ {storageTelemetry.quotaFormatted}</span>
+                    </div>
+                    <div className="w-16 h-1 bg-muted rounded-full overflow-hidden mt-0.5">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          storageTelemetry.percentUsed >= 95
+                            ? "bg-red-500"
+                            : storageTelemetry.percentUsed >= 80
+                            ? "bg-amber-500"
+                            : "bg-emerald-500"
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(2, storageTelemetry.percentUsed))}%` }}
+                      />
+                    </div>
+                  </div>
+                </button>
+              )}
 
               {currentUser && (
                 <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-border">
@@ -2796,6 +2831,112 @@ export function AdminDashboard({
             }, 1000);
           }}
         />
+      )}
+
+      {/* Cloudflare R2 Storage Details Modal */}
+      {isStorageModalOpen && storageTelemetry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-5 shadow-2xl relative">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500 flex items-center justify-center">
+                  <Cloud className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-foreground">Almacenamiento Cloudflare R2</h3>
+                  <p className="text-xs text-muted-foreground">Medidor de fotos de productos y comprobantes</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsStorageModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-4">
+              <div className="p-3.5 rounded-xl bg-muted/40 border border-border">
+                <div className="flex items-center justify-between text-xs font-bold mb-1.5">
+                  <span className="text-foreground">Espacio Consumido</span>
+                  <span className={storageTelemetry.percentUsed >= 80 ? "text-amber-500" : "text-emerald-500"}>
+                    {storageTelemetry.totalSizeFormatted} de {storageTelemetry.quotaFormatted} ({storageTelemetry.percentUsed}%)
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      storageTelemetry.percentUsed >= 95
+                        ? "bg-red-500"
+                        : storageTelemetry.percentUsed >= 80
+                        ? "bg-amber-500"
+                        : "bg-emerald-500"
+                    }`}
+                    style={{ width: `${Math.min(100, Math.max(2, storageTelemetry.percentUsed))}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  Plan actual: <strong>{storageTelemetry.planName}</strong> ({storageTelemetry.quotaFormatted} de cuota R2).
+                </p>
+              </div>
+
+              {/* Breakdown */}
+              <div className="space-y-2 text-xs">
+                <p className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider">
+                  Desglose por tipo de archivo
+                </p>
+
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-card border border-border">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4 text-blue-500" />
+                    <span className="font-medium text-foreground">Fotos de Productos</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-foreground">{storageTelemetry.byFolder.products.sizeFormatted}</span>
+                    <span className="text-[11px] text-muted-foreground ml-1.5">({storageTelemetry.byFolder.products.count} fotos)</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-card border border-border">
+                  <div className="flex items-center gap-2">
+                    <Receipt className="w-4 h-4 text-emerald-500" />
+                    <span className="font-medium text-foreground">Comprobantes de Pago</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-foreground">{storageTelemetry.byFolder.proofs.sizeFormatted}</span>
+                    <span className="text-[11px] text-muted-foreground ml-1.5">({storageTelemetry.byFolder.proofs.count} recibos)</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-card border border-border">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-purple-500" />
+                    <span className="font-medium text-foreground">Logos & Banners</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-foreground">{storageTelemetry.byFolder.branding.sizeFormatted}</span>
+                    <span className="text-[11px] text-muted-foreground ml-1.5">({storageTelemetry.byFolder.branding.count} logos)</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-600 dark:text-blue-400">
+                💡 <strong>Optimización WebP:</strong> Todas las fotos se optimizan y comprimen automáticamente antes de alojarse en Cloudflare R2 sin costo de transferencia (0$ Egress).
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setIsStorageModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-xs cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Reactive Alert Toast with Countdown Progress Bar */}
