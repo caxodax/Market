@@ -172,6 +172,19 @@ export type UserRole =
   | "TENANT_DELIVERY"
   | "CUSTOMER";
 
+export interface ImpersonationSession {
+  originalSuperAdmin: {
+    id: string;
+    email: string;
+    fullName: string;
+    role: UserRole;
+  };
+  targetTenantId: string;
+  targetTenantName: string;
+  targetTenantSlug: string;
+  startedAt: string;
+}
+
 export interface UserProfile {
   id: string; // auth.users UUID
   tenant_id: string | null; // null for super-admin or cross-tenant customers
@@ -182,6 +195,7 @@ export interface UserProfile {
   role: UserRole;
   created_at: string;
   updated_at: string;
+  impersonation?: ImpersonationSession | null;
 }
 
 export interface Customer {
@@ -647,6 +661,8 @@ export type AuditActionType =
   | "USER_LOGIN"
   | "STAFF_INVITED"
   | "STAFF_ROLE_UPDATED"
+  | "SUPPORT_IMPERSONATION_STARTED"
+  | "SUPPORT_IMPERSONATION_ENDED"
   | (string & {});
 
 export interface AuditActor {

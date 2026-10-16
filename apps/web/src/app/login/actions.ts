@@ -211,6 +211,7 @@ export async function logoutUserAction() {
   cookieStore.delete("marketos_session");
   cookieStore.delete("marketos_admin_session");
   cookieStore.delete("marketos_super_admin_session");
+  cookieStore.delete("marketos_impersonation");
   return { success: true };
 }
 
@@ -228,9 +229,21 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
 
   try {
     const parsed = JSON.parse(sessionCookie);
+
+    // Check for active support impersonation session
+    const impersonationCookie = cookieStore.get("marketos_impersonation")?.value;
+    let impersonation = null;
+    if (impersonationCookie) {
+      try {
+        impersonation = JSON.parse(impersonationCookie);
+      } catch {
+        impersonation = null;
+      }
+    }
+
     return {
       id: parsed.id,
-      tenant_id: parsed.tenantId || null,
+      tenant_id: impersonation ? impersonation.targetTenantId : (parsed.tenantId || null),
       email: parsed.email,
       full_name: parsed.fullName,
       phone: null,
@@ -238,6 +251,7 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
       role: parsed.role,
       created_at: parsed.loggedInAt,
       updated_at: parsed.loggedInAt,
+      impersonation,
     };
   } catch {
     return null;

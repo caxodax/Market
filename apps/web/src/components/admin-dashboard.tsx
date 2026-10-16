@@ -36,6 +36,7 @@ import {
   createStoreAction,
   updateStoreAction,
 } from "../app/admin/actions";
+import { stopImpersonationAction } from "../app/platform/actions";
 import { logoutUserAction } from "../app/login/actions";
 import { ProductModal } from "./product-modal";
 import { StaffModal, ROLE_LABELS } from "./staff-modal";
@@ -204,6 +205,21 @@ export function AdminDashboard({
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [refreshingOrders, setRefreshingOrders] = useState(false);
+  const [isStoppingImpersonation, setIsStoppingImpersonation] = useState(false);
+
+  const handleStopImpersonation = async () => {
+    setIsStoppingImpersonation(true);
+    try {
+      const res = await stopImpersonationAction();
+      if (res.success && res.redirectUrl) {
+        window.location.href = res.redirectUrl;
+      } else {
+        window.location.href = "/platform";
+      }
+    } catch {
+      window.location.href = "/platform";
+    }
+  };
 
   // Reactive Toast Notification with Countdown Progress Bar
   const [toast, setToast] = useState<AdminToast | null>(null);
@@ -1239,9 +1255,15 @@ export function AdminDashboard({
                     <span className="text-xs font-bold text-foreground truncate max-w-[120px]">
                       {currentUser.full_name}
                     </span>
-                    <span className="text-[10px] text-muted-foreground font-mono">
-                      {ROLE_LABELS[currentUser.role]?.label || currentUser.role}
-                    </span>
+                    {currentUser.impersonation ? (
+                      <span className="text-[10px] text-purple-400 font-extrabold flex items-center justify-end gap-1">
+                        <span>🎭 Modo Soporte</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        {ROLE_LABELS[currentUser.role]?.label || currentUser.role}
+                      </span>
+                    )}
                   </div>
                   <button
                     onClick={handleLogout}
@@ -1265,8 +1287,85 @@ export function AdminDashboard({
 
         {/* Main Body */}
         <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 flex-1 w-full space-y-5 overflow-x-hidden">
-        {/* PLATFORM SUPER ADMIN MASTER BANNER */}
-        {currentUser?.role === "PLATFORM_SUPER_ADMIN" && (
+        {/* PLATFORM SUPPORT IMPERSONATION BANNER ("LOGIN AS") */}
+        {currentUser?.impersonation ? (
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-950 border border-purple-500/50 text-white shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-2xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center shrink-0 text-xl shadow-inner text-purple-300">
+                🎭
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-purple-500 text-black px-2 py-0.5 rounded-md shadow-xs">
+                    Modo Soporte Activo ("Login As")
+                  </span>
+                  <span className="text-xs text-purple-200">
+                    Operando con permisos completos de Dueño
+                  </span>
+                </div>
+                <div className="text-sm font-bold text-white truncate flex items-center gap-2 mt-0.5">
+                  <span>{settingsState.business_name}</span>
+                  <span className="text-xs font-mono text-purple-300">({settingsState.tenant_id})</span>
+                  <span className="text-xs text-muted-foreground">•</span>
+                  <span className="text-xs text-purple-200 font-normal truncate">
+                    Auditado bajo Super Admin: <strong className="text-white">{currentUser.impersonation.originalSuperAdmin.fullName}</strong> ({currentUser.impersonation.originalSuperAdmin.email})
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+              {allTenants && allTenants.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-purple-200 font-medium hidden lg:inline">Cambiar Comercio:</span>
+                  <select
+                    value={settingsState.tenant_id}
+                    onChange={(e) => {
+                      window.location.href = `/admin?tenant=${e.target.value}`;
+                    }}
+                    className="h-9 px-3 rounded-xl bg-slate-900 border border-purple-500/30 text-xs font-semibold text-white focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
+                  >
+                    {allTenants.map((t) => (
+                      <option key={t.id} value={t.id} className="bg-slate-900 text-white">
+                        {t.name} ({t.slug})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleStopImpersonation}
+                disabled={isStoppingImpersonation}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black transition-all cursor-pointer shadow-md hover:shadow-lg disabled:opacity-50"
+                title="Cerrar la sesión de soporte técnico y regresar a la Consola Master"
+              >
+                {isStoppingImpersonation ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Saliendo...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🚪 Salir de Modo Soporte</span>
+                  </>
+                )}
+              </button>
+
+              <a
+                href={`/?tenant=${settingsState.tenant_id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold transition-colors cursor-pointer"
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>Ver Tienda PWA</span>
+                <ExternalLink className="w-3 h-3 text-purple-300" />
+              </a>
+            </div>
+          </div>
+        ) : currentUser?.role === "PLATFORM_SUPER_ADMIN" ? (
           <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/40 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0 text-indigo-400">
@@ -1327,7 +1426,7 @@ export function AdminDashboard({
               </a>
             </div>
           </div>
-        )}
+        ) : null}
         {/* KPI Summary Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 w-full">
           <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">

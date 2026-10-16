@@ -6,8 +6,10 @@ import {
   SubscriptionPlanTier,
   AuditLogFilters,
   PlatformBiAnalyticsFilter,
+  ImpersonationSession,
 } from "@marketos/types";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { invalidateTenantCache } from "../../lib/cached-queries";
 import { getCurrentUser } from "../login/actions";
 
@@ -245,6 +247,145 @@ export async function getPlatformBiAnalyticsAction(
         error instanceof Error
           ? error.message
           : "Error al cargar la analítica de negocio global",
+    };
+  }
+}
+
+/**
+ * Iniciar sesión de soporte / impersonación técnica ("Login As")
+ * Permite al Super Admin ingresar al panel /admin de cualquier comercio con 1 solo clic como si fuera el dueño.
+ */
+export async function impersonateTenantAction(tenantId: string) {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== "PLATFORM_SUPER_ADMIN") {
+      return {
+        success: false,
+        error:
+          "Acceso no autorizado: Solo un Super Administrador de la plataforma puede impersonar comercios.",
+      };
+    }
+
+    const tenant = await MarketOSRepository.getTenant(tenantId);
+    if (!tenant) {
+      return {
+        success: false,
+        error: `No se encontró el comercio con identificador: ${tenantId}`,
+      };
+    }
+
+    const impersonationSession: ImpersonationSession = {
+      originalSuperAdmin: {
+        id: currentUser.id,
+        email: currentUser.email,
+        fullName: currentUser.full_name,
+        role: currentUser.role,
+      },
+      targetTenantId: tenant.id,
+      targetTenantName: tenant.name,
+      targetTenantSlug: tenant.slug,
+      startedAt: new Date().toISOString(),
+    };
+
+    const cookieStore = await cookies();
+    cookieStore.set(
+      "marketos_impersonation",
+      JSON.stringify(impersonationSession),
+      {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 8, // 8 horas de sesión de soporte
+        path: "/",
+      }
+    );
+
+    // Bitácora de Auditoría Global (Audit Trail)
+    await MarketOSRepository.recordAuditLog({
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      actorId: currentUser.id,
+      actorName: currentUser.full_name,
+      actorEmail: currentUser.email,
+      actorRole: currentUser.role,
+      action: "SUPPORT_IMPERSONATION_STARTED",
+      entity: "tenants",
+      entityId: tenant.id,
+      newData: {
+        tenantName: tenant.name,
+        tenantSlug: tenant.slug,
+        impersonatedBy: currentUser.email,
+        actorRole: currentUser.role,
+        purpose: "Resolución de incidencias técnicas sin solicitud de contraseña (Login As)",
+      },
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/platform");
+
+    return {
+      success: true,
+      redirectUrl: `/admin?tenant=${tenant.id}`,
+    };
+  } catch (error) {
+    console.error("Error in impersonateTenantAction:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Error al iniciar impersonación de soporte",
+    };
+  }
+}
+
+/**
+ * Salir del modo de impersonación y regresar a la consola de Super Admin
+ */
+export async function stopImpersonationAction() {
+  try {
+    const cookieStore = await cookies();
+    const impersonationCookie = cookieStore.get("marketos_impersonation")?.value;
+
+    if (impersonationCookie) {
+      try {
+        const parsed: ImpersonationSession = JSON.parse(impersonationCookie);
+        await MarketOSRepository.recordAuditLog({
+          tenantId: parsed.targetTenantId,
+          tenantName: parsed.targetTenantName,
+          actorId: parsed.originalSuperAdmin.id,
+          actorName: parsed.originalSuperAdmin.fullName,
+          actorEmail: parsed.originalSuperAdmin.email,
+          actorRole: parsed.originalSuperAdmin.role,
+          action: "SUPPORT_IMPERSONATION_ENDED",
+          entity: "tenants",
+          entityId: parsed.targetTenantId,
+          newData: {
+            tenantName: parsed.targetTenantName,
+            endedAt: new Date().toISOString(),
+          },
+        });
+      } catch (err) {
+        console.error("Error logging stop impersonation audit:", err);
+      }
+      cookieStore.delete("marketos_impersonation");
+    }
+
+    revalidatePath("/admin");
+    revalidatePath("/platform");
+
+    return {
+      success: true,
+      redirectUrl: "/platform",
+    };
+  } catch (error) {
+    console.error("Error stopping impersonation:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Error al salir del modo de soporte",
     };
   }
 }

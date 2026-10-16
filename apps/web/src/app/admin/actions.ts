@@ -35,11 +35,14 @@ import { getCurrentUser } from "../login/actions";
 async function getAuditActor(): Promise<AuditActor> {
   const user = await getCurrentUser();
   if (user) {
+    const isImpersonating = Boolean(user.impersonation);
     return {
       id: user.id,
-      name: user.full_name,
+      name: isImpersonating
+        ? `${user.full_name} (Soporte / Impersonando Dueño)`
+        : user.full_name,
       email: user.email,
-      role: user.role,
+      role: isImpersonating ? "PLATFORM_SUPER_ADMIN" : user.role,
     };
   }
   return {

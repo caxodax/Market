@@ -34,12 +34,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   }
 
   const isSuperAdmin = currentUser.role === "PLATFORM_SUPER_ADMIN";
+  const isImpersonating = Boolean(currentUser.impersonation);
 
   // Dynamic tenant selection:
-  // If PLATFORM_SUPER_ADMIN, allow inspecting any tenant passed via query string (?tenant=...)
-  // Otherwise, use currentUser.tenant_id or default tenant
+  // 1. If in support impersonation mode, target the impersonated tenant
+  // 2. If PLATFORM_SUPER_ADMIN, allow inspecting any tenant passed via query string (?tenant=...)
+  // 3. Otherwise, use currentUser.tenant_id or default tenant
   let targetTenantId = process.env.DEFAULT_TENANT_ID || "shop-market-ca";
-  if (isSuperAdmin) {
+  if (currentUser.impersonation) {
+    targetTenantId = currentUser.impersonation.targetTenantId;
+  } else if (isSuperAdmin) {
     if (params?.tenant) {
       targetTenantId = params.tenant;
     }
@@ -50,8 +54,13 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   // Verificar si la tienda está suspendida
   const targetTenant = await MarketOSRepository.getTenant(targetTenantId);
 
-  // BLOQUEO INMEDIATO: Si la tienda está suspendida y el usuario no es Super Admin de la plataforma
-  if (targetTenant && (targetTenant.status === "suspended" || targetTenant.status === "inactive") && !isSuperAdmin) {
+  // BLOQUEO INMEDIATO: Si la tienda está suspendida y el usuario no es Super Admin ni está en modo soporte
+  if (
+    targetTenant &&
+    (targetTenant.status === "suspended" || targetTenant.status === "inactive") &&
+    !isSuperAdmin &&
+    !isImpersonating
+  ) {
     const settings = await MarketOSRepository.getTenantSettings(targetTenantId);
     return (
       <SuspendedAdminScreen

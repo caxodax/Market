@@ -370,6 +370,14 @@ export function AuditTrailViewer({
               badgeBg = "bg-cyan-500/10 text-cyan-600 border-cyan-500/20";
               actionIcon = <DollarSign className="w-3.5 h-3.5" />;
               actionTitle = "TASA CAMBIARIA";
+            } else if (log.action === "SUPPORT_IMPERSONATION_STARTED") {
+              badgeBg = "bg-purple-500/10 text-purple-400 border-purple-500/30";
+              actionIcon = <span className="text-xs">🎭</span>;
+              actionTitle = "LOGIN AS (INICIADO)";
+            } else if (log.action === "SUPPORT_IMPERSONATION_ENDED") {
+              badgeBg = "bg-slate-500/10 text-slate-400 border-slate-500/30";
+              actionIcon = <span className="text-xs">🚪</span>;
+              actionTitle = "LOGIN AS (FINALIZADO)";
             }
 
             return (

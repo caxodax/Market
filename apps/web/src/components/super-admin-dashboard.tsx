@@ -22,6 +22,8 @@ import {
   deletePlatformUserAction,
   renewTenantSubscriptionAction,
   changeTenantPlanAction,
+  impersonateTenantAction,
+  stopImpersonationAction,
 } from "../app/platform/actions";
 import { AuditTrailViewer } from "./audit-trail-viewer";
 import { PlatformBiAnalyticsTab } from "./platform-bi-analytics-tab";
@@ -139,6 +141,10 @@ export function SuperAdminDashboard({
     type: "success" | "error";
     text: string;
   } | null>(null);
+
+  // Support Impersonation State ("Login As")
+  const [impersonatingTenantId, setImpersonatingTenantId] = useState<string | null>(null);
+  const [isStoppingImpersonation, setIsStoppingImpersonation] = useState(false);
 
   // Auto-dismiss user alert
   useEffect(() => {
@@ -689,6 +695,38 @@ export function SuperAdminDashboard({
     }
   };
 
+  // Support Impersonation ("Login As") Handlers
+  const handleLoginAs = async (tenant: TenantWithDetails) => {
+    setImpersonatingTenantId(tenant.id);
+    try {
+      const res = await impersonateTenantAction(tenant.id);
+      if (res.success && res.redirectUrl) {
+        window.location.href = res.redirectUrl;
+      } else {
+        alert(res.error || "Error al iniciar sesión como dueño");
+        setImpersonatingTenantId(null);
+      }
+    } catch (err: any) {
+      console.error("Error logging in as tenant owner:", err);
+      alert(err?.message || "Error al iniciar sesión de soporte");
+      setImpersonatingTenantId(null);
+    }
+  };
+
+  const handleStopActiveImpersonation = async () => {
+    setIsStoppingImpersonation(true);
+    try {
+      const res = await stopImpersonationAction();
+      if (res.success && res.redirectUrl) {
+        window.location.href = res.redirectUrl;
+      } else {
+        window.location.reload();
+      }
+    } catch {
+      window.location.reload();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
       {/* Platform Master Header */}
@@ -789,6 +827,50 @@ export function SuperAdminDashboard({
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-6">
+        {/* ACTIVE IMPERSONATION NOTICE ON PLATFORM */}
+        {currentUser?.impersonation && (
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-950 border border-purple-500/50 text-white shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center shrink-0 text-xl shadow-inner">
+                🎭
+              </div>
+              <div>
+                <p className="text-xs font-bold text-white flex items-center gap-2">
+                  <span>Sesión de Soporte Técnico Activa ("Login As")</span>
+                  <span className="text-[10px] bg-purple-500 text-black font-extrabold px-1.5 py-0.2 rounded">
+                    EN CURSO
+                  </span>
+                </p>
+                <p className="text-sm font-black text-purple-200 mt-0.5">
+                  {currentUser.impersonation.targetTenantName}
+                  <span className="text-xs font-mono font-normal text-purple-300 ml-2">
+                    (/{currentUser.impersonation.targetTenantSlug})
+                  </span>
+                </p>
+                <p className="text-[11px] text-purple-300/80">
+                  Operador: {currentUser.impersonation.originalSuperAdmin.fullName} ({currentUser.impersonation.originalSuperAdmin.email})
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <a
+                href={`/admin?tenant=${currentUser.impersonation.targetTenantId}`}
+                className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-sm transition-colors"
+              >
+                Ingresar al Panel
+              </a>
+              <button
+                type="button"
+                onClick={handleStopActiveImpersonation}
+                disabled={isStoppingImpersonation}
+                className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {isStoppingImpersonation ? "Cerrando..." : "Finalizar Soporte"}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* KPI Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           {/* Active Tenants */}
@@ -1091,14 +1173,35 @@ export function SuperAdminDashboard({
                         {/* Actions */}
                         <td className="py-3.5 px-4 text-right">
                           <div className="flex items-center justify-end gap-2 flex-wrap">
+                            {/* 🎭 "Login As" / Impersonación para Soporte */}
+                            <button
+                              type="button"
+                              onClick={() => handleLoginAs(tenant)}
+                              disabled={impersonatingTenantId === tenant.id}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-500 hover:to-indigo-500 text-white text-[11px] font-black transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                              title={`Ingresar con 1 solo clic al panel /admin de ${tenant.name} como si fueras el dueño para resolver incidencias técnicas sin pedir contraseñas`}
+                            >
+                              {impersonatingTenantId === tenant.id ? (
+                                <>
+                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  <span>Accediendo...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-xs">🎭</span>
+                                  <span>Login As (Dueño)</span>
+                                </>
+                              )}
+                            </button>
+
                             {/* Administrar Tienda */}
                             <a
                               href={`/admin?tenant=${tenant.id}`}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-[11px] font-bold transition-all shadow-xs"
-                              title={`Entrar al panel de administración de ${tenant.name}`}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-border text-foreground hover:bg-muted text-[11px] font-bold transition-all shadow-xs"
+                              title={`Entrar al panel de administración de ${tenant.name} como Super Admin`}
                             >
-                              <ShieldCheck className="w-3.5 h-3.5" />
-                              <span>Administrar Tienda</span>
+                              <ShieldCheck className="w-3.5 h-3.5 text-primary" />
+                              <span>Admin</span>
                             </a>
 
                             {/* Ver PWA en vivo */}
@@ -1461,6 +1564,24 @@ export function SuperAdminDashboard({
                           {/* Actions */}
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-2 flex-wrap">
+                              {/* 🎭 Login As Soporte */}
+                              <button
+                                type="button"
+                                onClick={() => handleLoginAs(t)}
+                                disabled={impersonatingTenantId === t.id}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-[11px] font-black transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                                title={`Ingresar con 1 solo clic al panel /admin de ${t.name} como Dueño`}
+                              >
+                                {impersonatingTenantId === t.id ? (
+                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <>
+                                    <span className="text-xs">🎭</span>
+                                    <span>Login As</span>
+                                  </>
+                                )}
+                              </button>
+
                               {/* Registrar Cobro / Renovar */}
                               <button
                                 onClick={() => {
