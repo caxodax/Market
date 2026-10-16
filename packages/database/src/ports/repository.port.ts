@@ -75,6 +75,7 @@ import {
   TenantPlanLimits,
   QuotaCheckResult,
   PlatformBiAnalytics,
+  PlatformBiAnalyticsFilter,
   CreateDeliveryZoneInput,
   UpdateDeliveryZoneInput,
   CreateDriverInput,
@@ -629,7 +630,7 @@ export interface IPlatformRepository {
    * Obtener Inteligencia de Negocios y Métricas Globales (BI Analytics) de la red
    */
   getPlatformBiAnalytics(
-    dateRange?: "today" | "week" | "month" | "all"
+    filter?: PlatformBiAnalyticsFilter | "today" | "week" | "month" | "all"
   ): Promise<PlatformBiAnalytics>;
 
   /**

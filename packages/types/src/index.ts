@@ -441,6 +441,7 @@ export interface Order {
   payment_status?: PaymentStatus;
   proof_image_url?: string | null;
   store_name?: string;
+  delivery_zone_name?: string;
   // SENIAT Fiscal Invoice Data (Providencia 00071 & Factura Digital)
   is_fiscal_invoice?: boolean;
   fiscal_invoice_number?: string | null;
@@ -877,9 +878,46 @@ export interface PlatformDailyTrendItem {
   orderCount: number;
 }
 
+export interface DeliveryMethodBreakdown {
+  deliveryOrdersCount: number;
+  deliveryGmvUsd: number;
+  deliveryGmvVes: number;
+  deliverySharePercent: number; // % sobre el total de pedidos
+  deliveryAverageTicketUsd: number;
+  totalDeliveryFeesUsd: number;
+  totalDeliveryFeesVes: number;
+
+  pickupOrdersCount: number;
+  pickupGmvUsd: number;
+  pickupGmvVes: number;
+  pickupSharePercent: number; // % sobre el total de pedidos
+  pickupAverageTicketUsd: number;
+}
+
+export interface DeliveryZoneRankingItem {
+  zoneId: string;
+  zoneName: string;
+  tenantId: string;
+  tenantName: string;
+  ordersCount: number;
+  gmvUsd: number;
+  gmvVes: number;
+  sharePercent: number; // % de pedidos de delivery
+  averageDeliveryFeeUsd: number;
+  averageTicketUsd: number;
+}
+
+export interface PlatformBiAnalyticsFilter {
+  dateRange?: "today" | "week" | "month" | "all";
+  deliveryType?: "ALL" | "DELIVERY" | "PICKUP";
+  deliveryZoneId?: string | "ALL";
+}
+
 export interface PlatformBiAnalytics {
   dateRange: "today" | "week" | "month" | "all";
   exchangeRate: number; // Tasa BCV oficial aplicada
+  appliedDeliveryType: "ALL" | "DELIVERY" | "PICKUP";
+  appliedZoneId: string | "ALL";
   // Global Network Totals & AOV
   totalNetworkGmvUsd: number;
   totalNetworkGmvVes: number;
@@ -892,11 +930,16 @@ export interface PlatformBiAnalytics {
   orderSuccessRatePercent: number;
   activeTenantsCount: number;
   sellingTenantsCount: number; // Comercios con ventas en el periodo
+  // Delivery vs Pickup Breakdown & Zone Leaderboard
+  deliveryBreakdown: DeliveryMethodBreakdown;
+  deliveryZoneRankings: DeliveryZoneRankingItem[];
+  availableDeliveryZones: { id: string; name: string; tenantName?: string; ordersCount?: number }[];
   // Leaderboards & Breakdowns
   tenantRankings: TenantGmvRankingItem[];
   paymentMethodsConsolidated: ConsolidatedPaymentMethodStat[];
   dailyTrend: PlatformDailyTrendItem[];
 }
+
 
 
 

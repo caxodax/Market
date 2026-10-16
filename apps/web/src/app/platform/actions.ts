@@ -1,7 +1,12 @@
 "use server";
 
 import { MarketOSRepository } from "@marketos/database";
-import { OnboardTenantInput, SubscriptionPlanTier, AuditLogFilters } from "@marketos/types";
+import {
+  OnboardTenantInput,
+  SubscriptionPlanTier,
+  AuditLogFilters,
+  PlatformBiAnalyticsFilter,
+} from "@marketos/types";
 import { revalidatePath } from "next/cache";
 import { invalidateTenantCache } from "../../lib/cached-queries";
 import { getCurrentUser } from "../login/actions";
@@ -227,10 +232,10 @@ export async function deletePlatformUserAction(userId: string) {
  * Obtener Inteligencia de Negocios y Métricas Globales (BI Analytics)
  */
 export async function getPlatformBiAnalyticsAction(
-  dateRange: "today" | "week" | "month" | "all" = "all"
+  filter: PlatformBiAnalyticsFilter | "today" | "week" | "month" | "all" = "all"
 ) {
   try {
-    const analytics = await MarketOSRepository.getPlatformBiAnalytics(dateRange);
+    const analytics = await MarketOSRepository.getPlatformBiAnalytics(filter);
     return { success: true, analytics };
   } catch (error) {
     console.error("Error fetching platform BI analytics:", error);

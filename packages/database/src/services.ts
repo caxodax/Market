@@ -52,6 +52,9 @@ import {
   TenantPlanLimits,
   QuotaCheckResult,
   PlatformBiAnalytics,
+  PlatformBiAnalyticsFilter,
+  DeliveryMethodBreakdown,
+  DeliveryZoneRankingItem,
   TenantGmvRankingItem,
   ConsolidatedPaymentMethodStat,
   PlatformDailyTrendItem,
@@ -3522,17 +3525,49 @@ export class MarketOSRepository {
   /**
    * Get Platform Business Intelligence & Global Analytics (BI Analytics)
    * Ranking de tiendas por GMV, Ticket Promedio Global de la Red,
-   * y Desglose Consolidado de Métodos de Pago más usados (Pago Móvil, Zelle, Efectivo, Binance, etc.)
+   * Desglose Consolidado de Métodos de Pago más usados (Pago Móvil, Zelle, Efectivo, Binance, etc.)
+   * y Analítica de Despacho (Delivery vs Retiro en Tienda y Ranking de Zonas de Mayor Demanda)
    */
   static async getPlatformBiAnalytics(
-    dateRange: "today" | "week" | "month" | "all" = "all"
+    filterInput?: PlatformBiAnalyticsFilter | "today" | "week" | "month" | "all"
   ): Promise<PlatformBiAnalytics> {
-    const range = dateRange || "all";
+    const filter: PlatformBiAnalyticsFilter =
+      typeof filterInput === "string"
+        ? { dateRange: filterInput, deliveryType: "ALL", deliveryZoneId: "ALL" }
+        : {
+            dateRange: filterInput?.dateRange || "all",
+            deliveryType: filterInput?.deliveryType || "ALL",
+            deliveryZoneId: filterInput?.deliveryZoneId || "ALL",
+          };
+
+    const range = filter.dateRange || "all";
+    const selectedDeliveryType = filter.deliveryType || "ALL";
+    const selectedZoneId = filter.deliveryZoneId || "ALL";
+
     const { startUtc, endUtc } = getCaracasRangeBounds(range);
     const rate = await this.getExchangeRate("shop-market-ca");
     const activeRateValue = rate?.value || 52.5;
 
     const allTenants = await this.getAllTenants();
+    const supabase = getSupabase();
+
+    // Map of zones: zoneId -> DeliveryZone
+    const zoneMap = new Map<string, DeliveryZone>();
+    if (supabase) {
+      try {
+        const { data: dbZones } = await supabase
+          .from("delivery_zones")
+          .select("*");
+        if (dbZones) {
+          for (const z of dbZones) zoneMap.set(z.id, z as DeliveryZone);
+        }
+      } catch (err) {
+        console.warn("[MarketOS] getPlatformBiAnalytics error fetching zones:", err);
+      }
+    }
+    for (const z of state.deliveryZones) {
+      if (!zoneMap.has(z.id)) zoneMap.set(z.id, z);
+    }
 
     const METHOD_LABELS: Record<string, string> = {
       PAGO_MOVIL: "Pago Móvil (VES)",
@@ -3546,6 +3581,27 @@ export class MarketOSRepository {
       OTHER: "Otros Métodos",
     };
 
+    // Tracking for Delivery vs Pickup Breakdown & Zone Leaderboard
+    let totalDeliveryOrdersCount = 0;
+    let totalDeliveryGmvUsd = 0;
+    let totalDeliveryFeesUsd = 0;
+
+    let totalPickupOrdersCount = 0;
+    let totalPickupGmvUsd = 0;
+
+    const deliveryZoneStatsMap = new Map<
+      string,
+      {
+        zoneName: string;
+        tenantId: string;
+        tenantName: string;
+        ordersCount: number;
+        gmvUsd: number;
+        totalFeeUsd: number;
+      }
+    >();
+
+    // Tracking for filtered subset
     let totalNetworkGmvUsd = 0;
     let totalNetworkOrders = 0;
     let totalCompletedOrders = 0;
@@ -3583,10 +3639,66 @@ export class MarketOSRepository {
     for (const t of allTenants) {
       const orders = await this.getTenantOrders(t.id);
 
-      const filteredOrders = orders.filter((o) => {
+      // Date range filter
+      const ordersInDateRange = orders.filter((o) => {
         if (startUtc) {
           const orderDate = new Date(o.created_at);
           if (orderDate < startUtc || orderDate > endUtc) return false;
+        }
+        return true;
+      });
+
+      // 1. Compute Delivery vs Pickup & Zone rankings across ALL orders in this date range
+      for (const order of ordersInDateRange) {
+        if (order.delivery_type === "DELIVERY") {
+          totalDeliveryOrdersCount++;
+          if (order.status !== "CANCELLED") {
+            totalDeliveryGmvUsd += order.total_usd;
+            totalDeliveryFeesUsd += order.delivery_fee_usd || 0;
+          }
+
+          // Zone tracking
+          const zoneId = order.delivery_zone_id || "sin-zona";
+          const matchedZone = zoneMap.get(zoneId);
+          const zoneName =
+            matchedZone?.name ||
+            (order.delivery_zone_id
+              ? `Zona (${order.delivery_zone_id.slice(0, 8)})`
+              : "Sin Zona Especificada");
+
+          const currentZone = deliveryZoneStatsMap.get(zoneId) || {
+            zoneName,
+            tenantId: t.id,
+            tenantName: t.name,
+            ordersCount: 0,
+            gmvUsd: 0,
+            totalFeeUsd: 0,
+          };
+
+          currentZone.ordersCount++;
+          if (order.status !== "CANCELLED") {
+            currentZone.gmvUsd += order.total_usd;
+            currentZone.totalFeeUsd += order.delivery_fee_usd || 0;
+          }
+          deliveryZoneStatsMap.set(zoneId, currentZone);
+        } else if (order.delivery_type === "PICKUP") {
+          totalPickupOrdersCount++;
+          if (order.status !== "CANCELLED") {
+            totalPickupGmvUsd += order.total_usd;
+          }
+        }
+      }
+
+      // 2. Filter orders for this tenant according to deliveryType & deliveryZoneId filters
+      const filteredOrders = ordersInDateRange.filter((o) => {
+        if (
+          selectedDeliveryType !== "ALL" &&
+          o.delivery_type !== selectedDeliveryType
+        ) {
+          return false;
+        }
+        if (selectedZoneId !== "ALL" && o.delivery_zone_id !== selectedZoneId) {
+          return false;
         }
         return true;
       });
@@ -3666,6 +3778,88 @@ export class MarketOSRepository {
         gmvUsd: Number(tenantGmvUsd.toFixed(2)),
       });
     }
+
+    // Consolidated Delivery Breakdown calculations
+    const totalDespachoOrders = totalDeliveryOrdersCount + totalPickupOrdersCount;
+    const deliverySharePercent =
+      totalDespachoOrders > 0
+        ? Number(((totalDeliveryOrdersCount / totalDespachoOrders) * 100).toFixed(1))
+        : 0;
+    const pickupSharePercent =
+      totalDespachoOrders > 0
+        ? Number(((totalPickupOrdersCount / totalDespachoOrders) * 100).toFixed(1))
+        : 0;
+
+    const deliveryAverageTicketUsd =
+      totalDeliveryOrdersCount > 0
+        ? Number((totalDeliveryGmvUsd / totalDeliveryOrdersCount).toFixed(2))
+        : 0;
+    const pickupAverageTicketUsd =
+      totalPickupOrdersCount > 0
+        ? Number((totalPickupGmvUsd / totalPickupOrdersCount).toFixed(2))
+        : 0;
+
+    const deliveryBreakdown: DeliveryMethodBreakdown = {
+      deliveryOrdersCount: totalDeliveryOrdersCount,
+      deliveryGmvUsd: Number(totalDeliveryGmvUsd.toFixed(2)),
+      deliveryGmvVes: convertUsdToVes(totalDeliveryGmvUsd, activeRateValue),
+      deliverySharePercent,
+      deliveryAverageTicketUsd,
+      totalDeliveryFeesUsd: Number(totalDeliveryFeesUsd.toFixed(2)),
+      totalDeliveryFeesVes: convertUsdToVes(totalDeliveryFeesUsd, activeRateValue),
+      pickupOrdersCount: totalPickupOrdersCount,
+      pickupGmvUsd: Number(totalPickupGmvUsd.toFixed(2)),
+      pickupGmvVes: convertUsdToVes(totalPickupGmvUsd, activeRateValue),
+      pickupSharePercent,
+      pickupAverageTicketUsd,
+    };
+
+    // Consolidated Delivery Zone Rankings (Leaderboard of most demanded zones)
+    const deliveryZoneRankings: DeliveryZoneRankingItem[] = Array.from(
+      deliveryZoneStatsMap.entries()
+    )
+      .map(([zoneId, stat]) => {
+        const gmvUsd = Number(stat.gmvUsd.toFixed(2));
+        const gmvVes = convertUsdToVes(gmvUsd, activeRateValue);
+        const sharePercent =
+          totalDeliveryOrdersCount > 0
+            ? Number(((stat.ordersCount / totalDeliveryOrdersCount) * 100).toFixed(1))
+            : 0;
+        const averageDeliveryFeeUsd =
+          stat.ordersCount > 0
+            ? Number((stat.totalFeeUsd / stat.ordersCount).toFixed(2))
+            : 0;
+        const averageTicketUsd =
+          stat.ordersCount > 0
+            ? Number((gmvUsd / stat.ordersCount).toFixed(2))
+            : 0;
+
+        return {
+          zoneId,
+          zoneName: stat.zoneName,
+          tenantId: stat.tenantId,
+          tenantName: stat.tenantName,
+          ordersCount: stat.ordersCount,
+          gmvUsd,
+          gmvVes,
+          sharePercent,
+          averageDeliveryFeeUsd,
+          averageTicketUsd,
+        };
+      })
+      .sort((a, b) => b.ordersCount - a.ordersCount || b.gmvUsd - a.gmvUsd);
+
+    // Available delivery zones for dropdown filter with populated orders count
+    const availableDeliveryZones = Array.from(zoneMap.values()).map((z) => {
+      const tenant = allTenants.find((t) => t.id === z.tenant_id);
+      const zoneStats = deliveryZoneStatsMap.get(z.id);
+      return {
+        id: z.id,
+        name: z.name,
+        tenantName: tenant?.name,
+        ordersCount: zoneStats?.ordersCount || 0,
+      };
+    });
 
     totalNetworkGmvUsd = Number(totalNetworkGmvUsd.toFixed(2));
     const totalNetworkGmvVes = convertUsdToVes(totalNetworkGmvUsd, activeRateValue);
@@ -3802,6 +3996,8 @@ export class MarketOSRepository {
     return {
       dateRange: range,
       exchangeRate: activeRateValue,
+      appliedDeliveryType: selectedDeliveryType,
+      appliedZoneId: selectedZoneId,
       totalNetworkGmvUsd,
       totalNetworkGmvVes,
       networkAverageTicketUsd,
@@ -3813,6 +4009,9 @@ export class MarketOSRepository {
       orderSuccessRatePercent,
       activeTenantsCount: allTenants.filter((t) => t.status === "active").length,
       sellingTenantsCount,
+      deliveryBreakdown,
+      deliveryZoneRankings,
+      availableDeliveryZones,
       tenantRankings,
       paymentMethodsConsolidated,
       dailyTrend,

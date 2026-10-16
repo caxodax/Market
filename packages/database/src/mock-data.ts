@@ -539,6 +539,39 @@ export const INITIAL_DELIVERY_ZONES: DeliveryZone[] = [
   },
 ];
 
+export const DEMO_ADDITIONAL_DELIVERY_ZONES: DeliveryZone[] = [
+  {
+    id: "zone-las-mercedes",
+    tenant_id: "bodegon-gourmet",
+    name: "Las Mercedes & El Rosal",
+    price_usd: 5.0,
+    estimated_time: "30-45 min",
+    coverage_description: "Las Mercedes, Valle Arriba, El Rosal",
+    is_active: true,
+    sort_order: 1,
+  },
+  {
+    id: "zone-los-proceres",
+    tenant_id: "distribuidora-avila",
+    name: "Zona Industrial & El Valle",
+    price_usd: 10.0,
+    estimated_time: "45-60 min",
+    coverage_description: "Zona Industrial Los Próceres, Santa Mónica, El Valle",
+    is_active: true,
+    sort_order: 1,
+  },
+  {
+    id: "zone-palos-grandes",
+    tenant_id: "panaderia-dulce-trigo",
+    name: "Los Palos Grandes & Altamira",
+    price_usd: 3.0,
+    estimated_time: "20-35 min",
+    coverage_description: "Los Palos Grandes, Altamira, La Castellana",
+    is_active: true,
+    sort_order: 1,
+  },
+];
+
 export const INITIAL_COUPONS: Coupon[] = [
   {
     id: "f1111111-1111-1111-1111-111111111111",
@@ -891,6 +924,7 @@ export const DEMO_INITIAL_ORDERS: Order[] = [
     order_number: "ORD-101",
     status: "COMPLETED",
     delivery_type: "DELIVERY",
+    delivery_zone_id: "e1111111-1111-1111-1111-111111111111", // Nueva Segovia
     subtotal_usd: 25.0,
     delivery_fee_usd: 3.5,
     total_usd: 28.5,
@@ -929,6 +963,7 @@ export const DEMO_INITIAL_ORDERS: Order[] = [
     order_number: "ORD-103",
     status: "COMPLETED",
     delivery_type: "DELIVERY",
+    delivery_zone_id: "zone-los-proceres", // Zona Industrial Los Próceres
     subtotal_usd: 175.0,
     delivery_fee_usd: 5.0,
     total_usd: 180.0,
@@ -968,6 +1003,7 @@ export const DEMO_INITIAL_ORDERS: Order[] = [
     order_number: "ORD-105",
     status: "COMPLETED",
     delivery_type: "DELIVERY",
+    delivery_zone_id: "e2222222-2222-2222-2222-222222222222", // Este / Santa Rosa
     subtotal_usd: 31.0,
     delivery_fee_usd: 3.0,
     total_usd: 34.0,
@@ -987,6 +1023,7 @@ export const DEMO_INITIAL_ORDERS: Order[] = [
     order_number: "ORD-106",
     status: "COMPLETED",
     delivery_type: "DELIVERY",
+    delivery_zone_id: "zone-las-mercedes", // Las Mercedes
     subtotal_usd: 120.0,
     delivery_fee_usd: 5.0,
     total_usd: 125.0,
@@ -1026,6 +1063,7 @@ export const DEMO_INITIAL_ORDERS: Order[] = [
     order_number: "ORD-108",
     status: "COMPLETED",
     delivery_type: "DELIVERY",
+    delivery_zone_id: "zone-los-proceres", // Zona Industrial Los Próceres
     subtotal_usd: 200.0,
     delivery_fee_usd: 10.0,
     total_usd: 210.0,
@@ -1045,6 +1083,7 @@ export const DEMO_INITIAL_ORDERS: Order[] = [
     order_number: "ORD-109",
     status: "COMPLETED",
     delivery_type: "DELIVERY",
+    delivery_zone_id: "zone-las-mercedes", // Las Mercedes
     subtotal_usd: 135.0,
     delivery_fee_usd: 5.0,
     total_usd: 140.0,
@@ -1083,6 +1122,7 @@ export const DEMO_INITIAL_ORDERS: Order[] = [
     order_number: "ORD-111",
     status: "COMPLETED",
     delivery_type: "DELIVERY",
+    delivery_zone_id: "e1111111-1111-1111-1111-111111111111", // Nueva Segovia
     subtotal_usd: 51.5,
     delivery_fee_usd: 3.5,
     total_usd: 55.0,
@@ -1122,6 +1162,7 @@ export const DEMO_INITIAL_ORDERS: Order[] = [
     order_number: "ORD-113",
     status: "COMPLETED",
     delivery_type: "DELIVERY",
+    delivery_zone_id: "zone-los-proceres", // Zona Industrial Los Próceres
     subtotal_usd: 155.0,
     delivery_fee_usd: 10.0,
     total_usd: 165.0,
@@ -1141,6 +1182,7 @@ export const DEMO_INITIAL_ORDERS: Order[] = [
     order_number: "ORD-114",
     status: "COMPLETED",
     delivery_type: "DELIVERY",
+    delivery_zone_id: "zone-las-mercedes", // Las Mercedes
     subtotal_usd: 80.0,
     delivery_fee_usd: 5.0,
     total_usd: 85.0,
@@ -1160,6 +1202,7 @@ export const DEMO_INITIAL_ORDERS: Order[] = [
     order_number: "ORD-115",
     status: "COMPLETED",
     delivery_type: "DELIVERY",
+    delivery_zone_id: "e2222222-2222-2222-2222-222222222222", // Este / Santa Rosa
     subtotal_usd: 68.5,
     delivery_fee_usd: 3.5,
     total_usd: 72.0,
@@ -1198,6 +1241,7 @@ export const DEMO_INITIAL_ORDERS: Order[] = [
     order_number: "ORD-117",
     status: "COMPLETED",
     delivery_type: "DELIVERY",
+    delivery_zone_id: "e1111111-1111-1111-1111-111111111111", // Nueva Segovia
     subtotal_usd: 29.0,
     delivery_fee_usd: 3.0,
     total_usd: 32.0,
@@ -1217,6 +1261,7 @@ export const DEMO_INITIAL_ORDERS: Order[] = [
     order_number: "ORD-118",
     status: "COMPLETED",
     delivery_type: "DELIVERY",
+    delivery_zone_id: "e1111111-1111-1111-1111-111111111111", // Nueva Segovia
     subtotal_usd: 84.5,
     delivery_fee_usd: 3.5,
     total_usd: 88.0,
@@ -1271,7 +1316,7 @@ export const state = {
   products: INITIAL_PRODUCTS,
   rates: [INITIAL_EXCHANGE_RATE],
   rateHistory: INITIAL_RATE_HISTORY,
-  deliveryZones: INITIAL_DELIVERY_ZONES,
+  deliveryZones: [...INITIAL_DELIVERY_ZONES, ...DEMO_ADDITIONAL_DELIVERY_ZONES],
   coupons: INITIAL_COUPONS,
   drivers: INITIAL_DRIVERS,
   plans: INITIAL_SUBSCRIPTION_PLANS,
