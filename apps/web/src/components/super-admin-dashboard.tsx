@@ -11,6 +11,7 @@ import {
   UserProfile,
   UserRole,
   AuditLog,
+  PlatformBiAnalytics,
 } from "@marketos/types";
 import { formatCurrency, slugify } from "@marketos/utils";
 import {
@@ -23,6 +24,7 @@ import {
   changeTenantPlanAction,
 } from "../app/platform/actions";
 import { AuditTrailViewer } from "./audit-trail-viewer";
+import { PlatformBiAnalyticsTab } from "./platform-bi-analytics-tab";
 import {
   Building2,
   DollarSign,
@@ -63,6 +65,7 @@ import {
   Zap,
   Check,
   AlertTriangle,
+  BarChart3,
 } from "lucide-react";
 import { logoutUserAction } from "../app/login/actions";
 import { ExchangeRateManager } from "./exchange-rate-manager";
@@ -76,6 +79,7 @@ interface SuperAdminDashboardProps {
   ratesHistory?: RateHistoryItem[];
   initialProfiles?: UserProfile[];
   initialAuditLogs?: AuditLog[];
+  initialBiAnalytics?: PlatformBiAnalytics;
 }
 
 export function SuperAdminDashboard({
@@ -87,8 +91,11 @@ export function SuperAdminDashboard({
   ratesHistory = [],
   initialProfiles = [],
   initialAuditLogs = [],
+  initialBiAnalytics,
 }: SuperAdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<"TENANTS" | "BILLING" | "USERS" | "RATES" | "AUDIT">("TENANTS");
+  const [activeTab, setActiveTab] = useState<
+    "TENANTS" | "BILLING" | "BI" | "USERS" | "RATES" | "AUDIT"
+  >("TENANTS");
   const [tenants, setTenants] = useState<TenantWithDetails[]>(initialTenants);
   const [metrics, setMetrics] = useState<PlatformMetrics>(initialMetrics);
   const [profiles, setProfiles] = useState<UserProfile[]>(initialProfiles);
@@ -874,6 +881,18 @@ export function SuperAdminDashboard({
           </button>
 
           <button
+            onClick={() => setActiveTab("BI")}
+            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === "BI"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span>BI Analytics & Métricas</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab("USERS")}
             className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
               activeTab === "USERS"
@@ -1496,6 +1515,11 @@ export function SuperAdminDashboard({
             </div>
           </div>
         </div>
+      )}
+
+      {/* TAB: BI ANALYTICS & GLOBAL INTELLIGENCE */}
+      {activeTab === "BI" && (
+        <PlatformBiAnalyticsTab initialAnalytics={initialBiAnalytics} />
       )}
 
       {/* TAB 3: USERS & MULTI-TENANT STAFF DIRECTORY */}

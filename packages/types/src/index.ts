@@ -392,7 +392,9 @@ export type PaymentMethodType =
   | "ZELLE"
   | "CASH_USD"
   | "CASH_VES"
-  | "POS";
+  | "POS"
+  | "BINANCE"
+  | "BINANCE_PAY";
 
 export type PaymentStatus = "PENDING" | "APPROVED" | "REJECTED";
 
@@ -417,6 +419,7 @@ export interface Order {
   delivery_type: DeliveryType;
   delivery_zone_id?: string | null;
   delivery_address?: string | null;
+  subtotal_usd?: number;
   delivery_fee_usd?: number;
   coupon_id?: string | null;
   discount_usd?: number;
@@ -829,6 +832,70 @@ export interface DevicePwaStatus {
   isStandalone: boolean;
   hasNativePushApis: boolean;
   canSubscribePush: boolean;
+}
+
+// =====================================================================
+// PHASE 3.5: BI ANALYTICS & GLOBAL NETWORK INTELLIGENCE
+// =====================================================================
+
+export interface TenantGmvRankingItem {
+  tenantId: string;
+  tenantName: string;
+  tenantSlug: string;
+  category: string;
+  logoUrl: string | null;
+  planTier: SubscriptionPlanTier;
+  status: TenantStatus;
+  totalOrders: number;
+  completedOrders: number;
+  pendingOrders: number;
+  cancelledOrders: number;
+  gmvUsd: number;
+  gmvVes: number;
+  averageTicketUsd: number;
+  averageTicketVes: number;
+  sharePercent: number; // Porcentaje de cuota sobre el GMV total de la red
+  storesCount: number;
+  productsCount: number;
+}
+
+export interface ConsolidatedPaymentMethodStat {
+  method: PaymentMethodType;
+  label: string;
+  totalUsd: number;
+  totalVes: number;
+  transactionCount: number;
+  sharePercent: number; // Porcentaje del volumen de pagos procesados
+  averageTicketUsd: number;
+}
+
+export interface PlatformDailyTrendItem {
+  date: string;
+  label: string;
+  totalUsd: number;
+  totalVes: number;
+  orderCount: number;
+}
+
+export interface PlatformBiAnalytics {
+  dateRange: "today" | "week" | "month" | "all";
+  exchangeRate: number; // Tasa BCV oficial aplicada
+  // Global Network Totals & AOV
+  totalNetworkGmvUsd: number;
+  totalNetworkGmvVes: number;
+  networkAverageTicketUsd: number;
+  networkAverageTicketVes: number;
+  totalNetworkOrders: number;
+  completedOrdersCount: number;
+  pendingOrdersCount: number;
+  cancelledOrdersCount: number;
+  orderSuccessRatePercent: number;
+  activeTenantsCount: number;
+  sellingTenantsCount: number; // Comercios con ventas en el periodo
+  // Leaderboards & Breakdowns
+  tenantRankings: TenantGmvRankingItem[];
+  paymentMethodsConsolidated: ConsolidatedPaymentMethodStat[];
+  dailyTrend: PlatformDailyTrendItem[];
 }
 
 

@@ -222,3 +222,25 @@ export async function deletePlatformUserAction(userId: string) {
     };
   }
 }
+
+/**
+ * Obtener Inteligencia de Negocios y Métricas Globales (BI Analytics)
+ */
+export async function getPlatformBiAnalyticsAction(
+  dateRange: "today" | "week" | "month" | "all" = "all"
+) {
+  try {
+    const analytics = await MarketOSRepository.getPlatformBiAnalytics(dateRange);
+    return { success: true, analytics };
+  } catch (error) {
+    console.error("Error fetching platform BI analytics:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Error al cargar la analítica de negocio global",
+    };
+  }
+}
+

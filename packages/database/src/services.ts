@@ -51,6 +51,10 @@ import {
   AuditActionType,
   TenantPlanLimits,
   QuotaCheckResult,
+  PlatformBiAnalytics,
+  TenantGmvRankingItem,
+  ConsolidatedPaymentMethodStat,
+  PlatformDailyTrendItem,
 } from "@marketos/types";
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
 import { fetchBcvRate, convertUsdToVes, getCaracasDateKey, getCaracasRangeBounds } from "@marketos/utils";
@@ -2186,6 +2190,8 @@ export class MarketOSRepository {
       CASH_USD: "Efectivo Dólares ($)",
       CASH_VES: "Efectivo Bolívares (Bs)",
       POS: "Punto de Venta / Tarjeta",
+      BINANCE: "Binance Pay / USDT",
+      BINANCE_PAY: "Binance Pay / USDT",
     };
 
     const STATUS_LABELS: Record<OrderStatus, string> = {
@@ -3510,6 +3516,306 @@ export class MarketOSRepository {
       totalGmvUsd: Number(totalGmvUsd.toFixed(2)),
       totalGmvVes,
       mrrUsd: Number(mrrUsd.toFixed(2)),
+    };
+  }
+
+  /**
+   * Get Platform Business Intelligence & Global Analytics (BI Analytics)
+   * Ranking de tiendas por GMV, Ticket Promedio Global de la Red,
+   * y Desglose Consolidado de Métodos de Pago más usados (Pago Móvil, Zelle, Efectivo, Binance, etc.)
+   */
+  static async getPlatformBiAnalytics(
+    dateRange: "today" | "week" | "month" | "all" = "all"
+  ): Promise<PlatformBiAnalytics> {
+    const range = dateRange || "all";
+    const { startUtc, endUtc } = getCaracasRangeBounds(range);
+    const rate = await this.getExchangeRate("shop-market-ca");
+    const activeRateValue = rate?.value || 52.5;
+
+    const allTenants = await this.getAllTenants();
+
+    const METHOD_LABELS: Record<string, string> = {
+      PAGO_MOVIL: "Pago Móvil (VES)",
+      ZELLE: "Zelle (USD)",
+      CASH_USD: "Efectivo Dólares ($)",
+      CASH_VES: "Efectivo Bolívares (Bs)",
+      BINANCE: "Binance Pay / USDT",
+      BINANCE_PAY: "Binance Pay / USDT",
+      POS: "Punto de Venta / Tarjeta",
+      BANK_TRANSFER: "Transferencia Bancaria",
+      OTHER: "Otros Métodos",
+    };
+
+    let totalNetworkGmvUsd = 0;
+    let totalNetworkOrders = 0;
+    let totalCompletedOrders = 0;
+    let totalPendingOrders = 0;
+    let totalCancelledOrders = 0;
+
+    const tenantRankingMap = new Map<
+      string,
+      {
+        tenant: TenantWithDetails;
+        totalOrders: number;
+        completedOrders: number;
+        pendingOrders: number;
+        cancelledOrders: number;
+        gmvUsd: number;
+      }
+    >();
+
+    const paymentMethodsMap = new Map<
+      string,
+      {
+        method: PaymentMethodType;
+        label: string;
+        totalUsd: number;
+        totalVes: number;
+        transactionCount: number;
+      }
+    >();
+
+    const dailyTrendMap = new Map<
+      string,
+      { totalUsd: number; totalVes: number; orderCount: number }
+    >();
+
+    for (const t of allTenants) {
+      const orders = await this.getTenantOrders(t.id);
+
+      const filteredOrders = orders.filter((o) => {
+        if (startUtc) {
+          const orderDate = new Date(o.created_at);
+          if (orderDate < startUtc || orderDate > endUtc) return false;
+        }
+        return true;
+      });
+
+      let tenantTotalOrders = filteredOrders.length;
+      let tenantCompletedOrders = 0;
+      let tenantPendingOrders = 0;
+      let tenantCancelledOrders = 0;
+      let tenantGmvUsd = 0;
+
+      for (const order of filteredOrders) {
+        if (order.status === "COMPLETED") {
+          tenantCompletedOrders++;
+        } else if (order.status === "CANCELLED") {
+          tenantCancelledOrders++;
+        } else {
+          tenantPendingOrders++;
+        }
+
+        // Non-cancelled orders contribute to GMV and network volume
+        if (order.status !== "CANCELLED") {
+          tenantGmvUsd += order.total_usd;
+          totalNetworkGmvUsd += order.total_usd;
+
+          // Consolidated payment method breakdown
+          let rawMethod = (
+            order.payment_method ||
+            (order as any).paymentMethod ||
+            "OTHER"
+          ).toUpperCase();
+          if (rawMethod === "BINANCE_PAY") rawMethod = "BINANCE";
+
+          const label =
+            METHOD_LABELS[rawMethod] ||
+            (rawMethod === "BINANCE" ? "Binance Pay / USDT" : rawMethod);
+          const currentMethodStat = paymentMethodsMap.get(rawMethod) || {
+            method: rawMethod as PaymentMethodType,
+            label,
+            totalUsd: 0,
+            totalVes: 0,
+            transactionCount: 0,
+          };
+
+          currentMethodStat.totalUsd += order.total_usd;
+          currentMethodStat.totalVes +=
+            order.total_ves || convertUsdToVes(order.total_usd, activeRateValue);
+          currentMethodStat.transactionCount += 1;
+          paymentMethodsMap.set(rawMethod, currentMethodStat);
+
+          // Daily Trend Aggregation
+          const dayKey =
+            getCaracasDateKey(order.created_at) || order.created_at.split("T")[0];
+          const currentDaily = dailyTrendMap.get(dayKey) || {
+            totalUsd: 0,
+            totalVes: 0,
+            orderCount: 0,
+          };
+          currentDaily.totalUsd += order.total_usd;
+          currentDaily.totalVes +=
+            order.total_ves || convertUsdToVes(order.total_usd, activeRateValue);
+          currentDaily.orderCount += 1;
+          dailyTrendMap.set(dayKey, currentDaily);
+        }
+      }
+
+      totalNetworkOrders += tenantTotalOrders;
+      totalCompletedOrders += tenantCompletedOrders;
+      totalPendingOrders += tenantPendingOrders;
+      totalCancelledOrders += tenantCancelledOrders;
+
+      tenantRankingMap.set(t.id, {
+        tenant: t,
+        totalOrders: tenantTotalOrders,
+        completedOrders: tenantCompletedOrders,
+        pendingOrders: tenantPendingOrders,
+        cancelledOrders: tenantCancelledOrders,
+        gmvUsd: Number(tenantGmvUsd.toFixed(2)),
+      });
+    }
+
+    totalNetworkGmvUsd = Number(totalNetworkGmvUsd.toFixed(2));
+    const totalNetworkGmvVes = convertUsdToVes(totalNetworkGmvUsd, activeRateValue);
+
+    // Global Ticket Promedio de la Red (AOV)
+    const validOrdersForAov =
+      totalCompletedOrders > 0
+        ? totalCompletedOrders
+        : totalNetworkOrders - totalCancelledOrders > 0
+        ? totalNetworkOrders - totalCancelledOrders
+        : 0;
+
+    const networkAverageTicketUsd =
+      validOrdersForAov > 0
+        ? Number((totalNetworkGmvUsd / validOrdersForAov).toFixed(2))
+        : 0;
+    const networkAverageTicketVes = convertUsdToVes(
+      networkAverageTicketUsd,
+      activeRateValue
+    );
+
+    // Order Success Rate (% de pedidos completados sobre no-cancelados)
+    const nonCancelledTotal = totalNetworkOrders - totalCancelledOrders;
+    const orderSuccessRatePercent =
+      nonCancelledTotal > 0
+        ? Number(((totalCompletedOrders / nonCancelledTotal) * 100).toFixed(1))
+        : 0;
+
+    // Leaderboard de tiendas ordenado por GMV USD desc
+    const tenantRankings: TenantGmvRankingItem[] = Array.from(
+      tenantRankingMap.values()
+    )
+      .map((entry) => {
+        const t = entry.tenant;
+        const gmvUsd = entry.gmvUsd;
+        const gmvVes = convertUsdToVes(gmvUsd, activeRateValue);
+        const aovOrders =
+          entry.completedOrders > 0
+            ? entry.completedOrders
+            : entry.totalOrders - entry.cancelledOrders;
+        const aovUsd =
+          aovOrders > 0 ? Number((gmvUsd / aovOrders).toFixed(2)) : 0;
+        const aovVes = convertUsdToVes(aovUsd, activeRateValue);
+        const sharePercent =
+          totalNetworkGmvUsd > 0
+            ? Number(((gmvUsd / totalNetworkGmvUsd) * 100).toFixed(1))
+            : 0;
+
+        return {
+          tenantId: t.id,
+          tenantName: t.name,
+          tenantSlug: t.slug,
+          category: t.settings?.category || "Comercio",
+          logoUrl: t.logo_url || t.settings?.logo_url || null,
+          planTier: (t.plan?.id as SubscriptionPlanTier) || "GROWTH",
+          status: t.status,
+          totalOrders: entry.totalOrders,
+          completedOrders: entry.completedOrders,
+          pendingOrders: entry.pendingOrders,
+          cancelledOrders: entry.cancelledOrders,
+          gmvUsd,
+          gmvVes,
+          averageTicketUsd: aovUsd,
+          averageTicketVes: aovVes,
+          sharePercent,
+          storesCount: t.storesCount || t.stores?.length || 1,
+          productsCount: t.productsCount || 0,
+        };
+      })
+      .sort((a, b) => b.gmvUsd - a.gmvUsd);
+
+    const sellingTenantsCount = tenantRankings.filter((t) => t.gmvUsd > 0).length;
+
+    // Desglose Consolidado de Métodos de Pago
+    const totalApprovedPaymentUsd = Array.from(paymentMethodsMap.values()).reduce(
+      (sum, m) => sum + m.totalUsd,
+      0
+    );
+
+    const paymentMethodsConsolidated: ConsolidatedPaymentMethodStat[] = Array.from(
+      paymentMethodsMap.values()
+    )
+      .map((m) => {
+        const totalUsd = Number(m.totalUsd.toFixed(2));
+        const totalVes = Number(m.totalVes.toFixed(2));
+        const sharePercent =
+          totalApprovedPaymentUsd > 0
+            ? Number(((totalUsd / totalApprovedPaymentUsd) * 100).toFixed(1))
+            : 0;
+        const averageTicketUsd =
+          m.transactionCount > 0
+            ? Number((totalUsd / m.transactionCount).toFixed(2))
+            : 0;
+
+        return {
+          method: m.method,
+          label: m.label,
+          totalUsd,
+          totalVes,
+          transactionCount: m.transactionCount,
+          sharePercent,
+          averageTicketUsd,
+        };
+      })
+      .sort((a, b) => b.totalUsd - a.totalUsd);
+
+    // Tendencia Diaria en orden cronológico
+    const sortedDailyKeys = Array.from(dailyTrendMap.keys()).sort();
+    const dailyTrend: PlatformDailyTrendItem[] = sortedDailyKeys.map((dateKey) => {
+      const data = dailyTrendMap.get(dateKey)!;
+      const todayKey = getCaracasDateKey(new Date());
+      let label = dateKey;
+      if (dateKey === todayKey) {
+        label = "Hoy";
+      } else {
+        const parts = dateKey.split("-");
+        if (parts.length === 3) {
+          const d = new Date(`${dateKey}T12:00:00Z`);
+          label = d.toLocaleDateString("es-VE", {
+            day: "numeric",
+            month: "short",
+          });
+        }
+      }
+      return {
+        date: dateKey,
+        label,
+        totalUsd: Number(data.totalUsd.toFixed(2)),
+        totalVes: Number(data.totalVes.toFixed(2)),
+        orderCount: data.orderCount,
+      };
+    });
+
+    return {
+      dateRange: range,
+      exchangeRate: activeRateValue,
+      totalNetworkGmvUsd,
+      totalNetworkGmvVes,
+      networkAverageTicketUsd,
+      networkAverageTicketVes,
+      totalNetworkOrders,
+      completedOrdersCount: totalCompletedOrders,
+      pendingOrdersCount: totalPendingOrders,
+      cancelledOrdersCount: totalCancelledOrders,
+      orderSuccessRatePercent,
+      activeTenantsCount: allTenants.filter((t) => t.status === "active").length,
+      sellingTenantsCount,
+      tenantRankings,
+      paymentMethodsConsolidated,
+      dailyTrend,
     };
   }
 
