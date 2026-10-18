@@ -77,6 +77,7 @@ export function CatalogView({
   const [customizingProduct, setCustomizingProduct] = useState<Product | null>(null);
 
   const isFoodServiceActive = activeModuleIds.includes("food_service");
+  const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
 
   const getProductModifierGroups = (prod: Product): ProductModifierGroup[] => {
     if (!isFoodServiceActive || !modifierGroups || modifierGroups.length === 0) return [];
@@ -635,6 +636,7 @@ export function CatalogView({
                       key={product.id}
                       product={product}
                       exchangeRate={exchangeRate.value}
+                      showVesPrice={isVenezuelaActive}
                       hasModifiers={hasModifiers}
                       onOpenModifiers={(prod) => setCustomizingProduct(prod)}
                     />
@@ -749,11 +751,16 @@ export function CatalogView({
                   {totalItems} {totalItems === 1 ? "producto" : "productos"} en carrito
                 </p>
                 <p className="text-[10px] font-bold text-white/90">
-                  {formatCurrency(totalUsd, "USD")} • Bs.{" "}
-                  {totalVes.toLocaleString("es-VE", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  {formatCurrency(totalUsd, "USD")}
+                  {isVenezuelaActive && (
+                    <>
+                      {" "}• Bs.{" "}
+                      {totalVes.toLocaleString("es-VE", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </>
+                  )}
                 </p>
               </div>
             </div>
@@ -769,6 +776,7 @@ export function CatalogView({
       {/* Persistent Cart Drawer */}
       <CartDrawer
         exchangeRate={exchangeRate.value}
+        showVesPrice={isVenezuelaActive}
         onProceedToCheckout={() => setIsCheckoutOpen(true)}
       />
 
@@ -780,6 +788,7 @@ export function CatalogView({
         stores={stores}
         deliveryZones={deliveryZones}
         exchangeRate={exchangeRate.value}
+        activeModuleIds={activeModuleIds}
         onOrderCompleted={(order) => setCompletedOrder(order)}
       />
 

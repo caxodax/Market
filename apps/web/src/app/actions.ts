@@ -235,7 +235,7 @@ export async function setTenantModuleStatusAction(
   try {
     const { getCurrentUser } = await import("./login/actions");
     const user = await getCurrentUser();
-    if (!user || user.role !== "PLATFORM_SUPER_ADMIN") {
+    if (!user || (user.role !== "PLATFORM_SUPER_ADMIN" && !user.impersonation)) {
       return {
         success: false,
         error: "No autorizado. Se requieren permisos de Super Administrador.",

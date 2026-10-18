@@ -38,6 +38,7 @@ interface CheckoutDialogProps {
   stores: Store[];
   deliveryZones: DeliveryZone[];
   exchangeRate: number;
+  activeModuleIds?: import("@marketos/types").TenantModuleId[];
   onOrderCompleted: (order: Order) => void;
 }
 
@@ -48,8 +49,13 @@ export function CheckoutDialog({
   stores,
   deliveryZones,
   exchangeRate,
+  activeModuleIds = [],
   onOrderCompleted,
 }: CheckoutDialogProps) {
+  const isDeliveryActive = activeModuleIds.includes("delivery_fleet");
+  const isCouponsActive = activeModuleIds.includes("promotions_coupons");
+  const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
+
   const { items, totalUsd: rawSubtotalUsd, clearCart } = useCart();
   const fileInputId = useId();
 
@@ -120,7 +126,8 @@ export function CheckoutDialog({
 
   // Payment states
   const paymentSettings = settings.payment_settings;
-  const initialPaymentMethod = (paymentSettings?.enabled_methods?.[0] as any) || "PAGO_MOVIL";
+  const defaultMethod = isVenezuelaActive ? "PAGO_MOVIL" : "CASH_USD";
+  const initialPaymentMethod = (paymentSettings?.enabled_methods?.[0] as any) || defaultMethod;
   const [paymentMethod, setPaymentMethod] = useState<
     "PAGO_MOVIL" | "BANK_TRANSFER" | "ZELLE" | "CASH_USD"
   >(initialPaymentMethod);
@@ -159,12 +166,17 @@ export function CheckoutDialog({
   if (!isOpen) return null;
 
   // Payment methods and accounts config
-  const allPaymentMethodOptions: { id: "PAGO_MOVIL" | "BANK_TRANSFER" | "ZELLE" | "CASH_USD"; label: string }[] = [
-    { id: "PAGO_MOVIL", label: "Pago Móvil" },
-    { id: "BANK_TRANSFER", label: "Transferencia Bs." },
-    { id: "ZELLE", label: "Zelle USD" },
-    { id: "CASH_USD", label: "Efectivo Tienda" },
-  ];
+  const allPaymentMethodOptions: { id: "PAGO_MOVIL" | "BANK_TRANSFER" | "ZELLE" | "CASH_USD"; label: string }[] = isVenezuelaActive
+    ? [
+        { id: "PAGO_MOVIL", label: "Pago Móvil" },
+        { id: "BANK_TRANSFER", label: "Transferencia Bs." },
+        { id: "ZELLE", label: "Zelle USD" },
+        { id: "CASH_USD", label: "Efectivo Tienda" },
+      ]
+    : [
+        { id: "ZELLE", label: "Zelle USD" },
+        { id: "CASH_USD", label: "Efectivo Tienda" },
+      ];
 
   const enabledMethodKeys = paymentSettings?.enabled_methods;
   const availablePaymentMethods = enabledMethodKeys && enabledMethodKeys.length > 0
@@ -173,7 +185,7 @@ export function CheckoutDialog({
 
   const activePaymentMethod = availablePaymentMethods.some((m) => m.id === paymentMethod)
     ? paymentMethod
-    : (availablePaymentMethods[0]?.id || "PAGO_MOVIL");
+    : (availablePaymentMethods[0]?.id || (isVenezuelaActive ? "PAGO_MOVIL" : "CASH_USD"));
 
   const pmData = paymentSettings?.pago_movil || {
     bank: "Bancamiga",
@@ -293,8 +305,12 @@ export function CheckoutDialog({
     }
     setError(null);
 
-    if (!customerName.trim() || !customerPhone.trim() || !ciNumber.trim()) {
-      setError("Por favor completa tu nombre, cédula / RIF y número de teléfono (WhatsApp)");
+    if (!customerName.trim() || !customerPhone.trim() || (isVenezuelaActive && !ciNumber.trim())) {
+      setError(
+        isVenezuelaActive
+          ? "Por favor completa tu nombre, cédula / RIF y número de teléfono (WhatsApp)"
+          : "Por favor completa tu nombre y número de teléfono (WhatsApp)"
+      );
       return;
     }
 
@@ -348,7 +364,7 @@ export function CheckoutDialog({
           ? `${deliveryAddress} ${deliveryReference ? `(Ref: ${deliveryReference})` : ""} - Zona: ${selectedZone?.name || ""}`
           : undefined;
 
-      const fullCi = `${ciPrefix}-${ciNumber.trim()}`;
+      const fullCi = isVenezuelaActive && ciNumber.trim() ? `${ciPrefix}-${ciNumber.trim()}` : "N/A";
 
       const orderRes = await createOrderAction({
         tenantId: settings.tenant_id,
@@ -542,30 +558,32 @@ export function CheckoutDialog({
                     onChange={(e) => setCustomerName(e.target.value)}
                     className="w-full h-11 px-3 rounded-xl border border-input bg-background text-xs focus:ring-2 focus:ring-primary"
                   />
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {/* Cédula de Identidad / RIF */}
-                    <div className="flex gap-1.5">
-                      <select
-                        value={ciPrefix}
-                        onChange={(e) => setCiPrefix(e.target.value as "V" | "E" | "J" | "G")}
-                        className="h-11 px-2.5 rounded-xl border border-input bg-background text-xs font-bold text-foreground focus:ring-2 focus:ring-primary shrink-0 cursor-pointer"
-                        title="Tipo de documento"
-                      >
-                        <option value="V">V-</option>
-                        <option value="E">E-</option>
-                        <option value="J">J-</option>
-                        <option value="G">G-</option>
-                      </select>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        required
-                        placeholder="Cédula de Identidad *"
-                        value={ciNumber}
-                        onChange={(e) => setCiNumber(e.target.value.replace(/\D/g, ""))}
-                        className="w-full h-11 px-3 rounded-xl border border-input bg-background text-xs focus:ring-2 focus:ring-primary font-mono"
-                      />
-                    </div>
+                  <div className={`grid gap-2.5 ${isVenezuelaActive ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
+                    {/* Cédula de Identidad / RIF (Solo con plugin local_venezuela) */}
+                    {isVenezuelaActive && (
+                      <div className="flex gap-1.5">
+                        <select
+                          value={ciPrefix}
+                          onChange={(e) => setCiPrefix(e.target.value as "V" | "E" | "J" | "G")}
+                          className="h-11 px-2.5 rounded-xl border border-input bg-background text-xs font-bold text-foreground focus:ring-2 focus:ring-primary shrink-0 cursor-pointer"
+                          title="Tipo de documento"
+                        >
+                          <option value="V">V-</option>
+                          <option value="E">E-</option>
+                          <option value="J">J-</option>
+                          <option value="G">G-</option>
+                        </select>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          required
+                          placeholder="Cédula de Identidad *"
+                          value={ciNumber}
+                          onChange={(e) => setCiNumber(e.target.value.replace(/\D/g, ""))}
+                          className="w-full h-11 px-3 rounded-xl border border-input bg-background text-xs focus:ring-2 focus:ring-primary font-mono"
+                        />
+                      </div>
+                    )}
 
                     {/* Teléfono / WhatsApp */}
                     <input
@@ -580,46 +598,60 @@ export function CheckoutDialog({
                 </div>
               </div>
 
-              {/* Delivery method toggle */}
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-foreground uppercase tracking-wider">
-                  Modalidad de Entrega
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setDeliveryType("PICKUP")}
-                    className={`p-3 rounded-xl border flex flex-col items-center gap-1 transition-all ${
-                      deliveryType === "PICKUP"
-                        ? "border-primary bg-primary/10 text-primary font-bold shadow-sm"
-                        : "border-border bg-background text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
-                    <StoreIcon className="w-4 h-4" />
-                    <span className="text-xs">Retiro en Tienda</span>
-                    <span className="text-[10px] opacity-75">Gratis (Nueva Segovia)</span>
-                  </button>
+              {/* Delivery method toggle (Solo si plugin delivery_fleet está activo) */}
+              {isDeliveryActive ? (
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                    Modalidad de Entrega
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryType("PICKUP")}
+                      className={`p-3 rounded-xl border flex flex-col items-center gap-1 transition-all ${
+                        deliveryType === "PICKUP"
+                          ? "border-primary bg-primary/10 text-primary font-bold shadow-sm"
+                          : "border-border bg-background text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <StoreIcon className="w-4 h-4" />
+                      <span className="text-xs">Retiro en Tienda</span>
+                      <span className="text-[10px] opacity-75">Gratis</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setDeliveryType("DELIVERY")}
-                    className={`p-3 rounded-xl border flex flex-col items-center gap-1 transition-all ${
-                      deliveryType === "DELIVERY"
-                        ? "border-primary bg-primary/10 text-primary font-bold shadow-sm"
-                        : "border-border bg-background text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
-                    <Truck className="w-4 h-4" />
-                    <span className="text-xs">Delivery a Domicilio</span>
-                    <span className="text-[10px] opacity-75">
-                      Desde {formatCurrency(0, "USD")}
-                    </span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryType("DELIVERY")}
+                      className={`p-3 rounded-xl border flex flex-col items-center gap-1 transition-all ${
+                        deliveryType === "DELIVERY"
+                          ? "border-primary bg-primary/10 text-primary font-bold shadow-sm"
+                          : "border-border bg-background text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <Truck className="w-4 h-4" />
+                      <span className="text-xs">Delivery a Domicilio</span>
+                      <span className="text-[10px] opacity-75">
+                        Desde {formatCurrency(0, "USD")}
+                      </span>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-muted/40 border border-border flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <StoreIcon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-foreground block">Modalidad: Retiro en Tienda</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Tu pedido se prepara para retiro presencial en {selectedStore?.name || "nuestra sucursal principal"}.
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Delivery details & Zone selection */}
-              {deliveryType === "DELIVERY" && (
+              {isDeliveryActive && deliveryType === "DELIVERY" && (
                 <div className="space-y-3 p-3.5 rounded-xl bg-muted/30 border border-border animate-in fade-in">
                   <div>
                     <label className="text-xs font-bold text-foreground flex items-center gap-1.5 mb-1.5">
@@ -664,53 +696,55 @@ export function CheckoutDialog({
                 </div>
               )}
 
-              {/* Coupon / Promotion Section */}
-              <div className="p-3.5 rounded-xl bg-muted/20 border border-border space-y-2">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <Tag className="w-3.5 h-3.5 text-primary" />
-                  Cupón de Descuento
-                </label>
+              {/* Coupon / Promotion Section (Solo si plugin promotions_coupons está activo) */}
+              {isCouponsActive && (
+                <div className="p-3.5 rounded-xl bg-muted/20 border border-border space-y-2">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-primary" />
+                    Cupón de Descuento
+                  </label>
 
-                {!appliedCoupon ? (
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Ej. BIENVENIDO o SHOP10"
-                      value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                      className="flex-1 h-10 px-3 rounded-xl border border-input bg-background text-xs uppercase font-mono tracking-wider focus:ring-2 focus:ring-primary"
-                    />
-                    <button
-                      type="button"
-                      disabled={couponLoading || !couponCode.trim()}
-                      onClick={handleApplyCoupon}
-                      className="px-4 h-10 rounded-xl bg-secondary text-secondary-foreground text-xs font-bold hover:bg-secondary/80 disabled:opacity-50"
-                    >
-                      {couponLoading ? "Validando..." : "Aplicar"}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs">
-                    <div className="flex items-center gap-1.5 font-bold">
-                      <Check className="w-4 h-4" />
-                      <span>{appliedCoupon.code}: -$${appliedCoupon.discountUsd.toFixed(2)} USD</span>
+                  {!appliedCoupon ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Ej. BIENVENIDO o SHOP10"
+                        value={couponCode}
+                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                        className="flex-1 h-10 px-3 rounded-xl border border-input bg-background text-xs uppercase font-mono tracking-wider focus:ring-2 focus:ring-primary"
+                      />
+                      <button
+                        type="button"
+                        disabled={couponLoading || !couponCode.trim()}
+                        onClick={handleApplyCoupon}
+                        className="px-4 h-10 rounded-xl bg-secondary text-secondary-foreground text-xs font-bold hover:bg-secondary/80 disabled:opacity-50"
+                      >
+                        {couponLoading ? "Validando..." : "Aplicar"}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleRemoveCoupon}
-                      className="text-[11px] underline hover:text-emerald-700"
-                    >
-                      Quitar
-                    </button>
-                  </div>
-                )}
+                  ) : (
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <Check className="w-4 h-4" />
+                        <span>{appliedCoupon.code}: -${appliedCoupon.discountUsd.toFixed(2)} USD</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveCoupon}
+                        className="text-[11px] underline hover:text-emerald-700"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  )}
 
-                {couponMessage && !appliedCoupon && (
-                  <p className="text-[11px] text-destructive font-medium">
-                    {couponMessage}
-                  </p>
-                )}
-              </div>
+                  {couponMessage && !appliedCoupon && (
+                    <p className="text-[11px] text-destructive font-medium">
+                      {couponMessage}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Order live breakdown summary */}
               <div className="p-3.5 rounded-xl bg-muted/40 border border-border text-xs space-y-1.5">
@@ -726,7 +760,7 @@ export function CheckoutDialog({
                   </div>
                 )}
 
-                {deliveryType === "DELIVERY" && (
+                {isDeliveryActive && deliveryType === "DELIVERY" && (
                   <div className="flex justify-between text-muted-foreground">
                     <span>Delivery ({selectedZone?.name}):</span>
                     <span>
@@ -741,9 +775,11 @@ export function CheckoutDialog({
                     <span className="text-primary font-bold text-base">
                       {formatCurrency(totalUsd, "USD")}
                     </span>
-                    <span className="block text-xs font-semibold text-muted-foreground">
-                      Bs. {totalVes.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
-                    </span>
+                    {isVenezuelaActive && (
+                      <span className="block text-xs font-semibold text-muted-foreground">
+                        Bs. {totalVes.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -751,11 +787,11 @@ export function CheckoutDialog({
               <button
                 type="button"
                 onClick={() => {
-                  if (!customerName.trim() || !customerPhone.trim() || !ciNumber.trim()) {
-                    setError("Completa tu nombre, cédula / RIF y teléfono antes de continuar");
+                  if (!customerName.trim() || !customerPhone.trim() || (isVenezuelaActive && !ciNumber.trim())) {
+                    setError(isVenezuelaActive ? "Completa tu nombre, cédula / RIF y teléfono antes de continuar" : "Completa tu nombre y teléfono antes de continuar");
                     return;
                   }
-                  if (deliveryType === "DELIVERY" && !deliveryAddress.trim()) {
+                  if (isDeliveryActive && deliveryType === "DELIVERY" && !deliveryAddress.trim()) {
                     setError("Indica la dirección para el despacho");
                     return;
                   }

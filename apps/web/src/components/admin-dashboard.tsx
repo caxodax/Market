@@ -57,6 +57,7 @@ import { SalesReportsTab } from "./sales-reports-tab";
 import { DeliveryManager } from "./delivery-manager";
 import { AuditTrailViewer } from "./audit-trail-viewer";
 import { PlanUpgradeModal } from "./plan-upgrade-modal";
+import { TenantPluginsModal, AVAILABLE_PLUGINS } from "./tenant-plugins-modal";
 import {
   PackageCheck,
   Boxes,
@@ -236,6 +237,8 @@ export function AdminDashboard({
     setUpgradeModalQuotaType(type);
     setIsUpgradeModalOpen(true);
   };
+
+  const [isPluginsModalOpen, setIsPluginsModalOpen] = useState(false);
 
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [syncingBcv, setSyncingBcv] = useState(false);
@@ -839,16 +842,20 @@ export function AdminDashboard({
       badge: orders.length > 0 ? `${orders.length}` : null,
       badgeClassName: "bg-primary/10 text-primary text-[10px] px-1.5 py-0.5 rounded-full font-bold",
     },
-    {
-      id: "DELIVERY",
-      category: "OPERATIONS",
-      label: "Delivery y Repartidores",
-      shortLabel: "Delivery",
-      description: "Zonas, tarifas y motorizados",
-      icon: <Truck className="w-4 h-4 shrink-0" />,
-      badge: deliveryZones.length > 0 ? `${deliveryZones.length}` : null,
-      badgeClassName: "bg-blue-500/10 text-blue-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
-    },
+    ...(activeModuleIds.includes("delivery_fleet")
+      ? [
+          {
+            id: "DELIVERY" as const,
+            category: "OPERATIONS" as const,
+            label: "Delivery y Repartidores",
+            shortLabel: "Delivery",
+            description: "Zonas, tarifas y motorizados",
+            icon: <Truck className="w-4 h-4 shrink-0" />,
+            badge: deliveryZones.length > 0 ? `${deliveryZones.length}` : null,
+            badgeClassName: "bg-blue-500/10 text-blue-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+          },
+        ]
+      : []),
 
     // 2. Catálogo & Marketing
     {
@@ -887,16 +894,20 @@ export function AdminDashboard({
           },
         ]
       : []),
-    {
-      id: "COUPONS",
-      category: "CATALOG",
-      label: `Cupones de Descuento (${initialCoupons.length})`,
-      shortLabel: `Cupones (${initialCoupons.length})`,
-      description: "Descuentos en $ o % y fechas límite",
-      icon: <Ticket className="w-4 h-4 shrink-0" />,
-      badge: initialCoupons.length > 0 ? `${initialCoupons.length}` : null,
-      badgeClassName: "bg-purple-500/10 text-purple-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
-    },
+    ...(activeModuleIds.includes("promotions_coupons")
+      ? [
+          {
+            id: "COUPONS" as const,
+            category: "CATALOG" as const,
+            label: `Cupones de Descuento (${initialCoupons.length})`,
+            shortLabel: `Cupones (${initialCoupons.length})`,
+            description: "Descuentos en $ o % y fechas límite",
+            icon: <Ticket className="w-4 h-4 shrink-0" />,
+            badge: initialCoupons.length > 0 ? `${initialCoupons.length}` : null,
+            badgeClassName: "bg-purple-500/10 text-purple-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+          },
+        ]
+      : []),
     {
       id: "PUSH",
       category: "CATALOG",
@@ -937,16 +948,20 @@ export function AdminDashboard({
           : null,
       badgeClassName: "bg-emerald-500/10 text-emerald-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
     },
-    {
-      id: "RATES",
-      category: "FINANCE",
-      label: `Tasas y Divisas (${ratesHistory.length})`,
-      shortLabel: "Tasas & BCV",
-      description: "Monitor oficial BCV e histórico",
-      icon: <Landmark className="w-4 h-4 shrink-0" />,
-      badge: `Bs. ${rate.value.toFixed(2)}`,
-      badgeClassName: "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold",
-    },
+    ...(activeModuleIds.includes("local_venezuela")
+      ? [
+          {
+            id: "RATES" as const,
+            category: "FINANCE" as const,
+            label: `Tasas y Divisas (${ratesHistory.length})`,
+            shortLabel: "Tasas & BCV",
+            description: "Monitor oficial BCV e histórico",
+            icon: <Landmark className="w-4 h-4 shrink-0" />,
+            badge: `Bs. ${rate.value.toFixed(2)}`,
+            badgeClassName: "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold",
+          },
+        ]
+      : []),
 
     // 4. Administración
     {
@@ -1002,6 +1017,14 @@ export function AdminDashboard({
   ];
 
   const currentModule = modulesList.find((m) => m.id === activeTab) || modulesList[0];
+
+  // Auto-correct activeTab if current tab is not enabled for this tenant
+  useEffect(() => {
+    const isCurrentTabValid = modulesList.some((m) => m.id === activeTab);
+    if (!isCurrentTabValid) {
+      setActiveTab("PAYMENTS");
+    }
+  }, [activeModuleIds, activeTab, modulesList]);
 
   return (
     <div className="min-h-screen bg-background text-foreground flex w-full max-w-full overflow-x-hidden">
@@ -1371,17 +1394,19 @@ export function AdminDashboard({
                 <span>{planLimitsState?.plan.name || "Plan Starter"}</span>
               </button>
 
-              <button
-                onClick={() => setActiveTab("RATES")}
-                className="hidden md:flex items-center gap-1.5 text-xs bg-muted/60 hover:bg-muted border border-border px-2.5 py-1.5 rounded-xl font-mono transition-colors cursor-pointer"
-                title="Clic para ver monitor de tasas e histórico"
-              >
-                <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
-                <span>BCV:</span>
-                <strong className="text-foreground">
-                  Bs. {rate.value.toFixed(2)}
-                </strong>
-              </button>
+              {activeModuleIds.includes("local_venezuela") && (
+                <button
+                  onClick={() => setActiveTab("RATES")}
+                  className="hidden md:flex items-center gap-1.5 text-xs bg-muted/60 hover:bg-muted border border-border px-2.5 py-1.5 rounded-xl font-mono transition-colors cursor-pointer"
+                  title="Clic para ver monitor de tasas e histórico"
+                >
+                  <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>BCV:</span>
+                  <strong className="text-foreground">
+                    Bs. {rate.value.toFixed(2)}
+                  </strong>
+                </button>
+              )}
 
               <button
                 onClick={() => {
@@ -1409,19 +1434,21 @@ export function AdminDashboard({
                 )}
               </button>
 
-              <button
-                onClick={handleSyncBcv}
-                disabled={syncingBcv}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-secondary text-secondary-foreground text-xs font-semibold hover:bg-secondary/80 transition-colors disabled:opacity-50"
-                title="Sincronizar tasa oficial del BCV desde la API a la base de datos"
-              >
-                <RefreshCw
-                  className={`w-3.5 h-3.5 ${syncingBcv ? "animate-spin" : ""}`}
-                />
-                <span className="hidden xl:inline">
-                  {syncingBcv ? "Sincronizando..." : "Sincronizar BCV"}
-                </span>
-              </button>
+              {activeModuleIds.includes("local_venezuela") && (
+                <button
+                  onClick={handleSyncBcv}
+                  disabled={syncingBcv}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-secondary text-secondary-foreground text-xs font-semibold hover:bg-secondary/80 transition-colors disabled:opacity-50"
+                  title="Sincronizar tasa oficial del BCV desde la API a la base de datos"
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 ${syncingBcv ? "animate-spin" : ""}`}
+                  />
+                  <span className="hidden xl:inline">
+                    {syncingBcv ? "Sincronizando..." : "Sincronizar BCV"}
+                  </span>
+                </button>
+              )}
 
               <button
                 onClick={handleRefreshOrdersAndPayments}
@@ -1673,31 +1700,61 @@ export function AdminDashboard({
             </p>
           </div>
 
-          <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">
-            <div className="flex items-center justify-between text-muted-foreground mb-1">
-              <span className="text-xs font-semibold">Zonas de Entrega</span>
-              <Truck className="w-4 h-4 text-blue-500" />
+          {activeModuleIds.includes("delivery_fleet") ? (
+            <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-xs font-semibold">Zonas de Entrega</span>
+                <Truck className="w-4 h-4 text-blue-500" />
+              </div>
+              <div className="text-2xl font-black text-foreground">
+                {deliveryZones.length}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Rutas y Despacho Activos
+              </p>
             </div>
-            <div className="text-2xl font-black text-foreground">
-              {deliveryZones.length}
+          ) : (
+            <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-xs font-semibold">Inventario Activo</span>
+                <Boxes className="w-4 h-4 text-primary" />
+              </div>
+              <div className="text-2xl font-black text-foreground">
+                {products.length}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Productos en Catálogo Core
+              </p>
             </div>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              Barquisimeto y Cabudare
-            </p>
-          </div>
+          )}
 
-          <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">
-            <div className="flex items-center justify-between text-muted-foreground mb-1">
-              <span className="text-xs font-semibold">Tasa en Base de Datos</span>
-              <TrendingUp className="w-4 h-4 text-emerald-500" />
+          {activeModuleIds.includes("local_venezuela") ? (
+            <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-xs font-semibold">Tasa en Base de Datos</span>
+                <TrendingUp className="w-4 h-4 text-emerald-500" />
+              </div>
+              <div className="text-xl font-black text-foreground font-mono">
+                Bs. {rate.value.toFixed(2)}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Fuente: {rate.source}
+              </p>
             </div>
-            <div className="text-xl font-black text-foreground font-mono">
-              Bs. {rate.value.toFixed(2)}
+          ) : (
+            <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-xs font-semibold">Sedes & Puntos</span>
+                <Building2 className="w-4 h-4 text-indigo-500" />
+              </div>
+              <div className="text-2xl font-black text-foreground">
+                {stores.length}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Puntos de Retiro en Tienda
+              </p>
             </div>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              Fuente: {rate.source}
-            </p>
-          </div>
+          )}
         </div>
 
 
@@ -2872,154 +2929,148 @@ export function AdminDashboard({
         {/* TAB: PLUGINS & EXTENSIONES ACTIVAS */}
         {activeTab === "PLUGINS" && (
           <div className="space-y-6 animate-in fade-in">
-            <div className="bg-card border border-border p-6 rounded-2xl shadow-xs space-y-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-5 rounded-2xl bg-card border border-border shadow-xs">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center shrink-0">
                   <Puzzle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black text-foreground">
+                  <h2 className="text-base sm:text-lg font-black text-foreground">
                     Módulos y Plugins de la Tienda
                   </h2>
                   <p className="text-xs text-muted-foreground">
-                    Revisa las extensiones de industria y herramientas especializadas habilitadas para tu comercio.
+                    Extensiones y capacidades especializadas para <strong className="text-foreground">{settingsState.business_name}</strong>.
                   </p>
                 </div>
               </div>
+
+              {(currentUser?.role === "PLATFORM_SUPER_ADMIN" || currentUser?.impersonation) && (
+                <button
+                  type="button"
+                  onClick={() => setIsPluginsModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-sm cursor-pointer shrink-0"
+                  title="Abrir gestor para activar o desactivar plugins"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Gestionar Plugins (Activar / Desactivar)</span>
+                </button>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Plugin 1: Gastronomía */}
-              <div
-                className={`p-5 rounded-2xl border transition-all ${
-                  activeModuleIds.includes("food_service")
-                    ? "bg-amber-500/5 border-amber-500/30"
-                    : "bg-card border-border opacity-70"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
-                    <Utensils className="w-5 h-5" />
-                  </div>
-                  {activeModuleIds.includes("food_service") ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/15 px-2.5 py-1 rounded-full">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Activo
-                    </span>
-                  ) : (
-                    <span className="text-[11px] font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
-                      No contratado
-                    </span>
-                  )}
-                </div>
-                <h3 className="font-bold text-base text-foreground mb-1">
-                  Gastronomía & Restauración
-                </h3>
-                <p className="text-xs text-muted-foreground leading-relaxed mb-4">
-                  Control de insumos de cocina (BOM), escandallo de costos unitarios, personalización de salsas y extras en el catálogo PWA.
-                </p>
-                {activeModuleIds.includes("food_service") ? (
-                  <div className="pt-3 border-t border-amber-500/20 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("RAW_MATERIALS")}
-                      className="text-xs font-bold text-amber-600 hover:underline cursor-pointer"
-                    >
-                      Ir a Insumos →
-                    </button>
-                    <span className="text-muted-foreground text-xs">•</span>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("RECIPES")}
-                      className="text-xs font-bold text-amber-600 hover:underline cursor-pointer"
-                    >
-                      Ir a Recetas →
-                    </button>
-                  </div>
-                ) : (
-                  <div className="pt-3 border-t border-border text-[11px] text-muted-foreground">
-                    Solicita a Soporte o Super Admin la activación de este módulo.
-                  </div>
-                )}
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {AVAILABLE_PLUGINS.map((plugin) => {
+                const isActive = activeModuleIds.includes(plugin.id);
+                return (
+                  <div
+                    key={plugin.id}
+                    className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
+                      isActive
+                        ? "bg-card border-primary/40 shadow-xs"
+                        : "bg-card/60 border-border opacity-75"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center">
+                          {plugin.icon}
+                        </div>
+                        {isActive ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Activo
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
+                            Inactivo
+                          </span>
+                        )}
+                      </div>
 
-              {/* Plugin 2: Retail & Códigos de Barra */}
-              <div
-                className={`p-5 rounded-2xl border transition-all ${
-                  activeModuleIds.includes("barcode_retail")
-                    ? "bg-blue-500/5 border-blue-500/30"
-                    : "bg-card border-border opacity-70"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center">
-                    <ScanBarcode className="w-5 h-5" />
-                  </div>
-                  {activeModuleIds.includes("barcode_retail") ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 dark:text-blue-300 bg-blue-500/15 px-2.5 py-1 rounded-full">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Activo
-                    </span>
-                  ) : (
-                    <span className="text-[11px] font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
-                      No contratado
-                    </span>
-                  )}
-                </div>
-                <h3 className="font-bold text-base text-foreground mb-1">
-                  Retail, Bodegones & Barcode
-                </h3>
-                <p className="text-xs text-muted-foreground leading-relaxed mb-4">
-                  Escaneo rápido de códigos EAN-13/UPC con pistola láser o cámara, ventas de alta rotación y reposición de anaquel.
-                </p>
-                <div className="pt-3 border-t border-border text-[11px] text-muted-foreground">
-                  {activeModuleIds.includes("barcode_retail")
-                    ? "Módulo listo y activo para el punto de venta e inventario."
-                    : "Para supermercados y minimarkets con lectura de barras."}
-                </div>
-              </div>
+                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                        {plugin.categoryShort}
+                      </span>
+                      <h3 className="font-bold text-sm sm:text-base text-foreground mb-1">
+                        {plugin.name}
+                      </h3>
+                      <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+                        {plugin.description}
+                      </p>
+                    </div>
 
-              {/* Plugin 3: Localización Venezuela */}
-              <div
-                className={`p-5 rounded-2xl border transition-all ${
-                  activeModuleIds.includes("local_venezuela")
-                    ? "bg-emerald-500/5 border-emerald-500/30"
-                    : "bg-card border-border opacity-70"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-                    <Landmark className="w-5 h-5" />
+                    <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
+                      {isActive ? (
+                        plugin.id === "delivery_fleet" ? (
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("DELIVERY")}
+                            className="text-xs font-bold text-primary hover:underline cursor-pointer"
+                          >
+                            Ir a Delivery →
+                          </button>
+                        ) : plugin.id === "promotions_coupons" ? (
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("COUPONS")}
+                            className="text-xs font-bold text-primary hover:underline cursor-pointer"
+                          >
+                            Ir a Cupones →
+                          </button>
+                        ) : plugin.id === "local_venezuela" ? (
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("RATES")}
+                            className="text-xs font-bold text-primary hover:underline cursor-pointer"
+                          >
+                            Ir a Tasas & BCV →
+                          </button>
+                        ) : plugin.id === "food_service" ? (
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab("RAW_MATERIALS")}
+                              className="text-xs font-bold text-amber-600 hover:underline cursor-pointer"
+                            >
+                              Insumos →
+                            </button>
+                            <span className="text-muted-foreground">•</span>
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab("RECIPES")}
+                              className="text-xs font-bold text-amber-600 hover:underline cursor-pointer"
+                            >
+                              Recetas →
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                            Módulo habilitado en sistema
+                          </span>
+                        )
+                      ) : (currentUser?.role === "PLATFORM_SUPER_ADMIN" || currentUser?.impersonation) ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsPluginsModalOpen(true)}
+                          className="text-xs font-bold text-purple-600 dark:text-purple-400 hover:underline cursor-pointer"
+                        >
+                          Configurar módulo →
+                        </button>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground">
+                          Disponible para activación
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  {activeModuleIds.includes("local_venezuela") ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-2.5 py-1 rounded-full">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Activo
-                    </span>
-                  ) : (
-                    <span className="text-[11px] font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
-                      No contratado
-                    </span>
-                  )}
-                </div>
-                <h3 className="font-bold text-base text-foreground mb-1">
-                  Localización Oficial Venezuela
-                </h3>
-                <p className="text-xs text-muted-foreground leading-relaxed mb-4">
-                  Sincronización automática de tasa BCV, validación de Pago Móvil, cálculo IGTF y facturación fiscal SENIAT.
-                </p>
-                <div className="pt-3 border-t border-border text-[11px] text-muted-foreground">
-                  {activeModuleIds.includes("local_venezuela")
-                    ? "Módulo activo con tasa oficial en tiempo real y pasarela Bs."
-                    : "Soporte fiscal venezolano y pagos interbancarios."}
-                </div>
-              </div>
+                );
+              })}
             </div>
 
             {/* Banner Informativo */}
             <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-900 dark:text-purple-200 text-xs flex items-start gap-3">
               <Sparkles className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
               <div>
-                <p className="font-bold">¿Deseas activar o desactivar módulos para tu negocio?</p>
+                <p className="font-bold">Arquitectura Modular MarketOS</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Los módulos especializados se gestionan a nivel de plataforma desde el panel de Super Administrador (/platform) para garantizar la integridad de tu base de datos y la facturación de tu plan.
+                  Los módulos especializados se activan de forma independiente para cada comercio. Si un plugin está desactivado, su código y controles no se ejecutan, garantizando que el sistema opere exclusivamente con su núcleo (Core) base.
                 </p>
               </div>
             </div>
@@ -3066,6 +3117,33 @@ export function AdminDashboard({
           payments.find((p) => p.order_id === selectedOrderForModal?.id)?.id
         }
         isProcessing={processingId !== null}
+      />
+
+      {/* Tenant Plugins Modal for Super Admin & Support Impersonation */}
+      <TenantPluginsModal
+        tenant={
+          allTenants.find((t) => t.id === settings.tenant_id) || {
+            id: settings.tenant_id,
+            name: settings.business_name,
+            slug: settings.tenant_id,
+            status: "active",
+            logo_url: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            settings,
+            stores,
+            storesCount: stores.length,
+            productsCount: products.length,
+            ordersCount: orders.length,
+            totalRevenueUsd: 0,
+          }
+        }
+        isOpen={isPluginsModalOpen}
+        onClose={() => setIsPluginsModalOpen(false)}
+        onModulesUpdated={() => {
+          setIsPluginsModalOpen(false);
+          window.location.reload();
+        }}
       />
 
       {/* Create Store Modal */}

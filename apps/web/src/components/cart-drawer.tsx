@@ -7,11 +7,13 @@ import { X, Trash2, Plus, Minus, ArrowRight, ShoppingBag } from "lucide-react";
 
 interface CartDrawerProps {
   exchangeRate: number;
+  showVesPrice?: boolean;
   onProceedToCheckout: () => void;
 }
 
 export function CartDrawer({
   exchangeRate,
+  showVesPrice = false,
   onProceedToCheckout,
 }: CartDrawerProps) {
   const { items, isOpen, setIsOpen, removeItem, updateQuantity, totalUsd, totalItems } =
@@ -97,17 +99,19 @@ export function CartDrawer({
                         <span className="text-sm font-bold text-primary">
                           {formatCurrency(lineTotalUsd, "USD")}
                         </span>
-                        <span className="text-[11px] text-muted-foreground">
-                          (Bs.{" "}
-                          {convertUsdToVes(
-                            lineTotalUsd,
-                            exchangeRate
-                          ).toLocaleString("es-VE", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                          )
-                        </span>
+                        {showVesPrice && (
+                          <span className="text-[11px] text-muted-foreground">
+                            (Bs.{" "}
+                            {convertUsdToVes(
+                              lineTotalUsd,
+                              exchangeRate
+                            ).toLocaleString("es-VE", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                            )
+                          </span>
+                        )}
                       </div>
 
                       {/* Quantity controls */}
@@ -157,18 +161,20 @@ export function CartDrawer({
                     {formatCurrency(totalUsd, "USD")}
                   </span>
                 </div>
-                <div className="flex justify-between items-baseline text-xs">
-                  <span className="text-muted-foreground">
-                    Total al cambio BCV:
-                  </span>
-                  <span className="font-bold text-primary">
-                    Bs.{" "}
-                    {totalVes.toLocaleString("es-VE", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </span>
-                </div>
+                {showVesPrice && (
+                  <div className="flex justify-between items-baseline text-xs">
+                    <span className="text-muted-foreground">
+                      Total al cambio BCV:
+                    </span>
+                    <span className="font-bold text-primary">
+                      Bs.{" "}
+                      {totalVes.toLocaleString("es-VE", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <button

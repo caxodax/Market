@@ -23,6 +23,7 @@ interface StoreHeaderProps {
   settings: TenantSettings;
   exchangeRate: ExchangeRate;
   selectedStore?: Store;
+  activeModuleIds?: import("@marketos/types").TenantModuleId[];
   onOpenBranchSelector?: () => void;
   onOpenTracker?: () => void;
   onOpenAccount?: () => void;
@@ -33,6 +34,7 @@ export function StoreHeader({
   settings,
   exchangeRate,
   selectedStore,
+  activeModuleIds = [],
   onOpenBranchSelector,
   onOpenTracker,
   onOpenAccount,
@@ -81,13 +83,15 @@ export function StoreHeader({
             </div>
           )}
 
-          <div className="flex items-center gap-1.5 shrink-0 font-mono text-[11px]">
-            <TrendingUp className="w-3 h-3 text-emerald-400" />
-            <span className="hidden xs:inline text-white/70">BCV:</span>
-            <strong className="text-white">
-              Bs. {exchangeRate.value.toFixed(2)}
-            </strong>
-          </div>
+          {activeModuleIds?.includes("local_venezuela") && (
+            <div className="flex items-center gap-1.5 shrink-0 font-mono text-[11px]">
+              <TrendingUp className="w-3 h-3 text-emerald-400" />
+              <span className="hidden xs:inline text-white/70">BCV:</span>
+              <strong className="text-white">
+                Bs. {exchangeRate.value.toFixed(2)}
+              </strong>
+            </div>
+          )}
         </div>
       </div>
 

@@ -58,10 +58,16 @@ export async function GET(request: Request) {
         console.error("Failed to sync default tenant rate:", e);
       }
 
-      // Sync remaining active tenants
+      // Sync remaining active tenants that have local_venezuela enabled (or default)
       for (const tenant of activeTenants) {
         if (tenant.id === defaultTenantId) continue;
         try {
+          const activeModules = await MarketOSRepository.getTenantActiveModuleIds(tenant.id);
+          // If modules are configured, only sync if local_venezuela is active
+          if (activeModules.length > 0 && !activeModules.includes("local_venezuela")) {
+            continue;
+          }
+
           const rate = await MarketOSRepository.syncBcvRateFromApi(tenant.id);
           invalidateExchangeRateCache(tenant.id);
           results.push({

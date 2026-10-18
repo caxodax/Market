@@ -113,6 +113,7 @@ export function StorefrontPage({
             settings={settings}
             exchangeRate={exchangeRate}
             selectedStore={selectedStore}
+            activeModuleIds={activeModuleIds}
             onOpenBranchSelector={() => setIsBranchSelectorOpen(true)}
             onOpenTracker={() => setIsTrackerOpen(true)}
             onOpenAccount={() => setIsAccountOpen(true)}

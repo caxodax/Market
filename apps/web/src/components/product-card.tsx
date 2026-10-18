@@ -11,6 +11,7 @@ interface ProductCardProps {
   product: Product & { stock: number };
   exchangeRate: number;
   hasModifiers?: boolean;
+  showVesPrice?: boolean;
   onOpenModifiers?: (product: Product) => void;
 }
 
@@ -18,6 +19,7 @@ export function ProductCard({
   product,
   exchangeRate,
   hasModifiers = false,
+  showVesPrice = false,
   onOpenModifiers,
 }: ProductCardProps) {
   const { items, addItem, updateQuantity } = useCart();
@@ -115,13 +117,15 @@ export function ProductCard({
             </span>
           </div>
 
-          <span className="text-xs font-semibold text-foreground/80">
-            Bs.{" "}
-            {priceVes.toLocaleString("es-VE", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
-          </span>
+          {showVesPrice && (
+            <span className="text-xs font-semibold text-foreground/80">
+              Bs.{" "}
+              {priceVes.toLocaleString("es-VE", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+          )}
         </div>
 
         {/* Interactive Action Button / Inline Stepper */}

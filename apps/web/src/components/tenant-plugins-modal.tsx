@@ -23,6 +23,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
+  Truck,
+  Ticket,
+  Shirt,
+  Globe,
 } from "lucide-react";
 
 interface TenantPluginsModalProps {
@@ -32,19 +36,19 @@ interface TenantPluginsModalProps {
   onModulesUpdated?: () => void;
 }
 
-interface PluginMetadata {
+export interface PluginMetadata {
   id: TenantModuleId;
   name: string;
   badge: string;
-  category: "Restauración" | "Comercio Minorista" | "Finanzas Locales";
+  category: "Restauración" | "Comercio Minorista" | "Operaciones & Logística" | "Marketing & Ventas" | "Finanzas Locales";
   categoryShort: string;
   description: string;
   icon: React.ReactNode;
   features: string[];
-  themeColor: "amber" | "blue" | "emerald";
+  themeColor: "amber" | "blue" | "emerald" | "purple" | "indigo";
 }
 
-const AVAILABLE_PLUGINS: PluginMetadata[] = [
+export const AVAILABLE_PLUGINS: PluginMetadata[] = [
   {
     id: "food_service",
     name: "Gastronomía, Fast Food & Restaurantes",
@@ -52,7 +56,7 @@ const AVAILABLE_PLUGINS: PluginMetadata[] = [
     category: "Restauración",
     categoryShort: "Restauración",
     description:
-      "Diseñado para locales de comida rápida, hamburgueserías y perros calientes. Añade control de insumos (BOM), escandallo de costos y personalización de salsas/extras en el catálogo.",
+      "Diseñado para locales de comida rápida, hamburgueserías y restaurantes. Añade control de insumos (BOM), escandallo de costos y personalización de salsas/extras en el catálogo.",
     icon: <Utensils className="w-5 h-5 text-amber-500" />,
     features: [
       "Insumos de Cocina: Control de inventario en gramos, ml y unidades",
@@ -69,7 +73,7 @@ const AVAILABLE_PLUGINS: PluginMetadata[] = [
     category: "Comercio Minorista",
     categoryShort: "Retail",
     description:
-      "Optimizado para supermercados y minimarkets de alta rotación con códigos de barra estándar y venta por unidad física.",
+      "Optimizado para supermercados y minimarkets de alta rotación con códigos de barra estándar (EAN-13, UPC) y venta por unidad física.",
     icon: <ScanBarcode className="w-5 h-5 text-blue-500" />,
     features: [
       "Lectura rápida de códigos de barra (EAN-13, UPC)",
@@ -78,6 +82,57 @@ const AVAILABLE_PLUGINS: PluginMetadata[] = [
       "Búsqueda instantánea de productos por código",
     ],
     themeColor: "blue",
+  },
+  {
+    id: "clothing_variants",
+    name: "Moda, Calzado & Indumentaria",
+    badge: "v1.0.0 • Matriz de Variantes",
+    category: "Comercio Minorista",
+    categoryShort: "Moda & Calzado",
+    description:
+      "Especial para tiendas de ropa, calzado y accesorios. Permite gestionar variantes de tallas, colores y existencias independientes.",
+    icon: <Shirt className="w-5 h-5 text-indigo-500" />,
+    features: [
+      "Matriz de tallas y colores por producto",
+      "Control de stock independiente por cada combinación",
+      "Muestrarios de color y selector de tallas en catálogo PWA",
+      "Filtros de catálogo por talla disponible",
+    ],
+    themeColor: "indigo",
+  },
+  {
+    id: "delivery_fleet",
+    name: "Delivery Propio & Flota de Repartidores",
+    badge: "v1.0.0 • Logística Avanzada",
+    category: "Operaciones & Logística",
+    categoryShort: "Delivery & Rutas",
+    description:
+      "Gestiona rutas de entrega a domicilio, motorizados propios, asignación de pedidos en tiempo real y tarifas configuradas por zona.",
+    icon: <Truck className="w-5 h-5 text-blue-500" />,
+    features: [
+      "Zonas de reparto personalizadas con tarifas de delivery",
+      "Gestión de motorizados y repartidores activos",
+      "Asignación de despachos y estado en ruta",
+      "Opción de entrega a domicilio en checkout del cliente",
+    ],
+    themeColor: "blue",
+  },
+  {
+    id: "promotions_coupons",
+    name: "Marketing, Cupones & Promociones",
+    badge: "v1.0.0 • Conversión & Ventas",
+    category: "Marketing & Ventas",
+    categoryShort: "Marketing",
+    description:
+      "Herramientas de fidelización y conversión. Crea cupones de descuento porcentuales o fijos, límites de uso y fechas de caducidad.",
+    icon: <Ticket className="w-5 h-5 text-purple-500" />,
+    features: [
+      "Cupones de descuento en dólares ($) o porcentaje (%)",
+      "Límites de uso por cliente y fechas de vencimiento",
+      "Monto mínimo de compra condicional para el descuento",
+      "Canje de cupones directamente en el checkout de la tienda",
+    ],
+    themeColor: "purple",
   },
   {
     id: "local_venezuela",
@@ -96,9 +151,43 @@ const AVAILABLE_PLUGINS: PluginMetadata[] = [
     ],
     themeColor: "emerald",
   },
+  {
+    id: "local_colombia",
+    name: "Localización Oficial Colombia",
+    badge: "v1.0.0 • Finanzas & Pasarelas",
+    category: "Finanzas Locales",
+    categoryShort: "Colombia / TRM",
+    description:
+      "Soporte para comercios en Colombia. Sincronización con la TRM oficial, precios en Pesos Colombianos (COP) y pagos vía Nequi, Daviplata y PSE.",
+    icon: <Landmark className="w-5 h-5 text-emerald-500" />,
+    features: [
+      "Sincronización de TRM oficial del Banco de la República",
+      "Display de precios y cobro nativo en Pesos Colombianos (COP)",
+      "Recepción y comprobantes de Nequi, Daviplata y PSE",
+      "Campos de identificación fiscal DIAN (CC, NIT)",
+    ],
+    themeColor: "emerald",
+  },
+  {
+    id: "local_global",
+    name: "Localización Global & Pagos en Dólares",
+    badge: "v1.0.0 • Tarjetas & Stripe",
+    category: "Finanzas Locales",
+    categoryShort: "Global / USD",
+    description:
+      "Para comercios internacionales o transfronterizos que operan puramente en Dólares (USD) con tarjetas de crédito/débito internacionales y PayPal.",
+    icon: <Globe className="w-5 h-5 text-indigo-500" />,
+    features: [
+      "Operación pura en USD sin conversiones cambiarias locales",
+      "Pasarela de tarjetas de crédito y débito internacionales",
+      "Integración con PayPal y transferencias internacionales",
+      "Facturación estándar internacional sin recargos locales",
+    ],
+    themeColor: "indigo",
+  },
 ];
 
-const ITEMS_PER_PAGE = 2;
+const ITEMS_PER_PAGE = 4;
 
 export function TenantPluginsModal({
   tenant,
@@ -370,7 +459,9 @@ export function TenantPluginsModal({
             {[
               { id: "ALL", label: "Todas" },
               { id: "Restauración", label: "Restauración & Menú" },
-              { id: "Comercio Minorista", label: "Retail & Bodegones" },
+              { id: "Comercio Minorista", label: "Retail & Moda" },
+              { id: "Operaciones & Logística", label: "Delivery & Logística" },
+              { id: "Marketing & Ventas", label: "Marketing & Cupones" },
               { id: "Finanzas Locales", label: "Finanzas & Fiscal" },
             ].map((cat) => (
               <button
