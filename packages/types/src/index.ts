@@ -1036,6 +1036,20 @@ export interface PlatformStorageTelemetry {
   source: "r2_live" | "cached_fallback";
 }
 
+export interface PlatformSettings {
+  id: string;
+  platform_name: string;
+  platform_tagline: string;
+  logo_url: string | null;
+  support_phone: string | null;
+  support_email: string | null;
+  support_whatsapp: string | null;
+  currency_symbol: string;
+  contact_address?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
 
-
-
+export type UpdatePlatformSettingsInput = Partial<
+  Omit<PlatformSettings, "id" | "created_at" | "updated_at">
+>;

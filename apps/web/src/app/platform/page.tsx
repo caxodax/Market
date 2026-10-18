@@ -28,6 +28,7 @@ export default async function PlatformSuperAdminPage() {
     auditLogs,
     biAnalytics,
     storageTelemetry,
+    platformSettings,
   ] = await Promise.all([
     MarketOSRepository.getPlatformMetrics(),
     MarketOSRepository.getAllTenants(),
@@ -38,6 +39,7 @@ export default async function PlatformSuperAdminPage() {
     MarketOSRepository.getGlobalAuditLogs({ limit: 100 }),
     MarketOSRepository.getPlatformBiAnalytics("all"),
     MarketOSRepository.getPlatformStorageTelemetry(),
+    MarketOSRepository.getPlatformSettings(),
   ]);
 
   return (
@@ -52,6 +54,7 @@ export default async function PlatformSuperAdminPage() {
       initialAuditLogs={auditLogs}
       initialBiAnalytics={biAnalytics}
       initialStorageTelemetry={storageTelemetry}
+      initialPlatformSettings={platformSettings}
     />
   );
 }

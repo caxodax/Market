@@ -7,6 +7,8 @@ import {
   AuditLogFilters,
   PlatformBiAnalyticsFilter,
   ImpersonationSession,
+  PlatformSettings,
+  UpdatePlatformSettingsInput,
 } from "@marketos/types";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
@@ -444,5 +446,102 @@ export async function getTenantStorageDetailsAction(tenantId: string) {
     };
   }
 }
+
+/**
+ * Obtener ajustes globales de la plataforma SaaS (White-label, Canales de Soporte y Marca)
+ */
+export async function getPlatformSettingsAction() {
+  try {
+    const user = await getCurrentUser();
+    if (!user || user.role !== "PLATFORM_SUPER_ADMIN") {
+      return { success: false, error: "No autorizado. Solo Super Admin puede ver ajustes de plataforma." };
+    }
+
+    const settings = await MarketOSRepository.getPlatformSettings();
+    return { success: true, settings };
+  } catch (error) {
+    console.error("Error fetching platform settings:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al consultar ajustes de plataforma",
+    };
+  }
+}
+
+/**
+ * Actualizar ajustes globales de la plataforma SaaS (White-label, Canales de Soporte y Marca)
+ */
+export async function updatePlatformSettingsAction(data: UpdatePlatformSettingsInput) {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== "PLATFORM_SUPER_ADMIN") {
+      return { success: false, error: "No autorizado. Solo Super Admin puede actualizar ajustes de plataforma." };
+    }
+
+    const updated = await MarketOSRepository.updatePlatformSettings(data);
+
+    await MarketOSRepository.recordAuditLog({
+      tenantId: "platform",
+      tenantName: "Plataforma Global",
+      actorId: currentUser.id,
+      actorName: currentUser.full_name,
+      actorEmail: currentUser.email,
+      actorRole: currentUser.role,
+      action: "SETTINGS_UPDATED",
+      entity: "platform_settings",
+      entityId: "default",
+      newData: data,
+    });
+
+    revalidatePath("/platform");
+    revalidatePath("/login");
+
+    return { success: true, settings: updated };
+  } catch (error) {
+    console.error("Error updating platform settings:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al guardar ajustes de plataforma",
+    };
+  }
+}
+
+/**
+ * Subir logotipo oficial de la plataforma SaaS a Cloudflare R2
+ */
+export async function uploadPlatformLogoAction(formData: FormData) {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== "PLATFORM_SUPER_ADMIN") {
+      return { success: false, error: "No autorizado. Solo Super Admin puede subir logo de plataforma." };
+    }
+
+    const file = formData.get("file") as File | null;
+    if (!file || file.size === 0) {
+      return { success: false, error: "No se seleccionó ninguna imagen de logo" };
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const { uploadToR2 } = await import("@marketos/utils");
+    const res = await uploadToR2({
+      tenantId: "platform",
+      folder: "branding",
+      fileName: file.name || "platform-logo.webp",
+      body: buffer,
+      contentType: file.type || "image/webp",
+    });
+
+    return { success: true, url: res.url, key: res.key };
+  } catch (error) {
+    console.error("Error uploading platform logo to R2:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al subir logo de plataforma a Cloudflare R2",
+    };
+  }
+}
+
 
 

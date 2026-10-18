@@ -13,6 +13,7 @@ import {
   AuditLog,
   PlatformBiAnalytics,
   PlatformStorageTelemetry,
+  PlatformSettings,
 } from "@marketos/types";
 import { formatCurrency, slugify } from "@marketos/utils";
 import {
@@ -30,6 +31,7 @@ import { syncBcvRateAction } from "../app/admin/actions";
 import { AuditTrailViewer } from "./audit-trail-viewer";
 import { PlatformBiAnalyticsTab } from "./platform-bi-analytics-tab";
 import { PlatformStorageTab } from "./platform-storage-tab";
+import { PlatformSettingsTab } from "./platform-settings-tab";
 import { TenantPluginsModal } from "./tenant-plugins-modal";
 import {
   Building2,
@@ -89,6 +91,7 @@ interface SuperAdminDashboardProps {
   initialAuditLogs?: AuditLog[];
   initialBiAnalytics?: PlatformBiAnalytics;
   initialStorageTelemetry?: PlatformStorageTelemetry;
+  initialPlatformSettings?: PlatformSettings;
 }
 
 export function SuperAdminDashboard({
@@ -102,10 +105,25 @@ export function SuperAdminDashboard({
   initialAuditLogs = [],
   initialBiAnalytics,
   initialStorageTelemetry,
+  initialPlatformSettings,
 }: SuperAdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<
-    "TENANTS" | "BILLING" | "BI" | "STORAGE" | "USERS" | "RATES" | "AUDIT"
+    "TENANTS" | "BILLING" | "BI" | "STORAGE" | "USERS" | "RATES" | "AUDIT" | "SETTINGS"
   >("TENANTS");
+  const [platformSettings, setPlatformSettings] = useState<PlatformSettings>(
+    initialPlatformSettings || {
+      id: "default",
+      platform_name: "MarketOS",
+      platform_tagline: "Consola Centralizada Multi-Tenant SaaS",
+      logo_url: null,
+      support_phone: "+58 412-0000000",
+      support_email: "soporte@marketos.com",
+      support_whatsapp: "+58 412-0000000",
+      currency_symbol: "$",
+      contact_address: "Torre Empresarial, Piso 10",
+      updated_at: new Date().toISOString(),
+    }
+  );
   const [tenants, setTenants] = useState<TenantWithDetails[]>(initialTenants);
   const [metrics, setMetrics] = useState<PlatformMetrics>(initialMetrics);
   const [profiles, setProfiles] = useState<UserProfile[]>(initialProfiles);
@@ -190,18 +208,22 @@ export function SuperAdminDashboard({
   // Create User Form State
   const [newUserName, setNewUserName] = useState("");
   const [newUserEmail, setNewUserEmail] = useState("");
-  const [newUserPhone, setNewUserPhone] = useState("+58 4");
+  const [newUserPhone, setNewUserPhone] = useState("");
   const [newUserTenantId, setNewUserTenantId] = useState<string>("");
   const [newUserRole, setNewUserRole] = useState<UserRole>("TENANT_OWNER");
 
   // Edit User Form State
   const [editRole, setEditRole] = useState<UserRole>("TENANT_OWNER");
   const [editTenantId, setEditTenantId] = useState<string>("");
+  const [editFullName, setEditFullName] = useState<string>("");
+  const [editPhone, setEditPhone] = useState<string>("");
 
   const handleOpenEditUser = (user: UserProfile) => {
     setEditingUser(user);
     setEditRole(user.role);
     setEditTenantId(user.tenant_id || "");
+    setEditFullName(user.full_name || "");
+    setEditPhone(user.phone || "");
   };
 
   const handleCreateUserSubmit = async (e: React.FormEvent) => {
@@ -226,7 +248,7 @@ export function SuperAdminDashboard({
       setIsCreateUserOpen(false);
       setNewUserName("");
       setNewUserEmail("");
-      setNewUserPhone("+58 4");
+      setNewUserPhone("");
       setUserAlert({
         type: "success",
         text: `¡Usuario ${res.user.full_name} (${res.user.role}) registrado exitosamente!`,
@@ -250,28 +272,36 @@ export function SuperAdminDashboard({
       const res = await updateUserProfileAction(editingUser.id, {
         role: editRole,
         tenant_id: editTenantId.trim() || null,
+        full_name: editFullName.trim(),
+        phone: editPhone.trim() || null,
       });
 
       if (!res.success || !res.user) {
-        throw new Error(res.error || "No se pudo actualizar el rol");
+        throw new Error(res.error || "No se pudo actualizar el usuario");
       }
 
       setProfiles((prev) =>
         prev.map((p) =>
           p.id === editingUser.id
-            ? { ...p, role: editRole, tenant_id: editTenantId.trim() || null }
+            ? {
+                ...p,
+                role: editRole,
+                tenant_id: editTenantId.trim() || null,
+                full_name: editFullName.trim(),
+                phone: editPhone.trim() || null,
+              }
             : p
         )
       );
       setEditingUser(null);
       setUserAlert({
         type: "success",
-        text: `¡Rol de ${editingUser.full_name} actualizado a ${editRole}!`,
+        text: `¡Usuario ${editFullName.trim()} actualizado exitosamente!`,
       });
     } catch (err: any) {
       setUserAlert({
         type: "error",
-        text: err.message || "Error al actualizar rol",
+        text: err.message || "Error al actualizar usuario",
       });
     } finally {
       setUserLoading(false);
@@ -779,20 +809,28 @@ export function SuperAdminDashboard({
       <header className="border-b border-border bg-card/80 backdrop-blur sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-black text-xl shadow-sm tracking-tighter">
-              M
-            </div>
+            {platformSettings.logo_url ? (
+              <img
+                src={platformSettings.logo_url}
+                alt={platformSettings.platform_name || "Logo"}
+                className="h-10 w-10 rounded-xl object-contain bg-card border border-border p-1 shadow-sm shrink-0"
+              />
+            ) : (
+              <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-black text-xl shadow-sm tracking-tighter shrink-0">
+                {platformSettings.platform_name ? platformSettings.platform_name.charAt(0).toUpperCase() : "M"}
+              </div>
+            )}
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-black text-base tracking-tight text-foreground">
-                  MarketOS Master
+                  {platformSettings.platform_name || "MarketOS"} Master
                 </h1>
                 <span className="text-[10px] font-bold uppercase tracking-wider bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
                   Super Admin
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Consola Centralizada Multi-Tenant SaaS
+                {platformSettings.platform_tagline || "Consola Centralizada Multi-Tenant SaaS"}
               </p>
             </div>
           </div>
@@ -1083,6 +1121,18 @@ export function SuperAdminDashboard({
           >
             <ShieldCheck className="w-4 h-4" />
             <span>Auditoría Global (Audit Trail)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("SETTINGS")}
+            className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === "SETTINGS"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Sliders className="w-4 h-4 text-primary" />
+            <span>Ajustes de Plataforma</span>
           </button>
         </div>
 
@@ -2094,15 +2144,15 @@ export function SuperAdminDashboard({
 
                           <td className="py-3 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
-                              {/* Botón Editar Rol */}
+                              {/* Botón Editar Usuario */}
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditUser(user)}
                                 className="px-2.5 py-1.5 rounded-xl border border-border text-foreground hover:bg-muted font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
-                                title="Cambiar rol o tienda"
+                                title="Editar nombre, teléfono, rol o tienda"
                               >
                                 <Edit2 className="w-3 h-3 text-primary" />
-                                <span>Rol</span>
+                                <span>Editar</span>
                               </button>
 
                               {/* Botón Administrar Tienda */}
@@ -2172,6 +2222,32 @@ export function SuperAdminDashboard({
             allTenants={tenants}
           />
         </div>
+      )}
+
+      {/* TAB 8: PLATFORM & SAAS SETTINGS */}
+      {activeTab === "SETTINGS" && (
+        <PlatformSettingsTab
+          initialSettings={platformSettings}
+          currentUser={
+            currentUser || {
+              id: "master-admin",
+              email: "admin@marketos.com",
+              full_name: "Super Admin Maestro",
+              phone: "+58 412-0000000",
+              avatar_url: null,
+              role: "PLATFORM_SUPER_ADMIN",
+              tenant_id: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }
+          }
+          onSettingsUpdated={(updated) => setPlatformSettings(updated)}
+          onProfileUpdated={(updatedUser) => {
+            setProfiles((prev) =>
+              prev.map((p) => (p.id === updatedUser.id ? { ...p, ...updatedUser } : p))
+            );
+          }}
+        />
       )}
     </main>
 
@@ -2656,10 +2732,10 @@ export function SuperAdminDashboard({
               <div>
                 <h2 className="text-base font-bold text-foreground flex items-center gap-2">
                   <Edit2 className="w-4 h-4 text-primary" />
-                  Editar Rol y Acceso
+                  Editar Usuario y Acceso
                 </h2>
                 <p className="text-xs text-muted-foreground truncate max-w-xs">
-                  {editingUser.full_name} ({editingUser.email})
+                  {editingUser.email}
                 </p>
               </div>
               <button
@@ -2675,6 +2751,35 @@ export function SuperAdminDashboard({
               onSubmit={handleUpdateUserSubmit}
               className="p-5 space-y-4 text-xs"
             >
+              {/* Full Name */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">
+                  Nombre Completo *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  placeholder="Nombre y Apellido"
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background font-medium focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              {/* Phone */}
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">
+                  Teléfono Móvil
+                </label>
+                <input
+                  type="tel"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  placeholder="ej. +58 412 1234567 o internacional"
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background font-medium font-mono focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
               {/* Rol Selector */}
               <div className="space-y-1">
                 <label className="font-semibold text-foreground">

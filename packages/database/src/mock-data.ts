@@ -24,6 +24,7 @@ import {
   RawMaterial,
   ProductRecipe,
   ProductModifierGroup,
+  PlatformSettings,
 } from "@marketos/types";
 
 export const INITIAL_TENANT: Tenant = {
@@ -1613,5 +1614,17 @@ export const state = {
   rawMaterials: INITIAL_RAW_MATERIALS,
   recipes: INITIAL_RECIPES,
   modifierGroups: INITIAL_MODIFIER_GROUPS,
+  platformSettings: {
+    id: "default",
+    platform_name: "MarketOS",
+    platform_tagline: "Consola Centralizada Multi-Tenant SaaS",
+    logo_url: null,
+    support_phone: "+58 412-0000000",
+    support_email: "soporte@marketos.com",
+    support_whatsapp: "+58 412-0000000",
+    currency_symbol: "$",
+    contact_address: "Torre Empresarial, Piso 10",
+    updated_at: new Date().toISOString(),
+  } as PlatformSettings,
 };
 

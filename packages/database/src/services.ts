@@ -66,6 +66,8 @@ import {
   ProductRecipe,
   ProductModifierGroup,
   SelectedModifier,
+  PlatformSettings,
+  UpdatePlatformSettingsInput,
 } from "@marketos/types";
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
 import {
@@ -5915,5 +5917,79 @@ export class MarketOSRepository {
     }
 
     return { success: true, deductedItemsCount: deductedCount };
+  }
+
+  /**
+   * Obtener ajustes globales de la plataforma SaaS (White-label, Canales de Soporte y Marca)
+   */
+  static async getPlatformSettings(): Promise<PlatformSettings> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("platform_settings")
+          .select("*")
+          .eq("id", "default")
+          .maybeSingle();
+
+        if (!error && data) {
+          state.platformSettings = data as PlatformSettings;
+          return data as PlatformSettings;
+        }
+      } catch (e) {
+        console.warn("[Supabase] Get platform settings error:", e);
+      }
+    }
+
+    return (
+      state.platformSettings || {
+        id: "default",
+        platform_name: "MarketOS",
+        platform_tagline: "Consola Centralizada Multi-Tenant SaaS",
+        logo_url: null,
+        support_phone: "+58 412-0000000",
+        support_email: "soporte@marketos.com",
+        support_whatsapp: "+58 412-0000000",
+        currency_symbol: "$",
+        contact_address: "Torre Empresarial, Piso 10",
+        updated_at: new Date().toISOString(),
+      }
+    );
+  }
+
+  /**
+   * Actualizar ajustes globales de la plataforma SaaS (White-label y Canales de Soporte)
+   */
+  static async updatePlatformSettings(
+    input: Partial<PlatformSettings>
+  ): Promise<PlatformSettings> {
+    const current = await this.getPlatformSettings();
+    const updated: PlatformSettings = {
+      ...current,
+      ...input,
+      id: "default",
+      updated_at: new Date().toISOString(),
+    };
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("platform_settings")
+          .upsert(updated)
+          .select("*")
+          .single();
+
+        if (!error && data) {
+          state.platformSettings = data as PlatformSettings;
+          return data as PlatformSettings;
+        }
+      } catch (e) {
+        console.warn("[Supabase] Upsert platform settings error:", e);
+      }
+    }
+
+    state.platformSettings = updated;
+    return updated;
   }
 }
