@@ -2,6 +2,12 @@
  * MarketOS Core Multi-Tenant Domain Types
  */
 
+export * from "./modules";
+export * from "./ports";
+export * from "./food-service";
+
+import type { SelectedModifier } from "./food-service";
+
 export type TenantStatus = "active" | "inactive" | "suspended" | "trial";
 
 export interface Tenant {
@@ -421,6 +427,7 @@ export interface OrderItem {
   quantity: number;
   unit_price_usd: number;
   total_price_usd: number;
+  selected_modifiers?: SelectedModifier[];
 }
 
 export interface Order {
