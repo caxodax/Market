@@ -193,4 +193,4 @@ Cuando un nuevo programador se una al proyecto, debe seguir estas **Reglas de Or
 * [x] **Paso 2: Infraestructura en `@marketos/database`:** Migración de tablas `tenant_modules`, `raw_materials`, `recipes`, `product_modifiers` y métodos del repositorio.
 * [x] **Paso 3: Creación de `packages/plugins/food-service`:** Componentes de gestión de insumos, escandallo, modales de salsas/extras y deducción de stock.
 * [x] **Paso 4: Conexión de UI e Interruptores:** Modal de gestión de plugins en Super Admin (Opción 1), pestañas condicionales en Admin y modal de personalización en Storefront.
-* [ ] **Paso 5: Desacoplamiento de `packages/plugins/local-venezuela`:** Mover la lógica bancaria nacional (Pago Móvil, Zelle/Efectivo) y tasa BCV a su propio paquete modular desacoplado del core.
+* [x] **Paso 5: Desacoplamiento de `packages/plugins/local-venezuela`:** Mover la lógica bancaria nacional (Pago Móvil, Zelle/Efectivo) y tasa BCV a su propio paquete modular desacoplado del core.

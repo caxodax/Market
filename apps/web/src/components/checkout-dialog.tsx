@@ -4,6 +4,7 @@ import React, { useState, useId, useEffect, useRef } from "react";
 import { Store, TenantSettings, Order, DeliveryZone } from "@marketos/types";
 import { useCart } from "../context/cart-context";
 import { formatCurrency, convertUsdToVes, compressImage, formatFileSize } from "@marketos/utils";
+import { PagoMovilCard, validatePagoMovilInput } from "@marketos/plugin-local-venezuela";
 import {
   createOrderAction,
   submitPaymentProofAction,
@@ -302,10 +303,17 @@ export function CheckoutDialog({
       return;
     }
 
-    if (
-      (paymentMethod === "PAGO_MOVIL" || paymentMethod === "BANK_TRANSFER") &&
-      !referenceNumber.trim()
-    ) {
+    if (paymentMethod === "PAGO_MOVIL") {
+      const pmValidation = validatePagoMovilInput({
+        phone: pmData.phone,
+        idDoc: pmData.id_doc,
+        reference: referenceNumber,
+      });
+      if (!pmValidation.valid) {
+        setError(pmValidation.error || "Por favor verifica los datos de tu Pago Móvil");
+        return;
+      }
+    } else if (paymentMethod === "BANK_TRANSFER" && !referenceNumber.trim()) {
       setError("Por favor ingresa los últimos 4 a 6 dígitos de tu número de referencia");
       return;
     }
@@ -808,124 +816,11 @@ export function CheckoutDialog({
                 </div>
 
                 {activePaymentMethod === "PAGO_MOVIL" && (
-                  <div className="space-y-2 pt-1">
-                    {/* Banco */}
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border">
-                      <div>
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold block">
-                          Banco Receptor
-                        </span>
-                        <span className="font-bold text-xs text-foreground">
-                          {pmData.bank}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Teléfono */}
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border">
-                      <div>
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold block">
-                          Teléfono
-                        </span>
-                        <span className="font-mono font-bold text-xs text-foreground">
-                          {pmData.phone}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(pmData.phone.replace(/\D/g, ""), "phone")}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                          copiedField === "phone"
-                            ? "bg-emerald-600 text-white"
-                            : "bg-muted hover:bg-primary hover:text-primary-foreground text-foreground border border-border"
-                        }`}
-                      >
-                        {copiedField === "phone" ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>¡Copiado!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>Copiar</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* RIF */}
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border">
-                      <div>
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold block">
-                          RIF / Cédula / Titular
-                        </span>
-                        <span className="font-mono font-bold text-xs text-foreground">
-                          {pmData.id_doc} {pmData.name ? `(${pmData.name})` : ""}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(pmData.id_doc.replace(/[^A-Za-z0-9]/g, ""), "rif")}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                          copiedField === "rif"
-                            ? "bg-emerald-600 text-white"
-                            : "bg-muted hover:bg-primary hover:text-primary-foreground text-foreground border border-border"
-                        }`}
-                      >
-                        {copiedField === "rif" ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>¡Copiado!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>Copiar</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Monto exacto Bs */}
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-primary/10 border border-primary/30">
-                      <div>
-                        <span className="text-[10px] text-primary uppercase font-bold block">
-                          Monto exacto a transferir
-                        </span>
-                        <span className="font-mono font-black text-sm text-foreground">
-                          Bs.{" "}
-                          {totalVes.toLocaleString("es-VE", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleCopy(totalVes.toFixed(2), "amount_ves")
-                        }
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs ${
-                          copiedField === "amount_ves"
-                            ? "bg-emerald-600 text-white"
-                            : "bg-primary text-primary-foreground hover:bg-primary/90"
-                        }`}
-                      >
-                        {copiedField === "amount_ves" ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>¡Copiado!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>Copiar Monto</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
+                  <PagoMovilCard
+                    data={pmData}
+                    amountBs={totalVes}
+                    exchangeRate={exchangeRate}
+                  />
                 )}
 
                 {activePaymentMethod === "BANK_TRANSFER" && (

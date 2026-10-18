@@ -13,6 +13,7 @@
     "@marketos/auth": "workspace:*",
     "@marketos/database": "workspace:*",
     "@marketos/plugin-food-service": "workspace:*",
+    "@marketos/plugin-local-venezuela": "workspace:*",
     "@marketos/types": "workspace:*",
     "@marketos/ui": "workspace:*",
     "@marketos/utils": "workspace:*",

@@ -1,14 +1,27 @@
 "use server";
 
 import { MarketOSRepository } from "@marketos/database";
-import { OnboardTenantInput } from "@marketos/types";
+import { OnboardTenantInput, TenantModuleId } from "@marketos/types";
 import { revalidatePath } from "next/cache";
+import { getCurrentSuperAdminUser } from "./login/actions";
+
+/**
+ * Security Boundary: Validates caller has super_admin role
+ */
+async function assertSuperAdmin() {
+  const user = await getCurrentSuperAdminUser();
+  if (!user || user.role !== "PLATFORM_SUPER_ADMIN") {
+    throw new Error("No autorizado. Se requieren permisos de Super Administrador de Plataforma.");
+  }
+  return user;
+}
 
 /**
  * Onboard and automatically provision a new tenant
  */
 export async function onboardTenantAction(input: OnboardTenantInput) {
   try {
+    await assertSuperAdmin();
     const tenant = await MarketOSRepository.onboardTenant(input);
     revalidatePath("/");
     return { success: true, tenant };
@@ -32,12 +45,19 @@ export async function updateTenantStatusAction(
   status: "active" | "inactive" | "suspended" | "trial"
 ) {
   try {
+    await assertSuperAdmin();
     const updated = await MarketOSRepository.updateTenantStatus(tenantId, status);
     revalidatePath("/");
     return { success: updated };
   } catch (error) {
     console.error("Error updating tenant status:", error);
-    return { success: false, error: "Error al actualizar estado del comercio" };
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Error al actualizar estado del comercio",
+    };
   }
 }
 
@@ -46,11 +66,18 @@ export async function updateTenantStatusAction(
  */
 export async function getTenantModulesAction(tenantId: string) {
   try {
+    await assertSuperAdmin();
     const modules = await MarketOSRepository.getTenantModules(tenantId);
     return { success: true, modules };
   } catch (error) {
     console.error("Error fetching tenant modules:", error);
-    return { success: false, error: "Error al consultar los módulos del comercio" };
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Error al consultar los módulos del comercio",
+    };
   }
 }
 
@@ -59,16 +86,22 @@ export async function getTenantModulesAction(tenantId: string) {
  */
 export async function setTenantModuleStatusAction(
   tenantId: string,
-  moduleId: import("@marketos/types").TenantModuleId,
+  moduleId: TenantModuleId,
   isEnabled: boolean
 ) {
   try {
+    await assertSuperAdmin();
     const success = await MarketOSRepository.setTenantModuleStatus(tenantId, moduleId, isEnabled);
     revalidatePath("/");
     return { success };
   } catch (error) {
     console.error("Error setting tenant module status:", error);
-    return { success: false, error: "Error al actualizar el estado del módulo" };
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Error al actualizar el estado del módulo",
+    };
   }
 }
-

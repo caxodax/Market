@@ -53,6 +53,23 @@ async function getAuditActor(): Promise<AuditActor> {
   };
 }
 
+async function assertAuthorizedTenantAdmin(tenantId: string) {
+  const user = await getCurrentUser();
+  if (user) {
+    if (user.role === "PLATFORM_SUPER_ADMIN" || user.impersonation) {
+      return user;
+    }
+    if (user.tenant_id && user.tenant_id !== tenantId) {
+      throw new Error("Acceso denegado: No tiene permisos sobre este comercio.");
+    }
+    return user;
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("No autenticado. Inicie sesión para continuar.");
+  }
+  return null;
+}
+
 export async function reviewPaymentAction(
   tenantId: string,
   paymentId: string,
@@ -851,23 +868,31 @@ export async function saveRawMaterialAction(
   }
 ) {
   try {
+    await assertAuthorizedTenantAdmin(material.tenant_id);
     const saved = await MarketOSRepository.saveRawMaterial(material);
     revalidatePath("/admin");
     return { success: true, rawMaterial: saved };
   } catch (error) {
     console.error("Error saving raw material:", error);
-    return { success: false, error: "Error al guardar el insumo de cocina" };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al guardar el insumo de cocina",
+    };
   }
 }
 
 export async function deleteRawMaterialAction(tenantId: string, id: string) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     const deleted = await MarketOSRepository.deleteRawMaterial(tenantId, id);
     revalidatePath("/admin");
     return { success: deleted };
   } catch (error) {
     console.error("Error deleting raw material:", error);
-    return { success: false, error: "Error al eliminar insumo de cocina" };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al eliminar insumo de cocina",
+    };
   }
 }
 
@@ -883,12 +908,16 @@ export async function getProductRecipesAction(tenantId: string) {
 
 export async function saveProductRecipeAction(recipe: import("@marketos/types").ProductRecipe) {
   try {
+    await assertAuthorizedTenantAdmin(recipe.tenant_id);
     const saved = await MarketOSRepository.saveProductRecipe(recipe);
     revalidatePath("/admin");
     return { success: true, recipe: saved };
   } catch (error) {
     console.error("Error saving recipe:", error);
-    return { success: false, error: "Error al guardar la receta / escandallo" };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al guardar la receta / escandallo",
+    };
   }
 }
 

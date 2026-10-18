@@ -5788,8 +5788,73 @@ export class MarketOSRepository {
 
     let deductedCount = 0;
 
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        for (const item of order.items) {
+          // 1. Deduct Base Recipe
+          const recipe = await this.getProductRecipe(order.tenant_id, item.product_id);
+          if (recipe && recipe.items.length > 0) {
+            for (const ingredient of recipe.items) {
+              const totalQtyToDeduct = ingredient.quantity * item.quantity;
+              const { data: raw } = await supabase
+                .from("raw_materials")
+                .select("current_stock")
+                .eq("id", ingredient.raw_material_id)
+                .eq("tenant_id", order.tenant_id)
+                .single();
+              if (raw) {
+                const updatedStock = Math.max(
+                  0,
+                  Number((Number(raw.current_stock) - totalQtyToDeduct).toFixed(3))
+                );
+                await supabase
+                  .from("raw_materials")
+                  .update({ current_stock: updatedStock, updated_at: new Date().toISOString() })
+                  .eq("id", ingredient.raw_material_id)
+                  .eq("tenant_id", order.tenant_id);
+                deductedCount++;
+              }
+            }
+          }
+
+          // 2. Deduct Extra Modifiers (e.g. Extra Bacon)
+          if (item.selected_modifiers && item.selected_modifiers.length > 0) {
+            for (const mod of item.selected_modifiers) {
+              if (mod.raw_material_id) {
+                const { data: raw } = await supabase
+                  .from("raw_materials")
+                  .select("current_stock")
+                  .eq("id", mod.raw_material_id)
+                  .eq("tenant_id", order.tenant_id)
+                  .single();
+                if (raw) {
+                  const updatedStock = Math.max(
+                    0,
+                    Number((Number(raw.current_stock) - item.quantity).toFixed(3))
+                  );
+                  await supabase
+                    .from("raw_materials")
+                    .update({ current_stock: updatedStock, updated_at: new Date().toISOString() })
+                    .eq("id", mod.raw_material_id)
+                    .eq("tenant_id", order.tenant_id);
+                  deductedCount++;
+                }
+              }
+            }
+          }
+        }
+
+        if (deductedCount > 0) {
+          return { success: true, deductedItemsCount: deductedCount };
+        }
+      } catch (err) {
+        console.warn("[MarketOS] Could not deduct raw materials in Supabase:", err);
+      }
+    }
+
     for (const item of order.items) {
-      // 1. Deduct Base Recipe
+      // 1. Deduct Base Recipe in memory fallback
       const recipe = await this.getProductRecipe(order.tenant_id, item.product_id);
       if (recipe && recipe.items.length > 0) {
         for (const ingredient of recipe.items) {
