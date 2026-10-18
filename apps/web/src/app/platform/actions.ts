@@ -524,7 +524,7 @@ export async function uploadPlatformLogoAction(formData: FormData) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    const { uploadToR2 } = await import("@marketos/utils");
+    const { uploadToR2, formatMediaUrl } = await import("@marketos/utils");
     const res = await uploadToR2({
       tenantId: "platform",
       folder: "branding",
@@ -533,7 +533,9 @@ export async function uploadPlatformLogoAction(formData: FormData) {
       contentType: file.type || "image/webp",
     });
 
-    return { success: true, url: res.url, key: res.key };
+    const safeUrl = formatMediaUrl(res.url);
+
+    return { success: true, url: safeUrl, key: res.key };
   } catch (error) {
     console.error("Error uploading platform logo to R2:", error);
     return {

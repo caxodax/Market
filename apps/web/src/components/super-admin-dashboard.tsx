@@ -15,7 +15,7 @@ import {
   PlatformStorageTelemetry,
   PlatformSettings,
 } from "@marketos/types";
-import { formatCurrency, slugify } from "@marketos/utils";
+import { formatCurrency, slugify, formatMediaUrl } from "@marketos/utils";
 import {
   onboardTenantAction,
   updateTenantStatusAction,
@@ -124,12 +124,30 @@ export function SuperAdminDashboard({
       updated_at: new Date().toISOString(),
     }
   );
+  const [headerLogoError, setHeaderLogoError] = useState(false);
   const [tenants, setTenants] = useState<TenantWithDetails[]>(initialTenants);
   const [metrics, setMetrics] = useState<PlatformMetrics>(initialMetrics);
   const [profiles, setProfiles] = useState<UserProfile[]>(initialProfiles);
   const [storageTelemetry, setStorageTelemetry] = useState<PlatformStorageTelemetry | undefined>(
     initialStorageTelemetry
   );
+
+  // Sincronizar Favicon e icono en la pestaña del navegador en tiempo real
+  useEffect(() => {
+    const effectiveLogo = formatMediaUrl(platformSettings.logo_url);
+    if (effectiveLogo && !headerLogoError) {
+      let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "icon";
+        document.head.appendChild(link);
+      }
+      link.href = effectiveLogo;
+    }
+    if (platformSettings.platform_name) {
+      document.title = `${platformSettings.platform_name} Master`;
+    }
+  }, [platformSettings.logo_url, platformSettings.platform_name, headerLogoError]);
 
   // Billing & Subscriptions State
   const [billingSearchQuery, setBillingSearchQuery] = useState("");
@@ -809,11 +827,12 @@ export function SuperAdminDashboard({
       <header className="border-b border-border bg-card/80 backdrop-blur sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {platformSettings.logo_url ? (
+            {platformSettings.logo_url && !headerLogoError ? (
               <img
-                src={platformSettings.logo_url}
+                src={formatMediaUrl(platformSettings.logo_url)}
                 alt={platformSettings.platform_name || "Logo"}
                 className="h-10 w-10 rounded-xl object-contain bg-card border border-border p-1 shadow-sm shrink-0"
+                onError={() => setHeaderLogoError(true)}
               />
             ) : (
               <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-black text-xl shadow-sm tracking-tighter shrink-0">

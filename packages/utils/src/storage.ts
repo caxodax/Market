@@ -222,7 +222,11 @@ export function getR2FileUrl(key: string, bucket = process.env.R2_BUCKET_NAME ||
     process.env.NEXT_PUBLIC_R2_PUBLIC_DOMAIN ||
     process.env.NEXT_PUBLIC_R2_URL;
 
-  if (publicDomain && publicDomain.trim() !== "") {
+  if (
+    publicDomain &&
+    publicDomain.trim() !== "" &&
+    !publicDomain.includes("assets.marketos.app")
+  ) {
     const cleanDomain = publicDomain
       .trim()
       .replace(/^["']|["']$/g, "")
@@ -232,6 +236,28 @@ export function getR2FileUrl(key: string, bucket = process.env.R2_BUCKET_NAME ||
 
   // Fallback to streaming media proxy route (which reads directly from Cloudflare R2)
   return `/api/media/${key}`;
+}
+
+/**
+ * Format and resolve media URLs safely.
+ * If the URL references the unresolvable placeholder domain (assets.marketos.app),
+ * automatically redirects to the native Next.js streaming proxy route (/api/media/...).
+ */
+export function formatMediaUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+
+  if (trimmed.startsWith("/") || trimmed.startsWith("data:") || trimmed.startsWith("blob:")) {
+    return trimmed;
+  }
+
+  if (trimmed.includes("assets.marketos.app/")) {
+    const key = trimmed.split("assets.marketos.app/")[1];
+    return `/api/media/${key}`;
+  }
+
+  return trimmed;
 }
 
 /**

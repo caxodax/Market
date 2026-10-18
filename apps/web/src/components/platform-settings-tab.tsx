@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useEffect, useTransition } from "react";
 import {
   PlatformSettings,
   UpdatePlatformSettingsInput,
   UserProfile,
 } from "@marketos/types";
+import { formatMediaUrl } from "@marketos/utils";
 import {
   updatePlatformSettingsAction,
   uploadPlatformLogoAction,
@@ -51,7 +52,10 @@ export function PlatformSettingsTab({
   const [platformTagline, setPlatformTagline] = useState(
     initialSettings.platform_tagline || "Consola Centralizada Multi-Tenant SaaS"
   );
-  const [logoUrl, setLogoUrl] = useState(initialSettings.logo_url || "");
+  const [logoUrl, setLogoUrl] = useState(
+    initialSettings.logo_url ? formatMediaUrl(initialSettings.logo_url) : ""
+  );
+  const [logoLoadError, setLogoLoadError] = useState(false);
   const [supportPhone, setSupportPhone] = useState(initialSettings.support_phone || "");
   const [supportWhatsapp, setSupportWhatsapp] = useState(initialSettings.support_whatsapp || "");
   const [supportEmail, setSupportEmail] = useState(initialSettings.support_email || "");
@@ -70,10 +74,32 @@ export function PlatformSettingsTab({
   const [profileSuccessMessage, setProfileSuccessMessage] = useState<string | null>(null);
   const [profileErrorMessage, setProfileErrorMessage] = useState<string | null>(null);
 
+  // Sincronizar Favicon y Título en la pestaña del navegador en tiempo real
+  useEffect(() => {
+    const effective = formatMediaUrl(logoUrl);
+    if (effective && !logoLoadError) {
+      let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "icon";
+        document.head.appendChild(link);
+      }
+      link.href = effective;
+    }
+    if (platformName) {
+      document.title = `${platformName} Master | Consola Centralizada`;
+    }
+  }, [logoUrl, platformName, logoLoadError]);
+
   // Logo upload handler
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Previsualización instantánea local sin parpadeos
+    const instantPreview = URL.createObjectURL(file);
+    setLogoUrl(instantPreview);
+    setLogoLoadError(false);
 
     setIsUploadingLogo(true);
     setErrorMessage(null);
@@ -84,17 +110,12 @@ export function PlatformSettingsTab({
 
       const res = await uploadPlatformLogoAction(formData);
       if (res.success && res.url) {
-        setLogoUrl(res.url);
-        setSuccessMessage("Logotipo subido exitosamente a Cloudflare R2");
+        const cleanUrl = formatMediaUrl(res.url);
+        setLogoUrl(cleanUrl);
+        setLogoLoadError(false);
+        setSuccessMessage("Logotipo subido y enlazado exitosamente");
         setTimeout(() => setSuccessMessage(null), 4000);
       } else {
-        // Fallback: local data URL for preview
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const result = event.target?.result as string;
-          setLogoUrl(result);
-        };
-        reader.readAsDataURL(file);
         setSuccessMessage("Previsualización de imagen cargada localmente");
         setTimeout(() => setSuccessMessage(null), 4000);
       }
@@ -288,11 +309,12 @@ export function PlatformSettingsTab({
               <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-2xl border border-dashed border-border bg-muted/20">
                 {/* Logo Display Box */}
                 <div className="w-20 h-20 rounded-2xl border border-border bg-card flex items-center justify-center p-2 shrink-0 shadow-xs relative overflow-hidden">
-                  {logoUrl ? (
+                  {logoUrl && !logoLoadError ? (
                     <img
-                      src={logoUrl}
+                      src={formatMediaUrl(logoUrl)}
                       alt="Logo de Plataforma"
                       className="w-full h-full object-contain"
+                      onError={() => setLogoLoadError(true)}
                     />
                   ) : (
                     <div className="w-full h-full rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-black text-2xl tracking-tighter">
@@ -485,11 +507,12 @@ export function PlatformSettingsTab({
                 Header del Super Admin
               </span>
               <div className="flex items-center gap-3">
-                {logoUrl ? (
+                {logoUrl && !logoLoadError ? (
                   <img
-                    src={logoUrl}
+                    src={formatMediaUrl(logoUrl)}
                     alt={platformName}
                     className="h-10 w-10 rounded-xl object-contain bg-card border border-border p-1 shadow-xs shrink-0"
+                    onError={() => setLogoLoadError(true)}
                   />
                 ) : (
                   <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-black text-xl shadow-xs shrink-0 tracking-tighter">

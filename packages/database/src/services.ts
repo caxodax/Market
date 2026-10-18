@@ -78,6 +78,7 @@ import {
   scanR2PlatformStorage,
   scanR2TenantStorage,
   sanitizeSafeUrl,
+  formatMediaUrl,
 } from "@marketos/utils";
 import { createServerComponentClient } from "./server";
 import { isSupabaseOffline } from "./circuit-breaker";
@@ -5933,28 +5934,38 @@ export class MarketOSRepository {
           .maybeSingle();
 
         if (!error && data) {
-          state.platformSettings = data as PlatformSettings;
-          return data as PlatformSettings;
+          const formatted: PlatformSettings = {
+            ...(data as PlatformSettings),
+            logo_url: (data as PlatformSettings).logo_url
+              ? formatMediaUrl((data as PlatformSettings).logo_url)
+              : null,
+          };
+          state.platformSettings = formatted;
+          return formatted;
         }
       } catch (e) {
         console.warn("[Supabase] Get platform settings error:", e);
       }
     }
 
-    return (
-      state.platformSettings || {
-        id: "default",
-        platform_name: "MarketOS",
-        platform_tagline: "Consola Centralizada Multi-Tenant SaaS",
-        logo_url: null,
-        support_phone: "+58 412-0000000",
-        support_email: "soporte@marketos.com",
-        support_whatsapp: "+58 412-0000000",
-        currency_symbol: "$",
-        contact_address: "Torre Empresarial, Piso 10",
-        updated_at: new Date().toISOString(),
-      }
-    );
+    const current = state.platformSettings || {
+      id: "default",
+      platform_name: "MarketOS",
+      platform_tagline: "Consola Centralizada Multi-Tenant SaaS",
+      logo_url: null,
+      support_phone: "+58 412-0000000",
+      support_email: "soporte@marketos.com",
+      support_whatsapp: "+58 412-0000000",
+      currency_symbol: "$",
+      contact_address: "Torre Empresarial, Piso 10",
+      updated_at: new Date().toISOString(),
+    };
+
+    if (current.logo_url) {
+      current.logo_url = formatMediaUrl(current.logo_url);
+    }
+
+    return current;
   }
 
   /**
@@ -5964,9 +5975,11 @@ export class MarketOSRepository {
     input: Partial<PlatformSettings>
   ): Promise<PlatformSettings> {
     const current = await this.getPlatformSettings();
+    const cleanLogoUrl = input.logo_url ? formatMediaUrl(input.logo_url) : input.logo_url;
     const updated: PlatformSettings = {
       ...current,
       ...input,
+      ...(cleanLogoUrl !== undefined && { logo_url: cleanLogoUrl }),
       id: "default",
       updated_at: new Date().toISOString(),
     };
@@ -5981,8 +5994,14 @@ export class MarketOSRepository {
           .single();
 
         if (!error && data) {
-          state.platformSettings = data as PlatformSettings;
-          return data as PlatformSettings;
+          const formatted: PlatformSettings = {
+            ...(data as PlatformSettings),
+            logo_url: (data as PlatformSettings).logo_url
+              ? formatMediaUrl((data as PlatformSettings).logo_url)
+              : null,
+          };
+          state.platformSettings = formatted;
+          return formatted;
         }
       } catch (e) {
         console.warn("[Supabase] Upsert platform settings error:", e);
