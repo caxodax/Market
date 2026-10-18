@@ -58,6 +58,7 @@ import {
   Smartphone,
   MapPin,
   Phone,
+  ChevronLeft,
   ChevronRight,
   Sliders,
   Trash2,
@@ -357,6 +358,14 @@ export function SuperAdminDashboard({
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [tenantsPage, setTenantsPage] = useState(1);
+  const TENANTS_PER_PAGE = 8;
+
+  // Reset pagination when search or status filters change
+  useEffect(() => {
+    setTenantsPage(1);
+  }, [searchQuery, statusFilter]);
+
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [selectedTenantForStores, setSelectedTenantForStores] = useState<TenantWithDetails | null>(null);
   const [loading, setLoading] = useState(false);
@@ -472,6 +481,13 @@ export function SuperAdminDashboard({
 
     return matchesSearch && matchesStatus;
   });
+
+  const totalTenants = filteredTenants.length;
+  const totalTenantsPages = Math.max(1, Math.ceil(totalTenants / TENANTS_PER_PAGE));
+  const paginatedTenants = filteredTenants.slice(
+    (tenantsPage - 1) * TENANTS_PER_PAGE,
+    tenantsPage * TENANTS_PER_PAGE
+  );
 
   // Helper for computing subscription status and expiration
   const getSubscriptionInfo = (t: TenantWithDetails) => {
@@ -1100,7 +1116,7 @@ export function SuperAdminDashboard({
                     </td>
                   </tr>
                 ) : (
-                  filteredTenants.map((tenant) => {
+                  paginatedTenants.map((tenant) => {
                     const initials = tenant.name
                       .split(" ")
                       .map((w) => w[0])
@@ -1304,6 +1320,46 @@ export function SuperAdminDashboard({
               </tbody>
             </table>
           </div>
+
+          {/* Table Pagination Controls */}
+          {totalTenants > 0 && (
+            <div className="px-4 py-3 border-t border-border bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+              <div>
+                Mostrando{" "}
+                <strong className="text-foreground">
+                  {(tenantsPage - 1) * TENANTS_PER_PAGE + 1}-
+                  {Math.min(tenantsPage * TENANTS_PER_PAGE, totalTenants)}
+                </strong>{" "}
+                de <strong className="text-foreground">{totalTenants}</strong> comercios
+              </div>
+
+              {totalTenantsPages > 1 && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={tenantsPage <= 1}
+                    onClick={() => setTenantsPage((p) => Math.max(1, p - 1))}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-border text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer text-xs font-semibold"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Anterior</span>
+                  </button>
+                  <span className="px-2 font-bold text-foreground">
+                    {tenantsPage} / {totalTenantsPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={tenantsPage >= totalTenantsPages}
+                    onClick={() => setTenantsPage((p) => Math.min(totalTenantsPages, p + 1))}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-border text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer text-xs font-semibold"
+                  >
+                    <span>Siguiente</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* SaaS Subscription Plans Grid */}
