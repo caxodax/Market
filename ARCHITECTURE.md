@@ -19,3 +19,7 @@ Cloudflare R2 Object Storage (S3 API compatible, 10 GB Free, 0 Egress)
 
 ## External Services & APIs
 - **BCV Exchange Rate API**: Portal: `https://bcv.today/api/` | Endpoint: `https://bcv.today/api/v1/rate.json` (Native in-memory cache, automated daily sync for USD/VES official rate)
+
+## Modular Plugin Architecture
+For details on the Core vs. Plugins modular architecture (Odoo / Shopify Apps model), business verticals (Food Service / Pulldog vs Retail / Shop Market), and country localizations, see:
+- [MARKETOS_MODULAR_ARCHITECTURE.md](file:///home/lmontes/Documentos/Telegram/Market/MARKETOS_MODULAR_ARCHITECTURE.md)
