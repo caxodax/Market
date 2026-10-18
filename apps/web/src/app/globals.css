@@ -1,1 +1,10 @@
 @import "@marketos/ui/styles.css";
+
+/* Utility to eliminate annoying horizontal & vertical scrollbars while keeping smooth touch scroll */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

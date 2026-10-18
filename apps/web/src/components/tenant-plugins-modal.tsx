@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { TenantWithDetails, TenantModule, TenantModuleId } from "@marketos/types";
 import {
   getTenantModulesAction,
@@ -37,6 +37,7 @@ interface PluginMetadata {
   name: string;
   badge: string;
   category: "Restauración" | "Comercio Minorista" | "Finanzas Locales";
+  categoryShort: string;
   description: string;
   icon: React.ReactNode;
   features: string[];
@@ -49,6 +50,7 @@ const AVAILABLE_PLUGINS: PluginMetadata[] = [
     name: "Gastronomía, Fast Food & Restaurantes",
     badge: "v1.0.0 • Cocina & Menú",
     category: "Restauración",
+    categoryShort: "Restauración",
     description:
       "Diseñado para locales de comida rápida, hamburgueserías y perros calientes. Añade control de insumos (BOM), escandallo de costos y personalización de salsas/extras en el catálogo.",
     icon: <Utensils className="w-5 h-5 text-amber-500" />,
@@ -65,6 +67,7 @@ const AVAILABLE_PLUGINS: PluginMetadata[] = [
     name: "Retail, Supermercados & Bodegones",
     badge: "v1.0.0 • Punto de Venta",
     category: "Comercio Minorista",
+    categoryShort: "Retail",
     description:
       "Optimizado para supermercados y minimarkets de alta rotación con códigos de barra estándar y venta por unidad física.",
     icon: <ScanBarcode className="w-5 h-5 text-blue-500" />,
@@ -81,6 +84,7 @@ const AVAILABLE_PLUGINS: PluginMetadata[] = [
     name: "Localización Oficial Venezuela",
     badge: "v1.0.0 • Fiscal & Bancario",
     category: "Finanzas Locales",
+    categoryShort: "Fiscal / BCV",
     description:
       "Integración de pasarelas bancarias locales venezolanas, monitor automático de tasa oficial BCV y facturación fiscal.",
     icon: <Landmark className="w-5 h-5 text-emerald-500" />,
@@ -256,24 +260,24 @@ export function TenantPluginsModal({
   const inactiveCount = AVAILABLE_PLUGINS.length - activeCount;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-card w-full max-w-3xl rounded-2xl border border-border shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in overflow-y-auto">
+      <div className="bg-card w-full max-w-2xl sm:max-w-3xl rounded-2xl border border-border shadow-2xl flex flex-col max-h-[92vh] overflow-hidden my-auto">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between bg-muted/20">
-          <div className="flex items-center gap-3">
+        <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between bg-muted/20 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 border border-purple-500/20 flex items-center justify-center font-bold shrink-0">
               <Puzzle className="w-5 h-5" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base font-black text-foreground">
+                <h2 className="text-sm sm:text-base font-black text-foreground truncate">
                   Gestión de Plugins & Módulos
                 </h2>
-                <span className="text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-600 px-2.5 py-0.5 rounded-full border border-purple-500/20">
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-600 px-2.5 py-0.5 rounded-full border border-purple-500/20 whitespace-nowrap">
                   {activeCount} de {AVAILABLE_PLUGINS.length} activos
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5 truncate">
                 Comercio: <strong className="text-foreground">{tenant.name}</strong> ({tenant.slug})
               </p>
             </div>
@@ -281,7 +285,7 @@ export function TenantPluginsModal({
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+            className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0 ml-2"
             title="Cerrar ventana"
           >
             <X className="w-5 h-5" />
@@ -289,15 +293,15 @@ export function TenantPluginsModal({
         </div>
 
         {/* Info Banner */}
-        <div className="px-4 py-2.5 bg-muted/40 border-b border-border/60 flex items-start gap-2.5 text-xs text-muted-foreground">
+        <div className="px-4 py-2.5 bg-muted/40 border-b border-border/60 flex items-start gap-2.5 text-xs text-muted-foreground shrink-0">
           <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
           <p className="leading-relaxed">
             Como <strong>Super Admin</strong>, puedes encender o apagar plugins según el giro comercial de cada cliente. La tienda cargará dinámicamente sus paneles de control sin afectar a otros comercios.
           </p>
         </div>
 
-        {/* Search, Filter & Tabs Bar */}
-        <div className="p-3.5 border-b border-border/70 bg-card space-y-3">
+        {/* Search & Filters Bar (100% Mobile Responsive, No Horizontal Scroll) */}
+        <div className="p-3.5 sm:p-4 border-b border-border/70 bg-card space-y-3 shrink-0">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
             {/* Search input */}
             <div className="relative flex-1">
@@ -320,12 +324,12 @@ export function TenantPluginsModal({
               )}
             </div>
 
-            {/* Status pills */}
-            <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl self-start sm:self-auto border border-border/60">
+            {/* Status pills - Symmetric 3-column grid on mobile */}
+            <div className="grid grid-cols-3 sm:flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/60">
               <button
                 type="button"
                 onClick={() => setStatusFilter("ALL")}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all text-center cursor-pointer ${
                   statusFilter === "ALL"
                     ? "bg-background text-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
@@ -336,7 +340,7 @@ export function TenantPluginsModal({
               <button
                 type="button"
                 onClick={() => setStatusFilter("ACTIVE")}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all text-center cursor-pointer ${
                   statusFilter === "ACTIVE"
                     ? "bg-emerald-600 text-white shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
@@ -347,9 +351,9 @@ export function TenantPluginsModal({
               <button
                 type="button"
                 onClick={() => setStatusFilter("INACTIVE")}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all text-center cursor-pointer ${
                   statusFilter === "INACTIVE"
-                    ? "bg-muted text-foreground shadow-xs font-black"
+                    ? "bg-background text-foreground shadow-xs font-black"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -358,14 +362,14 @@ export function TenantPluginsModal({
             </div>
           </div>
 
-          {/* Category filter chips */}
-          <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] pb-0.5 scrollbar-none">
-            <span className="text-muted-foreground font-semibold flex items-center gap-1 shrink-0 mr-1">
+          {/* Category filter chips - Wrapped (Zero sideways scroll) */}
+          <div className="flex flex-wrap items-center gap-1.5 text-xs pt-0.5">
+            <span className="text-muted-foreground font-semibold flex items-center gap-1 text-[11px] mr-1 shrink-0">
               <Filter className="w-3 h-3" /> Categoría:
             </span>
             {[
               { id: "ALL", label: "Todas" },
-              { id: "Restauración", label: "Restauración & Fast Food" },
+              { id: "Restauración", label: "Restauración & Menú" },
               { id: "Comercio Minorista", label: "Retail & Bodegones" },
               { id: "Finanzas Locales", label: "Finanzas & Fiscal" },
             ].map((cat) => (
@@ -373,7 +377,7 @@ export function TenantPluginsModal({
                 key={cat.id}
                 type="button"
                 onClick={() => setCategoryFilter(cat.id)}
-                className={`px-2.5 py-1 rounded-lg font-semibold transition-all shrink-0 cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   categoryFilter === cat.id
                     ? "bg-primary/10 text-primary border border-primary/30 font-bold"
                     : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/50"
@@ -386,7 +390,7 @@ export function TenantPluginsModal({
         </div>
 
         {/* Content list */}
-        <div className="p-4 overflow-y-auto space-y-3.5 flex-1 bg-muted/10">
+        <div className="p-3.5 sm:p-4 overflow-y-auto space-y-3.5 flex-1 bg-muted/10 overflow-x-hidden">
           {error && (
             <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -446,8 +450,8 @@ export function TenantPluginsModal({
                         : "bg-card border-border hover:border-border/80 opacity-95"
                     }`}
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                      {/* Left Plugin Info */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      {/* Left: Plugin Details */}
                       <div className="flex items-start gap-3 flex-1 min-w-0">
                         <div className="p-2.5 rounded-xl bg-muted/60 border border-border/80 shrink-0 mt-0.5">
                           {plugin.icon}
@@ -471,7 +475,7 @@ export function TenantPluginsModal({
                           {/* Features list */}
                           <div className="pt-2 grid sm:grid-cols-2 gap-1.5 text-[11px] text-foreground/85 font-medium">
                             {plugin.features.map((feat, i) => (
-                              <div key={i} className="flex items-center gap-1.5">
+                              <div key={i} className="flex items-center gap-1.5 min-w-0">
                                 <Sparkles className="w-3 h-3 text-primary shrink-0" />
                                 <span className="truncate">{feat}</span>
                               </div>
@@ -480,30 +484,31 @@ export function TenantPluginsModal({
                         </div>
                       </div>
 
-                      {/* Right: Explicit Action Buttons & Switch */}
-                      <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/60">
+                      {/* Right: Symmetrical Action Section (Fixed geometry, clean alignment) */}
+                      <div className="flex sm:flex-col items-center sm:items-center justify-between sm:justify-center gap-2.5 shrink-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-border/60 sm:w-36">
                         {/* Status Badge */}
-                        <div className="flex items-center gap-1.5">
+                        <div className="w-full flex items-center justify-start sm:justify-center">
                           {isActive ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                              Habilitado
+                            <span className="w-32 sm:w-full inline-flex items-center justify-center gap-1.5 py-1 rounded-full text-xs font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>Habilitado</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-muted text-muted-foreground border border-border/60">
-                              Desactivado
+                            <span className="w-32 sm:w-full inline-flex items-center justify-center gap-1.5 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground border border-border/60">
+                              <PowerOff className="w-3 h-3 opacity-60 shrink-0" />
+                              <span>Desactivado</span>
                             </span>
                           )}
                         </div>
 
-                        {/* Prominent Action Button */}
-                        <div className="flex items-center gap-2">
+                        {/* Symmetrical Action Button (Identical dimensions w-32 sm:w-full h-9) */}
+                        <div className="w-full flex items-center justify-end sm:justify-center">
                           {isActive ? (
                             <button
                               type="button"
                               disabled={isBusy}
                               onClick={() => handleToggleModule(plugin.id)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-destructive/40 text-destructive hover:bg-destructive/10 text-xs font-bold transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-2xs"
+                              className="w-32 sm:w-full h-9 rounded-xl border border-destructive/40 bg-destructive/5 hover:bg-destructive/15 text-destructive font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-2xs"
                               title="Desactivar plugin para esta tienda"
                             >
                               {isBusy ? (
@@ -523,7 +528,7 @@ export function TenantPluginsModal({
                               type="button"
                               disabled={isBusy}
                               onClick={() => handleToggleModule(plugin.id)}
-                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-sm hover:shadow"
+                              className="w-32 sm:w-full h-9 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-sm hover:shadow"
                               title="Activar e instalar plugin para esta tienda"
                             >
                               {isBusy ? (
@@ -539,26 +544,6 @@ export function TenantPluginsModal({
                               )}
                             </button>
                           )}
-
-                          {/* Accessible Toggle Switch */}
-                          <button
-                            type="button"
-                            disabled={isBusy}
-                            onClick={() => handleToggleModule(plugin.id)}
-                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden disabled:opacity-50 ${
-                              isActive ? "bg-emerald-600" : "bg-muted-foreground/30"
-                            }`}
-                            role="switch"
-                            aria-checked={isActive}
-                            title={isActive ? "Haga clic para desactivar" : "Haga clic para activar"}
-                          >
-                            <span
-                              aria-hidden="true"
-                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                                isActive ? "translate-x-5" : "translate-x-0"
-                              }`}
-                            />
-                          </button>
                         </div>
                       </div>
                     </div>
@@ -570,7 +555,7 @@ export function TenantPluginsModal({
         </div>
 
         {/* Pagination & Footer */}
-        <div className="p-3.5 sm:p-4 border-t border-border bg-card flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="p-3.5 sm:p-4 border-t border-border bg-card flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
           {/* Pagination controls */}
           <div className="flex items-center gap-2 text-xs text-muted-foreground w-full sm:w-auto justify-between sm:justify-start">
             <span>
@@ -617,7 +602,7 @@ export function TenantPluginsModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2 rounded-xl bg-primary text-primary-foreground font-black text-xs hover:bg-primary/90 transition-all cursor-pointer shadow-xs active:scale-95"
+              className="px-6 py-2 rounded-xl bg-primary text-primary-foreground font-black text-xs hover:bg-primary/90 transition-all cursor-pointer shadow-xs active:scale-95"
             >
               Listo
             </button>

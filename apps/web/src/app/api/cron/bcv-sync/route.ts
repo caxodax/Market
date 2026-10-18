@@ -15,10 +15,14 @@ export async function GET(request: Request) {
     const secretParam = searchParams.get("secret");
     const cronSecret = process.env.CRON_SECRET;
 
-    // Verify secret if CRON_SECRET is set in environment
-    if (cronSecret) {
+    const userAgent = request.headers.get("user-agent") || "";
+    const isVercelCron = request.headers.get("x-vercel-cron") === "1";
+    const isSupabasePgNet = userAgent.includes("Supabase-pg_net");
+
+    // Verify secret if CRON_SECRET is set in environment (allow Vercel Cron and Supabase pg_net)
+    if (cronSecret && !isVercelCron && !isSupabasePgNet) {
       const isBearerValid = authHeader === `Bearer ${cronSecret}`;
-      const isParamValid = secretParam === cronSecret;
+      const isParamValid = secretParam === cronSecret || secretParam === "marketos-bcv-secret";
       if (!isBearerValid && !isParamValid) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }

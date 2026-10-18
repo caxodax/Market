@@ -567,7 +567,7 @@ export class MarketOSRepository {
           .maybeSingle();
 
         if (!error && data) {
-          return {
+          const rate: ExchangeRate = {
             id: data.id,
             tenant_id: data.tenant_id,
             currency: data.currency,
@@ -577,6 +577,17 @@ export class MarketOSRepository {
             source: data.source,
             updated_at: data.updated_at,
           };
+
+          // Self-healing: if rate in database is older than 6 hours, trigger background sync
+          const lastUpdated = new Date(data.updated_at).getTime();
+          const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000;
+          if (isNaN(lastUpdated) || lastUpdated < sixHoursAgo) {
+            MarketOSRepository.syncBcvRateFromApi(tenantId).catch((err) =>
+              console.warn("[MarketOS] Stale rate background refresh warning:", err)
+            );
+          }
+
+          return rate;
         }
       } catch (err) {
         console.warn("[MarketOS] Exchange rate fetch error, using resilient fallback:", err);

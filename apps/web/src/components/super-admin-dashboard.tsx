@@ -26,6 +26,7 @@ import {
   impersonateTenantAction,
   stopImpersonationAction,
 } from "../app/platform/actions";
+import { syncBcvRateAction } from "../app/admin/actions";
 import { AuditTrailViewer } from "./audit-trail-viewer";
 import { PlatformBiAnalyticsTab } from "./platform-bi-analytics-tab";
 import { PlatformStorageTab } from "./platform-storage-tab";
@@ -156,6 +157,25 @@ export function SuperAdminDashboard({
   const [impersonatingTenantId, setImpersonatingTenantId] = useState<string | null>(null);
   const [isStoppingImpersonation, setIsStoppingImpersonation] = useState(false);
   const [pluginsModalTenant, setPluginsModalTenant] = useState<TenantWithDetails | null>(null);
+
+  // BCV Rate state & Quick Sync
+  const [currentRate, setCurrentRate] = useState<ExchangeRate | undefined>(exchangeRate);
+  const [isSyncingRate, setIsSyncingRate] = useState(false);
+
+  const handleSyncRate = async () => {
+    setIsSyncingRate(true);
+    try {
+      const primaryTenantId = tenants[0]?.id || "shop-market-ca";
+      const res = await syncBcvRateAction(primaryTenantId);
+      if (res.success && res.rate) {
+        setCurrentRate(res.rate);
+      }
+    } catch (e) {
+      console.warn("Failed to sync rate from header:", e);
+    } finally {
+      setIsSyncingRate(false);
+    }
+  };
 
   // Auto-dismiss user alert
   useEffect(() => {
@@ -796,18 +816,30 @@ export function SuperAdminDashboard({
               </span>
             </div>
 
-            {exchangeRate && (
-              <button
-                onClick={() => setActiveTab("RATES")}
-                className="hidden sm:flex items-center gap-2 text-xs bg-muted/60 hover:bg-muted border border-border px-3 py-1.5 rounded-xl font-mono transition-colors cursor-pointer"
-                title="Monitor de tasas de cambio e histórico"
-              >
-                <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
-                <span>BCV:</span>
-                <strong className="text-foreground">
-                  Bs. {exchangeRate.value.toFixed(2)}
-                </strong>
-              </button>
+            {currentRate && (
+              <div className="hidden sm:flex items-center gap-1 bg-muted/60 border border-border px-2.5 py-1.5 rounded-xl font-mono text-xs">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("RATES")}
+                  className="flex items-center gap-1.5 hover:text-primary transition-colors cursor-pointer"
+                  title="Ver monitor de tasas de cambio e histórico"
+                >
+                  <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>BCV:</span>
+                  <strong className="text-foreground">
+                    Bs. {currentRate.value.toFixed(2)}
+                  </strong>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSyncRate}
+                  disabled={isSyncingRate}
+                  className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-50 ml-0.5"
+                  title="Sincronizar tasa oficial en vivo desde BD/BCV"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingRate ? "animate-spin text-primary" : ""}`} />
+                </button>
+              </div>
             )}
 
             <a
@@ -963,7 +995,7 @@ export function SuperAdminDashboard({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-border gap-2 overflow-x-auto pb-1">
+        <div className="flex border-b border-border gap-2 overflow-x-auto pb-1 no-scrollbar">
           <button
             onClick={() => setActiveTab("TENANTS")}
             className={`pb-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
