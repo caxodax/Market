@@ -60,6 +60,11 @@ import {
   PlatformDailyTrendItem,
   PlatformStorageTelemetry,
   TenantStorageTelemetry,
+  TenantModule,
+  TenantModuleId,
+  RawMaterial,
+  ProductRecipe,
+  ProductModifierGroup,
 } from "@marketos/types";
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
 import {
@@ -5357,5 +5362,440 @@ export class MarketOSRepository {
       totalSentCount: totalSent,
       lastSentAt,
     };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // MODULAR PLUGINS & TENANT MODULES SYSTEM
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Get all installed plugins/modules for a tenant
+   */
+  static async getTenantModules(tenantId: string): Promise<TenantModule[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("tenant_modules")
+          .select("*")
+          .eq("tenant_id", tenantId);
+
+        if (!error && data) {
+          return data as TenantModule[];
+        }
+      } catch (err) {
+        console.warn("[MarketOS] Could not fetch tenant modules from Supabase:", err);
+      }
+    }
+
+    return (state.tenantModules || []).filter((m) => m.tenant_id === tenantId);
+  }
+
+  /**
+   * Get list of active module IDs for a tenant (e.g. ['food_service', 'local_venezuela'])
+   */
+  static async getTenantActiveModuleIds(tenantId: string): Promise<TenantModuleId[]> {
+    const modules = await this.getTenantModules(tenantId);
+    return modules.filter((m) => m.is_active).map((m) => m.module_id);
+  }
+
+  /**
+   * Fast check if a specific plugin is active for a tenant
+   */
+  static async isModuleActiveForTenant(
+    tenantId: string,
+    moduleId: TenantModuleId
+  ): Promise<boolean> {
+    const activeIds = await this.getTenantActiveModuleIds(tenantId);
+    return activeIds.includes(moduleId);
+  }
+
+  /**
+   * Activate or deactivate a plugin for a tenant (Super Admin operation)
+   */
+  static async setTenantModuleStatus(
+    tenantId: string,
+    moduleId: TenantModuleId,
+    isActive: boolean,
+    settings?: Record<string, unknown>
+  ): Promise<TenantModule> {
+    const now = new Date().toISOString();
+    const supabase = getSupabase();
+
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("tenant_modules")
+          .upsert(
+            {
+              tenant_id: tenantId,
+              module_id: moduleId,
+              is_active: isActive,
+              settings: settings || {},
+              updated_at: now,
+            },
+            { onConflict: "tenant_id,module_id" }
+          )
+          .select()
+          .single();
+
+        if (!error && data) {
+          return data as TenantModule;
+        }
+      } catch (err) {
+        console.warn("[MarketOS] Could not update tenant module status in Supabase:", err);
+      }
+    }
+
+    // Mock state fallback
+    if (!state.tenantModules) state.tenantModules = [];
+    let existing = state.tenantModules.find(
+      (m) => m.tenant_id === tenantId && m.module_id === moduleId
+    );
+
+    if (existing) {
+      existing.is_active = isActive;
+      if (settings) existing.settings = { ...existing.settings, ...settings };
+      existing.updated_at = now;
+      return existing;
+    }
+
+    const newModule: TenantModule = {
+      id: `mod-${Date.now()}`,
+      tenant_id: tenantId,
+      module_id: moduleId,
+      is_active: isActive,
+      settings: settings || {},
+      installed_at: now,
+      updated_at: now,
+    };
+    state.tenantModules.push(newModule);
+    return newModule;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // FOOD SERVICE & GASTRONOMY (PULLDOG) REPOSITORY SERVICES
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Get raw materials / ingredients for a store
+   */
+  static async getRawMaterials(
+    tenantId: string,
+    storeId?: string
+  ): Promise<RawMaterial[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        let query = supabase
+          .from("raw_materials")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .is("deleted_at", null)
+          .order("name", { ascending: true });
+
+        if (storeId) {
+          query = query.eq("store_id", storeId);
+        }
+
+        const { data, error } = await query;
+        if (!error && data) {
+          return data as RawMaterial[];
+        }
+      } catch (err) {
+        console.warn("[MarketOS] Could not fetch raw materials from Supabase:", err);
+      }
+    }
+
+    return (state.rawMaterials || []).filter(
+      (r) =>
+        r.tenant_id === tenantId &&
+        (!storeId || r.store_id === storeId) &&
+        !r.deleted_at
+    );
+  }
+
+  /**
+   * Create or update a raw material / ingredient
+   */
+  static async saveRawMaterial(
+    input: Partial<RawMaterial> & {
+      tenant_id: string;
+      store_id: string;
+      name: string;
+    }
+  ): Promise<RawMaterial> {
+    const now = new Date().toISOString();
+    const id = input.id || `raw-${Date.now()}`;
+    const rawRecord: RawMaterial = {
+      id,
+      tenant_id: input.tenant_id,
+      store_id: input.store_id,
+      name: input.name,
+      sku: input.sku || null,
+      unit: input.unit || "UNIT",
+      current_stock: input.current_stock ?? 0,
+      min_alert_stock: input.min_alert_stock ?? 5,
+      cost_per_unit_usd: input.cost_per_unit_usd ?? 0,
+      is_active: input.is_active ?? true,
+      created_at: input.created_at || now,
+      updated_at: now,
+      deleted_at: input.deleted_at || null,
+    };
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("raw_materials")
+          .upsert(rawRecord)
+          .select()
+          .single();
+
+        if (!error && data) {
+          return data as RawMaterial;
+        }
+      } catch (err) {
+        console.warn("[MarketOS] Could not save raw material to Supabase:", err);
+      }
+    }
+
+    if (!state.rawMaterials) state.rawMaterials = [];
+    const idx = state.rawMaterials.findIndex((r) => r.id === id);
+    if (idx >= 0) {
+      state.rawMaterials[idx] = rawRecord;
+    } else {
+      state.rawMaterials.push(rawRecord);
+    }
+    return rawRecord;
+  }
+
+  /**
+   * Soft-delete a raw material (Preserves history & audit integrity)
+   */
+  static async deleteRawMaterial(tenantId: string, id: string): Promise<void> {
+    const now = new Date().toISOString();
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase
+          .from("raw_materials")
+          .update({ deleted_at: now, is_active: false })
+          .eq("id", id)
+          .eq("tenant_id", tenantId);
+      } catch (err) {
+        console.warn("[MarketOS] Could not soft delete raw material in Supabase:", err);
+      }
+    }
+
+    const item = (state.rawMaterials || []).find(
+      (r) => r.id === id && r.tenant_id === tenantId
+    );
+    if (item) {
+      item.deleted_at = now;
+      item.is_active = false;
+    }
+  }
+
+  /**
+   * Get recipe for a specific product
+   */
+  static async getProductRecipe(
+    tenantId: string,
+    productId: string
+  ): Promise<ProductRecipe | null> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("product_recipes")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .eq("product_id", productId)
+          .single();
+
+        if (!error && data) {
+          return data as ProductRecipe;
+        }
+      } catch (err) {
+        console.warn("[MarketOS] Could not fetch product recipe from Supabase:", err);
+      }
+    }
+
+    return (
+      (state.recipes || []).find(
+        (r) => r.tenant_id === tenantId && r.product_id === productId
+      ) || null
+    );
+  }
+
+  /**
+   * Save recipe for a product
+   */
+  static async saveProductRecipe(recipe: ProductRecipe): Promise<ProductRecipe> {
+    const now = new Date().toISOString();
+    const record: ProductRecipe = {
+      ...recipe,
+      updated_at: now,
+    };
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("product_recipes")
+          .upsert(record)
+          .select()
+          .single();
+
+        if (!error && data) {
+          return data as ProductRecipe;
+        }
+      } catch (err) {
+        console.warn("[MarketOS] Could not save product recipe to Supabase:", err);
+      }
+    }
+
+    if (!state.recipes) state.recipes = [];
+    const idx = state.recipes.findIndex(
+      (r) => r.tenant_id === recipe.tenant_id && r.product_id === recipe.product_id
+    );
+    if (idx >= 0) {
+      state.recipes[idx] = record;
+    } else {
+      state.recipes.push(record);
+    }
+    return record;
+  }
+
+  /**
+   * Get modifier groups (sauces, extras, toppings) for a product or category
+   */
+  static async getProductModifierGroups(
+    tenantId: string,
+    productId?: string,
+    categoryId?: string
+  ): Promise<ProductModifierGroup[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        let query = supabase
+          .from("product_modifier_groups")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true });
+
+        const { data, error } = await query;
+        if (!error && data) {
+          return (data as ProductModifierGroup[]).filter((g) => {
+            if (g.product_id && productId && g.product_id === productId) return true;
+            if (g.category_id && categoryId && g.category_id === categoryId) return true;
+            if (!g.product_id && !g.category_id) return true;
+            return false;
+          });
+        }
+      } catch (err) {
+        console.warn("[MarketOS] Could not fetch modifier groups from Supabase:", err);
+      }
+    }
+
+    return (state.modifierGroups || [])
+      .filter((g) => g.tenant_id === tenantId && g.is_active)
+      .filter((g) => {
+        if (g.product_id && productId && g.product_id === productId) return true;
+        if (g.category_id && categoryId && g.category_id === categoryId) return true;
+        if (!g.product_id && !g.category_id) return true;
+        return false;
+      })
+      .sort((a, b) => a.sort_order - b.sort_order);
+  }
+
+  /**
+   * Save a product modifier group
+   */
+  static async saveProductModifierGroup(
+    group: ProductModifierGroup
+  ): Promise<ProductModifierGroup> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("product_modifier_groups")
+          .upsert(group)
+          .select()
+          .single();
+
+        if (!error && data) {
+          return data as ProductModifierGroup;
+        }
+      } catch (err) {
+        console.warn("[MarketOS] Could not save modifier group to Supabase:", err);
+      }
+    }
+
+    if (!state.modifierGroups) state.modifierGroups = [];
+    const idx = state.modifierGroups.findIndex((g) => g.id === group.id);
+    if (idx >= 0) {
+      state.modifierGroups[idx] = group;
+    } else {
+      state.modifierGroups.push(group);
+    }
+    return group;
+  }
+
+  /**
+   * Automatically deduct raw material stock when a gastronomy order is processed
+   * (e.g. 1 Hot dog sold = -1 Bread, -1 Sausage, etc.)
+   */
+  static async deductRecipeInventoryForOrder(
+    order: Order
+  ): Promise<{ success: boolean; deductedItemsCount: number }> {
+    if (!order.items || order.items.length === 0) {
+      return { success: true, deductedItemsCount: 0 };
+    }
+
+    let deductedCount = 0;
+
+    for (const item of order.items) {
+      // 1. Deduct Base Recipe
+      const recipe = await this.getProductRecipe(order.tenant_id, item.product_id);
+      if (recipe && recipe.items.length > 0) {
+        for (const ingredient of recipe.items) {
+          const totalQtyToDeduct = ingredient.quantity * item.quantity;
+          const rawMaterial = (state.rawMaterials || []).find(
+            (r) => r.id === ingredient.raw_material_id && r.tenant_id === order.tenant_id
+          );
+
+          if (rawMaterial) {
+            rawMaterial.current_stock = Math.max(
+              0,
+              Number((rawMaterial.current_stock - totalQtyToDeduct).toFixed(3))
+            );
+            deductedCount++;
+          }
+        }
+      }
+
+      // 2. Deduct Extra Modifiers (e.g. Extra Bacon, Extra Sausage)
+      if (item.selected_modifiers && item.selected_modifiers.length > 0) {
+        for (const mod of item.selected_modifiers) {
+          if (mod.raw_material_id) {
+            const rawMaterial = (state.rawMaterials || []).find(
+              (r) => r.id === mod.raw_material_id && r.tenant_id === order.tenant_id
+            );
+            if (rawMaterial) {
+              rawMaterial.current_stock = Math.max(
+                0,
+                Number((rawMaterial.current_stock - item.quantity).toFixed(3))
+              );
+              deductedCount++;
+            }
+          }
+        }
+      }
+    }
+
+    return { success: true, deductedItemsCount: deductedCount };
   }
 }
