@@ -796,6 +796,7 @@ export function CatalogView({
       <OrderSuccessModal
         order={completedOrder}
         settings={settings}
+        activeModuleIds={activeModuleIds}
         onClose={() => setCompletedOrder(null)}
         onViewTicket={(ord) => {
           setCompletedOrder(null);
@@ -810,6 +811,7 @@ export function CatalogView({
         onClose={() => setTicketOrder(null)}
         settings={settings}
         store={stores[0]}
+        activeModuleIds={activeModuleIds}
       />
 
       {/* Customer Order Tracker Modal */}

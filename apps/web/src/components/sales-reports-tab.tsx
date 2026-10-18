@@ -9,6 +9,7 @@ import {
   SalesAnalytics,
   PaymentMethodType,
   OrderStatus,
+  TenantModuleId,
 } from "@marketos/types";
 import {
   formatCurrency,
@@ -45,6 +46,7 @@ interface SalesReportsTabProps {
   exchangeRate: ExchangeRate;
   initialOrders: Order[];
   initialPayments: PaymentProof[];
+  activeModuleIds?: TenantModuleId[];
 }
 
 export function SalesReportsTab({
@@ -53,7 +55,9 @@ export function SalesReportsTab({
   exchangeRate,
   initialOrders,
   initialPayments,
+  activeModuleIds = [],
 }: SalesReportsTabProps) {
+  const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
   const [dateRange, setDateRange] = useState<"today" | "week" | "month" | "all">("all");
   const [analytics, setAnalytics] = useState<SalesAnalytics | null>(null);
   const [loading, setLoading] = useState(false);
@@ -317,14 +321,16 @@ export function SalesReportsTab({
                 ? formatCurrency(analytics.totalRevenueUsd, "USD")
                 : formatCurrency(0, "USD")}
             </div>
-            <div className="text-xs font-mono font-bold text-emerald-600 mt-0.5">
-              Bs.{" "}
-              {analytics
-                ? analytics.totalRevenueVes.toLocaleString("es-VE", {
-                    minimumFractionDigits: 2,
-                  })
-                : "0,00"}
-            </div>
+            {isVenezuelaActive && (
+              <div className="text-xs font-mono font-bold text-emerald-600 mt-0.5">
+                Bs.{" "}
+                {analytics
+                  ? analytics.totalRevenueVes.toLocaleString("es-VE", {
+                      minimumFractionDigits: 2,
+                    })
+                  : "0,00"}
+              </div>
+            )}
           </div>
           <p className="text-[11px] text-muted-foreground pt-1">
             Ventas netas de pedidos aprobados/completados.
@@ -378,15 +384,17 @@ export function SalesReportsTab({
                 ? formatCurrency(analytics.averageTicketUsd, "USD")
                 : formatCurrency(0, "USD")}
             </div>
-            <div className="text-xs font-mono font-bold text-blue-600 mt-0.5">
-              Bs.{" "}
-              {analytics
-                ? (analytics.averageTicketUsd * exchangeRate.value).toLocaleString(
-                    "es-VE",
-                    { minimumFractionDigits: 2 }
-                  )
-                : "0,00"}
-            </div>
+            {isVenezuelaActive && (
+              <div className="text-xs font-mono font-bold text-blue-600 mt-0.5">
+                Bs.{" "}
+                {analytics
+                  ? (analytics.averageTicketUsd * exchangeRate.value).toLocaleString(
+                      "es-VE",
+                      { minimumFractionDigits: 2 }
+                    )
+                  : "0,00"}
+              </div>
+            )}
           </div>
           <p className="text-[11px] text-muted-foreground pt-1">
             Gasto promedio por cada cliente.
@@ -528,9 +536,11 @@ export function SalesReportsTab({
                     <span className="font-black text-primary">
                       {formatCurrency(prod.totalRevenueUsd, "USD")}
                     </span>
-                    <span className="block text-[10px] text-muted-foreground font-mono">
-                      Bs. {(prod.totalRevenueUsd * exchangeRate.value).toFixed(2)}
-                    </span>
+                    {isVenezuelaActive && (
+                      <span className="block text-[10px] text-muted-foreground font-mono">
+                        Bs. {(prod.totalRevenueUsd * exchangeRate.value).toFixed(2)}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -580,7 +590,7 @@ export function SalesReportsTab({
                   <th className="p-3">Productos Llevados</th>
                   <th className="p-3">Método / Ref</th>
                   <th className="p-3 text-right">Total ($)</th>
-                  <th className="p-3 text-right">Total (Bs)</th>
+                  {isVenezuelaActive && <th className="p-3 text-right">Total (Bs)</th>}
                   <th className="p-3 text-center">Estado</th>
                   <th className="p-3 text-center">Acción</th>
                 </tr>
@@ -636,12 +646,14 @@ export function SalesReportsTab({
                       <td className="p-3 text-right font-black text-foreground whitespace-nowrap">
                         {formatCurrency(order.total_usd, "USD")}
                       </td>
-                      <td className="p-3 text-right font-mono text-[11px] text-muted-foreground whitespace-nowrap">
-                        Bs.{" "}
-                        {order.total_ves.toLocaleString("es-VE", {
-                          minimumFractionDigits: 2,
-                        })}
-                      </td>
+                      {isVenezuelaActive && (
+                        <td className="p-3 text-right font-mono text-[11px] text-muted-foreground whitespace-nowrap">
+                          Bs.{" "}
+                          {order.total_ves.toLocaleString("es-VE", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </td>
+                      )}
                       <td className="p-3 text-center whitespace-nowrap">
                         <span
                           className={`inline-block text-[10px] font-black px-2 py-0.5 rounded-full border ${
@@ -683,6 +695,7 @@ export function SalesReportsTab({
         isOpen={!!selectedOrder}
         onClose={() => setSelectedOrder(null)}
         settings={settings}
+        activeModuleIds={activeModuleIds}
       />
     </div>
   );

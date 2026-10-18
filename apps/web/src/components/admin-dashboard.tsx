@@ -2045,9 +2045,11 @@ export function AdminDashboard({
                           <span className="text-sm font-black text-primary">
                             {formatCurrency(order.total_usd, "USD")}
                           </span>
-                          <span className="block text-[11px] text-muted-foreground font-mono">
-                            Bs. {order.total_ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
-                          </span>
+                          {activeModuleIds.includes("local_venezuela") && (
+                            <span className="block text-[11px] text-muted-foreground font-mono">
+                              Bs. {order.total_ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -2168,6 +2170,7 @@ export function AdminDashboard({
             exchangeRate={rate}
             initialOrders={orders}
             initialPayments={payments}
+            activeModuleIds={activeModuleIds}
           />
         )}
 
@@ -2352,10 +2355,12 @@ export function AdminDashboard({
                         </p>
 
                         <p className="text-xs font-mono font-bold text-primary">
-                          {formatCurrency(prod.price_usd, "USD")}{" "}
-                          <span className="text-[11px] text-muted-foreground font-normal">
-                            (Bs. {priceVes.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-                          </span>
+                          {formatCurrency(prod.price_usd, "USD")}
+                          {activeModuleIds.includes("local_venezuela") && (
+                            <span className="text-[11px] text-muted-foreground font-normal">
+                              {" "}(Bs. {priceVes.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                            </span>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -2444,6 +2449,7 @@ export function AdminDashboard({
             initialDeliveryZones={deliveryZones}
             initialDrivers={drivers}
             exchangeRate={rate}
+            activeModuleIds={activeModuleIds}
           />
         )}
 
@@ -2922,6 +2928,7 @@ export function AdminDashboard({
         {activeTab === "SETTINGS" && (
           <StoreSettingsTab
             settings={settingsState}
+            activeModuleIds={activeModuleIds}
             onUpdateSuccess={(updated) => setSettingsState(updated)}
           />
         )}
@@ -3109,6 +3116,7 @@ export function AdminDashboard({
         onClose={() => setSelectedOrderForModal(null)}
         settings={settingsState}
         drivers={drivers}
+        activeModuleIds={activeModuleIds}
         onUpdateStatus={handleUpdateOrderStatus}
         onReviewPayment={async (paymentId, status) => {
           await handleReview(paymentId, status);

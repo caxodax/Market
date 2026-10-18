@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Order, OrderStatus, TenantSettings, Driver } from "@marketos/types";
+import { Order, OrderStatus, TenantSettings, Driver, TenantModuleId } from "@marketos/types";
 import { formatCurrency, generateOrderStatusNotificationWhatsAppLink } from "@marketos/utils";
 import { BottomSheetModal } from "./bottom-sheet-modal";
 import {
@@ -35,6 +35,7 @@ interface OrderDetailsModalProps {
   onClose: () => void;
   settings: TenantSettings;
   drivers?: Driver[];
+  activeModuleIds?: TenantModuleId[];
   onUpdateStatus?: (orderId: string, newStatus: OrderStatus, driverId?: string) => Promise<void>;
   onReviewPayment?: (paymentId: string, status: "APPROVED" | "REJECTED") => Promise<void>;
   paymentId?: string;
@@ -93,11 +94,13 @@ export function OrderDetailsModal({
   onClose,
   settings,
   drivers = [],
+  activeModuleIds = [],
   onUpdateStatus,
   onReviewPayment,
   paymentId,
   isProcessing = false,
 }: OrderDetailsModalProps) {
+  const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
@@ -347,9 +350,11 @@ export function OrderDetailsModal({
                     <span className="font-black text-foreground">
                       {formatCurrency(item.total_price_usd, "USD")}
                     </span>
-                    <span className="block text-[10px] text-muted-foreground font-mono">
-                      Bs. {(item.total_price_usd * order.exchange_rate_applied).toFixed(2)}
-                    </span>
+                    {isVenezuelaActive && (
+                      <span className="block text-[10px] text-muted-foreground font-mono">
+                        Bs. {(item.total_price_usd * order.exchange_rate_applied).toFixed(2)}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -495,16 +500,20 @@ export function OrderDetailsModal({
                 </span>
               </div>
 
-              <div className="flex justify-between text-muted-foreground text-[11px] font-mono">
-                <span>Total en Bolívares:</span>
-                <span className="font-bold text-foreground">
-                  Bs. {order.total_ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
-                </span>
-              </div>
+              {isVenezuelaActive && (
+                <>
+                  <div className="flex justify-between text-muted-foreground text-[11px] font-mono">
+                    <span>Total en Bolívares:</span>
+                    <span className="font-bold text-foreground">
+                      Bs. {order.total_ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
 
-              <div className="text-[10px] text-muted-foreground text-right pt-0.5">
-                Tasa aplicada: Bs. {order.exchange_rate_applied.toFixed(2)}
-              </div>
+                  <div className="text-[10px] text-muted-foreground text-right pt-0.5">
+                    Tasa aplicada: Bs. {order.exchange_rate_applied.toFixed(2)}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

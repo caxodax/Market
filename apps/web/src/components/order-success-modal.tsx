@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Order, TenantSettings } from "@marketos/types";
+import { Order, TenantSettings, TenantModuleId } from "@marketos/types";
 import {
   formatCurrency,
   generateCustomerOrderWhatsAppLink,
@@ -13,6 +13,7 @@ interface OrderSuccessModalProps {
   settings: TenantSettings;
   onClose: () => void;
   onViewTicket?: (order: Order) => void;
+  activeModuleIds?: TenantModuleId[];
 }
 
 export function OrderSuccessModal({
@@ -20,7 +21,9 @@ export function OrderSuccessModal({
   settings,
   onClose,
   onViewTicket,
+  activeModuleIds = [],
 }: OrderSuccessModalProps) {
+  const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
   if (!order) return null;
 
   // Formatted WhatsApp order link
@@ -60,7 +63,7 @@ export function OrderSuccessModal({
             {order.order_number}
           </p>
 
-          {order.customer_id_number && (
+          {isVenezuelaActive && order.customer_id_number && (
             <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-primary/10 border border-primary/20 text-xs font-mono font-bold text-primary">
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Cédula: {order.customer_id_number}</span>
@@ -76,18 +79,22 @@ export function OrderSuccessModal({
               {formatCurrency(order.total_usd, "USD")}
             </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Monto Total en Bolívares:</span>
-            <span className="font-bold text-primary">
-              Bs. {order.total_ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Tasa aplicada:</span>
-            <span className="font-mono text-muted-foreground">
-              Bs. {order.exchange_rate_applied.toFixed(2)}/USD
-            </span>
-          </div>
+          {isVenezuelaActive && (
+            <>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Monto Total en Bolívares:</span>
+                <span className="font-bold text-primary">
+                  Bs. {order.total_ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Tasa aplicada:</span>
+                <span className="font-mono text-muted-foreground">
+                  Bs. {order.exchange_rate_applied.toFixed(2)}/USD
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Ordered Items Preview */}

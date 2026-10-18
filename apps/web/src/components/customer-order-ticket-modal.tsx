@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Order, OrderStatus, TenantSettings, Store } from "@marketos/types";
+import { Order, OrderStatus, TenantSettings, Store, TenantModuleId } from "@marketos/types";
 import { formatCurrency, generateCustomerOrderWhatsAppLink } from "@marketos/utils";
 import { BottomSheetModal } from "./bottom-sheet-modal";
 import {
@@ -32,6 +32,7 @@ interface CustomerOrderTicketModalProps {
   onClose: () => void;
   settings: TenantSettings;
   store?: Store;
+  activeModuleIds?: TenantModuleId[];
 }
 
 interface StepInfo {
@@ -47,7 +48,9 @@ export function CustomerOrderTicketModal({
   onClose,
   settings,
   store,
+  activeModuleIds = [],
 }: CustomerOrderTicketModalProps) {
+  const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
   const [copiedOrder, setCopiedOrder] = useState(false);
   const [copiedCi, setCopiedCi] = useState(false);
 
@@ -146,7 +149,7 @@ export function CustomerOrderTicketModal({
   const totalItemsCount = items.reduce((acc, it) => acc + it.quantity, 0);
 
   // SENIAT Fiscal Compliance Status (Providencia 00071 & Factura Digital)
-  const isFiscal = Boolean(order.is_fiscal_invoice || settings.billing_settings?.fiscal_billing_enabled);
+  const isFiscal = isVenezuelaActive && Boolean(order.is_fiscal_invoice || settings.billing_settings?.fiscal_billing_enabled);
   const billingSettings = settings.billing_settings;
   const emitterRif = billingSettings?.emitter_fiscal_data?.rif || "J-50123456-7";
   const emitterBusinessName = billingSettings?.emitter_fiscal_data?.business_name || settings.business_name;
@@ -295,7 +298,7 @@ export function CustomerOrderTicketModal({
                 <th className="py-1.5 text-left">Producto / Descripción</th>
                 <th className="py-1.5 text-right w-24">P. Unit ($)</th>
                 <th className="py-1.5 text-right w-24">Total ($)</th>
-                <th className="py-1.5 text-right w-28">Total (Bs.)</th>
+                {isVenezuelaActive && <th className="py-1.5 text-right w-28">Total (Bs.)</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
@@ -313,9 +316,11 @@ export function CustomerOrderTicketModal({
                   <td className="py-1.5 text-right font-mono font-bold">
                     ${item.total_price_usd.toFixed(2)}
                   </td>
-                  <td className="py-1.5 text-right font-mono text-slate-700">
-                    Bs. {(item.total_price_usd * order.exchange_rate_applied).toFixed(2)}
-                  </td>
+                  {isVenezuelaActive && (
+                    <td className="py-1.5 text-right font-mono text-slate-700">
+                      Bs. {(item.total_price_usd * order.exchange_rate_applied).toFixed(2)}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -350,9 +355,11 @@ export function CustomerOrderTicketModal({
                   : "Por Conciliar"}
               </span>
             </p>
-            <p className="text-[10px] text-slate-500 pt-1">
-              Tasa Oficial BCV: Bs. {order.exchange_rate_applied.toFixed(2)}
-            </p>
+            {isVenezuelaActive && (
+              <p className="text-[10px] text-slate-500 pt-1">
+                Tasa Oficial BCV: Bs. {order.exchange_rate_applied.toFixed(2)}
+              </p>
+            )}
           </div>
 
           {/* Totals Calculation */}
@@ -403,14 +410,16 @@ export function CustomerOrderTicketModal({
               </span>
             </div>
 
-            <div className="flex justify-between items-baseline font-mono">
-              <span className="text-slate-600 font-bold text-xs">
-                {isFiscal ? "TOTAL FACTURA BOLÍVARES:" : "TOTAL BOLÍVARES:"}
-              </span>
-              <span className="font-bold text-base text-slate-950">
-                Bs. {order.total_ves.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
+            {isVenezuelaActive && (
+              <div className="flex justify-between items-baseline font-mono">
+                <span className="text-slate-600 font-bold text-xs">
+                  {isFiscal ? "TOTAL FACTURA BOLÍVARES:" : "TOTAL BOLÍVARES:"}
+                </span>
+                <span className="font-bold text-base text-slate-950">
+                  Bs. {order.total_ves.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -827,9 +836,11 @@ export function CustomerOrderTicketModal({
                       <span className="font-black text-foreground">
                         {formatCurrency(item.total_price_usd, "USD")}
                       </span>
-                      <span className="block text-[10px] text-muted-foreground font-mono">
-                        Bs. {(item.total_price_usd * order.exchange_rate_applied).toFixed(2)}
-                      </span>
+                      {isVenezuelaActive && (
+                        <span className="block text-[10px] text-muted-foreground font-mono">
+                          Bs. {(item.total_price_usd * order.exchange_rate_applied).toFixed(2)}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -936,16 +947,20 @@ export function CustomerOrderTicketModal({
                   </span>
                 </div>
 
-                <div className="flex justify-between text-muted-foreground text-[11px] font-mono">
-                  <span>Total en Bolívares:</span>
-                  <span className="font-bold text-foreground">
-                    Bs. {order.total_ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
+                {isVenezuelaActive && (
+                  <>
+                    <div className="flex justify-between text-muted-foreground text-[11px] font-mono">
+                      <span>Total en Bolívares:</span>
+                      <span className="font-bold text-foreground">
+                        Bs. {order.total_ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
 
-                <div className="text-[10px] text-muted-foreground text-right pt-0.5">
-                  Tasa BCV aplicada: Bs. {order.exchange_rate_applied.toFixed(2)}
-                </div>
+                    <div className="text-[10px] text-muted-foreground text-right pt-0.5">
+                      Tasa BCV aplicada: Bs. {order.exchange_rate_applied.toFixed(2)}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

@@ -10,6 +10,7 @@ import {
   FiscalBillingMode,
   FiscalTaxPayerType,
   FiscalProvider,
+  TenantModuleId,
 } from "@marketos/types";
 import { updateTenantSettingsAction, uploadStoreLogoAction } from "../app/admin/actions";
 import { compressImage } from "@marketos/utils";
@@ -53,6 +54,7 @@ import {
 interface StoreSettingsTabProps {
   settings: TenantSettings;
   onUpdateSuccess?: (updated: TenantSettings) => void;
+  activeModuleIds?: TenantModuleId[];
 }
 
 const AVAILABLE_PAYMENT_METHODS: {
@@ -133,7 +135,8 @@ const VENEZUELAN_BANKS = [
   "Otro Banco",
 ];
 
-export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTabProps) {
+export function StoreSettingsTab({ settings, onUpdateSuccess, activeModuleIds = [] }: StoreSettingsTabProps) {
+  const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
   const [activeSubTab, setActiveSubTab] = useState<"GENERAL" | "DOMAINS" | "PAYMENTS" | "BRANDING" | "OPERATIONS" | "FISCAL">("GENERAL");
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -511,7 +514,7 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
       )}
 
       {/* Sub Navigation Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 border-b border-border pb-3">
+      <div className={`grid grid-cols-2 sm:grid-cols-3 ${isVenezuelaActive ? "lg:grid-cols-6" : "lg:grid-cols-5"} gap-2 border-b border-border pb-3`}>
         <button
           type="button"
           onClick={() => setActiveSubTab("GENERAL")}
@@ -577,27 +580,29 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
           <span>Operatividad</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveSubTab("FISCAL")}
-          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-            activeSubTab === "FISCAL"
-              ? "bg-primary text-primary-foreground border-primary shadow-xs"
-              : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted"
-          }`}
-        >
-          <Receipt className="w-4 h-4" />
-          <span>SENIAT & Fiscal</span>
-          <span
-            className={`text-[9px] px-1.5 py-0.5 rounded-full font-extrabold ${
-              fiscalBillingEnabled
-                ? "bg-emerald-500 text-white"
-                : "bg-muted text-muted-foreground border border-border"
+        {isVenezuelaActive && (
+          <button
+            type="button"
+            onClick={() => setActiveSubTab("FISCAL")}
+            className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              activeSubTab === "FISCAL"
+                ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted"
             }`}
           >
-            {fiscalBillingEnabled ? "ON" : "OFF"}
-          </span>
-        </button>
+            <Receipt className="w-4 h-4" />
+            <span>SENIAT & Fiscal</span>
+            <span
+              className={`text-[9px] px-1.5 py-0.5 rounded-full font-extrabold ${
+                fiscalBillingEnabled
+                  ? "bg-emerald-500 text-white"
+                  : "bg-muted text-muted-foreground border border-border"
+              }`}
+            >
+              {fiscalBillingEnabled ? "ON" : "OFF"}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* SUBTAB 1: GENERAL & ADDRESS */}
@@ -954,7 +959,12 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2">
-              {AVAILABLE_PAYMENT_METHODS.map((m) => {
+              {AVAILABLE_PAYMENT_METHODS.filter((m) => {
+                if (!isVenezuelaActive && (m.id === "PAGO_MOVIL" || m.id === "BANK_TRANSFER" || m.id === "CASH_VES")) {
+                  return false;
+                }
+                return true;
+              }).map((m) => {
                 const Icon = m.icon;
                 const isChecked = enabledMethods.includes(m.id);
                 return (
@@ -994,7 +1004,7 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
           </div>
 
           {/* Pago Móvil Account Details */}
-          {enabledMethods.includes("PAGO_MOVIL") && (
+          {isVenezuelaActive && enabledMethods.includes("PAGO_MOVIL") && (
             <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-foreground font-bold text-sm">
@@ -1067,7 +1077,7 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
           )}
 
           {/* Bank Transfer Details */}
-          {enabledMethods.includes("BANK_TRANSFER") && (
+          {isVenezuelaActive && enabledMethods.includes("BANK_TRANSFER") && (
             <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-foreground font-bold text-sm">
@@ -1626,7 +1636,7 @@ export function StoreSettingsTab({ settings, onUpdateSuccess }: StoreSettingsTab
       )}
 
       {/* SUBTAB 6: SENIAT FISCAL COMPLIANCE & FACTURACIÓN DIGITAL */}
-      {activeSubTab === "FISCAL" && (
+      {isVenezuelaActive && activeSubTab === "FISCAL" && (
         <div className="space-y-6">
           {/* Header Explanation Banner */}
           <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-3">

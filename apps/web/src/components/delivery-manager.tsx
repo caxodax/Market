@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import type { DeliveryZone, Driver, ExchangeRate } from "@marketos/types";
+import type { DeliveryZone, Driver, ExchangeRate, TenantModuleId } from "@marketos/types";
 import {
   MapPin,
   Truck,
@@ -39,6 +39,7 @@ interface DeliveryManagerProps {
   initialDeliveryZones: DeliveryZone[];
   initialDrivers: Driver[];
   exchangeRate?: ExchangeRate;
+  activeModuleIds?: TenantModuleId[];
 }
 
 export function DeliveryManager({
@@ -46,7 +47,9 @@ export function DeliveryManager({
   initialDeliveryZones = [],
   initialDrivers = [],
   exchangeRate,
+  activeModuleIds = [],
 }: DeliveryManagerProps) {
+  const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
   const [activeSection, setActiveSection] = useState<"ZONES" | "DRIVERS">("ZONES");
   const [zones, setZones] = useState<DeliveryZone[]>(initialDeliveryZones);
   const [drivers, setDrivers] = useState<Driver[]>(initialDrivers);
@@ -368,7 +371,7 @@ export function DeliveryManager({
       )}
 
       {/* KPI Overview Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className={`grid grid-cols-2 ${isVenezuelaActive ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-3 sm:gap-4`}>
         {/* Zonas Activas */}
         <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">
           <div className="flex items-center justify-between text-muted-foreground mb-1">
@@ -418,18 +421,20 @@ export function DeliveryManager({
         </div>
 
         {/* Tasa BCV aplicada */}
-        <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">
-          <div className="flex items-center justify-between text-muted-foreground mb-1">
-            <span className="text-xs font-semibold">Tasa Oficial de Tarifas</span>
-            <Navigation className="w-4 h-4 text-amber-500" />
+        {isVenezuelaActive && (
+          <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">
+            <div className="flex items-center justify-between text-muted-foreground mb-1">
+              <span className="text-xs font-semibold">Tasa Oficial de Tarifas</span>
+              <Navigation className="w-4 h-4 text-amber-500" />
+            </div>
+            <div className="text-2xl font-black text-foreground font-mono">
+              Bs. {bcvRate.toFixed(2)}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Conversión en vivo para cobros en Bs
+            </p>
           </div>
-          <div className="text-2xl font-black text-foreground font-mono">
-            Bs. {bcvRate.toFixed(2)}
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            Conversión en vivo para cobros en Bs
-          </p>
-        </div>
+        )}
       </div>
 
       {/* Sub-tabs selector & Global Create button */}
@@ -570,9 +575,11 @@ export function DeliveryManager({
                               <span className="font-mono text-xs font-black text-primary block">
                                 ${zone.price_usd.toFixed(2)}
                               </span>
-                              <span className="text-[10px] text-muted-foreground font-mono block">
-                                ~ Bs. {vesPrice.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
-                              </span>
+                              {isVenezuelaActive && (
+                                <span className="text-[10px] text-muted-foreground font-mono block">
+                                  ~ Bs. {vesPrice.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                                </span>
+                              )}
                             </div>
                           )}
                         </div>

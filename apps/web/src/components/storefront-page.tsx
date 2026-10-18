@@ -184,6 +184,7 @@ export function StorefrontPage({
           settings={settings}
           isOpen={isAccountOpen}
           onClose={() => setIsAccountOpen(false)}
+          activeModuleIds={activeModuleIds}
         />
 
         {/* Multi-Tenant PWA & Web Push Notification Prompt */}

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { CustomerAccountSummary, TenantSettings, Order } from "@marketos/types";
+import { CustomerAccountSummary, TenantSettings, Order, TenantModuleId } from "@marketos/types";
 import { formatCurrency } from "@marketos/utils";
 import { lookupCustomerAction } from "../app/actions";
 import { BottomSheetModal } from "./bottom-sheet-modal";
@@ -27,6 +27,7 @@ interface CustomerLookupModalProps {
   settings: TenantSettings;
   isOpen: boolean;
   onClose: () => void;
+  activeModuleIds?: TenantModuleId[];
 }
 
 export function CustomerLookupModal({
@@ -34,7 +35,9 @@ export function CustomerLookupModal({
   settings,
   isOpen,
   onClose,
+  activeModuleIds = [],
 }: CustomerLookupModalProps) {
+  const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -267,9 +270,11 @@ export function CustomerLookupModal({
                             <span className="font-bold text-primary text-xs">
                               {formatCurrency(order.total_usd, "USD")}
                             </span>
-                            <span className="text-[10px] text-muted-foreground ml-1">
-                              (Bs. {order.total_ves.toFixed(2)})
-                            </span>
+                            {isVenezuelaActive && (
+                              <span className="text-[10px] text-muted-foreground ml-1">
+                                (Bs. {order.total_ves.toFixed(2)})
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -335,6 +340,7 @@ export function CustomerLookupModal({
           isOpen={!!selectedOrderForDetails}
           onClose={() => setSelectedOrderForDetails(null)}
           settings={settings}
+          activeModuleIds={activeModuleIds}
         />
       )}
     </>
