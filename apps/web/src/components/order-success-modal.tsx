@@ -31,6 +31,7 @@ export function OrderSuccessModal({
     tenantPhone: settings.whatsapp_number || settings.phone,
     businessName: settings.business_name,
     order,
+    isVenezuelaActive,
   });
 
   return (

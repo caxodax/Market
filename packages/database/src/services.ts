@@ -1592,7 +1592,9 @@ export class MarketOSRepository {
    * Create an Order with Multi-Tenant isolation and Phase 2 Operational features
    */
   static async createOrder(input: CreateOrderInput): Promise<Order> {
-    const rate = await this.getExchangeRate(input.tenantId);
+    const activeModules = await this.getTenantActiveModuleIds(input.tenantId);
+    const isVenezuelaActive = activeModules.includes("local_venezuela");
+    const rate = isVenezuelaActive ? await this.getExchangeRate(input.tenantId) : { value: 1 };
     
     // 1. Calculate items subtotal
     const subtotalUsd = input.items.reduce(
@@ -1625,7 +1627,8 @@ export class MarketOSRepository {
     const finalTotalUsd = Number(
       Math.max(0, subtotalUsd - discountUsd + deliveryFeeUsd).toFixed(2)
     );
-    const totalVes = convertUsdToVes(finalTotalUsd, rate.value);
+    const totalVes = isVenezuelaActive ? convertUsdToVes(finalTotalUsd, rate.value) : 0;
+    const exchangeRateApplied = isVenezuelaActive ? rate.value : 1;
     const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
     const supabase = getSupabase();
 
@@ -1792,7 +1795,7 @@ export class MarketOSRepository {
       discount_usd: discountUsd,
       total_usd: finalTotalUsd,
       total_ves: totalVes,
-      exchange_rate_applied: rate.value,
+      exchange_rate_applied: exchangeRateApplied,
       notes: input.notes || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -1963,10 +1966,10 @@ export class MarketOSRepository {
       order_id: input.orderId,
       tenant_id: input.tenantId,
       method: input.method,
-      bank_name: input.bankName || "Pago Móvil / Transferencia",
+      bank_name: input.bankName || "Comprobante de Pago",
       reference_number: input.referenceNumber,
       amount: input.amount,
-      currency: input.currency || "VES",
+      currency: input.currency || "USD",
       payment_date: new Date().toISOString().split("T")[0],
       proof_image_url: sanitizeSafeUrl(input.proofImageUrl),
       status: "PENDING",
@@ -2018,7 +2021,7 @@ export class MarketOSRepository {
         method: input.method,
         referenceNumber: input.referenceNumber,
         amount: input.amount,
-        currency: input.currency || "VES",
+        currency: input.currency || "USD",
       },
     });
 
@@ -2363,8 +2366,10 @@ export class MarketOSRepository {
           let fiscalPayload: Record<string, any> = {};
           if (status === "APPROVED") {
             try {
+              const activeModules = await MarketOSRepository.getTenantActiveModuleIds(tenantId);
+              const isVenezuelaActive = activeModules.includes("local_venezuela");
               const settings = await MarketOSRepository.getTenantSettings(tenantId);
-              if (settings?.billing_settings?.fiscal_billing_enabled) {
+              if (isVenezuelaActive && settings?.billing_settings?.fiscal_billing_enabled) {
                 const { data: ordRow } = await supabase
                   .from("orders")
                   .select("total_usd, total_ves, exchange_rate_applied, order_number")
@@ -2390,7 +2395,7 @@ export class MarketOSRepository {
                 const invSeq = Date.now().toString().slice(-8);
                 const invNum = `FACT-${invSeq}`;
                 const ctrlNum = `00-${invSeq}`;
-                const rif = settings.billing_settings.emitter_fiscal_data?.rif || "J-50123456-7";
+                const rif = settings.billing_settings.emitter_fiscal_data?.rif || "";
 
                 fiscalPayload = {
                   is_fiscal_invoice: true,
@@ -2448,8 +2453,10 @@ export class MarketOSRepository {
         if (status === "APPROVED") {
           order.status = "PREPARING";
           await MarketOSRepository.deductRecipeInventoryForOrder(order);
+          const activeModules = await MarketOSRepository.getTenantActiveModuleIds(tenantId);
+          const isVenezuelaActive = activeModules.includes("local_venezuela");
           const settings = state.settings.find((s) => s.tenant_id === tenantId);
-          if (settings?.billing_settings?.fiscal_billing_enabled) {
+          if (isVenezuelaActive && settings?.billing_settings?.fiscal_billing_enabled) {
             const totUsd = order.total_usd || 0;
             const exRate = order.exchange_rate_applied || 1;
             const ivaRate = (settings.billing_settings.default_iva_rate || 16) / 100;
@@ -2469,7 +2476,7 @@ export class MarketOSRepository {
             const invSeq = Date.now().toString().slice(-8);
             const invNum = `FACT-${invSeq}`;
             const ctrlNum = `00-${invSeq}`;
-            const rif = settings.billing_settings.emitter_fiscal_data?.rif || "J-50123456-7";
+            const rif = settings.billing_settings.emitter_fiscal_data?.rif || "";
 
             order.is_fiscal_invoice = true;
             order.fiscal_invoice_number = invNum;
@@ -4157,7 +4164,7 @@ export class MarketOSRepository {
       email: input.ownerEmail,
       whatsapp_number: input.whatsapp.replace(/[^0-9]/g, ""),
       address: input.address,
-      supported_currencies: ["USD", "VES"],
+      supported_currencies: ["USD"],
       default_currency: "USD",
       social_links: {},
     };
@@ -4219,8 +4226,11 @@ export class MarketOSRepository {
           sort_order: 1,
         });
 
-        // Fetch official BCV rate for new tenant
-        await this.syncBcvRateFromApi(tenantId);
+        // Fetch official BCV rate for new tenant only if local_venezuela is active
+        const activeMods = await this.getTenantActiveModuleIds(tenantId);
+        if (activeMods.includes("local_venezuela")) {
+          await this.syncBcvRateFromApi(tenantId);
+        }
       } catch (e) {
         console.warn("[Supabase] Onboarding fallback to memory state:", e);
       }

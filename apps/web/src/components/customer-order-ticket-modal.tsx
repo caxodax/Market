@@ -78,6 +78,7 @@ export function CustomerOrderTicketModal({
     tenantPhone: settings.whatsapp_number || settings.phone,
     businessName: settings.business_name,
     order,
+    isVenezuelaActive,
   });
 
   const formattedDate = new Date(order.created_at).toLocaleString("es-VE", {

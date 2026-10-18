@@ -14,6 +14,7 @@ import {
 } from "@marketos/types";
 import { updateTenantSettingsAction, uploadStoreLogoAction } from "../app/admin/actions";
 import { compressImage } from "@marketos/utils";
+import { VENEZUELAN_BANK_NAMES, SeniatFiscalSettings } from "@marketos/plugin-local-venezuela";
 import {
   Store,
   CreditCard,
@@ -121,20 +122,6 @@ const PRESET_FONTS = [
   { id: "Outfit", name: "Outfit", description: "Minimalista, estilizada y moderna" },
 ];
 
-const VENEZUELAN_BANKS = [
-  "Bancamiga",
-  "Banesco",
-  "Banco de Venezuela (BDV)",
-  "Mercantil",
-  "BBVA Provincial",
-  "Bancaribe",
-  "Banco Nacional de Crédito (BNC)",
-  "Banco Exterior",
-  "Banplus",
-  "Banco Plaza",
-  "Otro Banco",
-];
-
 export function StoreSettingsTab({ settings, onUpdateSuccess, activeModuleIds = [] }: StoreSettingsTabProps) {
   const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
   const [activeSubTab, setActiveSubTab] = useState<"GENERAL" | "DOMAINS" | "PAYMENTS" | "BRANDING" | "OPERATIONS" | "FISCAL">("GENERAL");
@@ -164,55 +151,55 @@ export function StoreSettingsTab({ settings, onUpdateSuccess, activeModuleIds = 
 
   // Form State: Payments
   const defaultPaymentSettings: PaymentAccountSettings = settings.payment_settings || {
-    enabled_methods: ["PAGO_MOVIL", "BANK_TRANSFER", "ZELLE", "CASH_USD"],
+    enabled_methods: ["ZELLE", "CASH_USD"],
     pago_movil: {
-      bank: "Bancamiga",
-      phone: "04245919577",
-      id_doc: "J-50123456-7",
-      name: settings.business_name || "Shop Market C.A.",
+      bank: "",
+      phone: "",
+      id_doc: "",
+      name: settings.business_name || "",
     },
     bank_transfer: {
-      bank: "Bancamiga",
-      account_number: "01720111551100012345",
+      bank: "",
+      account_number: "",
       account_type: "Corriente",
-      id_doc: "J-50123456-7",
-      name: settings.business_name || "Shop Market C.A.",
+      id_doc: "",
+      name: settings.business_name || "",
     },
     zelle: {
-      email: "pagos@shopmarket.com",
-      name: settings.business_name || "Shop Market C.A.",
+      email: "",
+      name: settings.business_name || "",
     },
     cash_usd: {
-      instructions: "Billetes en buen estado sin roturas ni marcas. Pago al retirar en caja o contra entrega con vuelto disponible.",
+      instructions: "Pago en efectivo al retirar en tienda o contra entrega.",
     },
     cash_ves: {
-      instructions: "Efectivo en Bolívares en caja según tasa oficial.",
+      instructions: "Efectivo en moneda nacional en caja según tasa oficial.",
     },
     pos: {
-      instructions: "Punto de venta disponible en caja para tarjetas de débito.",
+      instructions: "Punto de venta disponible en caja para tarjetas.",
     },
   };
 
   const [enabledMethods, setEnabledMethods] = useState<PaymentMethodType[]>(
-    defaultPaymentSettings.enabled_methods || ["PAGO_MOVIL", "CASH_USD"]
+    defaultPaymentSettings.enabled_methods || ["CASH_USD"]
   );
 
   // Pago Móvil fields
-  const [pmBank, setPmBank] = useState(defaultPaymentSettings.pago_movil?.bank || "Bancamiga");
-  const [pmPhone, setPmPhone] = useState(defaultPaymentSettings.pago_movil?.phone || "04245919577");
-  const [pmIdDoc, setPmIdDoc] = useState(defaultPaymentSettings.pago_movil?.id_doc || "J-50123456-7");
-  const [pmName, setPmName] = useState(defaultPaymentSettings.pago_movil?.name || settings.business_name || "Shop Market C.A.");
+  const [pmBank, setPmBank] = useState(defaultPaymentSettings.pago_movil?.bank || "");
+  const [pmPhone, setPmPhone] = useState(defaultPaymentSettings.pago_movil?.phone || "");
+  const [pmIdDoc, setPmIdDoc] = useState(defaultPaymentSettings.pago_movil?.id_doc || "");
+  const [pmName, setPmName] = useState(defaultPaymentSettings.pago_movil?.name || settings.business_name || "");
 
   // Bank Transfer fields
-  const [btBank, setBtBank] = useState(defaultPaymentSettings.bank_transfer?.bank || "Bancamiga");
-  const [btAccountNumber, setBtAccountNumber] = useState(defaultPaymentSettings.bank_transfer?.account_number || "01720111551100012345");
+  const [btBank, setBtBank] = useState(defaultPaymentSettings.bank_transfer?.bank || "");
+  const [btAccountNumber, setBtAccountNumber] = useState(defaultPaymentSettings.bank_transfer?.account_number || "");
   const [btAccountType, setBtAccountType] = useState(defaultPaymentSettings.bank_transfer?.account_type || "Corriente");
-  const [btIdDoc, setBtIdDoc] = useState(defaultPaymentSettings.bank_transfer?.id_doc || "J-50123456-7");
-  const [btName, setBtName] = useState(defaultPaymentSettings.bank_transfer?.name || settings.business_name || "Shop Market C.A.");
+  const [btIdDoc, setBtIdDoc] = useState(defaultPaymentSettings.bank_transfer?.id_doc || "");
+  const [btName, setBtName] = useState(defaultPaymentSettings.bank_transfer?.name || settings.business_name || "");
 
   // Zelle fields
-  const [zelleEmail, setZelleEmail] = useState(defaultPaymentSettings.zelle?.email || "pagos@shopmarket.com");
-  const [zelleName, setZelleName] = useState(defaultPaymentSettings.zelle?.name || settings.business_name || "Shop Market C.A.");
+  const [zelleEmail, setZelleEmail] = useState(defaultPaymentSettings.zelle?.email || "");
+  const [zelleName, setZelleName] = useState(defaultPaymentSettings.zelle?.name || settings.business_name || "");
 
   // Cash / POS fields
   const [cashUsdInstructions, setCashUsdInstructions] = useState(
@@ -260,10 +247,10 @@ export function StoreSettingsTab({ settings, onUpdateSuccess, activeModuleIds = 
     default_iva_rate: 16.0,
     fiscal_provider: "THE_FACTORY_HKA",
     emitter_fiscal_data: {
-      rif: "J-50123456-7",
-      business_name: settings.business_name || "Shop Market C.A.",
-      fiscal_address: settings.address || "Barquisimeto, Estado Lara, Venezuela",
-      phone: settings.phone || "+58 424-5919577",
+      rif: "",
+      business_name: settings.business_name || "",
+      fiscal_address: settings.address || "",
+      phone: settings.phone || "",
     },
     provider_credentials: {
       api_key: "",
@@ -278,7 +265,7 @@ export function StoreSettingsTab({ settings, onUpdateSuccess, activeModuleIds = 
   const [applyIgtf, setApplyIgtf] = useState(defaultBilling.apply_igtf ?? false);
   const [defaultIvaRate, setDefaultIvaRate] = useState(defaultBilling.default_iva_rate ?? 16.0);
   const [fiscalProvider, setFiscalProvider] = useState<FiscalProvider>(defaultBilling.fiscal_provider || "THE_FACTORY_HKA");
-  const [emitterRif, setEmitterRif] = useState(defaultBilling.emitter_fiscal_data?.rif || "J-50123456-7");
+  const [emitterRif, setEmitterRif] = useState(defaultBilling.emitter_fiscal_data?.rif || "");
   const [emitterBusinessName, setEmitterBusinessName] = useState(defaultBilling.emitter_fiscal_data?.business_name || settings.business_name || "");
   const [emitterFiscalAddress, setEmitterFiscalAddress] = useState(defaultBilling.emitter_fiscal_data?.fiscal_address || settings.address || "");
   const [emitterPhone, setEmitterPhone] = useState(defaultBilling.emitter_fiscal_data?.phone || settings.phone || "");
@@ -1026,7 +1013,7 @@ export function StoreSettingsTab({ settings, onUpdateSuccess, activeModuleIds = 
                     onChange={(e) => setPmBank(e.target.value)}
                     className="w-full h-10 px-3 rounded-xl border border-input bg-background text-foreground text-xs font-semibold focus:ring-2 focus:ring-primary focus:outline-none"
                   >
-                    {VENEZUELAN_BANKS.map((b) => (
+                    {VENEZUELAN_BANK_NAMES.map((b) => (
                       <option key={b} value={b}>
                         {b}
                       </option>
@@ -1099,7 +1086,7 @@ export function StoreSettingsTab({ settings, onUpdateSuccess, activeModuleIds = 
                     onChange={(e) => setBtBank(e.target.value)}
                     className="w-full h-10 px-3 rounded-xl border border-input bg-background text-foreground text-xs font-semibold focus:ring-2 focus:ring-primary focus:outline-none"
                   >
-                    {VENEZUELAN_BANKS.map((b) => (
+                    {VENEZUELAN_BANK_NAMES.map((b) => (
                       <option key={b} value={b}>
                         {b}
                       </option>
@@ -1635,305 +1622,36 @@ export function StoreSettingsTab({ settings, onUpdateSuccess, activeModuleIds = 
         </div>
       )}
 
-      {/* SUBTAB 6: SENIAT FISCAL COMPLIANCE & FACTURACIÓN DIGITAL */}
+      {/* SUBTAB 6: SENIAT FISCAL COMPLIANCE & FACTURACIÓN DIGITAL (Plugin local_venezuela) */}
       {isVenezuelaActive && activeSubTab === "FISCAL" && (
-        <div className="space-y-6">
-          {/* Header Explanation Banner */}
-          <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                <Receipt className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-extrabold text-sm sm:text-base text-foreground">
-                  Cumplimiento Fiscal SENIAT (Providencia 00071 & Factura Digital)
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Controla la emisión fiscal de tus pedidos según el modelo operativo de tu empresa.
-                </p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-muted/40 border border-border text-xs text-muted-foreground space-y-2 leading-relaxed">
-              <p>
-                <strong className="text-foreground">📌 Contexto Legal Actual en Venezuela:</strong> El SENIAT eliminó la homologación previa del programa informático, pero <span className="text-foreground font-semibold">mantiene vigentes todas las normativas de facturación (Providencia 00071)</span> y la obligatoriedad de imprentas digitales autorizadas para ventas digitales y e-commerce.
-              </p>
-              <p>
-                Si tu negocio <strong className="text-foreground">ya cuenta con máquina fiscal en mostrador o un ERP contable</strong> (Saint, Profit, A2, Valery), mantén este módulo en <strong className="text-emerald-600 dark:text-emerald-400">OFF (Modo Preventa)</strong>. MarketOS generará las notas de entrega limpias para empaque y despacho, y la cajera emitirá la factura fiscal en la máquina física.
-              </p>
-            </div>
-          </div>
-
-          {/* Master Switch: Toggle ON / OFF (Default OFF) */}
-          <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-primary" />
-                  <span>Emisión Automatizada de Factura Fiscal Digital</span>
-                </h4>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Activa la estructuración legal completa (RIF emisor, discriminación IVA 16%, IGTF 3% y rangos autorizados).
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setFiscalBillingEnabled(!fiscalBillingEnabled)}
-                className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  fiscalBillingEnabled ? "bg-emerald-600" : "bg-muted-foreground/30"
-                }`}
-                title={fiscalBillingEnabled ? "Desactivar facturación fiscal" : "Activar facturación fiscal"}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                    fiscalBillingEnabled ? "translate-x-7" : "translate-x-0"
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Status explanation alert */}
-            <div
-              className={`p-4 rounded-xl border text-xs leading-relaxed ${
-                fiscalBillingEnabled
-                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300"
-                  : "bg-muted/40 border-border text-muted-foreground"
-              }`}
-            >
-              {fiscalBillingEnabled ? (
-                <div className="space-y-1">
-                  <div className="font-bold flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-                    <CheckCircle className="w-4 h-4" />
-                    <span>🟢 MÓDULO FISCAL ACTIVO (Emisión Digital SENIAT)</span>
-                  </div>
-                  <p>
-                    Al conciliar pagos aprobados, el sistema estructurará el documento como <strong>FACTURA DIGITAL</strong> con Número de Factura, Número de Control, desglose de IVA (16%), IGTF (3% si aplica) y código QR fiscal de validación.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <div className="font-bold flex items-center gap-1.5 text-foreground">
-                    <span>⚪ MODO ACTUAL: TICKET DE PEDIDO / PREVENTA (POR DEFECTO)</span>
-                  </div>
-                  <p>
-                    Los pedidos se generan como <strong>comprobantes de compra / notas de entrega internas</strong>. No se generan correlativos fiscales automáticos. Este modo es el 100% recomendado para comercios que facturan físicamente en su caja registradora o ERP.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Detailed Configuration (Rendered when fiscalBillingEnabled is true) */}
-          {fiscalBillingEnabled && (
-            <div className="space-y-6 animate-in fade-in duration-200">
-              {/* Emitter Fiscal Data Card */}
-              <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
-                <div className="flex items-center gap-2 text-foreground font-bold text-sm">
-                  <Building2 className="w-4 h-4 text-primary" />
-                  <span>Datos Fiscales del Comercio Emisor (Providencia 00071)</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <label className="font-semibold text-muted-foreground block mb-1.5">
-                      RIF del Negocio / Emisor *
-                    </label>
-                    <input
-                      type="text"
-                      value={emitterRif}
-                      onChange={(e) => setEmitterRif(e.target.value.toUpperCase())}
-                      placeholder="ej. J-50123456-7"
-                      className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-mono font-bold focus:ring-2 focus:ring-primary focus:outline-none uppercase"
-                    />
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      Debe comenzar con J, V, G o E según el registro SENIAT.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="font-semibold text-muted-foreground block mb-1.5">
-                      Razón Social Fiscal *
-                    </label>
-                    <input
-                      type="text"
-                      value={emitterBusinessName}
-                      onChange={(e) => setEmitterBusinessName(e.target.value)}
-                      placeholder="ej. Shop Market C.A."
-                      className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="font-semibold text-muted-foreground block mb-1.5">
-                      Domicilio Fiscal Completo *
-                    </label>
-                    <input
-                      type="text"
-                      value={emitterFiscalAddress}
-                      onChange={(e) => setEmitterFiscalAddress(e.target.value)}
-                      placeholder="ej. Av. Lara c/c Calle 3, Edif. Centro, Piso 1, Barquisimeto, Edo. Lara"
-                      className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
-                    />
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      Dirección legal inscrita en el RIF del SENIAT que debe aparecer en toda factura.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="font-semibold text-muted-foreground block mb-1.5">
-                      Teléfono Fiscal
-                    </label>
-                    <input
-                      type="text"
-                      value={emitterPhone}
-                      onChange={(e) => setEmitterPhone(e.target.value)}
-                      placeholder="ej. +58 424 5919577"
-                      className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Tax Regime & Aliquots Card */}
-              <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
-                <div className="flex items-center gap-2 text-foreground font-bold text-sm">
-                  <Scale className="w-4 h-4 text-primary" />
-                  <span>Régimen Tributario & Alícuotas de Impuesto</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <label className="font-semibold text-muted-foreground block mb-1.5">
-                      Condición ante el SENIAT
-                    </label>
-                    <select
-                      value={taxPayerType}
-                      onChange={(e) => setTaxPayerType(e.target.value as FiscalTaxPayerType)}
-                      className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none cursor-pointer"
-                    >
-                      <option value="ORDINARY">Contribuyente Ordinario</option>
-                      <option value="SPECIAL">Contribuyente Especial (Sujeto Pasivo Especial)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="font-semibold text-muted-foreground block mb-1.5">
-                      Alícuota General de IVA (%)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={defaultIvaRate}
-                      onChange={(e) => setDefaultIvaRate(Number(e.target.value))}
-                      placeholder="16.00"
-                      className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-mono font-bold focus:ring-2 focus:ring-primary focus:outline-none"
-                    />
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      Tasa general estipulada por ley (actualmente 16.00%).
-                    </p>
-                  </div>
-                </div>
-
-                {/* IGTF 3% Toggle Card */}
-                <div className="p-4 rounded-xl border border-border bg-muted/20 flex items-center justify-between gap-4">
-                  <div>
-                    <h5 className="font-bold text-xs text-foreground">
-                      Impuesto a las Grandes Transacciones Financieras (IGTF 3%)
-                    </h5>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Aplica el 3% a cobros recibidos en divisas (efectivo USD, Zelle) si tu negocio está designado como Sujeto Pasivo Especial.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setApplyIgtf(!applyIgtf)}
-                    className={`relative inline-flex h-6 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      applyIgtf ? "bg-emerald-600" : "bg-muted-foreground/30"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                        applyIgtf ? "translate-x-6" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
-
-              {/* Digital Printer / Provider Card */}
-              <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
-                <div className="flex items-center gap-2 text-foreground font-bold text-sm">
-                  <FileText className="w-4 h-4 text-primary" />
-                  <span>Imprenta Digital Autorizada (Proveedor Tecnológico SENIAT)</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <label className="font-semibold text-muted-foreground block mb-1.5">
-                      Modalidad de Emisión Fiscal
-                    </label>
-                    <select
-                      value={billingMode}
-                      onChange={(e) => setBillingMode(e.target.value as FiscalBillingMode)}
-                      className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none cursor-pointer"
-                    >
-                      <option value="DIGITAL_INVOICE">Facturación Digital por API (Imprenta Autorizada)</option>
-                      <option value="MANUAL_INVOICE">Talonario Fiscal Preimpreso (Asignación Manual)</option>
-                      <option value="TICKET_ONLY">Comprobante Interno (Preventa)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="font-semibold text-muted-foreground block mb-1.5">
-                      Proveedor de Facturación Digital
-                    </label>
-                    <select
-                      value={fiscalProvider}
-                      onChange={(e) => setFiscalProvider(e.target.value as FiscalProvider)}
-                      className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none cursor-pointer"
-                    >
-                      <option value="THE_FACTORY_HKA">The Factory HKA (Recomendado Venezuela)</option>
-                      <option value="LIXIE">Lixie Digital</option>
-                      <option value="GURUSOFT">GuruSoft e-Docs</option>
-                      <option value="FACTURATECH">FacturaTech</option>
-                      <option value="MANUAL_SIMULATION">Simulador / Integración Propia</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="font-semibold text-muted-foreground block mb-1.5">
-                      API Token / Clave de Integración
-                    </label>
-                    <input
-                      type="password"
-                      value={providerApiKey}
-                      onChange={(e) => setProviderApiKey(e.target.value)}
-                      placeholder="••••••••••••••••••••••••"
-                      className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-mono focus:ring-2 focus:ring-primary focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-semibold text-muted-foreground block mb-1.5">
-                      Entorno de Ejecución
-                    </label>
-                    <select
-                      value={providerEnv}
-                      onChange={(e) => setProviderEnv(e.target.value as "SANDBOX" | "PRODUCTION")}
-                      className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none cursor-pointer"
-                    >
-                      <option value="SANDBOX">Sandbox (Pruebas de Emisión)</option>
-                      <option value="PRODUCTION">Producción (SENIAT Oficial en Vivo)</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        <SeniatFiscalSettings
+          fiscalBillingEnabled={fiscalBillingEnabled}
+          setFiscalBillingEnabled={setFiscalBillingEnabled}
+          emitterRif={emitterRif}
+          setEmitterRif={setEmitterRif}
+          emitterBusinessName={emitterBusinessName}
+          setEmitterBusinessName={setEmitterBusinessName}
+          emitterFiscalAddress={emitterFiscalAddress}
+          setEmitterFiscalAddress={setEmitterFiscalAddress}
+          emitterPhone={emitterPhone}
+          setEmitterPhone={setEmitterPhone}
+          taxPayerType={taxPayerType}
+          setTaxPayerType={setTaxPayerType}
+          defaultIvaRate={defaultIvaRate}
+          setDefaultIvaRate={setDefaultIvaRate}
+          applyIgtf={applyIgtf}
+          setApplyIgtf={setApplyIgtf}
+          billingMode={billingMode}
+          setBillingMode={setBillingMode}
+          fiscalProvider={fiscalProvider}
+          setFiscalProvider={setFiscalProvider}
+          providerApiKey={providerApiKey}
+          setProviderApiKey={setProviderApiKey}
+          providerEnv={providerEnv}
+          setProviderEnv={setProviderEnv}
+        />
       )}
+
 
       {/* Floating Bottom Save Action Bar */}
       <div className="p-4 rounded-2xl bg-card border border-border flex items-center justify-between">

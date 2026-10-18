@@ -131,7 +131,7 @@ export function CheckoutDialog({
   const [paymentMethod, setPaymentMethod] = useState<
     "PAGO_MOVIL" | "BANK_TRANSFER" | "ZELLE" | "CASH_USD"
   >(initialPaymentMethod);
-  const [bankName, setBankName] = useState(paymentSettings?.pago_movil?.bank || "Bancamiga");
+  const [bankName, setBankName] = useState(paymentSettings?.pago_movil?.bank || "");
   const [referenceNumber, setReferenceNumber] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
@@ -188,22 +188,22 @@ export function CheckoutDialog({
     : (availablePaymentMethods[0]?.id || (isVenezuelaActive ? "PAGO_MOVIL" : "CASH_USD"));
 
   const pmData = paymentSettings?.pago_movil || {
-    bank: "Bancamiga",
-    phone: "04245919577",
-    id_doc: "J-50123456-7",
+    bank: "",
+    phone: "",
+    id_doc: "",
     name: settings.business_name,
   };
 
   const btData = paymentSettings?.bank_transfer || {
-    bank: "Bancamiga",
-    account_number: "01720111551100012345",
+    bank: "",
+    account_number: "",
     account_type: "Corriente",
-    id_doc: "J-50123456-7",
+    id_doc: "",
     name: settings.business_name,
   };
 
   const zelleData = paymentSettings?.zelle || {
-    email: "pagos@shopmarket.com",
+    email: "",
     name: settings.business_name,
   };
 
@@ -403,8 +403,8 @@ export function CheckoutDialog({
             ? bankName
             : undefined,
         referenceNumber: referenceNumber || (paymentMethod === "CASH_USD" ? "EFECTIVO-TIENDA" : "PENDIENTE"),
-        amount: paymentMethod === "ZELLE" ? totalUsd : totalVes,
-        currency: paymentMethod === "ZELLE" ? "USD" : "VES",
+        amount: (paymentMethod === "ZELLE" || paymentMethod === "CASH_USD" || !isVenezuelaActive) ? totalUsd : totalVes,
+        currency: (paymentMethod === "ZELLE" || paymentMethod === "CASH_USD" || !isVenezuelaActive) ? "USD" : "VES",
         proofImageUrl,
       });
 

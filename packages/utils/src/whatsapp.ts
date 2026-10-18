@@ -8,6 +8,7 @@ export interface WhatsAppOrderInput {
   deliveryZoneName?: string;
   paymentMethod?: string;
   referenceNumber?: string;
+  isVenezuelaActive?: boolean;
 }
 
 export interface WhatsAppNotificationInput {
@@ -26,12 +27,10 @@ export interface WhatsAppNotificationInput {
  */
 export function sanitizeWhatsAppPhone(phone: string): string {
   let cleaned = phone.replace(/\D/g, "");
-  // If starts with 0 (e.g. 04241234567), replace with 584241234567
-  if (cleaned.startsWith("0")) {
+  // Only convert local Venezuelan 04XX (11 digits) to 584XX
+  if (cleaned.length === 11 && cleaned.startsWith("04")) {
     cleaned = `58${cleaned.slice(1)}`;
-  }
-  // If starts with 4 (e.g. 4241234567), prefix 58
-  if (cleaned.startsWith("4")) {
+  } else if (cleaned.length === 10 && cleaned.startsWith("4")) {
     cleaned = `58${cleaned}`;
   }
   return cleaned;
@@ -48,6 +47,7 @@ export function generateCustomerOrderWhatsAppLink({
   deliveryZoneName,
   paymentMethod,
   referenceNumber,
+  isVenezuelaActive = false,
 }: WhatsAppOrderInput): string {
   const cleanPhone = sanitizeWhatsAppPhone(tenantPhone);
 
@@ -82,7 +82,9 @@ export function generateCustomerOrderWhatsAppLink({
 
   lines.push("");
   lines.push(`💵 *Total USD:* $${order.total_usd.toFixed(2)}`);
-  lines.push(`🇻🇪 *Total Bs. (Tasa BCV ${order.exchange_rate_applied.toFixed(2)}):* Bs. ${order.total_ves.toFixed(2)}`);
+  if (isVenezuelaActive && order.total_ves && order.total_ves > 0) {
+    lines.push(`🇻🇪 *Total Bs. (Tasa BCV ${order.exchange_rate_applied.toFixed(2)}):* Bs. ${order.total_ves.toFixed(2)}`);
+  }
 
   if (paymentMethod || referenceNumber) {
     lines.push("");

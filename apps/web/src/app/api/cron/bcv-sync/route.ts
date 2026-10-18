@@ -43,28 +43,10 @@ export async function GET(request: Request) {
         source: rate.source,
       });
     } else {
-      // Sync default tenant first
-      const defaultTenantId = process.env.DEFAULT_TENANT_ID || "shop-market-ca";
-      try {
-        const defaultRate =
-          await MarketOSRepository.syncBcvRateFromApi(defaultTenantId);
-        invalidateExchangeRateCache(defaultTenantId);
-        results.push({
-          tenantId: defaultTenantId,
-          rate: defaultRate.value,
-          source: defaultRate.source,
-        });
-      } catch (e) {
-        console.error("Failed to sync default tenant rate:", e);
-      }
-
-      // Sync remaining active tenants that have local_venezuela enabled (or default)
       for (const tenant of activeTenants) {
-        if (tenant.id === defaultTenantId) continue;
         try {
           const activeModules = await MarketOSRepository.getTenantActiveModuleIds(tenant.id);
-          // If modules are configured, only sync if local_venezuela is active
-          if (activeModules.length > 0 && !activeModules.includes("local_venezuela")) {
+          if (!activeModules.includes("local_venezuela")) {
             continue;
           }
 

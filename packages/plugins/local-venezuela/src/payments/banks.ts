@@ -27,7 +27,12 @@ export const VENEZUELAN_BANKS: VenezuelanBank[] = [
   { code: "0174", name: "Banplus Banco Universal, C.A.", shortName: "Banplus" },
   { code: "0175", name: "Banco Bicentenario del Pueblo, Banco Universal C.A.", shortName: "Banco Bicentenario" },
   { code: "0177", name: "Banco de la Fuerza Armada Nacional Bolivariana (BANFANB)", shortName: "BANFANB" },
-  { code: "0191", name: "Banco Nacional de Crédito, C.A. Banco Universal", shortName: "BNC" },
+  { code: "0191", name: "Banco Nacional de Crédito, C.A. Banco Universal", shortName: "Banco Nacional de Crédito (BNC)" },
+];
+
+export const VENEZUELAN_BANK_NAMES: string[] = [
+  ...VENEZUELAN_BANKS.map((b) => b.shortName),
+  "Otro Banco",
 ];
 
 export function getBankByCode(code: string): VenezuelanBank | undefined {

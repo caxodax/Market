@@ -827,7 +827,9 @@ export function AdminDashboard({
       category: "OPERATIONS",
       label: "Validación de Pagos",
       shortLabel: "Pagos",
-      description: "Pago Móvil, Zelle y transferencias",
+      description: activeModuleIds.includes("local_venezuela")
+        ? "Pago Móvil, Zelle y transferencias"
+        : "Validación de comprobantes y transferencias",
       icon: <FileCheck2 className="w-4 h-4 shrink-0" />,
       badge: pendingPaymentsCount > 0 ? `${pendingPaymentsCount}` : null,
       badgeClassName: "bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-black",
@@ -925,7 +927,9 @@ export function AdminDashboard({
       category: "FINANCE",
       label: "Reportes & Ventas",
       shortLabel: "Reportes",
-      description: "Ingresos en $ y Bs, métodos y top ventas",
+      description: activeModuleIds.includes("local_venezuela")
+        ? "Ingresos en $ y Bs, métodos y top ventas"
+        : "Ingresos en $, métodos y top ventas",
       icon: <BarChart3 className="w-4 h-4 shrink-0" />,
       badge:
         orders.length > 0
@@ -1814,7 +1818,9 @@ export function AdminDashboard({
                             <strong>Monto Reportado:</strong>{" "}
                             {payment.currency === "USD"
                               ? formatCurrency(payment.amount, "USD")
-                              : `Bs. ${payment.amount.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`}
+                              : payment.currency === "VES"
+                              ? `Bs. ${payment.amount.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`
+                              : formatCurrency(payment.amount, payment.currency as any)}
                           </p>
                         </div>
 

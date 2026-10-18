@@ -122,6 +122,7 @@ export function SalesReportsTab({
         analytics,
         exchangeRate,
         dateRange,
+        activeModuleIds,
       });
     } catch (err) {
       console.error("Error exportando reporte a Excel:", err);
@@ -131,7 +132,7 @@ export function SalesReportsTab({
     }
   };
 
-  // Export report to CSV with Caracas timestamps
+  // Export report to CSV
   const handleExportCsv = () => {
     if (!dateFilteredOrders || dateFilteredOrders.length === 0) {
       alert("No hay pedidos registrados en el período seleccionado para exportar.");
@@ -140,7 +141,7 @@ export function SalesReportsTab({
 
     const headers = [
       "Numero_Pedido",
-      "Fecha_Hora_Caracas",
+      isVenezuelaActive ? "Fecha_Hora_Caracas" : "Fecha_Hora",
       "Cliente",
       "Telefono",
       "Modalidad",
@@ -149,13 +150,12 @@ export function SalesReportsTab({
       "Estado",
       "Articulos_Total",
       "Total_USD",
-      "Total_VES",
-      "Tasa_BCV",
+      ...(isVenezuelaActive ? ["Total_VES", "Tasa_BCV"] : []),
     ];
 
     const rows = dateFilteredOrders.map((o) => [
       o.order_number,
-      `"${formatCaracasDateTime(o.created_at)}"`,
+      `"${isVenezuelaActive ? formatCaracasDateTime(o.created_at) : new Date(o.created_at).toLocaleString()}"`,
       `"${o.customer_name || "Cliente General"}"`,
       `"${o.customer_phone || ""}"`,
       o.delivery_type,
@@ -164,8 +164,7 @@ export function SalesReportsTab({
       o.status,
       o.items?.reduce((acc, it) => acc + it.quantity, 0) || 0,
       o.total_usd.toFixed(2),
-      o.total_ves.toFixed(2),
-      o.exchange_rate_applied.toFixed(2),
+      ...(isVenezuelaActive ? [o.total_ves.toFixed(2), o.exchange_rate_applied.toFixed(2)] : []),
     ]);
 
     const csvContent =

@@ -19,6 +19,7 @@ export interface ExportReportOptions {
   analytics: SalesAnalytics | null;
   exchangeRate: ExchangeRate;
   dateRange: "today" | "week" | "month" | "all";
+  activeModuleIds?: string[];
 }
 
 /**
@@ -90,7 +91,8 @@ async function downloadWorkbook(workbook: ExcelJS.Workbook, fileName: string) {
  * 3. Desglose Diario (Daily trend)
  */
 export async function exportSalesReportsToExcel(options: ExportReportOptions) {
-  const { settings, orders, analytics, exchangeRate, dateRange } = options;
+  const { settings, orders, analytics, exchangeRate, dateRange, activeModuleIds = [] } = options;
+  const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
 
   const workbook = createMarketOSWorkbook(settings.business_name);
   const rateValue = exchangeRate.value || 1;
@@ -126,7 +128,9 @@ export async function exportSalesReportsToExcel(options: ExportReportOptions) {
   // Subtítulo con Metadatos del Período
   wsSummary.mergeCells("A2:F2");
   const subCell = wsSummary.getCell("A2");
-  subCell.value = `Período: ${rangeTitle}  |  Generado: ${formatCaracasDateTime(new Date())}  |  Zona Horaria: America/Caracas (UTC-4)  |  Tasa Oficial: Bs. ${rateValue.toFixed(2)}`;
+  subCell.value = isVenezuelaActive
+    ? `Período: ${rangeTitle}  |  Generado: ${formatCaracasDateTime(new Date())}  |  Zona Horaria: America/Caracas (UTC-4)  |  Tasa Oficial: Bs. ${rateValue.toFixed(2)}`
+    : `Período: ${rangeTitle}  |  Generado: ${new Date().toLocaleString()}  |  Moneda Base: USD`;
   subCell.font = { name: "Segoe UI", size: 9, italic: true, color: { argb: "FF334155" } };
   subCell.fill = {
     type: "pattern",
@@ -163,7 +167,9 @@ export async function exportSalesReportsToExcel(options: ExportReportOptions) {
 
   const kpis = [
     { label: "Ventas Totales Facturadas (USD)", value: totalRevenueUsd, numFmt: '"$"#,##0.00', highlight: true },
-    { label: "Ventas Totales Facturadas (VES)", value: totalRevenueVes, numFmt: '"Bs. "#,##0.00', highlight: true },
+    ...(isVenezuelaActive
+      ? [{ label: "Ventas Totales Facturadas (VES)", value: totalRevenueVes, numFmt: '"Bs. "#,##0.00', highlight: true }]
+      : []),
     { label: "Total de Pedidos en el Período", value: orders.length, numFmt: "#,##0" },
     { label: "Pedidos Entregados con Éxito", value: completedOrders, numFmt: "#,##0" },
     { label: "Pedidos en Proceso / Ruta", value: activeOrders, numFmt: "#,##0" },
@@ -316,7 +322,7 @@ export async function exportSalesReportsToExcel(options: ExportReportOptions) {
   wsOrders.columns = [
     { header: "#", key: "index", width: 6 },
     { header: "N° Pedido", key: "order_number", width: 16 },
-    { header: "Fecha / Hora (Caracas)", key: "date", width: 22 },
+    { header: isVenezuelaActive ? "Fecha / Hora (Caracas)" : "Fecha / Hora", key: "date", width: 22 },
     { header: "Cliente", key: "customer_name", width: 26 },
     { header: "Teléfono", key: "customer_phone", width: 16 },
     { header: "Modalidad", key: "delivery_type", width: 14 },
@@ -329,8 +335,12 @@ export async function exportSalesReportsToExcel(options: ExportReportOptions) {
     { header: "Descuento ($)", key: "discount_usd", width: 14 },
     { header: "Delivery ($)", key: "delivery_fee_usd", width: 14 },
     { header: "Total USD ($)", key: "total_usd", width: 15 },
-    { header: "Total VES (Bs)", key: "total_ves", width: 18 },
-    { header: "Tasa BCV", key: "exchange_rate", width: 12 },
+    ...(isVenezuelaActive
+      ? [
+          { header: "Total VES (Bs)", key: "total_ves", width: 18 },
+          { header: "Tasa BCV", key: "exchange_rate", width: 12 },
+        ]
+      : []),
   ];
 
   styleHeaderRow(wsOrders.getRow(1), 28);
@@ -347,7 +357,7 @@ export async function exportSalesReportsToExcel(options: ExportReportOptions) {
   };
 
   orders.forEach((o, i) => {
-    const formattedCaracasDate = formatCaracasDateTime(o.created_at);
+    const formattedCaracasDate = isVenezuelaActive ? formatCaracasDateTime(o.created_at) : new Date(o.created_at).toLocaleString();
     const itemsCount = o.items?.reduce((acc, it) => acc + it.quantity, 0) || 0;
     const isCompleted = o.status === "COMPLETED";
     const isDelivering = o.status === "DELIVERING";
@@ -373,8 +383,7 @@ export async function exportSalesReportsToExcel(options: ExportReportOptions) {
       discount_usd: discountUsd,
       delivery_fee_usd: deliveryFeeUsd,
       total_usd: o.total_usd,
-      total_ves: o.total_ves,
-      exchange_rate: o.exchange_rate_applied,
+      ...(isVenezuelaActive ? { total_ves: o.total_ves, exchange_rate: o.exchange_rate_applied } : {}),
     });
 
     row.height = 22;
@@ -394,11 +403,13 @@ export async function exportSalesReportsToExcel(options: ExportReportOptions) {
     row.getCell("discount_usd").numFmt = '"$"#,##0.00';
     row.getCell("delivery_fee_usd").numFmt = '"$"#,##0.00';
     row.getCell("total_usd").numFmt = '"$"#,##0.00';
-    row.getCell("total_ves").numFmt = '"Bs. "#,##0.00';
-    row.getCell("exchange_rate").numFmt = "#,##0.00";
-
     row.getCell("total_usd").font = { bold: true };
-    row.getCell("total_ves").font = { bold: true };
+
+    if (isVenezuelaActive) {
+      row.getCell("total_ves").numFmt = '"Bs. "#,##0.00';
+      row.getCell("exchange_rate").numFmt = "#,##0.00";
+      row.getCell("total_ves").font = { bold: true };
+    }
 
     // Color condicional por estado
     const statusCell = row.getCell("status");
@@ -480,10 +491,10 @@ export async function exportSalesReportsToExcel(options: ExportReportOptions) {
 
     wsDaily.columns = [
       { header: "#", key: "index", width: 6 },
-      { header: "Fecha (Caracas)", key: "date", width: 18 },
+      { header: isVenezuelaActive ? "Fecha (Caracas)" : "Fecha", key: "date", width: 18 },
       { header: "Pedidos", key: "count", width: 14 },
       { header: "Total Ventas USD ($)", key: "total_usd", width: 22 },
-      { header: "Total Ventas VES (Bs)", key: "total_ves", width: 24 },
+      ...(isVenezuelaActive ? [{ header: "Total Ventas VES (Bs)", key: "total_ves", width: 24 }] : []),
       { header: "Ticket Promedio USD", key: "avg_ticket", width: 20 },
     ];
 
@@ -497,7 +508,7 @@ export async function exportSalesReportsToExcel(options: ExportReportOptions) {
         date: day.date,
         count: day.orderCount,
         total_usd: day.totalUsd,
-        total_ves: ves,
+        ...(isVenezuelaActive ? { total_ves: ves } : {}),
         avg_ticket: avg,
       });
 
@@ -506,7 +517,9 @@ export async function exportSalesReportsToExcel(options: ExportReportOptions) {
       r.getCell("date").alignment = { vertical: "middle", horizontal: "center" };
       r.getCell("count").alignment = { vertical: "middle", horizontal: "center" };
       r.getCell("total_usd").numFmt = '"$"#,##0.00';
-      r.getCell("total_ves").numFmt = '"Bs. "#,##0.00';
+      if (isVenezuelaActive) {
+        r.getCell("total_ves").numFmt = '"Bs. "#,##0.00';
+      }
       r.getCell("avg_ticket").numFmt = '"$"#,##0.00';
 
       r.eachCell((c) => {
