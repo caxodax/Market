@@ -113,6 +113,8 @@ import {
   Cloud,
   Utensils,
   ChefHat,
+  Puzzle,
+  ScanBarcode,
 } from "lucide-react";
 
 interface AdminDashboardProps {
@@ -196,6 +198,7 @@ export function AdminDashboard({
     | "STORES"
     | "RAW_MATERIALS"
     | "RECIPES"
+    | "PLUGINS"
   >("PAYMENTS");
   const [settingsState, setSettingsState] = useState(settings);
   const [products, setProducts] = useState(initialProducts);
@@ -793,7 +796,8 @@ export function AdminDashboard({
       | "SETTINGS"
       | "STORES"
       | "RAW_MATERIALS"
-      | "RECIPES";
+      | "RECIPES"
+      | "PLUGINS";
     category: ModuleCategory;
     label: string;
     shortLabel: string;
@@ -984,6 +988,16 @@ export function AdminDashboard({
       icon: <Sliders className="w-4 h-4 shrink-0" />,
       badge: "Tienda",
       badgeClassName: "bg-primary/10 text-primary text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+    },
+    {
+      id: "PLUGINS",
+      category: "MANAGEMENT",
+      label: `Módulos & Plugins (${activeModuleIds.length})`,
+      shortLabel: "Plugins",
+      description: "Extensiones y capacidades activas",
+      icon: <Puzzle className="w-4 h-4 shrink-0" />,
+      badge: `${activeModuleIds.length} activos`,
+      badgeClassName: "bg-purple-500/10 text-purple-600 border border-purple-500/20 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
     },
   ];
 
@@ -2853,6 +2867,163 @@ export function AdminDashboard({
             settings={settingsState}
             onUpdateSuccess={(updated) => setSettingsState(updated)}
           />
+        )}
+
+        {/* TAB: PLUGINS & EXTENSIONES ACTIVAS */}
+        {activeTab === "PLUGINS" && (
+          <div className="space-y-6 animate-in fade-in">
+            <div className="bg-card border border-border p-6 rounded-2xl shadow-xs space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center">
+                  <Puzzle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-foreground">
+                    Módulos y Plugins de la Tienda
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Revisa las extensiones de industria y herramientas especializadas habilitadas para tu comercio.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Plugin 1: Gastronomía */}
+              <div
+                className={`p-5 rounded-2xl border transition-all ${
+                  activeModuleIds.includes("food_service")
+                    ? "bg-amber-500/5 border-amber-500/30"
+                    : "bg-card border-border opacity-70"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                    <Utensils className="w-5 h-5" />
+                  </div>
+                  {activeModuleIds.includes("food_service") ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/15 px-2.5 py-1 rounded-full">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Activo
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
+                      No contratado
+                    </span>
+                  )}
+                </div>
+                <h3 className="font-bold text-base text-foreground mb-1">
+                  Gastronomía & Restauración
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+                  Control de insumos de cocina (BOM), escandallo de costos unitarios, personalización de salsas y extras en el catálogo PWA.
+                </p>
+                {activeModuleIds.includes("food_service") ? (
+                  <div className="pt-3 border-t border-amber-500/20 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("RAW_MATERIALS")}
+                      className="text-xs font-bold text-amber-600 hover:underline cursor-pointer"
+                    >
+                      Ir a Insumos →
+                    </button>
+                    <span className="text-muted-foreground text-xs">•</span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("RECIPES")}
+                      className="text-xs font-bold text-amber-600 hover:underline cursor-pointer"
+                    >
+                      Ir a Recetas →
+                    </button>
+                  </div>
+                ) : (
+                  <div className="pt-3 border-t border-border text-[11px] text-muted-foreground">
+                    Solicita a Soporte o Super Admin la activación de este módulo.
+                  </div>
+                )}
+              </div>
+
+              {/* Plugin 2: Retail & Códigos de Barra */}
+              <div
+                className={`p-5 rounded-2xl border transition-all ${
+                  activeModuleIds.includes("barcode_retail")
+                    ? "bg-blue-500/5 border-blue-500/30"
+                    : "bg-card border-border opacity-70"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                    <ScanBarcode className="w-5 h-5" />
+                  </div>
+                  {activeModuleIds.includes("barcode_retail") ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 dark:text-blue-300 bg-blue-500/15 px-2.5 py-1 rounded-full">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Activo
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
+                      No contratado
+                    </span>
+                  )}
+                </div>
+                <h3 className="font-bold text-base text-foreground mb-1">
+                  Retail, Bodegones & Barcode
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+                  Escaneo rápido de códigos EAN-13/UPC con pistola láser o cámara, ventas de alta rotación y reposición de anaquel.
+                </p>
+                <div className="pt-3 border-t border-border text-[11px] text-muted-foreground">
+                  {activeModuleIds.includes("barcode_retail")
+                    ? "Módulo listo y activo para el punto de venta e inventario."
+                    : "Para supermercados y minimarkets con lectura de barras."}
+                </div>
+              </div>
+
+              {/* Plugin 3: Localización Venezuela */}
+              <div
+                className={`p-5 rounded-2xl border transition-all ${
+                  activeModuleIds.includes("local_venezuela")
+                    ? "bg-emerald-500/5 border-emerald-500/30"
+                    : "bg-card border-border opacity-70"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                    <Landmark className="w-5 h-5" />
+                  </div>
+                  {activeModuleIds.includes("local_venezuela") ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-2.5 py-1 rounded-full">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Activo
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
+                      No contratado
+                    </span>
+                  )}
+                </div>
+                <h3 className="font-bold text-base text-foreground mb-1">
+                  Localización Oficial Venezuela
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+                  Sincronización automática de tasa BCV, validación de Pago Móvil, cálculo IGTF y facturación fiscal SENIAT.
+                </p>
+                <div className="pt-3 border-t border-border text-[11px] text-muted-foreground">
+                  {activeModuleIds.includes("local_venezuela")
+                    ? "Módulo activo con tasa oficial en tiempo real y pasarela Bs."
+                    : "Soporte fiscal venezolano y pagos interbancarios."}
+                </div>
+              </div>
+            </div>
+
+            {/* Banner Informativo */}
+            <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-900 dark:text-purple-200 text-xs flex items-start gap-3">
+              <Sparkles className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">¿Deseas activar o desactivar módulos para tu negocio?</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Los módulos especializados se gestionan a nivel de plataforma desde el panel de Super Administrador (/platform) para garantizar la integridad de tu base de datos y la facturación de tu plan.
+                </p>
+              </div>
+            </div>
+          </div>
         )}
       </main>
       </div>

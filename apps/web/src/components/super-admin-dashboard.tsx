@@ -29,10 +29,12 @@ import {
 import { AuditTrailViewer } from "./audit-trail-viewer";
 import { PlatformBiAnalyticsTab } from "./platform-bi-analytics-tab";
 import { PlatformStorageTab } from "./platform-storage-tab";
+import { TenantPluginsModal } from "./tenant-plugins-modal";
 import {
   Building2,
   DollarSign,
   TrendingUp,
+  Puzzle,
   Package,
   Store,
   Plus,
@@ -152,6 +154,7 @@ export function SuperAdminDashboard({
   // Support Impersonation State ("Login As")
   const [impersonatingTenantId, setImpersonatingTenantId] = useState<string | null>(null);
   const [isStoppingImpersonation, setIsStoppingImpersonation] = useState(false);
+  const [pluginsModalTenant, setPluginsModalTenant] = useState<TenantWithDetails | null>(null);
 
   // Auto-dismiss user alert
   useEffect(() => {
@@ -1145,6 +1148,15 @@ export function SuperAdminDashboard({
                             <p className="text-[11px] text-muted-foreground">
                               ${tenant.plan?.price_usd_monthly || 49}/mes
                             </p>
+                            <button
+                              type="button"
+                              onClick={() => setPluginsModalTenant(tenant)}
+                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-600 dark:text-purple-400 hover:underline cursor-pointer pt-0.5"
+                              title={`Configurar módulos y plugins para ${tenant.name}`}
+                            >
+                              <Puzzle className="w-2.5 h-2.5" />
+                              <span>Plugins</span>
+                            </button>
                           </div>
                         </td>
 
@@ -1246,6 +1258,17 @@ export function SuperAdminDashboard({
                               <ShieldCheck className="w-3.5 h-3.5 text-primary" />
                               <span>Admin</span>
                             </a>
+
+                            {/* Gestión de Plugins y Módulos */}
+                            <button
+                              type="button"
+                              onClick={() => setPluginsModalTenant(tenant)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 text-purple-700 dark:text-purple-300 hover:bg-purple-500/20 text-[11px] font-bold transition-colors cursor-pointer shadow-xs"
+                              title={`Gestionar plugins y módulos activados para ${tenant.name}`}
+                            >
+                              <Puzzle className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                              <span>Plugins</span>
+                            </button>
 
                             {/* Ver PWA en vivo */}
                             <a
@@ -2882,6 +2905,15 @@ export function SuperAdminDashboard({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Tenant Plugins & Modules Manager Modal */}
+      {pluginsModalTenant && (
+        <TenantPluginsModal
+          tenant={pluginsModalTenant}
+          isOpen={Boolean(pluginsModalTenant)}
+          onClose={() => setPluginsModalTenant(null)}
+        />
       )}
     </div>
   );

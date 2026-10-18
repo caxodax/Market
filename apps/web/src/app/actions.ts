@@ -210,3 +210,48 @@ export async function lookupCustomerAction(
     return { success: false, summary: null };
   }
 }
+
+/**
+ * Get installed and available modules for a tenant (Super Admin operation)
+ */
+export async function getTenantModulesAction(tenantId: string) {
+  try {
+    const modules = await MarketOSRepository.getTenantModules(tenantId);
+    return { success: true, modules };
+  } catch (error) {
+    console.error("Error fetching tenant modules:", error);
+    return { success: false, error: "Error al consultar los módulos del comercio" };
+  }
+}
+
+/**
+ * Enable or disable a plugin/module for a specific tenant (Super Admin operation)
+ */
+export async function setTenantModuleStatusAction(
+  tenantId: string,
+  moduleId: import("@marketos/types").TenantModuleId,
+  isEnabled: boolean
+) {
+  try {
+    const { getCurrentUser } = await import("./login/actions");
+    const user = await getCurrentUser();
+    if (!user || user.role !== "PLATFORM_SUPER_ADMIN") {
+      return {
+        success: false,
+        error: "No autorizado. Se requieren permisos de Super Administrador.",
+      };
+    }
+    const success = await MarketOSRepository.setTenantModuleStatus(
+      tenantId,
+      moduleId,
+      isEnabled
+    );
+    revalidatePath("/platform");
+    revalidatePath("/admin");
+    revalidatePath("/");
+    return { success: Boolean(success) };
+  } catch (error) {
+    console.error("Error setting tenant module status:", error);
+    return { success: false, error: "Error al actualizar el estado del módulo" };
+  }
+}
