@@ -106,6 +106,7 @@ export interface CreateOrderInput {
     productName: string;
     quantity: number;
     unitPriceUsd: number;
+    selected_modifiers?: import("@marketos/types").SelectedModifier[];
   }[];
   notes?: string;
   idempotencyKey?: string;

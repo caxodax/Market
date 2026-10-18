@@ -9,7 +9,10 @@ import {
   ExchangeRate,
   Order,
   DeliveryZone,
+  ProductModifierGroup,
+  TenantModuleId,
 } from "@marketos/types";
+import { ModifierModal } from "@marketos/plugin-food-service";
 import { formatCurrency, convertUsdToVes } from "@marketos/utils";
 import { useCart } from "../context/cart-context";
 import { ProductCard } from "./product-card";
@@ -48,6 +51,8 @@ interface CatalogViewProps {
   setIsTrackerOpen: (open: boolean) => void;
   selectedCategory?: string | null;
   setSelectedCategory?: (cat: string | null) => void;
+  activeModuleIds?: TenantModuleId[];
+  modifierGroups?: ProductModifierGroup[];
 }
 
 export function CatalogView({
@@ -61,10 +66,27 @@ export function CatalogView({
   setIsTrackerOpen,
   selectedCategory: controlledCategory,
   setSelectedCategory: setControlledCategory,
+  activeModuleIds = [],
+  modifierGroups = [],
 }: CatalogViewProps) {
-  const { totalItems, totalUsd, setIsOpen } = useCart();
+  const { totalItems, totalUsd, setIsOpen, addItem } = useCart();
   const { favorites, favoritesCount } = useFavorites();
   const totalVes = convertUsdToVes(totalUsd, exchangeRate.value);
+
+  // Food Service Plugin: Modifier Customizer Modal State
+  const [customizingProduct, setCustomizingProduct] = useState<Product | null>(null);
+
+  const isFoodServiceActive = activeModuleIds.includes("food_service");
+
+  const getProductModifierGroups = (prod: Product): ProductModifierGroup[] => {
+    if (!isFoodServiceActive || !modifierGroups || modifierGroups.length === 0) return [];
+    return modifierGroups.filter((g) => {
+      if (g.product_id && g.product_id === prod.id) return true;
+      if (g.category_id && prod.category_id && g.category_id === prod.category_id) return true;
+      if (!g.product_id && !g.category_id) return true;
+      return false;
+    });
+  };
 
   // Multi-Category Filter State
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(
@@ -605,13 +627,19 @@ export function CatalogView({
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-4">
-                {paginatedProducts.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    exchangeRate={exchangeRate.value}
-                  />
-                ))}
+                {paginatedProducts.map((product) => {
+                  const mods = getProductModifierGroups(product);
+                  const hasModifiers = mods.length > 0;
+                  return (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      exchangeRate={exchangeRate.value}
+                      hasModifiers={hasModifiers}
+                      onOpenModifiers={(prod) => setCustomizingProduct(prod)}
+                    />
+                  );
+                })}
               </div>
 
               {/* Responsive User-Selectable Pagination Bar */}
@@ -785,6 +813,21 @@ export function CatalogView({
         settings={settings}
         initialQuery={trackingInitialQuery}
       />
+
+      {/* Food Service Plugin: Interactive Modifier Customizer Modal */}
+      {customizingProduct && (
+        <ModifierModal
+          isOpen={Boolean(customizingProduct)}
+          onClose={() => setCustomizingProduct(null)}
+          product={customizingProduct}
+          modifierGroups={getProductModifierGroups(customizingProduct)}
+          exchangeRate={exchangeRate.value}
+          onConfirmAddToCart={(prod, qty, selectedModifiers, unitPrice) => {
+            addItem(prod, qty, true, selectedModifiers, unitPrice);
+            setCustomizingProduct(null);
+          }}
+        />
+      )}
     </div>
   );
 }

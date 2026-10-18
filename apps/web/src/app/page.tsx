@@ -10,6 +10,7 @@ import {
   getCachedExchangeRate,
   getCachedDeliveryZones,
 } from "../lib/cached-queries";
+import { MarketOSRepository } from "@marketos/database";
 import { StorefrontPage } from "../components/storefront-page";
 import { SuspendedStorePage } from "../components/suspended-store-page";
 
@@ -97,15 +98,25 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   }
 
   // Fetch tenant data concurrently from Next.js Edge Data Cache (<15ms latency, 0 Postgres queries on repeat visits)
-  const [settings, categories, products, stores, exchangeRate, deliveryZones] =
-    await Promise.all([
-      getCachedTenantSettings(activeTenantId),
-      getCachedCategories(activeTenantId),
-      getCachedProducts(activeTenantId),
-      getCachedStores(activeTenantId),
-      getCachedExchangeRate(activeTenantId),
-      getCachedDeliveryZones(activeTenantId),
-    ]);
+  const [
+    settings,
+    categories,
+    products,
+    stores,
+    exchangeRate,
+    deliveryZones,
+    activeModuleIds,
+    modifierGroups,
+  ] = await Promise.all([
+    getCachedTenantSettings(activeTenantId),
+    getCachedCategories(activeTenantId),
+    getCachedProducts(activeTenantId),
+    getCachedStores(activeTenantId),
+    getCachedExchangeRate(activeTenantId),
+    getCachedDeliveryZones(activeTenantId),
+    MarketOSRepository.getTenantActiveModuleIds(activeTenantId),
+    MarketOSRepository.getProductModifierGroups(activeTenantId),
+  ]);
 
   return (
     <StorefrontPage
@@ -115,6 +126,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       stores={stores}
       deliveryZones={deliveryZones}
       exchangeRate={exchangeRate}
+      activeModuleIds={activeModuleIds}
+      modifierGroups={modifierGroups}
     />
   );
 }

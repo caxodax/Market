@@ -65,6 +65,7 @@ import {
   RawMaterial,
   ProductRecipe,
   ProductModifierGroup,
+  SelectedModifier,
 } from "@marketos/types";
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
 import {
@@ -112,6 +113,7 @@ export interface CreateOrderInput {
     productName: string;
     quantity: number;
     unitPriceUsd: number;
+    selected_modifiers?: SelectedModifier[];
   }[];
   notes?: string;
   idempotencyKey?: string;
@@ -1795,6 +1797,7 @@ export class MarketOSRepository {
         quantity: it.quantity,
         unit_price_usd: it.unitPriceUsd,
         total_price_usd: Number((it.quantity * it.unitPriceUsd).toFixed(2)),
+        selected_modifiers: it.selected_modifiers,
       })),
     };
 
@@ -2432,6 +2435,7 @@ export class MarketOSRepository {
         if (!orderNumber && order.order_number) orderNumber = order.order_number;
         if (status === "APPROVED") {
           order.status = "PREPARING";
+          await MarketOSRepository.deductRecipeInventoryForOrder(order);
           const settings = state.settings.find((s) => s.tenant_id === tenantId);
           if (settings?.billing_settings?.fiscal_billing_enabled) {
             const totUsd = order.total_usd || 0;
@@ -2657,6 +2661,10 @@ export class MarketOSRepository {
 
       if (status === "CANCELLED" && oldStatus !== "CANCELLED") {
         await MarketOSRepository.restoreOrderInventoryStock(tenantId, orderId);
+      }
+
+      if (status === "PREPARING" && oldStatus !== "PREPARING") {
+        await MarketOSRepository.deductRecipeInventoryForOrder(order);
       }
 
       const isCancellation = status === "CANCELLED";
@@ -5627,6 +5635,29 @@ export class MarketOSRepository {
         (r) => r.tenant_id === tenantId && r.product_id === productId
       ) || null
     );
+  }
+
+  /**
+   * Get all product recipes for a tenant
+   */
+  static async getProductRecipes(tenantId: string): Promise<ProductRecipe[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("product_recipes")
+          .select("*")
+          .eq("tenant_id", tenantId);
+
+        if (!error && data) {
+          return data as ProductRecipe[];
+        }
+      } catch (err) {
+        console.warn("[MarketOS] Could not fetch product recipes from Supabase:", err);
+      }
+    }
+
+    return (state.recipes || []).filter((r) => r.tenant_id === tenantId);
   }
 
   /**

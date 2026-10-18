@@ -1,18 +1,27 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { Product } from "@marketos/types";
+import { Product, SelectedModifier } from "@marketos/types";
 
 export interface CartItem {
+  id?: string;
   product: Product;
   quantity: number;
+  selected_modifiers?: SelectedModifier[];
+  unit_price_usd?: number;
 }
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (product: Product, quantity?: number, openDrawer?: boolean) => void;
-  removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  addItem: (
+    product: Product,
+    quantity?: number,
+    openDrawer?: boolean,
+    selected_modifiers?: SelectedModifier[],
+    unit_price_usd?: number
+  ) => void;
+  removeItem: (productIdOrLineId: string) => void;
+  updateQuantity: (productIdOrLineId: string, quantity: number) => void;
   clearCart: () => void;
   totalItems: number;
   totalUsd: number;
@@ -50,35 +59,67 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [items, isInitialized]);
 
-  const addItem = (product: Product, quantity = 1, openDrawer = false) => {
+  const addItem = (
+    product: Product,
+    quantity = 1,
+    openDrawer = false,
+    selected_modifiers?: SelectedModifier[],
+    unit_price_usd?: number
+  ) => {
+    const finalUnitPrice = unit_price_usd ?? product.price_usd;
     setItems((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
+      const modSig =
+        selected_modifiers && selected_modifiers.length > 0
+          ? JSON.stringify(selected_modifiers)
+          : "";
+      const existing = prev.find(
+        (item) =>
+          item.product.id === product.id &&
+          (item.selected_modifiers && item.selected_modifiers.length > 0
+            ? JSON.stringify(item.selected_modifiers) === modSig
+            : !modSig)
+      );
       if (existing) {
         return prev.map((item) =>
-          item.product.id === product.id
+          item === existing
             ? { ...item, quantity: item.quantity + quantity }
             : item
         );
       }
-      return [...prev, { product, quantity }];
+      return [
+        ...prev,
+        {
+          id: `${product.id}-${Date.now()}`,
+          product,
+          quantity,
+          selected_modifiers,
+          unit_price_usd: finalUnitPrice,
+        },
+      ];
     });
     if (openDrawer) {
       setIsOpen(true);
     }
   };
 
-  const removeItem = (productId: string) => {
-    setItems((prev) => prev.filter((item) => item.product.id !== productId));
+  const removeItem = (productIdOrLineId: string) => {
+    setItems((prev) =>
+      prev.filter(
+        (item) => item.product.id !== productIdOrLineId && item.id !== productIdOrLineId
+      )
+    );
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
+  const updateQuantity = (productIdOrLineId: string, quantity: number) => {
     if (quantity <= 0) {
-      removeItem(productId);
+      removeItem(productIdOrLineId);
       return;
     }
     setItems((prev) =>
       prev.map((item) =>
-        item.product.id === productId ? { ...item, quantity } : item
+        item.product.id === productIdOrLineId || item.id === productIdOrLineId
+          ? { ...item, quantity }
+          : item
       )
     );
   };
@@ -90,7 +131,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalUsd = Number(
     items
-      .reduce((sum, item) => sum + item.product.price_usd * item.quantity, 0)
+      .reduce(
+        (sum, item) =>
+          sum + (item.unit_price_usd ?? item.product.price_usd) * item.quantity,
+        0
+      )
       .toFixed(2)
   );
 

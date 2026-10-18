@@ -26,6 +26,9 @@ importers:
       '@marketos/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@marketos/plugin-food-service':
+        specifier: workspace:*
+        version: link:../../packages/plugins/food-service
       '@marketos/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -81,6 +84,9 @@ importers:
       '@marketos/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@marketos/plugin-food-service':
+        specifier: workspace:*
+        version: link:../../packages/plugins/food-service
       '@marketos/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -139,6 +145,9 @@ importers:
       '@marketos/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@marketos/plugin-food-service':
+        specifier: workspace:*
+        version: link:../../packages/plugins/food-service
       '@marketos/types':
         specifier: workspace:*
         version: link:../../packages/types

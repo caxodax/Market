@@ -58,68 +58,90 @@ export function CartDrawer({
                 </p>
               </div>
             ) : (
-              items.map(({ product, quantity }) => (
-                <div
-                  key={product.id}
-                  className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card/60"
-                >
-                  <img
-                    src={product.image_url || ""}
-                    alt={product.name}
-                    className="w-16 h-16 rounded-lg object-cover bg-muted shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-xs font-semibold text-foreground truncate">
-                      {product.name}
-                    </h4>
-                    <div className="mt-1 flex items-baseline gap-1.5">
-                      <span className="text-sm font-bold text-primary">
-                        {formatCurrency(product.price_usd * quantity, "USD")}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground">
-                        (Bs.{" "}
-                        {convertUsdToVes(
-                          product.price_usd * quantity,
-                          exchangeRate
-                        ).toLocaleString("es-VE", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                        )
-                      </span>
-                    </div>
+              items.map((item) => {
+                const itemLineKey = item.id || item.product.id;
+                const unitPrice = item.unit_price_usd ?? item.product.price_usd;
+                const lineTotalUsd = unitPrice * item.quantity;
 
-                    {/* Quantity controls */}
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="flex items-center rounded-lg border border-border bg-background">
-                        <button
-                          onClick={() => updateQuantity(product.id, quantity - 1)}
-                          className="p-1 text-muted-foreground hover:text-foreground"
-                        >
-                          <Minus className="w-3.5 h-3.5" />
-                        </button>
-                        <span className="px-2 text-xs font-semibold">
-                          {quantity}
+                return (
+                  <div
+                    key={itemLineKey}
+                    className="flex items-start gap-3 p-3 rounded-xl border border-border bg-card/60"
+                  >
+                    <img
+                      src={item.product.image_url || ""}
+                      alt={item.product.name}
+                      className="w-16 h-16 rounded-lg object-cover bg-muted shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-semibold text-foreground truncate">
+                        {item.product.name}
+                      </h4>
+
+                      {/* Modifiers Pill Display */}
+                      {item.selected_modifiers && item.selected_modifiers.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {item.selected_modifiers.map((mod, i) => (
+                            <span
+                              key={i}
+                              className="text-[9px] px-1.5 py-0.5 rounded-md bg-secondary text-secondary-foreground font-medium"
+                            >
+                              {mod.option_name}
+                              {mod.price_usd > 0 && ` (+$${mod.price_usd.toFixed(2)})`}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="mt-1 flex items-baseline gap-1.5">
+                        <span className="text-sm font-bold text-primary">
+                          {formatCurrency(lineTotalUsd, "USD")}
                         </span>
-                        <button
-                          onClick={() => updateQuantity(product.id, quantity + 1)}
-                          className="p-1 text-muted-foreground hover:text-foreground"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
+                        <span className="text-[11px] text-muted-foreground">
+                          (Bs.{" "}
+                          {convertUsdToVes(
+                            lineTotalUsd,
+                            exchangeRate
+                          ).toLocaleString("es-VE", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                          )
+                        </span>
                       </div>
 
-                      <button
-                        onClick={() => removeItem(product.id)}
-                        className="p-1 text-muted-foreground hover:text-destructive transition-colors ml-auto"
-                        title="Eliminar producto"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {/* Quantity controls */}
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="flex items-center rounded-lg border border-border bg-background">
+                          <button
+                            onClick={() => updateQuantity(itemLineKey, item.quantity - 1)}
+                            className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="px-2 text-xs font-semibold">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => updateQuantity(itemLineKey, item.quantity + 1)}
+                            className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <button
+                          onClick={() => removeItem(itemLineKey)}
+                          className="p-1 text-muted-foreground hover:text-destructive transition-colors ml-auto cursor-pointer"
+                          title="Eliminar producto"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 

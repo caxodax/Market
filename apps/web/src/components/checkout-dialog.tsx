@@ -359,7 +359,8 @@ export function CheckoutDialog({
           productId: i.product.id,
           productName: i.product.name,
           quantity: i.quantity,
-          unitPriceUsd: i.product.price_usd,
+          unitPriceUsd: i.unit_price_usd ?? i.product.price_usd,
+          selected_modifiers: i.selected_modifiers,
         })),
         notes: `Método: ${paymentMethod} | ${deliveryType === "DELIVERY" ? `Zona: ${selectedZone?.name}` : "Retiro en Tienda"}`,
       });

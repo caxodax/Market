@@ -26,6 +26,8 @@ interface StorefrontPageProps {
   stores: Store[];
   deliveryZones: DeliveryZone[];
   exchangeRate: ExchangeRate;
+  activeModuleIds?: import("@marketos/types").TenantModuleId[];
+  modifierGroups?: import("@marketos/types").ProductModifierGroup[];
 }
 
 function hexToHslString(hex: string): string {
@@ -65,6 +67,8 @@ export function StorefrontPage({
   stores,
   deliveryZones,
   exchangeRate,
+  activeModuleIds = [],
+  modifierGroups = [],
 }: StorefrontPageProps) {
   const [isTrackerOpen, setIsTrackerOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
@@ -126,6 +130,8 @@ export function StorefrontPage({
             setIsTrackerOpen={setIsTrackerOpen}
             selectedCategory={activeCategory}
             setSelectedCategory={setActiveCategory}
+            activeModuleIds={activeModuleIds}
+            modifierGroups={modifierGroups}
           />
 
         {/* Storefront Footer */}

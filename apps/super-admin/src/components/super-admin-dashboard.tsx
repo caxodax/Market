@@ -35,9 +35,11 @@ import {
   Users,
   LogOut,
   Smartphone,
+  Puzzle,
 } from "lucide-react";
 import { UserProfile } from "@marketos/types";
 import { logoutSuperAdminAction } from "../app/login/actions";
+import { TenantPluginsModal } from "./tenant-plugins-modal";
 
 interface SuperAdminDashboardProps {
   metrics: PlatformMetrics;
@@ -64,6 +66,7 @@ export function SuperAdminDashboard({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [selectedTenantForPlugins, setSelectedTenantForPlugins] = useState<TenantWithDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -481,6 +484,16 @@ export function SuperAdminDashboard({
                               <span>Administrar Tienda</span>
                             </a>
 
+                            <button
+                              type="button"
+                              onClick={() => setSelectedTenantForPlugins(tenant)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 text-purple-600 hover:bg-purple-500/20 text-[11px] font-bold transition-all shadow-xs cursor-pointer"
+                              title={`Gestionar Plugins y Módulos de ${tenant.name}`}
+                            >
+                              <Puzzle className="w-3.5 h-3.5" />
+                              <span>Plugins</span>
+                            </button>
+
                             <a
                               href={`/?tenant=${tenant.slug || tenant.id}`}
                               target="_blank"
@@ -788,6 +801,15 @@ export function SuperAdminDashboard({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Tenant Plugins & Modules Manager Modal */}
+      {selectedTenantForPlugins && (
+        <TenantPluginsModal
+          tenant={selectedTenantForPlugins}
+          isOpen={Boolean(selectedTenantForPlugins)}
+          onClose={() => setSelectedTenantForPlugins(null)}
+        />
       )}
     </div>
   );

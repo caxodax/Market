@@ -88,6 +88,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     allTenants,
     planLimits,
     storageTelemetry,
+    activeModuleIds,
+    rawMaterials,
+    existingRecipes,
   ] = await Promise.all([
     MarketOSRepository.getTenantSettings(targetTenantId),
     MarketOSRepository.getProducts(targetTenantId),
@@ -105,6 +108,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     isSuperAdmin ? MarketOSRepository.getAllTenants() : Promise.resolve([]),
     MarketOSRepository.getTenantPlanLimits(targetTenantId),
     MarketOSRepository.getTenantStorageTelemetry(targetTenantId),
+    MarketOSRepository.getTenantActiveModuleIds(targetTenantId),
+    MarketOSRepository.getRawMaterials(targetTenantId),
+    MarketOSRepository.getProductRecipes(targetTenantId),
   ]);
 
   return (
@@ -144,6 +150,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         currentStoreId={params?.store}
         planLimits={planLimits}
         storageTelemetry={storageTelemetry}
+        activeModuleIds={activeModuleIds}
+        initialRawMaterials={rawMaterials}
+        initialRecipes={existingRecipes}
       />
     </div>
   );

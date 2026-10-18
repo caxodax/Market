@@ -21,7 +21,11 @@ import {
   TenantPlanLimits,
   SubscriptionPlanTier,
   TenantStorageTelemetry,
+  TenantModuleId,
+  RawMaterial,
+  ProductRecipe,
 } from "@marketos/types";
+import { RawMaterialsAdmin, RecipeManagerAdmin } from "@marketos/plugin-food-service";
 import {
   formatCurrency,
   generateOrderStatusNotificationWhatsAppLink,
@@ -36,6 +40,9 @@ import {
   getLatestPaymentsAction,
   createStoreAction,
   updateStoreAction,
+  saveRawMaterialAction,
+  deleteRawMaterialAction,
+  saveProductRecipeAction,
 } from "../app/admin/actions";
 import { stopImpersonationAction } from "../app/platform/actions";
 import { logoutUserAction } from "../app/login/actions";
@@ -104,6 +111,8 @@ import {
   Zap,
   Crown,
   Cloud,
+  Utensils,
+  ChefHat,
 } from "lucide-react";
 
 interface AdminDashboardProps {
@@ -125,6 +134,9 @@ interface AdminDashboardProps {
   currentStoreId?: string;
   planLimits?: TenantPlanLimits;
   storageTelemetry?: TenantStorageTelemetry;
+  activeModuleIds?: TenantModuleId[];
+  initialRawMaterials?: RawMaterial[];
+  initialRecipes?: ProductRecipe[];
 }
 
 interface AdminToast {
@@ -165,12 +177,30 @@ export function AdminDashboard({
   currentStoreId,
   planLimits,
   storageTelemetry,
+  activeModuleIds = [],
+  initialRawMaterials = [],
+  initialRecipes = [],
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<
-    "PAYMENTS" | "ORDERS" | "REPORTS" | "INVENTORY" | "DELIVERY" | "COUPONS" | "PUSH" | "RATES" | "AUDIT" | "STAFF" | "SETTINGS" | "STORES"
+    | "PAYMENTS"
+    | "ORDERS"
+    | "REPORTS"
+    | "INVENTORY"
+    | "DELIVERY"
+    | "COUPONS"
+    | "PUSH"
+    | "RATES"
+    | "AUDIT"
+    | "STAFF"
+    | "SETTINGS"
+    | "STORES"
+    | "RAW_MATERIALS"
+    | "RECIPES"
   >("PAYMENTS");
   const [settingsState, setSettingsState] = useState(settings);
   const [products, setProducts] = useState(initialProducts);
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>(initialRawMaterials);
+  const [recipes, setRecipes] = useState<ProductRecipe[]>(initialRecipes);
   const [orders, setOrders] = useState(initialOrders);
   const [payments, setPayments] = useState(initialPayments);
   const [rate, setRate] = useState(initialRate);
@@ -645,12 +675,125 @@ export function AdminDashboard({
     }
   };
 
+  // Food Service Plugin Handlers
+  const handleSaveRawMaterial = async (
+    material: Partial<RawMaterial> & { tenant_id: string; store_id: string; name: string }
+  ) => {
+    try {
+      const res = await saveRawMaterialAction(material);
+      if (res.success && res.rawMaterial) {
+        setRawMaterials((prev) => {
+          const idx = prev.findIndex((m) => m.id === res.rawMaterial!.id);
+          if (idx !== -1) {
+            const next = [...prev];
+            next[idx] = res.rawMaterial!;
+            return next;
+          }
+          return [res.rawMaterial!, ...prev];
+        });
+        showToast({
+          type: "success",
+          title: "Insumo Guardado",
+          message: `Insumo de cocina "${res.rawMaterial.name}" guardado exitosamente.`,
+        });
+      } else {
+        showToast({
+          type: "error",
+          title: "Error al guardar",
+          message: res.error || "No se pudo guardar el insumo.",
+        });
+      }
+    } catch (err: any) {
+      showToast({
+        type: "error",
+        title: "Error",
+        message: err.message || "Error al guardar insumo.",
+      });
+    }
+  };
+
+  const handleDeleteRawMaterial = async (id: string) => {
+    try {
+      const res = await deleteRawMaterialAction(settings.tenant_id, id);
+      if (res.success) {
+        setRawMaterials((prev) => prev.filter((m) => m.id !== id));
+        showToast({
+          type: "success",
+          title: "Insumo Eliminado",
+          message: "El insumo fue removido de la cocina.",
+        });
+      } else {
+        showToast({
+          type: "error",
+          title: "Error al eliminar",
+          message: res.error || "No se pudo eliminar el insumo.",
+        });
+      }
+    } catch (err: any) {
+      showToast({
+        type: "error",
+        title: "Error",
+        message: err.message || "Error al eliminar insumo.",
+      });
+    }
+  };
+
+  const handleSaveRecipe = async (recipe: ProductRecipe) => {
+    try {
+      const res = await saveProductRecipeAction(recipe);
+      if (res.success && res.recipe) {
+        setRecipes((prev) => {
+          const idx = prev.findIndex(
+            (r) => r.id === res.recipe!.id || r.product_id === res.recipe!.product_id
+          );
+          if (idx !== -1) {
+            const next = [...prev];
+            next[idx] = res.recipe!;
+            return next;
+          }
+          return [...prev, res.recipe!];
+        });
+        showToast({
+          type: "success",
+          title: "Receta Guardada",
+          message: "Ficha técnica y escandallo de costos actualizados exitosamente.",
+        });
+      } else {
+        showToast({
+          type: "error",
+          title: "Error al guardar receta",
+          message: res.error || "No se pudo guardar la receta.",
+        });
+      }
+    } catch (err: any) {
+      showToast({
+        type: "error",
+        title: "Error",
+        message: err.message || "Error inesperado al guardar receta.",
+      });
+    }
+  };
+
   const pendingPaymentsCount = payments.filter((p) => p.status === "PENDING").length;
 
   type ModuleCategory = "OPERATIONS" | "CATALOG" | "FINANCE" | "MANAGEMENT";
 
   interface ModuleItem {
-    id: "PAYMENTS" | "ORDERS" | "REPORTS" | "INVENTORY" | "DELIVERY" | "COUPONS" | "PUSH" | "RATES" | "AUDIT" | "STAFF" | "SETTINGS" | "STORES";
+    id:
+      | "PAYMENTS"
+      | "ORDERS"
+      | "REPORTS"
+      | "INVENTORY"
+      | "DELIVERY"
+      | "COUPONS"
+      | "PUSH"
+      | "RATES"
+      | "AUDIT"
+      | "STAFF"
+      | "SETTINGS"
+      | "STORES"
+      | "RAW_MATERIALS"
+      | "RECIPES";
     category: ModuleCategory;
     label: string;
     shortLabel: string;
@@ -714,6 +857,32 @@ export function AdminDashboard({
       badge: `${products.length}`,
       badgeClassName: "bg-muted text-muted-foreground text-[10px] px-1.5 py-0.5 rounded-full font-bold",
     },
+    ...(activeModuleIds.includes("food_service")
+      ? [
+          {
+            id: "RAW_MATERIALS" as const,
+            category: "CATALOG" as const,
+            label: "Insumos de Cocina",
+            shortLabel: "Insumos",
+            description: "Carnes, panes, salsas y materia prima",
+            icon: <Utensils className="w-4 h-4 shrink-0" />,
+            badge: "Cocina",
+            badgeClassName:
+              "bg-amber-500/10 text-amber-600 border border-amber-500/20 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+          },
+          {
+            id: "RECIPES" as const,
+            category: "CATALOG" as const,
+            label: "Recetas & Escandallo",
+            shortLabel: "Recetas",
+            description: "Fichas técnicas, costo unitario y margen bruto",
+            icon: <ChefHat className="w-4 h-4 shrink-0" />,
+            badge: "BOM",
+            badgeClassName:
+              "bg-orange-500/10 text-orange-600 border border-orange-500/20 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+          },
+        ]
+      : []),
     {
       id: "COUPONS",
       category: "CATALOG",
@@ -2174,6 +2343,28 @@ export function AdminDashboard({
             </div>
           </div>
         ); })()}
+
+        {/* PLUGIN FOOD SERVICE: RAW MATERIALS */}
+        {activeTab === "RAW_MATERIALS" && (
+          <RawMaterialsAdmin
+            tenantId={settings.tenant_id}
+            stores={stores}
+            rawMaterials={rawMaterials}
+            onSaveRawMaterial={handleSaveRawMaterial}
+            onDeleteRawMaterial={handleDeleteRawMaterial}
+          />
+        )}
+
+        {/* PLUGIN FOOD SERVICE: RECIPES & BOM */}
+        {activeTab === "RECIPES" && (
+          <RecipeManagerAdmin
+            tenantId={settings.tenant_id}
+            products={products}
+            rawMaterials={rawMaterials}
+            existingRecipes={recipes}
+            onSaveRecipe={handleSaveRecipe}
+          />
+        )}
 
         {/* TAB 4: DELIVERY & DRIVERS */}
         {activeTab === "DELIVERY" && (

@@ -5,14 +5,21 @@ import { Product } from "@marketos/types";
 import { formatCurrency, convertUsdToVes } from "@marketos/utils";
 import { useCart } from "../context/cart-context";
 import { useFavorites } from "../context/favorites-context";
-import { Plus, Minus, ShoppingCart, Heart } from "lucide-react";
+import { Plus, Minus, ShoppingCart, Heart, Sparkles } from "lucide-react";
 
 interface ProductCardProps {
   product: Product & { stock: number };
   exchangeRate: number;
+  hasModifiers?: boolean;
+  onOpenModifiers?: (product: Product) => void;
 }
 
-export function ProductCard({ product, exchangeRate }: ProductCardProps) {
+export function ProductCard({
+  product,
+  exchangeRate,
+  hasModifiers = false,
+  onOpenModifiers,
+}: ProductCardProps) {
   const { items, addItem, updateQuantity } = useCart();
   const { isFavorite, toggleFavorite } = useFavorites();
 
@@ -142,7 +149,13 @@ export function ProductCard({ product, exchangeRate }: ProductCardProps) {
               <button
                 type="button"
                 disabled={quantityInCart >= product.stock}
-                onClick={() => addItem(product, 1, false)}
+                onClick={() => {
+                  if (hasModifiers && onOpenModifiers) {
+                    onOpenModifiers(product);
+                  } else {
+                    addItem(product, 1, false);
+                  }
+                }}
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary hover:text-primary-foreground transition-colors active:scale-95 disabled:opacity-40 cursor-pointer"
                 aria-label="Aumentar cantidad"
               >
@@ -151,16 +164,29 @@ export function ProductCard({ product, exchangeRate }: ProductCardProps) {
             </div>
           ) : (
             <button
-              onClick={() => addItem(product, 1, false)}
+              onClick={() => {
+                if (hasModifiers && onOpenModifiers) {
+                  onOpenModifiers(product);
+                } else {
+                  addItem(product, 1, false);
+                }
+              }}
               disabled={isOutOfStock}
               className={`w-full h-10 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer ${
                 isOutOfStock
                   ? "bg-muted text-muted-foreground cursor-not-allowed"
+                  : hasModifiers
+                  ? "bg-amber-500 text-white hover:bg-amber-600 shadow-2xs"
                   : "bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground shadow-2xs"
               }`}
             >
               {isOutOfStock ? (
                 <span>Sin stock</span>
+              ) : hasModifiers ? (
+                <>
+                  <Sparkles className="w-4 h-4 stroke-[2.5]" />
+                  <span>Personalizar</span>
+                </>
               ) : (
                 <>
                   <Plus className="w-4 h-4 stroke-[2.5]" />

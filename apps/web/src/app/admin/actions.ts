@@ -830,3 +830,66 @@ export async function getTenantPlanLimitsAction(tenantId: string) {
   }
 }
 
+/**
+ * Food Service Plugin: Raw Materials & Recipes actions
+ */
+export async function getRawMaterialsAction(tenantId: string) {
+  try {
+    const rawMaterials = await MarketOSRepository.getRawMaterials(tenantId);
+    return { success: true, rawMaterials };
+  } catch (error) {
+    console.error("Error fetching raw materials:", error);
+    return { success: false, error: "Error al obtener insumos de cocina" };
+  }
+}
+
+export async function saveRawMaterialAction(
+  material: Partial<import("@marketos/types").RawMaterial> & {
+    tenant_id: string;
+    store_id: string;
+    name: string;
+  }
+) {
+  try {
+    const saved = await MarketOSRepository.saveRawMaterial(material);
+    revalidatePath("/admin");
+    return { success: true, rawMaterial: saved };
+  } catch (error) {
+    console.error("Error saving raw material:", error);
+    return { success: false, error: "Error al guardar el insumo de cocina" };
+  }
+}
+
+export async function deleteRawMaterialAction(tenantId: string, id: string) {
+  try {
+    const deleted = await MarketOSRepository.deleteRawMaterial(tenantId, id);
+    revalidatePath("/admin");
+    return { success: deleted };
+  } catch (error) {
+    console.error("Error deleting raw material:", error);
+    return { success: false, error: "Error al eliminar insumo de cocina" };
+  }
+}
+
+export async function getProductRecipesAction(tenantId: string) {
+  try {
+    const recipes = await MarketOSRepository.getProductRecipes(tenantId);
+    return { success: true, recipes };
+  } catch (error) {
+    console.error("Error fetching product recipes:", error);
+    return { success: false, error: "Error al consultar recetas y escandallos" };
+  }
+}
+
+export async function saveProductRecipeAction(recipe: import("@marketos/types").ProductRecipe) {
+  try {
+    const saved = await MarketOSRepository.saveProductRecipe(recipe);
+    revalidatePath("/admin");
+    return { success: true, recipe: saved };
+  } catch (error) {
+    console.error("Error saving recipe:", error);
+    return { success: false, error: "Error al guardar la receta / escandallo" };
+  }
+}
+
+
