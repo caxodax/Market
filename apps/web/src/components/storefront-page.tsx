@@ -89,7 +89,8 @@ export function StorefrontPage({
 
   const primaryHsl = settings.primary_color ? hexToHslString(settings.primary_color) : null;
   const secondaryHsl = settings.secondary_color ? hexToHslString(settings.secondary_color) : null;
-  const fontFamilyName = settings.font_family || "Inter";
+  const rawFont = settings.font_family || "Inter";
+  const fontFamilyName = rawFont.replace(/[^a-zA-Z0-9 -]/g, "").trim() || "Inter";
 
   return (
     <FavoritesProvider tenantId={settings.tenant_id}>
@@ -101,7 +102,7 @@ export function StorefrontPage({
               :root {
                 ${primaryHsl ? `--primary: ${primaryHsl}; --ring: ${primaryHsl};` : ""}
                 ${secondaryHsl ? `--secondary: ${secondaryHsl};` : ""}
-                ${fontFamilyName ? `font-family: '${fontFamilyName}', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;` : ""}
+                font-family: '${fontFamilyName}', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
               }
             `,
           }}

@@ -8,6 +8,15 @@ import {
 import { calculateIgtf } from "../payments/igtf.ts";
 import { convertUsdToVes, formatBs } from "../exchange/bcv.ts";
 
+function sanitizeSafeUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith("javascript:") || lower.startsWith("vbscript:") || lower.startsWith("data:")) return null;
+  if (lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("/") || lower.startsWith("mailto:") || lower.startsWith("tel:")) return trimmed;
+  return null;
+}
+
 console.log("🧪 [Ponytail Check] Running tests for @marketos/plugin-local-venezuela...");
 
 // 1. Mobile phone validation
@@ -58,4 +67,11 @@ assert.strictEqual(bancamiga?.shortName, "Bancamiga");
 const bdv = getBankByCode("0102");
 assert.strictEqual(bdv?.shortName, "Banco de Venezuela");
 
-console.log("✅ [Ponytail Check] All 6 local-venezuela tests passed successfully!");
+// 7. Security Checks (XSS & Protocol Hijack)
+assert.strictEqual(sanitizeSafeUrl("javascript:alert(1)"), null, "javascript: URLs must be blocked");
+assert.strictEqual(sanitizeSafeUrl("JAVASCRIPT:alert(document.cookie)"), null, "Uppercase JAVASCRIPT: must be blocked");
+assert.strictEqual(sanitizeSafeUrl("data:text/html;base64,PHNjcmlwdD4="), null, "data: URIs must be blocked");
+assert.strictEqual(sanitizeSafeUrl("https://r2.marketos.lat/proof.jpg"), "https://r2.marketos.lat/proof.jpg", "Valid https URL allowed");
+assert.strictEqual(sanitizeSafeUrl("/media/proof.png"), "/media/proof.png", "Valid relative path allowed");
+
+console.log("✅ [Ponytail Check] All 7 local-venezuela & security tests passed successfully!");

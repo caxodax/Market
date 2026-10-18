@@ -38,6 +38,19 @@ const nextConfig: NextConfig = {
       "da39b83a69bcd9080f03c4000bbb2f3011dc2816952c479d05a9b9866258ee53",
     R2_BUCKET_NAME: process.env.R2_BUCKET_NAME || "marketos-media",
   },
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-XSS-Protection", value: "1; mode=block" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

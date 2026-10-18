@@ -229,3 +229,30 @@ export function slugify(text: string): string {
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
 }
+
+/**
+ * Sanitize URL to prevent XSS payloads (e.g. javascript:, data:, vbscript:)
+ * Allows only http://, https://, /relative, mailto:, and tel:
+ */
+export function sanitizeSafeUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  const lower = trimmed.toLowerCase();
+  if (
+    lower.startsWith("javascript:") ||
+    lower.startsWith("vbscript:") ||
+    lower.startsWith("data:")
+  ) {
+    return null;
+  }
+  if (
+    lower.startsWith("http://") ||
+    lower.startsWith("https://") ||
+    lower.startsWith("/") ||
+    lower.startsWith("mailto:") ||
+    lower.startsWith("tel:")
+  ) {
+    return trimmed;
+  }
+  return null;
+}

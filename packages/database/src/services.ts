@@ -75,6 +75,7 @@ import {
   getCaracasRangeBounds,
   scanR2PlatformStorage,
   scanR2TenantStorage,
+  sanitizeSafeUrl,
 } from "@marketos/utils";
 import { createServerComponentClient } from "./server";
 import { isSupabaseOffline } from "./circuit-breaker";
@@ -1956,7 +1957,7 @@ export class MarketOSRepository {
       amount: input.amount,
       currency: input.currency || "VES",
       payment_date: new Date().toISOString().split("T")[0],
-      proof_image_url: input.proofImageUrl || null,
+      proof_image_url: sanitizeSafeUrl(input.proofImageUrl),
       status: "PENDING",
       created_at: new Date().toISOString(),
     };
