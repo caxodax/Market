@@ -189,8 +189,8 @@ Cuando un nuevo programador se una al proyecto, debe seguir estas **Reglas de Or
 
 ## 6. Plan de Ejecución y Migración Paso a Paso
 
-* [ ] **Fase 1: Fundaciones en `@marketos/types`:** Definir la interfaz `TenantModule` y los tipos base de plugins (`PluginManifest`, `RawMaterial`, `Recipe`, `ProductModifier`).
-* [ ] **Fase 2: Infraestructura en `@marketos/database`:** Crear la tabla `tenant_modules` y helpers de consulta (`getTenantActiveModules(tenantId)`).
-* [ ] **Fase 3: Creación de `packages/plugins/food-service`:** Implementar el modelo de datos de materia prima y recetas para Pulldog.
-* [ ] **Fase 4: Desacoplamiento de `packages/plugins/local-venezuela`:** Mover la lógica bancaria nacional y BCV a su paquete modular.
-* [ ] **Fase 5: Interruptores en Admin y Web:** Conectar el panel de administración para mostrar u ocultar pestañas según los plugins contratados por el cliente.
+* [x] **Paso 1: Fundaciones en `@marketos/types`:** Definición de interfaces `TenantModule`, `PluginManifest`, `RawMaterial`, `ProductRecipe`, `ProductModifier`.
+* [x] **Paso 2: Infraestructura en `@marketos/database`:** Migración de tablas `tenant_modules`, `raw_materials`, `recipes`, `product_modifiers` y métodos del repositorio.
+* [x] **Paso 3: Creación de `packages/plugins/food-service`:** Componentes de gestión de insumos, escandallo, modales de salsas/extras y deducción de stock.
+* [x] **Paso 4: Conexión de UI e Interruptores:** Modal de gestión de plugins en Super Admin (Opción 1), pestañas condicionales en Admin y modal de personalización en Storefront.
+* [ ] **Paso 5: Desacoplamiento de `packages/plugins/local-venezuela`:** Mover la lógica bancaria nacional (Pago Móvil, Zelle/Efectivo) y tasa BCV a su propio paquete modular desacoplado del core.
