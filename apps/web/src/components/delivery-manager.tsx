@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import type { DeliveryZone, Driver, ExchangeRate, TenantModuleId } from "@marketos/types";
+import type { DeliveryZone, Driver, ExchangeRate, TenantModuleId, Order } from "@marketos/types";
 import {
   MapPin,
   Truck,
@@ -23,6 +23,7 @@ import {
   RefreshCw,
   Power,
   ShieldCheck,
+  Store,
 } from "lucide-react";
 import { formatCurrency } from "@marketos/utils";
 import {
@@ -40,6 +41,7 @@ interface DeliveryManagerProps {
   initialDrivers: Driver[];
   exchangeRate?: ExchangeRate;
   activeModuleIds?: TenantModuleId[];
+  orders?: Order[];
 }
 
 export function DeliveryManager({
@@ -48,6 +50,7 @@ export function DeliveryManager({
   initialDrivers = [],
   exchangeRate,
   activeModuleIds = [],
+  orders = [],
 }: DeliveryManagerProps) {
   const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
   const [activeSection, setActiveSection] = useState<"ZONES" | "DRIVERS">("ZONES");
@@ -342,6 +345,37 @@ export function DeliveryManager({
   const activeDriversCount = drivers.filter((d) => d.is_active).length;
   const bcvRate = exchangeRate?.value || 60;
 
+  // Fulfillment & Delivery Breakdown
+  const deliveryOrders = orders.filter((o) => o.delivery_type === "DELIVERY");
+  const pickupOrders = orders.filter((o) => o.delivery_type === "PICKUP");
+  const totalFulfillmentOrders = deliveryOrders.length + pickupOrders.length;
+  const deliverySharePercent =
+    totalFulfillmentOrders > 0
+      ? Math.round((deliveryOrders.length / totalFulfillmentOrders) * 100)
+      : 0;
+  const pickupSharePercent =
+    totalFulfillmentOrders > 0 ? 100 - deliverySharePercent : 0;
+  const deliveryGmvUsd = deliveryOrders.reduce(
+    (acc, o) => acc + (o.total_usd || 0),
+    0
+  );
+  const pickupGmvUsd = pickupOrders.reduce(
+    (acc, o) => acc + (o.total_usd || 0),
+    0
+  );
+  const totalDeliveryFeesUsd = deliveryOrders.reduce(
+    (acc, o) => acc + (o.delivery_fee_usd || 0),
+    0
+  );
+  const deliveryAvgTicketUsd =
+    deliveryOrders.length > 0
+      ? Number((deliveryGmvUsd / deliveryOrders.length).toFixed(2))
+      : 0;
+  const pickupAvgTicketUsd =
+    pickupOrders.length > 0
+      ? Number((pickupGmvUsd / pickupOrders.length).toFixed(2))
+      : 0;
+
   return (
     <div className="space-y-6 animate-in fade-in">
       {/* Toast Alert */}
@@ -369,6 +403,159 @@ export function DeliveryManager({
           </button>
         </div>
       )}
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* FULFILLMENT BREAKDOWN: RETIRO EN TIENDA VS DELIVERY */}
+      {/* ────────────────────────────────────────────────────────── */}
+      <div className="bg-card rounded-2xl border border-border shadow-xs p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <Navigation className="w-5 h-5 text-primary" />
+              <h3 className="text-sm font-bold text-foreground">
+                Desglose Logístico: Retiro en Tienda vs Envío a Domicilio
+              </h3>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Comparativa de volumen de pedidos, cuota de mercado, ticket promedio (AOV) y recaudación de fletes
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Fletes Totales:</span>
+            <span className="font-bold text-foreground bg-primary/10 border border-primary/20 px-2.5 py-1 rounded-lg">
+              ${totalDeliveryFeesUsd.toLocaleString("es-VE", { minimumFractionDigits: 2 })} USD
+              {isVenezuelaActive && ` (${formatCurrency(totalDeliveryFeesUsd * bcvRate, "VES")})`}
+            </span>
+          </div>
+        </div>
+
+        {/* Proportional Split Bar */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs font-semibold">
+            <span className="text-sky-500 flex items-center gap-1.5">
+              <Bike className="w-3.5 h-3.5" />
+              Delivery: {deliverySharePercent}% ({deliveryOrders.length} pedidos)
+            </span>
+            <span className="text-emerald-500 flex items-center gap-1.5">
+              <Store className="w-3.5 h-3.5" />
+              Retiro en Tienda: {pickupSharePercent}% ({pickupOrders.length} pedidos)
+            </span>
+          </div>
+          <div className="h-3 w-full bg-muted/40 rounded-full overflow-hidden flex shadow-inner">
+            <div
+              className="h-full bg-sky-500 transition-all duration-500"
+              style={{ width: `${totalFulfillmentOrders > 0 ? deliverySharePercent : 50}%` }}
+              title={`Delivery: ${deliverySharePercent}%`}
+            />
+            <div
+              className="h-full bg-emerald-500 transition-all duration-500"
+              style={{ width: `${totalFulfillmentOrders > 0 ? pickupSharePercent : 50}%` }}
+              title={`Retiro en Tienda: ${pickupSharePercent}%`}
+            />
+          </div>
+        </div>
+
+        {/* Two Comparison Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+          {/* Card 1: Delivery */}
+          <div className="p-4 rounded-xl border border-sky-500/20 bg-sky-500/5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center border border-sky-500/20">
+                <Bike className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-foreground">
+                  Envíos a Domicilio (Delivery)
+                </h4>
+                <span className="text-[11px] text-muted-foreground">
+                  Despacho con motorizado o repartidor
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-border/40">
+              <div>
+                <span className="text-[10px] uppercase text-muted-foreground font-semibold">Pedidos</span>
+                <div className="text-lg font-black text-foreground">
+                  {deliveryOrders.length}
+                </div>
+                <div className="text-[10px] text-sky-500 font-semibold">
+                  {deliverySharePercent}% cuota
+                </div>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase text-muted-foreground font-semibold">Ventas (GMV)</span>
+                <div className="text-lg font-black text-foreground">
+                  ${deliveryGmvUsd.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                </div>
+                {isVenezuelaActive && (
+                  <div className="text-[10px] text-emerald-500 font-semibold">
+                    {formatCurrency(deliveryGmvUsd * bcvRate, "VES")}
+                  </div>
+                )}
+              </div>
+              <div>
+                <span className="text-[10px] uppercase text-muted-foreground font-semibold">Ticket Prom.</span>
+                <div className="text-lg font-black text-foreground">
+                  ${deliveryAvgTicketUsd}
+                </div>
+                <div className="text-[10px] text-muted-foreground font-medium">
+                  Fletes: ${totalDeliveryFeesUsd.toFixed(2)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Retiro en Tienda */}
+          <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center border border-emerald-500/20">
+                <Store className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-foreground">
+                  Retiro en Tienda (Pick-up)
+                </h4>
+                <span className="text-[11px] text-muted-foreground">
+                  Cliente retira directamente en sucursal
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-border/40">
+              <div>
+                <span className="text-[10px] uppercase text-muted-foreground font-semibold">Pedidos</span>
+                <div className="text-lg font-black text-foreground">
+                  {pickupOrders.length}
+                </div>
+                <div className="text-[10px] text-emerald-500 font-semibold">
+                  {pickupSharePercent}% cuota
+                </div>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase text-muted-foreground font-semibold">Ventas (GMV)</span>
+                <div className="text-lg font-black text-foreground">
+                  ${pickupGmvUsd.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                </div>
+                {isVenezuelaActive && (
+                  <div className="text-[10px] text-emerald-500 font-semibold">
+                    {formatCurrency(pickupGmvUsd * bcvRate, "VES")}
+                  </div>
+                )}
+              </div>
+              <div>
+                <span className="text-[10px] uppercase text-muted-foreground font-semibold">Ticket Prom.</span>
+                <div className="text-lg font-black text-foreground">
+                  ${pickupAvgTicketUsd}
+                </div>
+                <div className="text-[10px] text-muted-foreground font-medium">
+                  $0.00 Fletes logísticos
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* KPI Overview Cards */}
       <div className={`grid grid-cols-2 ${isVenezuelaActive ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-3 sm:gap-4`}>

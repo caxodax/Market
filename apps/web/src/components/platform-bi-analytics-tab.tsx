@@ -7,7 +7,6 @@ import {
   TenantGmvRankingItem,
   ConsolidatedPaymentMethodStat,
   PaymentMethodType,
-  DeliveryZoneRankingItem,
 } from "@marketos/types";
 import { formatCurrency } from "@marketos/utils";
 import { getPlatformBiAnalyticsAction } from "../app/platform/actions";
@@ -35,13 +34,6 @@ import {
   Copy,
   Check,
   Percent,
-  Bike,
-  Store,
-  MapPin,
-  Filter,
-  Flame,
-  X,
-  Navigation,
 } from "lucide-react";
 
 interface PlatformBiAnalyticsTabProps {
@@ -94,27 +86,15 @@ export function PlatformBiAnalyticsTab({
   const [selectedRange, setSelectedRange] = useState<"today" | "week" | "month" | "all">(
     initialAnalytics?.dateRange || "all"
   );
-  const [selectedDeliveryType, setSelectedDeliveryType] = useState<"ALL" | "DELIVERY" | "PICKUP">(
-    initialAnalytics?.appliedDeliveryType || "ALL"
-  );
-  const [selectedZoneId, setSelectedZoneId] = useState<string | "ALL">(
-    initialAnalytics?.appliedZoneId || "ALL"
-  );
   const [isPending, startTransition] = useTransition();
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedSummary, setCopiedSummary] = useState(false);
 
   // Core fetch function
-  const fetchFilteredAnalytics = (
-    range: "today" | "week" | "month" | "all",
-    deliveryType: "ALL" | "DELIVERY" | "PICKUP",
-    zoneId: string | "ALL"
-  ) => {
+  const fetchFilteredAnalytics = (range: "today" | "week" | "month" | "all") => {
     startTransition(async () => {
       const filter: PlatformBiAnalyticsFilter = {
         dateRange: range,
-        deliveryType,
-        deliveryZoneId: zoneId,
       };
       const res = await getPlatformBiAnalyticsAction(filter);
       if (res.success && res.analytics) {
@@ -125,66 +105,24 @@ export function PlatformBiAnalyticsTab({
 
   React.useEffect(() => {
     if (!initialAnalytics) {
-      fetchFilteredAnalytics("all", "ALL", "ALL");
+      fetchFilteredAnalytics("all");
     }
   }, [initialAnalytics]);
 
   const handleRangeChange = (range: "today" | "week" | "month" | "all") => {
     setSelectedRange(range);
-    fetchFilteredAnalytics(range, selectedDeliveryType, selectedZoneId);
-  };
-
-  const handleDeliveryTypeChange = (type: "ALL" | "DELIVERY" | "PICKUP") => {
-    setSelectedDeliveryType(type);
-    // If switching to pickup, reset zone selection since pickup does not have a delivery zone
-    const nextZone = type === "PICKUP" ? "ALL" : selectedZoneId;
-    if (type === "PICKUP") {
-      setSelectedZoneId("ALL");
-    }
-    fetchFilteredAnalytics(selectedRange, type, nextZone);
-  };
-
-  const handleZoneChange = (zoneId: string | "ALL") => {
-    setSelectedZoneId(zoneId);
-    // If selecting a specific zone, ensure delivery type is set to DELIVERY
-    const nextDeliveryType = zoneId !== "ALL" ? "DELIVERY" : selectedDeliveryType;
-    if (zoneId !== "ALL") {
-      setSelectedDeliveryType("DELIVERY");
-    }
-    fetchFilteredAnalytics(selectedRange, nextDeliveryType, zoneId);
-  };
-
-  const handleClearFulfillmentFilters = () => {
-    setSelectedDeliveryType("ALL");
-    setSelectedZoneId("ALL");
-    fetchFilteredAnalytics(selectedRange, "ALL", "ALL");
+    fetchFilteredAnalytics(range);
   };
 
   // Copy Executive Summary to clipboard
   const handleCopySummary = () => {
-    const delivery = analytics.deliveryBreakdown;
-    const topZones = (analytics.deliveryZoneRankings || []).slice(0, 3);
-
     const summaryText = `📊 MARKETOS BI EXECUTIVE SUMMARY (${selectedRange.toUpperCase()})
-• GMV Total Red: $${analytics.totalNetworkGmvUsd.toLocaleString("es-VE", { minimumFractionDigits: 2 })} USD (${formatCurrency(analytics.totalNetworkGmvVes, "VES")})
-• Ticket Promedio Global (AOV): $${analytics.networkAverageTicketUsd} USD (${formatCurrency(analytics.networkAverageTicketVes, "VES")})
+• GMV Total Red: $${analytics.totalNetworkGmvUsd.toLocaleString("es-VE", { minimumFractionDigits: 2 })} USD
+• Ticket Promedio Global (AOV): $${analytics.networkAverageTicketUsd} USD
 • Pedidos Totales: ${analytics.totalNetworkOrders} (${analytics.completedOrdersCount} completados, ${analytics.cancelledOrdersCount} cancelados)
 • Tasa de Éxito: ${analytics.orderSuccessRatePercent}%
 • Comercios Transaccionando: ${analytics.sellingTenantsCount} de ${analytics.activeTenantsCount}
 
-🛵 LOGÍSTICA & DESPACHO:
-• Envío a Domicilio: ${delivery?.deliveryOrdersCount ?? 0} pedidos (${delivery?.deliverySharePercent ?? 0}%) • GMV: $${delivery?.deliveryGmvUsd ?? 0} USD • Ticket Prom.: $${delivery?.deliveryAverageTicketUsd ?? 0} USD
-• Retiro en Tienda: ${delivery?.pickupOrdersCount ?? 0} pedidos (${delivery?.pickupSharePercent ?? 0}%) • GMV: $${delivery?.pickupGmvUsd ?? 0} USD • Ticket Prom.: $${delivery?.pickupAverageTicketUsd ?? 0} USD
-• Fletes Delivery Recaudados: $${delivery?.totalDeliveryFeesUsd ?? 0} USD (${formatCurrency(delivery?.totalDeliveryFeesVes ?? 0, "VES")})
-
-${topZones.length > 0 ? `📍 TOP ZONAS DE DELIVERY CON MAYOR DEMANDA:
-${topZones
-  .map(
-    (z, i) =>
-      `${i + 1}. ${z.zoneName} (${z.tenantName}): ${z.ordersCount} pedidos ($${z.gmvUsd} USD, ${z.sharePercent}% de envíos) - Tarifa Prom.: $${z.averageDeliveryFeeUsd} USD`
-  )
-  .join("\n")}
-` : ""}
 🏆 TOP TIENDAS:
 ${analytics.tenantRankings
   .slice(0, 3)
@@ -383,141 +321,6 @@ ${analytics.paymentMethodsConsolidated
       </div>
 
       {/* ────────────────────────────────────────────────────────── */}
-      {/* SECONDARY FILTER BAR: MODALIDAD DE ENTREGA Y ZONAS */}
-      {/* ────────────────────────────────────────────────────────── */}
-      <div className="bg-card p-4 rounded-2xl border border-border shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        {/* Fulfillment Method Pills */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 w-full md:w-auto">
-          <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 shrink-0">
-            <Filter className="w-3.5 h-3.5 text-primary" />
-            Modalidad:
-          </span>
-          <div className="flex items-center bg-muted/50 p-1 rounded-xl border border-border flex-wrap gap-1">
-            <button
-              onClick={() => handleDeliveryTypeChange("ALL")}
-              disabled={isPending}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                selectedDeliveryType === "ALL"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <span>📦 Todos</span>
-              <span className="text-[10px] opacity-80">
-                ({(analytics.deliveryBreakdown?.deliveryOrdersCount ?? 0) + (analytics.deliveryBreakdown?.pickupOrdersCount ?? 0)})
-              </span>
-            </button>
-            <button
-              onClick={() => handleDeliveryTypeChange("DELIVERY")}
-              disabled={isPending}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                selectedDeliveryType === "DELIVERY"
-                  ? "bg-sky-600 text-white shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Bike className="w-3.5 h-3.5" />
-              <span>Solo Delivery</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/20 text-white font-bold">
-                {analytics.deliveryBreakdown?.deliveryOrdersCount ?? 0}
-              </span>
-            </button>
-            <button
-              onClick={() => handleDeliveryTypeChange("PICKUP")}
-              disabled={isPending}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                selectedDeliveryType === "PICKUP"
-                  ? "bg-emerald-600 text-white shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Store className="w-3.5 h-3.5" />
-              <span>Solo Retiro</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/20 text-white font-bold">
-                {analytics.deliveryBreakdown?.pickupOrdersCount ?? 0}
-              </span>
-            </button>
-          </div>
-        </div>
-
-        {/* Custom Delivery Zone Filter Dropdown */}
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 shrink-0">
-            <MapPin className="w-3.5 h-3.5 text-amber-400" />
-            Zona:
-          </span>
-          <div className="relative flex-1 md:w-64">
-            <select
-              value={selectedZoneId}
-              onChange={(e) => handleZoneChange(e.target.value)}
-              disabled={isPending || selectedDeliveryType === "PICKUP"}
-              className="w-full pl-3 pr-8 py-1.5 text-xs bg-muted/60 border border-border rounded-xl text-foreground font-medium focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-40 disabled:cursor-not-allowed appearance-none cursor-pointer"
-            >
-              <option value="ALL">
-                🌐 Todas las Zonas ({analytics.deliveryBreakdown?.deliveryOrdersCount ?? 0} envíos)
-              </option>
-              {(analytics.availableDeliveryZones || []).map((zone) => (
-                <option key={zone.id} value={zone.id}>
-                  {zone.name} {zone.tenantName ? `(${zone.tenantName})` : ""} {typeof zone.ordersCount === "number" ? `• ${zone.ordersCount} ped.` : ""}
-                </option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">
-              ▼
-            </div>
-          </div>
-
-          {(selectedDeliveryType !== "ALL" || selectedZoneId !== "ALL") && (
-            <button
-              onClick={handleClearFulfillmentFilters}
-              disabled={isPending}
-              className="p-1.5 text-xs font-medium bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/30 rounded-xl transition-all cursor-pointer flex items-center gap-1 shrink-0"
-              title="Restablecer filtros de despacho y zona"
-            >
-              <X className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Restablecer</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Active Filter Notice Badge */}
-      {(selectedDeliveryType !== "ALL" || selectedZoneId !== "ALL") && (
-        <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-between gap-3 text-xs text-foreground">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span>
-              Filtro Activo:{" "}
-              <strong>
-                {selectedDeliveryType === "DELIVERY"
-                  ? "Solo Envíos a Domicilio (Delivery)"
-                  : selectedDeliveryType === "PICKUP"
-                  ? "Solo Retiros en Tienda (Pickup)"
-                  : "Todos los tipos"}
-              </strong>
-              {selectedZoneId !== "ALL" && (
-                <>
-                  {" "}
-                  en zona{" "}
-                  <strong>
-                    {analytics.availableDeliveryZones?.find((z) => z.id === selectedZoneId)?.name ||
-                      selectedZoneId}
-                  </strong>
-                </>
-              )}
-              . Todos los KPIs, volumen de ventas y rankings reflejan únicamente este segmento.
-            </span>
-          </div>
-          <button
-            onClick={handleClearFulfillmentFilters}
-            className="text-[11px] font-bold text-primary hover:underline shrink-0 cursor-pointer"
-          >
-            Quitar Filtro
-          </button>
-        </div>
-      )}
-
-      {/* ────────────────────────────────────────────────────────── */}
       {/* GLOBAL NETWORK KPIS STRIP */}
       {/* ────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -534,14 +337,15 @@ ${analytics.paymentMethodsConsolidated
           <div className="mt-3">
             <div className="text-2xl font-black text-foreground tracking-tight">
               ${analytics.totalNetworkGmvUsd.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+              <span className="text-xs font-semibold text-muted-foreground ml-1.5">USD</span>
             </div>
-            <div className="text-xs font-semibold text-emerald-400 mt-0.5">
-              {formatCurrency(analytics.totalNetworkGmvVes, "VES")}
+            <div className="text-xs font-medium text-muted-foreground mt-0.5">
+              Volumen bruto procesado
             </div>
           </div>
           <div className="mt-3 pt-2.5 border-t border-border/60 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>Facturación de comercios</span>
-            <span className="font-semibold text-foreground">Tasa BCV: {analytics.exchangeRate.toFixed(2)}</span>
+            <span>Facturación de la red</span>
+            <span className="font-semibold text-foreground">Multi-Tenant SaaS</span>
           </div>
         </div>
 
@@ -558,9 +362,10 @@ ${analytics.paymentMethodsConsolidated
           <div className="mt-3">
             <div className="text-2xl font-black text-foreground tracking-tight">
               ${analytics.networkAverageTicketUsd.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+              <span className="text-xs font-semibold text-muted-foreground ml-1.5">USD</span>
             </div>
-            <div className="text-xs font-semibold text-blue-400 mt-0.5">
-              {formatCurrency(analytics.networkAverageTicketVes, "VES")}
+            <div className="text-xs font-medium text-muted-foreground mt-0.5">
+              Promedio por transacción
             </div>
           </div>
           <div className="mt-3 pt-2.5 border-t border-border/60 flex items-center justify-between text-[11px] text-muted-foreground">
@@ -619,190 +424,6 @@ ${analytics.paymentMethodsConsolidated
           <div className="mt-3 pt-2.5 border-t border-border/60 flex items-center justify-between text-[11px] text-muted-foreground">
             <span>Comercios activos</span>
             <span className="font-semibold text-foreground">SaaS Network</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ────────────────────────────────────────────────────────── */}
-      {/* FULFILLMENT BREAKDOWN: RETIRO EN TIENDA VS DELIVERY */}
-      {/* ────────────────────────────────────────────────────────── */}
-      <div className="bg-card rounded-2xl border border-border shadow-sm p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <Navigation className="w-5 h-5 text-primary" />
-              <h3 className="text-sm font-bold text-foreground">
-                Desglose Logístico: Retiro en Tienda vs Envío a Domicilio
-              </h3>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Comparativa de volumen de pedidos, cuota de mercado, ticket promedio (AOV) y recaudación de fletes
-            </p>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground">Fletes Totales:</span>
-            <span className="font-bold text-foreground bg-primary/10 border border-primary/20 px-2.5 py-1 rounded-lg">
-              ${(analytics.deliveryBreakdown?.totalDeliveryFeesUsd ?? 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })} USD ({formatCurrency(analytics.deliveryBreakdown?.totalDeliveryFeesVes ?? 0, "VES")})
-            </span>
-          </div>
-        </div>
-
-        {/* Proportional Split Bar */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs font-semibold">
-            <span className="text-sky-400 flex items-center gap-1.5">
-              <Bike className="w-3.5 h-3.5" />
-              Delivery: {analytics.deliveryBreakdown?.deliverySharePercent ?? 0}% ({analytics.deliveryBreakdown?.deliveryOrdersCount ?? 0} pedidos)
-            </span>
-            <span className="text-emerald-400 flex items-center gap-1.5">
-              <Store className="w-3.5 h-3.5" />
-              Retiro en Tienda: {analytics.deliveryBreakdown?.pickupSharePercent ?? 0}% ({analytics.deliveryBreakdown?.pickupOrdersCount ?? 0} pedidos)
-            </span>
-          </div>
-          <div className="h-3 w-full bg-muted/40 rounded-full overflow-hidden flex shadow-inner">
-            <div
-              className="h-full bg-sky-500 transition-all duration-500"
-              style={{ width: `${analytics.deliveryBreakdown?.deliverySharePercent ?? 50}%` }}
-              title={`Delivery: ${analytics.deliveryBreakdown?.deliverySharePercent ?? 0}%`}
-            />
-            <div
-              className="h-full bg-emerald-500 transition-all duration-500"
-              style={{ width: `${analytics.deliveryBreakdown?.pickupSharePercent ?? 50}%` }}
-              title={`Retiro en Tienda: ${analytics.deliveryBreakdown?.pickupSharePercent ?? 0}%`}
-            />
-          </div>
-        </div>
-
-        {/* Two Comparison Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-          {/* Card 1: Delivery */}
-          <div
-            onClick={() => handleDeliveryTypeChange(selectedDeliveryType === "DELIVERY" ? "ALL" : "DELIVERY")}
-            className={`p-4 rounded-xl border transition-all cursor-pointer ${
-              selectedDeliveryType === "DELIVERY"
-                ? "bg-sky-500/10 border-sky-500/40 shadow-sm"
-                : "bg-muted/20 border-border hover:border-sky-500/30"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center border border-sky-500/20">
-                  <Bike className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-foreground">
-                    Envíos a Domicilio (Delivery)
-                  </h4>
-                  <span className="text-[11px] text-muted-foreground">
-                    Despacho con motorizado o repartidor
-                  </span>
-                </div>
-              </div>
-              <span
-                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                  selectedDeliveryType === "DELIVERY"
-                    ? "bg-sky-500 text-black"
-                    : "bg-sky-500/10 text-sky-400 border border-sky-500/20"
-                }`}
-              >
-                {selectedDeliveryType === "DELIVERY" ? "Filtro Activo" : "Filtrar"}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-border/40">
-              <div>
-                <span className="text-[10px] uppercase text-muted-foreground font-semibold">Pedidos</span>
-                <div className="text-lg font-black text-foreground">
-                  {analytics.deliveryBreakdown?.deliveryOrdersCount ?? 0}
-                </div>
-                <div className="text-[10px] text-sky-400 font-semibold">
-                  {analytics.deliveryBreakdown?.deliverySharePercent ?? 0}% cuota
-                </div>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase text-muted-foreground font-semibold">Ventas (GMV)</span>
-                <div className="text-lg font-black text-foreground">
-                  ${(analytics.deliveryBreakdown?.deliveryGmvUsd ?? 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })}
-                </div>
-                <div className="text-[10px] text-emerald-400 font-semibold">
-                  {formatCurrency(analytics.deliveryBreakdown?.deliveryGmvVes ?? 0, "VES")}
-                </div>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase text-muted-foreground font-semibold">Ticket Prom.</span>
-                <div className="text-lg font-black text-foreground">
-                  ${analytics.deliveryBreakdown?.deliveryAverageTicketUsd ?? 0}
-                </div>
-                <div className="text-[10px] text-muted-foreground font-medium">
-                  Fletes: ${analytics.deliveryBreakdown?.totalDeliveryFeesUsd ?? 0}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Retiro en Tienda */}
-          <div
-            onClick={() => handleDeliveryTypeChange(selectedDeliveryType === "PICKUP" ? "ALL" : "PICKUP")}
-            className={`p-4 rounded-xl border transition-all cursor-pointer ${
-              selectedDeliveryType === "PICKUP"
-                ? "bg-emerald-500/10 border-emerald-500/40 shadow-sm"
-                : "bg-muted/20 border-border hover:border-emerald-500/30"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
-                  <Store className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-foreground">
-                    Retiro en Tienda (Pick-up)
-                  </h4>
-                  <span className="text-[11px] text-muted-foreground">
-                    Cliente retira directamente en sucursal
-                  </span>
-                </div>
-              </div>
-              <span
-                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                  selectedDeliveryType === "PICKUP"
-                    ? "bg-emerald-500 text-black"
-                    : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                }`}
-              >
-                {selectedDeliveryType === "PICKUP" ? "Filtro Activo" : "Filtrar"}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-border/40">
-              <div>
-                <span className="text-[10px] uppercase text-muted-foreground font-semibold">Pedidos</span>
-                <div className="text-lg font-black text-foreground">
-                  {analytics.deliveryBreakdown?.pickupOrdersCount ?? 0}
-                </div>
-                <div className="text-[10px] text-emerald-400 font-semibold">
-                  {analytics.deliveryBreakdown?.pickupSharePercent ?? 0}% cuota
-                </div>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase text-muted-foreground font-semibold">Ventas (GMV)</span>
-                <div className="text-lg font-black text-foreground">
-                  ${(analytics.deliveryBreakdown?.pickupGmvUsd ?? 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })}
-                </div>
-                <div className="text-[10px] text-emerald-400 font-semibold">
-                  {formatCurrency(analytics.deliveryBreakdown?.pickupGmvVes ?? 0, "VES")}
-                </div>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase text-muted-foreground font-semibold">Ticket Prom.</span>
-                <div className="text-lg font-black text-foreground">
-                  ${analytics.deliveryBreakdown?.pickupAverageTicketUsd ?? 0}
-                </div>
-                <div className="text-[10px] text-muted-foreground font-medium">
-                  $0.00 fletes logísticos
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -1037,130 +658,6 @@ ${analytics.paymentMethodsConsolidated
             vigente al momento de cada operación para un análisis consolidado preciso.
           </div>
         </div>
-      </div>
-
-      {/* ────────────────────────────────────────────────────────── */}
-      {/* PILLAR: LEADERBOARD DE ZONAS DE MAYOR DEMANDA DE DELIVERY */}
-      {/* ────────────────────────────────────────────────────────── */}
-      <div className="bg-card rounded-2xl border border-border shadow-sm p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <Flame className="w-5 h-5 text-amber-500" />
-              <h3 className="text-sm font-bold text-foreground">
-                Zonas de Mayor Demanda de Delivery
-              </h3>
-              <span className="text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">
-                {analytics.deliveryZoneRankings?.length ?? 0} Zonas Activas
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Ranking de zonas geográficas con mayor recurrencia de pedidos a domicilio y facturación
-            </p>
-          </div>
-          {selectedZoneId !== "ALL" && (
-            <button
-              onClick={() => handleZoneChange("ALL")}
-              className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-              Quitar filtro de zona
-            </button>
-          )}
-        </div>
-
-        {(!analytics.deliveryZoneRankings || analytics.deliveryZoneRankings.length === 0) ? (
-          <div className="text-center py-8 text-xs text-muted-foreground">
-            No hay pedidos con zonas de delivery registradas en este período.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            {analytics.deliveryZoneRankings.map((zone, idx) => {
-              const isSelected = selectedZoneId === zone.zoneId;
-              const isTop1 = idx === 0;
-              const isTop2 = idx === 1;
-              const isTop3 = idx === 2;
-
-              return (
-                <div
-                  key={zone.zoneId}
-                  onClick={() => handleZoneChange(isSelected ? "ALL" : zone.zoneId)}
-                  className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
-                    isSelected
-                      ? "bg-primary/10 border-primary ring-1 ring-primary shadow-sm"
-                      : isTop1
-                      ? "bg-amber-500/5 border-amber-500/30 hover:border-amber-500/60"
-                      : isTop2
-                      ? "bg-slate-400/5 border-slate-400/30 hover:border-slate-400/60"
-                      : isTop3
-                      ? "bg-amber-700/5 border-amber-700/30 hover:border-amber-700/60"
-                      : "bg-muted/20 border-border hover:border-border/80"
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div
-                          className={`w-6 h-6 rounded-md flex items-center justify-center font-black text-[11px] shrink-0 ${
-                            isTop1
-                              ? "bg-amber-500 text-black"
-                              : isTop2
-                              ? "bg-slate-300 text-black"
-                              : isTop3
-                              ? "bg-amber-700 text-white"
-                              : "bg-muted text-muted-foreground border border-border"
-                          }`}
-                        >
-                          #{idx + 1}
-                        </div>
-                        <div className="font-bold text-xs text-foreground truncate">
-                          {zone.zoneName}
-                        </div>
-                      </div>
-                      <span
-                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                          isSelected
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground border border-border/50"
-                        }`}
-                      >
-                        {isSelected ? "Activo" : "Filtrar"}
-                      </span>
-                    </div>
-
-                    <div className="text-[11px] text-muted-foreground mt-1 truncate">
-                      {zone.tenantName}
-                    </div>
-                  </div>
-
-                  <div className="mt-3 pt-2.5 border-t border-border/40 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Pedidos:</span>
-                      <span className="font-bold text-foreground">
-                        {zone.ordersCount}{" "}
-                        <span className="text-[10px] text-sky-400 font-semibold">
-                          ({zone.sharePercent}%)
-                        </span>
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">GMV Zona:</span>
-                      <span className="font-black text-foreground">
-                        ${zone.gmvUsd.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-muted-foreground">Tarifa Prom.:</span>
-                      <span className="font-semibold text-emerald-400">
-                        ${zone.averageDeliveryFeeUsd} USD
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       {/* ────────────────────────────────────────────────────────── */}

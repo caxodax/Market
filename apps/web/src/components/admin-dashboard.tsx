@@ -2456,6 +2456,7 @@ export function AdminDashboard({
             initialDrivers={drivers}
             exchangeRate={rate}
             activeModuleIds={activeModuleIds}
+            orders={orders}
           />
         )}
 
