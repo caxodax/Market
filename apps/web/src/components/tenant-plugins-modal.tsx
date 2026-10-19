@@ -30,7 +30,9 @@ import {
   MessageCircle,
   Sliders,
   LayoutTemplate,
+  Eye,
 } from "lucide-react";
+import { PluginDetailModal } from "./plugin-detail-modal";
 
 interface TenantPluginsModalProps {
   tenant: TenantWithDetails;
@@ -57,6 +59,7 @@ export interface PluginMetadata {
   icon: React.ReactNode;
   features: string[];
   themeColor: "amber" | "blue" | "emerald" | "purple" | "indigo";
+  targetAudience?: string;
 }
 
 export const AVAILABLE_PLUGINS: PluginMetadata[] = [
@@ -67,14 +70,16 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
     category: "Restauración",
     categoryShort: "Restauración",
     description:
-      "Diseñado para locales de comida rápida, hamburgueserías y restaurantes. Añade control de insumos (BOM), escandallo de costos y personalización de salsas/extras en el catálogo.",
+      "Diseñado para locales de comida rápida, hamburgueserías, pizzerías y restaurantes. Añade control de insumos (BOM), escandallo de costos y personalización interactiva de salsas y extras en el catálogo público.",
     icon: <Utensils className="w-5 h-5 text-amber-500" />,
     features: [
-      "Insumos de Cocina: Control de inventario en gramos, ml y unidades",
-      "Recetas & Escandallo: Fichas técnicas, costo unitario y margen bruto",
-      "Descarte en Tiempo Real: Reducción automática de stock al validar pedidos",
-      "Modal de Salsas & Extras: Personalización interactiva para el cliente",
+      "Insumos de Cocina: Control de inventario en gramos, mililitros y unidades",
+      "Recetas & Escandallo: Fichas técnicas, costo unitario y margen bruto proyectado",
+      "Descarte en Tiempo Real: Reducción automática de existencias al validar pedidos",
+      "Modal de Salsas & Extras: Personalización interactiva de modificadores para el cliente",
     ],
+    targetAudience:
+      "Restaurantes, hamburgueserías, pizzerías, locales de sushi, reposterías y cualquier negocio gastronómico que elabore productos con ingredientes fraccionados.",
     themeColor: "amber",
   },
   {
@@ -84,14 +89,16 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
     category: "Comercio Minorista",
     categoryShort: "Retail",
     description:
-      "Optimizado para supermercados y minimarkets de alta rotación con códigos de barra estándar (EAN-13, UPC) y venta por unidad física.",
+      "Optimizado para supermercados, minimarkets y bodegones de alta rotación con soporte de códigos de barra estándar (EAN-13, UPC) y venta por unidad física.",
     icon: <ScanBarcode className="w-5 h-5 text-blue-500" />,
     features: [
-      "Lectura rápida de códigos de barra (EAN-13, UPC)",
-      "Control de existencias por empaque y unidad sellada",
-      "Gestión de pasillos, estantes y reposición masiva",
-      "Búsqueda instantánea de productos por código",
+      "Lectura rápida de códigos de barra estándar (EAN-13, UPC)",
+      "Control de existencias por empaque, bulto y unidad sellada",
+      "Gestión de pasillos, estantes y reposición masiva de mercancía",
+      "Búsqueda instantánea de productos por escaneo de código",
     ],
+    targetAudience:
+      "Supermercados, minimarkets, bodegones, licorerías, farmacias y ferreterías con productos empacados y atención rápida en caja.",
     themeColor: "blue",
   },
   {
@@ -101,14 +108,16 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
     category: "Comercio Minorista",
     categoryShort: "Moda & Calzado",
     description:
-      "Especial para tiendas de ropa, calzado y accesorios. Permite gestionar variantes de tallas, colores y existencias independientes.",
+      "Especial para tiendas de ropa, calzado y accesorios. Permite gestionar matrices bidimensionales de tallas, colores y existencias totalmente independientes.",
     icon: <Shirt className="w-5 h-5 text-indigo-500" />,
     features: [
-      "Matriz de tallas y colores por producto",
-      "Control de stock independiente por cada combinación",
-      "Muestrarios de color y selector de tallas en catálogo PWA",
-      "Filtros de catálogo por talla disponible",
+      "Matriz de tallas y colores independientes por producto",
+      "Control de inventario individual por cada combinación (SKU)",
+      "Muestrarios de color y selector visual de tallas en el catálogo PWA",
+      "Filtros de catálogo por talla disponible y disponibilidad en tiempo real",
     ],
+    targetAudience:
+      "Boutiques de moda, zapaterías, tiendas deportivas, confección y accesorios que manejen tallas (S, M, L, XL), números de calzado y variedad de colores.",
     themeColor: "indigo",
   },
   {
@@ -118,14 +127,16 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
     category: "Operaciones & Logística",
     categoryShort: "Delivery & Rutas",
     description:
-      "Gestiona rutas de entrega a domicilio, motorizados propios, asignación de pedidos en tiempo real y tarifas configuradas por zona.",
+      "Gestiona rutas de entrega a domicilio, motorizados propios, asignación de pedidos en tiempo real y tarifas dinámicas configuradas por zona geográfica.",
     icon: <Truck className="w-5 h-5 text-blue-500" />,
     features: [
-      "Zonas de reparto personalizadas con tarifas de delivery",
-      "Gestión de motorizados y repartidores activos",
-      "Asignación de despachos y estado en ruta",
-      "Opción de entrega a domicilio en checkout del cliente",
+      "Zonas de reparto personalizadas con tarifas de delivery diferenciadas",
+      "Gestión de motorizados y repartidores activos con datos de contacto",
+      "Asignación de despachos y tracking de estado en ruta",
+      "Opción de entrega a domicilio o retiro en sede en el checkout del cliente",
     ],
+    targetAudience:
+      "Comercios con reparto a domicilio propio, restaurantes con motorizados internos, farmacias o floristerías que requieran control de rutas y zonas de entrega.",
     themeColor: "blue",
   },
   {
@@ -135,14 +146,16 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
     category: "Marketing & Ventas",
     categoryShort: "Marketing",
     description:
-      "Herramientas de fidelización y conversión. Crea cupones de descuento porcentuales o fijos, límites de uso y fechas de caducidad.",
+      "Herramientas profesionales de fidelización y conversión. Diseña cupones de descuento porcentuales o de monto fijo, con límites de uso y fechas de caducidad.",
     icon: <Ticket className="w-5 h-5 text-purple-500" />,
     features: [
-      "Cupones de descuento en dólares ($) o porcentaje (%)",
-      "Límites de uso por cliente y fechas de vencimiento",
-      "Monto mínimo de compra condicional para el descuento",
-      "Canje de cupones directamente en el checkout de la tienda",
+      "Cupones de descuento en moneda base ($) o porcentaje (%)",
+      "Límites de uso por cliente, uso global y fechas de vigencia programadas",
+      "Monto mínimo de compra condicional para aplicar el descuento",
+      "Canje y validación automática de cupones directamente en el checkout",
     ],
+    targetAudience:
+      "Cualquier tienda que busque incentivar compras recurrentes, lanzar promociones estacionales, premiar clientes o colaborar con campañas de influencers.",
     themeColor: "purple",
   },
   {
@@ -152,14 +165,16 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
     category: "Finanzas Locales",
     categoryShort: "Fiscal / BCV",
     description:
-      "Integración de pasarelas bancarias locales venezolanas, monitor automático de tasa oficial BCV y facturación fiscal.",
+      "Integración de pasarelas bancarias locales venezolanas, monitor automático de tasa oficial BCV en tiempo real y facturación fiscal con cálculo legal de IGTF.",
     icon: <Landmark className="w-5 h-5 text-emerald-500" />,
     features: [
-      "Sincronización automatizada con la tasa oficial BCV",
-      "Módulo de validación de Pago Móvil y cuentas bancarias",
-      "Doble display de precios en USD y Bolívares (VES)",
-      "Cálculo legal de IGTF (3%) y comprobantes de retención",
+      "Sincronización automatizada con la tasa oficial del Banco Central de Venezuela (BCV)",
+      "Módulo de validación de Pago Móvil y cuentas bancarias locales",
+      "Doble display de precios en Dólares (USD) y Bolívares (VES)",
+      "Cálculo legal de IGTF (3%) y comprobantes de retención fiscal",
     ],
+    targetAudience:
+      "Comercios radicados en Venezuela que cobran en Bolívares (Pago Móvil, transferencias), requieren tasa oficial del BCV en tiempo real y facturación con IGTF.",
     themeColor: "emerald",
   },
   {
@@ -169,14 +184,16 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
     category: "Finanzas Locales",
     categoryShort: "Colombia / TRM",
     description:
-      "Soporte para comercios en Colombia. Sincronización con la TRM oficial, precios en Pesos Colombianos (COP) y pagos vía Nequi, Daviplata y PSE.",
+      "Soporte integral para comercios en Colombia. Sincronización con la TRM oficial, precios en Pesos Colombianos (COP) y pagos vía Nequi, Daviplata y PSE.",
     icon: <Landmark className="w-5 h-5 text-emerald-500" />,
     features: [
       "Sincronización de TRM oficial del Banco de la República",
       "Display de precios y cobro nativo en Pesos Colombianos (COP)",
-      "Recepción y comprobantes de Nequi, Daviplata y PSE",
-      "Campos de identificación fiscal DIAN (CC, NIT)",
+      "Recepción y comprobantes de pago para Nequi, Daviplata y PSE",
+      "Campos de identificación fiscal DIAN (Cédula de Ciudadanía, NIT)",
     ],
+    targetAudience:
+      "Comercios operando en Colombia que facturan en Pesos Colombianos (COP) y reciben transferencias bancarias y billeteras móviles locales.",
     themeColor: "emerald",
   },
   {
@@ -186,7 +203,7 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
     category: "Finanzas Locales",
     categoryShort: "Global / USD",
     description:
-      "Para comercios internacionales o transfronterizos que operan puramente en Dólares (USD) con tarjetas de crédito/débito internacionales y PayPal.",
+      "Para comercios internacionales o transfronterizos que operan puramente en Dólares (USD) con pasarelas de tarjetas de crédito/débito y transferencias internacionales.",
     icon: <Globe className="w-5 h-5 text-indigo-500" />,
     features: [
       "Operación pura en USD sin conversiones cambiarias locales",
@@ -194,6 +211,8 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
       "Integración con PayPal y transferencias internacionales",
       "Facturación estándar internacional sin recargos locales",
     ],
+    targetAudience:
+      "Negocios internacionales, exportadores, dropshipping o ventas transfronterizas que operan puramente en Dólares (USD) con pasarelas globales.",
     themeColor: "indigo",
   },
   {
@@ -203,7 +222,7 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
     category: "Fabricación & Personalización",
     categoryShort: "MTO & CPQ",
     description:
-      "Motor universal de cotización y costeo para fabricación bajo pedido (sublimación, imprenta textil, cortinas, cristalería, letreros). Incluye matrices por área/longitud/volumen, auditoría de margen neto y hojas de taller.",
+      "Motor universal de cotización y costeo para fabricación bajo pedido (sublimación, imprenta textil, cortinas, cristalería, letreros). Incluye matrices por área/longitud/volumen, auditoría de margen neto y hojas de taller sin datos financieros.",
     icon: <Sliders className="w-5 h-5 text-indigo-500" />,
     features: [
       "Matriz Universal: Dimensiones por área (m²), metros lineales (m) o unidad personalizada",
@@ -211,6 +230,8 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
       "Vista Dual: Margen neto y ganancia privada para el dueño; precio limpio para el cliente",
       "Ficha de Taller & Anticipos: Hoja técnica sin precios y control de hitos (50% anticipo)",
     ],
+    targetAudience:
+      "Sublimación, imprentas, talleres textiles, carpinterías, cristalerías, letreros y fabricantes bajo pedido que necesitan costeo Cost-Plus y hojas de taller.",
     themeColor: "indigo",
   },
   {
@@ -228,11 +249,13 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
       "Venta Flash & FOMO: Contador regresivo en tiempo real con horas, minutos y segundos",
       "100% Personalizable: Activa, desactiva y reordena cada bloque desde el panel de control",
     ],
+    targetAudience:
+      "Comercios que buscan destacar visualmente con vitrinas modernas: sliders promocionales, stories estilo Instagram, reseñas con estrellas y contadores flash.",
     themeColor: "purple",
   },
 ];
 
-const ITEMS_PER_PAGE = 4;
+const ITEMS_PER_PAGE = 6;
 
 export function TenantPluginsModal({
   tenant,
@@ -247,6 +270,7 @@ export function TenantPluginsModal({
   const [updatingId, setUpdatingId] = useState<TenantModuleId | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [selectedDetailPlugin, setSelectedDetailPlugin] = useState<PluginMetadata | null>(null);
 
   // Search & Filter & Pagination states
   const [searchQuery, setSearchQuery] = useState("");
@@ -592,7 +616,7 @@ export function TenantPluginsModal({
               </button>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {paginatedPlugins.map((plugin) => {
                 const isActive = isModuleActive(plugin.id);
                 const isBusy = updatingId === plugin.id;
@@ -600,127 +624,99 @@ export function TenantPluginsModal({
                 return (
                   <div
                     key={plugin.id}
-                    className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+                    onClick={() => setSelectedDetailPlugin(plugin)}
+                    className={`p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer group ${
                       isActive
-                        ? "bg-card border-emerald-500/40 shadow-xs ring-1 ring-emerald-500/20"
-                        : "bg-card border-border hover:border-border/80 opacity-95"
+                        ? "bg-card border-emerald-500/40 shadow-xs hover:border-emerald-500/80 ring-1 ring-emerald-500/20"
+                        : "bg-card border-border hover:border-primary/50 hover:shadow-xs"
                     }`}
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      {/* Left: Plugin Details */}
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <div className="p-2.5 rounded-xl bg-muted/60 border border-border/80 shrink-0 mt-0.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+                      {/* Left: Plugin Essential Info (Compact, Clean, No Ellipsis) */}
+                      <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-muted/60 border border-border/80 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                           {plugin.icon}
                         </div>
-                        <div className="space-y-1.5 min-w-0 flex-1">
+                        <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-black text-sm text-foreground">
+                            <h3 className="font-black text-sm text-foreground group-hover:text-primary transition-colors">
                               {plugin.name}
                             </h3>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-secondary text-secondary-foreground">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-secondary text-secondary-foreground shrink-0">
                               {plugin.badge}
                             </span>
-                            <span className="text-[10px] font-semibold text-muted-foreground border border-border/70 px-2 py-0.5 rounded-md">
+                            <span className="text-[10px] font-semibold text-muted-foreground border border-border/70 px-2 py-0.5 rounded-md shrink-0">
                               {plugin.category}
                             </span>
                           </div>
-                          <p className="text-xs text-muted-foreground leading-relaxed">
-                            {plugin.description}
-                          </p>
-
-                          {/* Features list */}
-                          <div className="pt-2 grid sm:grid-cols-2 gap-1.5 text-[11px] text-foreground/85 font-medium">
-                            {plugin.features.map((feat, i) => (
-                              <div key={i} className="flex items-center gap-1.5 min-w-0">
-                                <Sparkles className="w-3 h-3 text-primary shrink-0" />
-                                <span className="truncate">{feat}</span>
-                              </div>
-                            ))}
+                          <div className="flex items-center gap-1.5 text-xs text-primary font-semibold group-hover:underline">
+                            <Info className="w-3.5 h-3.5 shrink-0" />
+                            <span>Ver ficha completa & capacidades sin recorte →</span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Right: Symmetrical Action Section (Fixed geometry, clean alignment) */}
-                      <div className="flex sm:flex-col items-center sm:items-center justify-between sm:justify-center gap-2.5 shrink-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-border/60 sm:w-36">
+                      {/* Right: Status & Action (Stopping propagation to keep card clickable) */}
+                      <div
+                        className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/60"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {/* Status Badge */}
-                        <div className="w-full flex items-center justify-start sm:justify-center">
-                          {isActive ? (
-                            <span className="w-32 sm:w-full inline-flex items-center justify-center gap-1.5 py-1 rounded-full text-xs font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              <span>Habilitado</span>
-                            </span>
-                          ) : (
-                            <span className="w-32 sm:w-full inline-flex items-center justify-center gap-1.5 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground border border-border/60">
-                              <PowerOff className="w-3 h-3 opacity-60 shrink-0" />
-                              <span>Desactivado</span>
-                            </span>
-                          )}
-                        </div>
+                        {isActive ? (
+                          <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full text-xs font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span>Habilitado</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full text-xs font-semibold bg-muted text-muted-foreground border border-border/60">
+                            <PowerOff className="w-3 h-3 opacity-60 shrink-0" />
+                            <span>Desactivado</span>
+                          </span>
+                        )}
 
-                        {/* Symmetrical Action Button (Identical dimensions w-32 sm:w-full h-9) */}
-                        <div className="w-full flex items-center justify-end sm:justify-center">
-                          {isSuperAdmin ? (
-                            isActive ? (
-                              <button
-                                type="button"
-                                disabled={isBusy}
-                                onClick={() => handleToggleModule(plugin.id)}
-                                className="w-32 sm:w-full h-9 rounded-xl border border-destructive/40 bg-destructive/5 hover:bg-destructive/15 text-destructive font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-2xs"
-                                title="Desactivar plugin para esta tienda"
-                              >
-                                {isBusy ? (
-                                  <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    <span>Guardando...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <PowerOff className="w-3.5 h-3.5" />
-                                    <span>Desactivar</span>
-                                  </>
-                                )}
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                disabled={isBusy}
-                                onClick={() => handleToggleModule(plugin.id)}
-                                className="w-32 sm:w-full h-9 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-sm hover:shadow"
-                                title="Activar e instalar plugin para esta tienda"
-                              >
-                                {isBusy ? (
-                                  <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    <span>Guardando...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Power className="w-3.5 h-3.5" />
-                                    <span>Activar Módulo</span>
-                                  </>
-                                )}
-                              </button>
-                            )
-                          ) : isActive ? (
-                            <div className="w-32 sm:w-full h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Activo en Plan</span>
-                            </div>
-                          ) : (
-                            <a
-                              href={`https://wa.me/${(supportPhone || "584120000000").replace(/\D/g, "")}?text=${encodeURIComponent(
-                                `Hola, me gustaría cotizar y solicitar la activación del plugin "${plugin.name}" (${plugin.id}) para mi comercio "${tenant.name}".`
-                              )}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="w-32 sm:w-full h-9 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm hover:shadow"
-                              title="Solicitar cotización y activación al Administrador"
+                        {/* Symmetrical Action Button */}
+                        {isSuperAdmin ? (
+                          isActive ? (
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() => handleToggleModule(plugin.id)}
+                              className="h-8 px-3 rounded-xl border border-destructive/40 bg-destructive/5 hover:bg-destructive/15 text-destructive font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-2xs"
+                              title="Desactivar plugin para esta tienda"
                             >
-                              <MessageCircle className="w-3.5 h-3.5" />
-                              <span>Cotizar / Activar</span>
-                            </a>
-                          )}
-                        </div>
+                              {isBusy ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <PowerOff className="w-3 h-3" />
+                              )}
+                              <span>Desactivar</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() => handleToggleModule(plugin.id)}
+                              className="h-8 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-sm hover:shadow"
+                              title="Activar e instalar plugin para esta tienda"
+                            >
+                              {isBusy ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Power className="w-3 h-3" />
+                              )}
+                              <span>Activar Módulo</span>
+                            </button>
+                          )
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDetailPlugin(plugin)}
+                            className="h-8 px-3 rounded-xl border border-border hover:bg-muted text-foreground font-semibold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span>Ver Ficha</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -785,6 +781,22 @@ export function TenantPluginsModal({
           </div>
         </div>
       </div>
+
+      {/* Full Plugin Detail Modal (Progressive Disclosure - Uncut Details) */}
+      {selectedDetailPlugin && (
+        <PluginDetailModal
+          plugin={selectedDetailPlugin}
+          isOpen={Boolean(selectedDetailPlugin)}
+          onClose={() => setSelectedDetailPlugin(null)}
+          isActive={isModuleActive(selectedDetailPlugin.id)}
+          isSuperAdmin={isSuperAdmin}
+          isBusy={updatingId === selectedDetailPlugin.id}
+          onToggleStatus={(id) => handleToggleModule(id)}
+          supportPhone={supportPhone}
+          tenantName={tenant.name}
+          tenantId={tenant.id}
+        />
+      )}
     </div>
   );
 }

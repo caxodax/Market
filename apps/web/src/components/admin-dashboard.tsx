@@ -60,7 +60,8 @@ import { SalesReportsTab } from "./sales-reports-tab";
 import { DeliveryManager } from "./delivery-manager";
 import { AuditTrailViewer } from "./audit-trail-viewer";
 import { PlanUpgradeModal } from "./plan-upgrade-modal";
-import { TenantPluginsModal, AVAILABLE_PLUGINS } from "./tenant-plugins-modal";
+import { TenantPluginsModal, AVAILABLE_PLUGINS, PluginMetadata } from "./tenant-plugins-modal";
+import { PluginDetailModal } from "./plugin-detail-modal";
 import { useAutoRefresh } from "../lib/use-auto-refresh";
 import {
   PackageCheck,
@@ -270,6 +271,7 @@ export function AdminDashboard({
   };
 
   const [isPluginsModalOpen, setIsPluginsModalOpen] = useState(false);
+  const [selectedPluginForDetail, setSelectedPluginForDetail] = useState<PluginMetadata | null>(null);
 
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [syncingBcv, setSyncingBcv] = useState(false);
@@ -3185,15 +3187,16 @@ export function AdminDashboard({
                 return (
                   <div
                     key={plugin.id}
-                    className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
+                    onClick={() => setSelectedPluginForDetail(plugin)}
+                    className={`p-5 rounded-2xl border transition-all flex flex-col justify-between cursor-pointer group hover:shadow-md ${
                       isActive
-                        ? "bg-card border-primary/40 shadow-xs"
-                        : "bg-card/60 border-border opacity-75"
+                        ? "bg-card border-emerald-500/40 shadow-xs hover:border-emerald-500/80 ring-1 ring-emerald-500/20"
+                        : "bg-card/70 border-border hover:border-primary/50"
                     }`}
                   >
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="w-10 h-10 rounded-xl bg-muted/80 border border-border/80 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                           {plugin.icon}
                         </div>
                         {isActive ? (
@@ -3201,30 +3204,41 @@ export function AdminDashboard({
                             <CheckCircle2 className="w-3.5 h-3.5" /> Activo
                           </span>
                         ) : (
-                          <span className="text-[11px] font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
+                          <span className="text-[11px] font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full border border-border/60">
                             Inactivo
                           </span>
                         )}
                       </div>
 
-                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-wider block mb-1">
-                        {plugin.categoryShort}
-                      </span>
-                      <h3 className="font-bold text-sm sm:text-base text-foreground mb-1">
-                        {plugin.name}
-                      </h3>
-                      <p className="text-xs text-muted-foreground leading-relaxed mb-4">
-                        {plugin.description}
-                      </p>
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase tracking-wider block">
+                          {plugin.categoryShort}
+                        </span>
+                        <h3 className="font-black text-sm sm:text-base text-foreground group-hover:text-primary transition-colors leading-snug">
+                          {plugin.name}
+                        </h3>
+                      </div>
                     </div>
 
-                    <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
+                    <div
+                      className="pt-3 mt-4 border-t border-border flex items-center justify-between text-xs"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPluginForDetail(plugin)}
+                        className="text-xs font-bold text-primary hover:underline cursor-pointer flex items-center gap-1"
+                      >
+                        <Info className="w-3.5 h-3.5" />
+                        <span>Ver Ficha & Detalles</span>
+                      </button>
+
                       {isActive ? (
                         plugin.id === "delivery_fleet" ? (
                           <button
                             type="button"
                             onClick={() => setActiveTab("DELIVERY")}
-                            className="text-xs font-bold text-primary hover:underline cursor-pointer"
+                            className="text-xs font-bold text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
                           >
                             Ir a Delivery →
                           </button>
@@ -3232,7 +3246,7 @@ export function AdminDashboard({
                           <button
                             type="button"
                             onClick={() => setActiveTab("COUPONS")}
-                            className="text-xs font-bold text-primary hover:underline cursor-pointer"
+                            className="text-xs font-bold text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
                           >
                             Ir a Cupones →
                           </button>
@@ -3240,53 +3254,31 @@ export function AdminDashboard({
                           <button
                             type="button"
                             onClick={() => setActiveTab("RATES")}
-                            className="text-xs font-bold text-primary hover:underline cursor-pointer"
+                            className="text-xs font-bold text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
                           >
                             Ir a Tasas & BCV →
                           </button>
                         ) : plugin.id === "food_service" ? (
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setActiveTab("RAW_MATERIALS")}
-                              className="text-xs font-bold text-amber-600 hover:underline cursor-pointer"
-                            >
-                              Insumos →
-                            </button>
-                            <span className="text-muted-foreground">•</span>
-                            <button
-                              type="button"
-                              onClick={() => setActiveTab("RECIPES")}
-                              className="text-xs font-bold text-amber-600 hover:underline cursor-pointer"
-                            >
-                              Recetas →
-                            </button>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("RAW_MATERIALS")}
+                            className="text-xs font-bold text-amber-600 hover:underline cursor-pointer"
+                          >
+                            Ir a Insumos →
+                          </button>
                         ) : (
-                          <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                            Módulo habilitado en sistema
+                          <span className="text-[10px] text-emerald-600 font-medium">
+                            Habilitado
                           </span>
                         )
-                      ) : (currentUser?.role === "PLATFORM_SUPER_ADMIN" || currentUser?.impersonation) ? (
+                      ) : (
                         <button
                           type="button"
-                          onClick={() => setIsPluginsModalOpen(true)}
-                          className="text-xs font-bold text-purple-600 dark:text-purple-400 hover:underline cursor-pointer"
+                          onClick={() => setSelectedPluginForDetail(plugin)}
+                          className="text-xs font-bold text-emerald-600 hover:text-emerald-500 cursor-pointer"
                         >
-                          Configurar módulo →
+                          Cotizar →
                         </button>
-                      ) : (
-                        <a
-                          href={`https://wa.me/${(settingsState.whatsapp_number || settingsState.phone || "584120000000").replace(/\D/g, "")}?text=${encodeURIComponent(
-                            `Hola, quisiera cotizar y solicitar la activación del plugin "${plugin.name}" (${plugin.id}) para mi comercio "${settingsState.business_name}".`
-                          )}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 cursor-pointer"
-                        >
-                          <MessageCircle className="w-3.5 h-3.5" />
-                          <span>Cotizar / Solicitar Activación →</span>
-                        </a>
                       )}
                     </div>
                   </div>
@@ -3405,6 +3397,28 @@ export function AdminDashboard({
           window.location.reload();
         }}
       />
+
+      {/* Full Plugin Detail Modal (Progressive Disclosure - Uncut Details) */}
+      {selectedPluginForDetail && (
+        <PluginDetailModal
+          plugin={selectedPluginForDetail}
+          isOpen={Boolean(selectedPluginForDetail)}
+          onClose={() => setSelectedPluginForDetail(null)}
+          isActive={activeModuleIds.includes(selectedPluginForDetail.id)}
+          isSuperAdmin={currentUser?.role === "PLATFORM_SUPER_ADMIN" || Boolean(currentUser?.impersonation)}
+          onNavigateToModule={(pluginId) => {
+            if (pluginId === "delivery_fleet") setActiveTab("DELIVERY");
+            else if (pluginId === "promotions_coupons") setActiveTab("COUPONS");
+            else if (pluginId === "local_venezuela") setActiveTab("RATES");
+            else if (pluginId === "food_service") setActiveTab("RAW_MATERIALS");
+            else if (pluginId === "storefront_pro") setActiveTab("STOREFRONT_STUDIO");
+            else setActiveTab("PLUGINS");
+          }}
+          supportPhone={settingsState.whatsapp_number || settingsState.phone}
+          tenantName={settingsState.business_name}
+          tenantId={settingsState.tenant_id}
+        />
+      )}
 
       {/* Create Store Modal */}
       {isStoreModalOpen && (
