@@ -18,6 +18,7 @@ import { CustomerLookupModal } from "./customer-lookup-modal";
 import { BranchSelectorModal } from "./branch-selector-modal";
 import { PwaPushBanner } from "./pwa/pwa-push-banner";
 import { ShieldCheck, MapPin, Heart } from "lucide-react";
+import { useAutoRefresh } from "../lib/use-auto-refresh";
 
 interface StorefrontPageProps {
   settings: TenantSettings;
@@ -70,6 +71,9 @@ export function StorefrontPage({
   activeModuleIds = [],
   modifierGroups = [],
 }: StorefrontPageProps) {
+  // Ponytail Ultra: Auto-refresh store data & BCV rate on focus and every 60s without full reload
+  useAutoRefresh(60000);
+
   const [isTrackerOpen, setIsTrackerOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [selectedStore, setSelectedStore] = useState<Store>(

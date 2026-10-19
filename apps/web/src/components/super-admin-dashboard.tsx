@@ -33,6 +33,7 @@ import { PlatformBiAnalyticsTab } from "./platform-bi-analytics-tab";
 import { PlatformStorageTab } from "./platform-storage-tab";
 import { PlatformSettingsTab } from "./platform-settings-tab";
 import { TenantPluginsModal } from "./tenant-plugins-modal";
+import { useAutoRefresh } from "../lib/use-auto-refresh";
 import {
   Building2,
   DollarSign,
@@ -237,6 +238,13 @@ export function SuperAdminDashboard({
   // BCV Rate state & Quick Sync
   const [currentRate, setCurrentRate] = useState<ExchangeRate | undefined>(exchangeRate);
   const [isSyncingRate, setIsSyncingRate] = useState(false);
+
+  // Ponytail Ultra: Background auto-refresh on tab focus & interval
+  useAutoRefresh(60000);
+
+  useEffect(() => {
+    if (exchangeRate) setCurrentRate(exchangeRate);
+  }, [exchangeRate]);
 
   const handleSyncRate = async () => {
     setIsSyncingRate(true);

@@ -59,6 +59,7 @@ import { DeliveryManager } from "./delivery-manager";
 import { AuditTrailViewer } from "./audit-trail-viewer";
 import { PlanUpgradeModal } from "./plan-upgrade-modal";
 import { TenantPluginsModal, AVAILABLE_PLUGINS } from "./tenant-plugins-modal";
+import { useAutoRefresh } from "../lib/use-auto-refresh";
 import {
   PackageCheck,
   Boxes,
@@ -213,6 +214,29 @@ export function AdminDashboard({
   const [rate, setRate] = useState(initialRate);
   const [auditLogs, setAuditLogs] = useState(initialAuditLogs);
   const [staff, setStaff] = useState<UserProfile[]>(initialStaffMembers);
+
+  // Ponytail Ultra: Auto-refresh admin data (orders, rate, payments) on tab focus and every 45s
+  useAutoRefresh(45000);
+
+  useEffect(() => {
+    setRate(initialRate);
+  }, [initialRate]);
+
+  useEffect(() => {
+    setOrders(initialOrders);
+  }, [initialOrders]);
+
+  useEffect(() => {
+    setPayments(initialPayments);
+  }, [initialPayments]);
+
+  useEffect(() => {
+    setProducts(initialProducts);
+  }, [initialProducts]);
+
+  useEffect(() => {
+    setAuditLogs(initialAuditLogs);
+  }, [initialAuditLogs]);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [auditFilter, setAuditFilter] = useState<string>("ALL");
   const [orderSearchQuery, setOrderSearchQuery] = useState<string>("");
