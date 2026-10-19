@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS cpq_quote_items (
 CREATE TABLE IF NOT EXISTS cpq_work_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  order_id TEXT REFERENCES orders(id) ON DELETE SET NULL,
+  order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
   quote_id UUID REFERENCES cpq_quotes(id) ON DELETE SET NULL,
   status TEXT NOT NULL DEFAULT 'QUEUED' CHECK (status IN ('QUEUED', 'IN_PROCESS', 'READY', 'DELIVERED')),
   production_sheet JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS cpq_work_orders (
 -- 8. Milestone Payment Tracking (e.g. 50% advance, balance on dispatch)
 CREATE TABLE IF NOT EXISTS cpq_order_milestones (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
   total_amount NUMERIC(12,2) NOT NULL CHECK (total_amount >= 0),
   paid_amount NUMERIC(12,2) NOT NULL DEFAULT 0.0 CHECK (paid_amount >= 0),
   pending_balance NUMERIC(12,2) NOT NULL CHECK (pending_balance >= 0),
@@ -129,27 +129,87 @@ ALTER TABLE cpq_quote_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cpq_work_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cpq_order_milestones ENABLE ROW LEVEL SECURITY;
 
--- Standard Multi-tenant RLS Policies
+-- Standard Multi-tenant RLS Policies (Supports both standard Supabase auth helper functions & session variables)
+DROP POLICY IF EXISTS "Tenant isolation for cpq_cost_settings" ON cpq_cost_settings;
 CREATE POLICY "Tenant isolation for cpq_cost_settings" ON cpq_cost_settings
-  FOR ALL USING (tenant_id = current_setting('app.current_tenant_id', true) OR current_setting('app.is_super_admin', true) = 'true');
+  FOR ALL USING (
+    tenant_id = public.current_user_tenant_id() 
+    OR public.is_super_admin() 
+    OR tenant_id = current_setting('app.current_tenant_id', true) 
+    OR current_setting('app.is_super_admin', true) = 'true'
+  );
 
+DROP POLICY IF EXISTS "Tenant isolation for cpq_pricing_matrices" ON cpq_pricing_matrices;
 CREATE POLICY "Tenant isolation for cpq_pricing_matrices" ON cpq_pricing_matrices
-  FOR ALL USING (tenant_id = current_setting('app.current_tenant_id', true) OR current_setting('app.is_super_admin', true) = 'true');
+  FOR ALL USING (
+    tenant_id = public.current_user_tenant_id() 
+    OR public.is_super_admin() 
+    OR tenant_id = current_setting('app.current_tenant_id', true) 
+    OR current_setting('app.is_super_admin', true) = 'true'
+  );
 
+DROP POLICY IF EXISTS "Tenant isolation for cpq_attribute_options" ON cpq_attribute_options;
 CREATE POLICY "Tenant isolation for cpq_attribute_options" ON cpq_attribute_options
-  FOR ALL USING (matrix_id IN (SELECT id FROM cpq_pricing_matrices WHERE tenant_id = current_setting('app.current_tenant_id', true) OR current_setting('app.is_super_admin', true) = 'true'));
+  FOR ALL USING (
+    matrix_id IN (
+      SELECT id FROM cpq_pricing_matrices 
+      WHERE tenant_id = public.current_user_tenant_id() 
+         OR public.is_super_admin() 
+         OR tenant_id = current_setting('app.current_tenant_id', true) 
+         OR current_setting('app.is_super_admin', true) = 'true'
+    )
+  );
 
+DROP POLICY IF EXISTS "Tenant isolation for cpq_volume_tiers" ON cpq_volume_tiers;
 CREATE POLICY "Tenant isolation for cpq_volume_tiers" ON cpq_volume_tiers
-  FOR ALL USING (matrix_id IN (SELECT id FROM cpq_pricing_matrices WHERE tenant_id = current_setting('app.current_tenant_id', true) OR current_setting('app.is_super_admin', true) = 'true'));
+  FOR ALL USING (
+    matrix_id IN (
+      SELECT id FROM cpq_pricing_matrices 
+      WHERE tenant_id = public.current_user_tenant_id() 
+         OR public.is_super_admin() 
+         OR tenant_id = current_setting('app.current_tenant_id', true) 
+         OR current_setting('app.is_super_admin', true) = 'true'
+    )
+  );
 
+DROP POLICY IF EXISTS "Tenant isolation for cpq_quotes" ON cpq_quotes;
 CREATE POLICY "Tenant isolation for cpq_quotes" ON cpq_quotes
-  FOR ALL USING (tenant_id = current_setting('app.current_tenant_id', true) OR current_setting('app.is_super_admin', true) = 'true');
+  FOR ALL USING (
+    tenant_id = public.current_user_tenant_id() 
+    OR public.is_super_admin() 
+    OR tenant_id = current_setting('app.current_tenant_id', true) 
+    OR current_setting('app.is_super_admin', true) = 'true'
+  );
 
+DROP POLICY IF EXISTS "Tenant isolation for cpq_quote_items" ON cpq_quote_items;
 CREATE POLICY "Tenant isolation for cpq_quote_items" ON cpq_quote_items
-  FOR ALL USING (quote_id IN (SELECT id FROM cpq_quotes WHERE tenant_id = current_setting('app.current_tenant_id', true) OR current_setting('app.is_super_admin', true) = 'true'));
+  FOR ALL USING (
+    quote_id IN (
+      SELECT id FROM cpq_quotes 
+      WHERE tenant_id = public.current_user_tenant_id() 
+         OR public.is_super_admin() 
+         OR tenant_id = current_setting('app.current_tenant_id', true) 
+         OR current_setting('app.is_super_admin', true) = 'true'
+    )
+  );
 
+DROP POLICY IF EXISTS "Tenant isolation for cpq_work_orders" ON cpq_work_orders;
 CREATE POLICY "Tenant isolation for cpq_work_orders" ON cpq_work_orders
-  FOR ALL USING (tenant_id = current_setting('app.current_tenant_id', true) OR current_setting('app.is_super_admin', true) = 'true'));
+  FOR ALL USING (
+    tenant_id = public.current_user_tenant_id() 
+    OR public.is_super_admin() 
+    OR tenant_id = current_setting('app.current_tenant_id', true) 
+    OR current_setting('app.is_super_admin', true) = 'true'
+  );
 
+DROP POLICY IF EXISTS "Tenant isolation for cpq_order_milestones" ON cpq_order_milestones;
 CREATE POLICY "Tenant isolation for cpq_order_milestones" ON cpq_order_milestones
-  FOR ALL USING (order_id IN (SELECT id FROM orders WHERE tenant_id = current_setting('app.current_tenant_id', true) OR current_setting('app.is_super_admin', true) = 'true'));
+  FOR ALL USING (
+    order_id IN (
+      SELECT id FROM orders 
+      WHERE tenant_id = public.current_user_tenant_id() 
+         OR public.is_super_admin() 
+         OR tenant_id = current_setting('app.current_tenant_id', true) 
+         OR current_setting('app.is_super_admin', true) = 'true'
+    )
+  );
