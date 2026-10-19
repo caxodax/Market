@@ -54,7 +54,7 @@ export default async function PlatformSuperAdminPage() {
     MarketOSRepository.getExchangeRate("shop-market-ca"),
     MarketOSRepository.getExchangeRateHistory(undefined, 50),
     MarketOSRepository.getAllProfiles(),
-    MarketOSRepository.getGlobalAuditLogs({ limit: 100 }),
+    MarketOSRepository.getGlobalAuditLogs({ limit: 150 }),
     MarketOSRepository.getPlatformBiAnalytics("all"),
     MarketOSRepository.getPlatformStorageTelemetry(),
     MarketOSRepository.getPlatformSettings(),
