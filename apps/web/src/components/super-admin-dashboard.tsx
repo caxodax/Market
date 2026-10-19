@@ -80,6 +80,46 @@ import {
 import { logoutUserAction } from "../app/login/actions";
 import { ExchangeRateManager } from "./exchange-rate-manager";
 
+function TenantAvatar({
+  logoUrl,
+  name,
+  primaryColor = "#DC2626",
+  initials,
+  className = "w-10 h-10",
+}: {
+  logoUrl?: string | null;
+  name: string;
+  primaryColor?: string;
+  initials: string;
+  className?: string;
+}) {
+  const [hasError, setHasError] = useState(false);
+  const formattedUrl = formatMediaUrl(logoUrl);
+
+  if (formattedUrl && !hasError) {
+    return (
+      <div className={`${className} rounded-xl bg-card border border-border p-1 shrink-0 flex items-center justify-center shadow-xs overflow-hidden`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={formattedUrl}
+          alt={name}
+          className="w-full h-full object-contain"
+          onError={() => setHasError(true)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`${className} rounded-xl flex items-center justify-center font-black text-sm text-white shrink-0 shadow-xs`}
+      style={{ backgroundColor: primaryColor }}
+    >
+      {initials}
+    </div>
+  );
+}
+
 interface SuperAdminDashboardProps {
   metrics: PlatformMetrics;
   tenants: TenantWithDetails[];
@@ -1227,6 +1267,12 @@ export function SuperAdminDashboard({
 
                     const primaryColor =
                       tenant.settings?.primary_color || "#DC2626";
+                    const tenantLogo =
+                      tenant.settings?.logo_url ||
+                      tenant.logo_url ||
+                      (tenant.slug === "shop-market-ca" || tenant.id === "shop-market-ca"
+                        ? "/brand/logo.png"
+                        : null);
 
                     return (
                       <tr
@@ -1236,12 +1282,12 @@ export function SuperAdminDashboard({
                         {/* Tenant Name & Details */}
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-3">
-                            <div
-                              className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm text-white shrink-0 shadow-xs"
-                              style={{ backgroundColor: primaryColor }}
-                            >
-                              {initials}
-                            </div>
+                            <TenantAvatar
+                              logoUrl={tenantLogo}
+                              name={tenant.name}
+                              primaryColor={primaryColor}
+                              initials={initials}
+                            />
                             <div>
                               <p className="font-bold text-foreground text-sm">
                                 {tenant.name}
@@ -1677,22 +1723,33 @@ export function SuperAdminDashboard({
                   ) : (
                     filteredBillingTenants.map((t) => {
                       const info = getSubscriptionInfo(t);
+                      const tenantInitials = t.name
+                        ? t.name
+                            .split(" ")
+                            .map((w: string) => w[0])
+                            .slice(0, 2)
+                            .join("")
+                            .toUpperCase()
+                        : "TI";
+                      const tenantLogo =
+                        t.settings?.logo_url ||
+                        t.logo_url ||
+                        (t.slug === "shop-market-ca" || t.id === "shop-market-ca"
+                          ? "/brand/logo.png"
+                          : null);
+
                       return (
                         <tr key={t.id} className="hover:bg-muted/30 transition-colors">
                           {/* Tenant Info */}
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-muted border border-border p-1 shrink-0 flex items-center justify-center">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={t.settings?.logo_url || t.logo_url || "/brand/logo.png"}
-                                  alt={t.name}
-                                  className="w-full h-full object-contain"
-                                  onError={(e) => {
-                                    (e.target as HTMLElement).style.display = "none";
-                                  }}
-                                />
-                              </div>
+                              <TenantAvatar
+                                logoUrl={tenantLogo}
+                                name={t.name}
+                                primaryColor={t.settings?.primary_color || "#DC2626"}
+                                initials={tenantInitials}
+                                className="w-9 h-9"
+                              />
                               <div>
                                 <p className="font-bold text-foreground text-xs">{t.name}</p>
                                 <p className="text-[11px] text-muted-foreground font-mono">
