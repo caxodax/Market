@@ -98,7 +98,7 @@ export function StorefrontPage({
 
   return (
     <FavoritesProvider tenantId={settings.tenant_id}>
-      <CartProvider>
+      <CartProvider tenantId={settings.tenant_id} catalogProducts={products}>
         {/* Dynamic Brand Themes & Typography */}
         <style
           dangerouslySetInnerHTML={{

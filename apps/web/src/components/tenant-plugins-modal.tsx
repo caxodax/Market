@@ -28,6 +28,7 @@ import {
   Shirt,
   Globe,
   MessageCircle,
+  Sliders,
 } from "lucide-react";
 
 interface TenantPluginsModalProps {
@@ -43,7 +44,13 @@ export interface PluginMetadata {
   id: TenantModuleId;
   name: string;
   badge: string;
-  category: "Restauración" | "Comercio Minorista" | "Operaciones & Logística" | "Marketing & Ventas" | "Finanzas Locales";
+  category:
+    | "Restauración"
+    | "Comercio Minorista"
+    | "Operaciones & Logística"
+    | "Marketing & Ventas"
+    | "Finanzas Locales"
+    | "Fabricación & Personalización";
   categoryShort: string;
   description: string;
   icon: React.ReactNode;
@@ -185,6 +192,23 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
       "Pasarela de tarjetas de crédito y débito internacionales",
       "Integración con PayPal y transferencias internacionales",
       "Facturación estándar internacional sin recargos locales",
+    ],
+    themeColor: "indigo",
+  },
+  {
+    id: "mto_cpq",
+    name: "Make-to-Order & CPQ (Personalización & Cotizador)",
+    badge: "v1.0.0 • Cost-Plus & Taller",
+    category: "Fabricación & Personalización",
+    categoryShort: "MTO & CPQ",
+    description:
+      "Motor universal de cotización y costeo para fabricación bajo pedido (sublimación, imprenta textil, cortinas, cristalería, letreros). Incluye matrices por área/longitud/volumen, auditoría de margen neto y hojas de taller.",
+    icon: <Sliders className="w-5 h-5 text-indigo-500" />,
+    features: [
+      "Matriz Universal: Dimensiones por área (m²), metros lineales (m) o unidad personalizada",
+      "Cost-Plus Real: Insumos base, factor de merma (%), mano de obra y horas de máquina",
+      "Vista Dual: Margen neto y ganancia privada para el dueño; precio limpio para el cliente",
+      "Ficha de Taller & Anticipos: Hoja técnica sin precios y control de hitos (50% anticipo)",
     ],
     themeColor: "indigo",
   },
@@ -485,6 +509,7 @@ export function TenantPluginsModal({
               { id: "Operaciones & Logística", label: "Delivery & Logística" },
               { id: "Marketing & Ventas", label: "Marketing & Cupones" },
               { id: "Finanzas Locales", label: "Finanzas & Fiscal" },
+              { id: "Fabricación & Personalización", label: "Fabricación & MTO" },
             ].map((cat) => (
               <button
                 key={cat.id}

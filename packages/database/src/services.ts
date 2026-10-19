@@ -1643,13 +1643,69 @@ export class MarketOSRepository {
     const isVenezuelaActive = activeModules.includes("local_venezuela");
     const rate = isVenezuelaActive ? await this.getExchangeRate(input.tenantId) : { value: 1 };
     
-    // 1. Calculate items subtotal
-    const subtotalUsd = input.items.reduce(
+    // Ensure valid store UUID
+    let validStoreId = input.storeId;
+    if (!isUuid(validStoreId)) {
+      const stores = await this.getStores(input.tenantId);
+      validStoreId = stores[0]?.id || "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d";
+    }
+
+    const supabase = getSupabase();
+
+    // 1. Ponytail Security Guard: Validate authentic product prices and verify stock before placing order
+    const validatedItems = input.items.map((it) => ({ ...it }));
+
+    if (supabase) {
+      const productIds = input.items
+        .map((it) => it.productId)
+        .filter((id) => isUuid(id));
+
+      if (productIds.length > 0) {
+        const { data: dbProducts } = await supabase
+          .from("products")
+          .select("id, name, price_usd, is_active, inventory(quantity, store_id)")
+          .eq("tenant_id", input.tenantId)
+          .in("id", productIds);
+
+        if (dbProducts && dbProducts.length > 0) {
+          const productMap = new Map(dbProducts.map((p: any) => [p.id, p]));
+
+          for (const item of validatedItems) {
+            const dbProd: any = productMap.get(item.productId);
+            if (dbProd) {
+              if (!dbProd.is_active) {
+                throw new Error(`El producto "${dbProd.name}" no está disponible actualmente.`);
+              }
+
+              // Overwrite with authentic server price from database
+              const basePrice = Number(dbProd.price_usd);
+              const modifiersDelta = item.selected_modifiers?.reduce((sum, m) => sum + (m.price_usd || 0), 0) || 0;
+              item.unitPriceUsd = Number((basePrice + modifiersDelta).toFixed(2));
+
+              // Pre-order stock verification
+              const invForStore = Array.isArray(dbProd.inventory)
+                ? dbProd.inventory.find((inv: any) => inv.store_id === validStoreId)
+                : null;
+              const currentStock = invForStore?.quantity ?? 0;
+
+              if (currentStock < item.quantity) {
+                throw new Error(
+                  `Stock insuficiente para "${dbProd.name}". Disponibles: ${currentStock}, solicitados: ${item.quantity}.`
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Calculate items subtotal with authentic server prices
+    const subtotalUsd = validatedItems.reduce(
       (acc, item) => acc + item.unitPriceUsd * item.quantity,
       0
     );
 
-    // 2. Validate and apply coupon discount if present
+    // 3. Validate and apply coupon discount if present
     let discountUsd = 0;
     let couponId: string | null = null;
     if (input.couponCode) {
@@ -1666,30 +1722,37 @@ export class MarketOSRepository {
       discountUsd = input.discountUsd;
     }
 
-    // 3. Apply delivery fee if delivery selected
-    const deliveryFeeUsd =
-      input.deliveryType === "DELIVERY" ? input.deliveryFeeUsd || 0 : 0;
+    // 4. Validate delivery fee against database delivery_zones
+    let deliveryFeeUsd = 0;
+    let validDeliveryZoneId: string | null = null;
 
-    // 4. Compute final totals
+    if (input.deliveryType === "DELIVERY") {
+      if (input.deliveryZoneId && isUuid(input.deliveryZoneId) && supabase) {
+        const { data: zone } = await supabase
+          .from("delivery_zones")
+          .select("id, price_usd, is_active")
+          .eq("tenant_id", input.tenantId)
+          .eq("id", input.deliveryZoneId)
+          .maybeSingle();
+
+        if (zone && zone.is_active) {
+          validDeliveryZoneId = zone.id;
+          deliveryFeeUsd = Number(zone.price_usd);
+        } else {
+          deliveryFeeUsd = input.deliveryFeeUsd || 0;
+        }
+      } else {
+        deliveryFeeUsd = input.deliveryFeeUsd || 0;
+      }
+    }
+
+    // 5. Compute final totals
     const finalTotalUsd = Number(
       Math.max(0, subtotalUsd - discountUsd + deliveryFeeUsd).toFixed(2)
     );
     const totalVes = isVenezuelaActive ? convertUsdToVes(finalTotalUsd, rate.value) : 0;
     const exchangeRateApplied = isVenezuelaActive ? rate.value : 1;
     const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
-    const supabase = getSupabase();
-
-    // Ensure valid store UUID
-    let validStoreId = input.storeId;
-    if (!isUuid(validStoreId)) {
-      const stores = await this.getStores(input.tenantId);
-      validStoreId = stores[0]?.id || "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d";
-    }
-
-    const validDeliveryZoneId =
-      input.deliveryType === "DELIVERY" && isUuid(input.deliveryZoneId)
-        ? input.deliveryZoneId
-        : null;
 
     const validCouponId = isUuid(couponId) ? couponId : null;
 
@@ -1850,7 +1913,7 @@ export class MarketOSRepository {
       customer_phone: input.customerPhone,
       customer_id_number: input.customerIdNumber || null,
       customer_email: input.customerEmail || null,
-      items: input.items.map((it, idx) => ({
+      items: validatedItems.map((it, idx) => ({
         id: `item-${Date.now()}-${idx}`,
         order_id: `ord-${Date.now()}`,
         tenant_id: input.tenantId,
@@ -1893,7 +1956,7 @@ export class MarketOSRepository {
           console.error("[MarketOS] Failed to insert order into Supabase:", orderInsertErr);
         } else if (insertedOrder && isUuid(insertedOrder.id)) {
           newOrder.id = insertedOrder.id;
-          newOrder.items = input.items.map((it, idx) => ({
+          newOrder.items = validatedItems.map((it, idx) => ({
             id: `item-${insertedOrder.id}-${idx}`,
             order_id: insertedOrder.id,
             tenant_id: input.tenantId,
@@ -1905,7 +1968,7 @@ export class MarketOSRepository {
           }));
 
           // Insert order items
-          const itemsPayload = input.items.map((it) => ({
+          const itemsPayload = validatedItems.map((it) => ({
             tenant_id: input.tenantId,
             order_id: insertedOrder.id,
             product_id: isUuid(it.productId) ? it.productId : null,
@@ -1936,7 +1999,7 @@ export class MarketOSRepository {
           }
 
           // Decrement inventory stock & record inventory movements in Supabase
-          for (const item of input.items) {
+          for (const item of validatedItems) {
             const targetProductId = isUuid(item.productId)
               ? item.productId
               : itemsPayload.find((p) => p.product_name === item.productName)?.product_id;

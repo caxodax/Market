@@ -11,7 +11,8 @@ export type TenantModuleId =
   | "local_colombia"        // Localización: Nequi, Daviplata, PSE, TRM, DIAN
   | "local_global"          // Localización: Stripe, PayPal, Tarjetas internacionales
   | "promotions_coupons"    // Marketing: Cupones de descuento, 2x1, combos
-  | "delivery_fleet";       // Logística: Repartidores propios, asignación de rutas
+  | "delivery_fleet"        // Logística: Repartidores propios, asignación de rutas
+  | "mto_cpq";              // Fabricación & CPQ: Make-to-Order, dimensiones, costeo y cotizaciones
 
 export type PluginCategory =
   | "location"              // Localización por país

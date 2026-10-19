@@ -65,6 +65,8 @@ export function CartDrawer({
                 const unitPrice = item.unit_price_usd ?? item.product.price_usd;
                 const lineTotalUsd = unitPrice * item.quantity;
 
+                const isMaxStock = item.product.stock !== undefined && item.quantity >= item.product.stock;
+
                 return (
                   <div
                     key={itemLineKey}
@@ -74,6 +76,11 @@ export function CartDrawer({
                       src={item.product.image_url || ""}
                       alt={item.product.name}
                       className="w-16 h-16 rounded-lg object-cover bg-muted shrink-0"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z'/%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M16 10a4 4 0 0 1-8 0'/%3E%3C/svg%3E";
+                        e.currentTarget.className = "w-16 h-16 rounded-lg object-contain p-3 bg-muted/40 shrink-0 opacity-40";
+                      }}
                     />
                     <div className="flex-1 min-w-0">
                       <h4 className="text-xs font-semibold text-foreground truncate">
@@ -120,6 +127,7 @@ export function CartDrawer({
                           <button
                             onClick={() => updateQuantity(itemLineKey, item.quantity - 1)}
                             className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                            aria-label="Disminuir"
                           >
                             <Minus className="w-3.5 h-3.5" />
                           </button>
@@ -127,12 +135,21 @@ export function CartDrawer({
                             {item.quantity}
                           </span>
                           <button
+                            disabled={isMaxStock}
                             onClick={() => updateQuantity(itemLineKey, item.quantity + 1)}
-                            className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                            className="p-1 text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                            title={isMaxStock ? "Máximo stock disponible alcanzado" : "Aumentar"}
+                            aria-label="Aumentar"
                           >
                             <Plus className="w-3.5 h-3.5" />
                           </button>
                         </div>
+
+                        {isMaxStock && (
+                          <span className="text-[10px] text-amber-500 font-semibold">
+                            Máx. ({item.product.stock})
+                          </span>
+                        )}
 
                         <button
                           onClick={() => removeItem(itemLineKey)}

@@ -1,11 +1,11 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useMemo } from "react";
 import { Product, SelectedModifier } from "@marketos/types";
 
 export interface CartItem {
   id?: string;
-  product: Product;
+  product: Product & { stock?: number };
   quantity: number;
   selected_modifiers?: SelectedModifier[];
   unit_price_usd?: number;
@@ -14,7 +14,7 @@ export interface CartItem {
 interface CartContextType {
   items: CartItem[];
   addItem: (
-    product: Product,
+    product: Product & { stock?: number },
     quantity?: number,
     openDrawer?: boolean,
     selected_modifiers?: SelectedModifier[],
@@ -31,36 +31,90 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-const CART_STORAGE_KEY = "marketos_cart_shop_market";
+interface CartProviderProps {
+  children: React.ReactNode;
+  tenantId?: string;
+  catalogProducts?: (Product & { stock: number })[];
+}
 
-export function CartProvider({ children }: { children: React.ReactNode }) {
+export function CartProvider({ children, tenantId, catalogProducts }: CartProviderProps) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Load cart from localStorage (Persistent Cart)
+  // Tenant-isolated storage key to prevent cross-tenant cart bleeding
+  const storageKey = useMemo(() => {
+    return tenantId ? `marketos_cart_${tenantId}` : "marketos_cart_shop_market";
+  }, [tenantId]);
+
+  // Load cart from localStorage (Persistent Cart with tenant isolation)
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(CART_STORAGE_KEY);
+      const saved = localStorage.getItem(storageKey);
       if (saved) {
         setItems(JSON.parse(saved));
+      } else {
+        setItems([]);
       }
     } catch (e) {
       console.error("Failed to restore persistent cart", e);
     } finally {
       setIsInitialized(true);
     }
-  }, []);
+  }, [storageKey]);
 
   // Save cart to localStorage
   useEffect(() => {
     if (isInitialized) {
-      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+      localStorage.setItem(storageKey, JSON.stringify(items));
     }
-  }, [items, isInitialized]);
+  }, [items, isInitialized, storageKey]);
+
+  // Reconcile stale prices and stock from catalog products on mount / refresh
+  useEffect(() => {
+    if (!catalogProducts || catalogProducts.length === 0 || !isInitialized) return;
+    const productMap = new Map(catalogProducts.map((p) => [p.id, p]));
+
+    setItems((prev) => {
+      let changed = false;
+      const next = prev.map((item) => {
+        const live = productMap.get(item.product.id);
+        if (!live) return item;
+
+        const livePrice = live.price_usd;
+        const liveStock = live.stock;
+        const modPrice = item.selected_modifiers?.reduce((s, m) => s + (m.price_usd || 0), 0) || 0;
+        const expectedUnit = Number((livePrice + modPrice).toFixed(2));
+
+        const priceChanged = item.product.price_usd !== livePrice || item.unit_price_usd !== expectedUnit;
+        const stockChanged = item.product.stock !== liveStock;
+
+        // Auto-cap quantity to live stock if stock > 0
+        const newQty = liveStock > 0 ? Math.min(item.quantity, liveStock) : item.quantity;
+        const qtyChanged = newQty !== item.quantity;
+
+        if (priceChanged || stockChanged || qtyChanged) {
+          changed = true;
+          return {
+            ...item,
+            quantity: newQty,
+            unit_price_usd: expectedUnit,
+            product: {
+              ...item.product,
+              price_usd: livePrice,
+              stock: liveStock,
+            },
+          };
+        }
+        return item;
+      });
+
+      return changed ? next : prev;
+    });
+  }, [catalogProducts, isInitialized]);
 
   const addItem = (
-    product: Product,
+    product: Product & { stock?: number },
     quantity = 1,
     openDrawer = false,
     selected_modifiers?: SelectedModifier[],
@@ -80,9 +134,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             : !modSig)
       );
       if (existing) {
+        // Enforce stock ceiling if available
+        const maxStock = product.stock ?? 9999;
+        const nextQuantity = Math.min(existing.quantity + quantity, maxStock);
         return prev.map((item) =>
           item === existing
-            ? { ...item, quantity: item.quantity + quantity }
+            ? { ...item, quantity: nextQuantity }
             : item
         );
       }
@@ -91,7 +148,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         {
           id: `${product.id}-${Date.now()}`,
           product,
-          quantity,
+          quantity: product.stock !== undefined && product.stock > 0 ? Math.min(quantity, product.stock) : quantity,
           selected_modifiers,
           unit_price_usd: finalUnitPrice,
         },
@@ -116,11 +173,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     setItems((prev) =>
-      prev.map((item) =>
-        item.product.id === productIdOrLineId || item.id === productIdOrLineId
-          ? { ...item, quantity }
-          : item
-      )
+      prev.map((item) => {
+        if (item.product.id === productIdOrLineId || item.id === productIdOrLineId) {
+          const maxStock = item.product.stock ?? 9999;
+          const cappedQty = Math.min(quantity, maxStock);
+          return { ...item, quantity: cappedQty };
+        }
+        return item;
+      })
     );
   };
 

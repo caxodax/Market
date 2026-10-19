@@ -576,6 +576,8 @@ export function CheckoutDialog({
                         <input
                           type="text"
                           inputMode="numeric"
+                          pattern="[0-9]*"
+                          autoComplete="off"
                           required
                           placeholder="Cédula de Identidad *"
                           value={ciNumber}
@@ -588,8 +590,10 @@ export function CheckoutDialog({
                     {/* Teléfono / WhatsApp */}
                     <input
                       type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
                       required
-                      placeholder="Teléfono / WhatsApp *"
+                      placeholder="Teléfono / WhatsApp (ej. 04121234567) *"
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
                       className="w-full h-11 px-3 rounded-xl border border-input bg-background text-xs focus:ring-2 focus:ring-primary font-mono"
