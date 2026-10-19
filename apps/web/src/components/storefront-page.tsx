@@ -19,6 +19,7 @@ import { BranchSelectorModal } from "./branch-selector-modal";
 import { PwaPushBanner } from "./pwa/pwa-push-banner";
 import { ShieldCheck, MapPin, Heart } from "lucide-react";
 import { useAutoRefresh } from "../lib/use-auto-refresh";
+import { StorefrontProRenderer, createDefaultStorefrontConfig } from "@marketos/plugin-storefront-pro";
 
 interface StorefrontPageProps {
   settings: TenantSettings;
@@ -96,6 +97,11 @@ export function StorefrontPage({
   const rawFont = settings.font_family || "Inter";
   const fontFamilyName = rawFont.replace(/[^a-zA-Z0-9 -]/g, "").trim() || "Inter";
 
+  const isStorefrontProActive = activeModuleIds.includes("storefront_pro");
+  const storefrontConfig = isStorefrontProActive
+    ? settings.storefront_config || createDefaultStorefrontConfig(settings.business_name)
+    : null;
+
   return (
     <FavoritesProvider tenantId={settings.tenant_id}>
       <CartProvider tenantId={settings.tenant_id} catalogProducts={products}>
@@ -112,6 +118,21 @@ export function StorefrontPage({
           }}
         />
         <div className="min-h-screen bg-background text-foreground flex flex-col w-full max-w-full overflow-x-hidden">
+          {/* Storefront Pro: Top Marquee if active */}
+          {isStorefrontProActive && (
+            <StorefrontProRenderer
+              config={storefrontConfig}
+              position="top"
+              categories={categories}
+              products={products}
+              selectedStore={selectedStore}
+              exchangeRate={exchangeRate}
+              selectedCategoryId={activeCategory}
+              onSelectCategory={setActiveCategory}
+              onAddToCart={() => {}}
+            />
+          )}
+
           {/* Brand Header with Live BCV exchange rate, Cart trigger and Branch Selector */}
           <StoreHeader
             settings={settings}

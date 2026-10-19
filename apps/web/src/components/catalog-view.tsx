@@ -22,6 +22,7 @@ import { OrderSuccessModal } from "./order-success-modal";
 import { OrderTrackerModal } from "./order-tracker-modal";
 import { CustomerOrderTicketModal } from "./customer-order-ticket-modal";
 import { useFavorites } from "../context/favorites-context";
+import { StorefrontProRenderer, createDefaultStorefrontConfig } from "@marketos/plugin-storefront-pro";
 import {
   Search,
   SlidersHorizontal,
@@ -78,6 +79,10 @@ export function CatalogView({
 
   const isFoodServiceActive = activeModuleIds.includes("food_service");
   const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
+  const isStorefrontProActive = activeModuleIds.includes("storefront_pro");
+  const storefrontConfig = isStorefrontProActive
+    ? settings.storefront_config || createDefaultStorefrontConfig(settings.business_name)
+    : null;
 
   const getProductModifierGroups = (prod: Product): ProductModifierGroup[] => {
     if (!isFoodServiceActive || !modifierGroups || modifierGroups.length === 0) return [];
@@ -519,27 +524,66 @@ export function CatalogView({
 
       {/* Main Catalog Section */}
       <main className="max-w-7xl mx-auto px-3 sm:px-4 pt-3 sm:pt-4">
-        {/* Promotional VIP Banner Capsule (Clean & Compact) */}
-        <div className="mb-4 p-2.5 sm:p-3 rounded-2xl bg-gradient-to-r from-primary/10 via-amber-500/10 to-primary/5 border border-primary/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-xs">
-              <Tag className="w-4 h-4" />
-            </div>
-            <div className="min-w-0 text-xs">
-              <span className="font-extrabold text-foreground tracking-tight">
-                Cupones Activos:{" "}
-              </span>
-              <span className="text-muted-foreground text-[11px]">
-                Usa <code className="font-mono font-bold text-primary bg-primary/10 px-1 py-0.5 rounded">BIENVENIDO</code> ($2 OFF) o <code className="font-mono font-bold text-primary bg-primary/10 px-1 py-0.5 rounded">SHOP10</code> (10% OFF).
-              </span>
-            </div>
+        {/* Storefront Pro: Body Modular Sections (Hero, Bubbles, Rails, Reels, Badges, etc.) */}
+        {isStorefrontProActive && storefrontConfig ? (
+          <div className="mb-4">
+            <StorefrontProRenderer
+              config={storefrontConfig}
+              position="body"
+              categories={categories}
+              products={products}
+              selectedStore={stores[0]}
+              exchangeRate={exchangeRate}
+              selectedCategoryId={selectedCategoryIds[0] || null}
+              onSelectCategory={(catId) => {
+                if (catId) {
+                  setSelectedCategoryIds([catId]);
+                  if (setControlledCategory) setControlledCategory(catId);
+                } else {
+                  setSelectedCategoryIds([]);
+                  if (setControlledCategory) setControlledCategory(null);
+                }
+              }}
+              onAddToCart={addItem}
+              onActionClick={(link) => {
+                if (link?.startsWith("category:")) {
+                  const catTarget = link.replace("category:", "").toLowerCase();
+                  const found = categories.find(
+                    (c) => c.id.toLowerCase() === catTarget || c.name.toLowerCase().includes(catTarget)
+                  );
+                  if (found) {
+                    setSelectedCategoryIds([found.id]);
+                    if (setControlledCategory) setControlledCategory(found.id);
+                  }
+                } else if (link === "catalog") {
+                  document.getElementById("catalog-section")?.scrollIntoView({ behavior: "smooth" });
+                }
+              }}
+            />
           </div>
+        ) : (
+          /* Promotional VIP Banner Capsule (Clean & Compact) */
+          <div className="mb-4 p-2.5 sm:p-3 rounded-2xl bg-gradient-to-r from-primary/10 via-amber-500/10 to-primary/5 border border-primary/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-xs">
+                <Tag className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 text-xs">
+                <span className="font-extrabold text-foreground tracking-tight">
+                  Cupones Activos:{" "}
+                </span>
+                <span className="text-muted-foreground text-[11px]">
+                  Usa <code className="font-mono font-bold text-primary bg-primary/10 px-1 py-0.5 rounded">BIENVENIDO</code> ($2 OFF) o <code className="font-mono font-bold text-primary bg-primary/10 px-1 py-0.5 rounded">SHOP10</code> (10% OFF).
+                </span>
+              </div>
+            </div>
 
-          <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-foreground/80 self-end sm:self-auto bg-background/90 px-2.5 py-1 rounded-xl border border-border shadow-2xs shrink-0">
-            <Truck className="w-3 h-3 text-primary shrink-0" />
-            <span>Delivery gratis en Nueva Segovia</span>
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-foreground/80 self-end sm:self-auto bg-background/90 px-2.5 py-1 rounded-xl border border-border shadow-2xs shrink-0">
+              <Truck className="w-3 h-3 text-primary shrink-0" />
+              <span>Delivery gratis en Nueva Segovia</span>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Section Heading with Counter */}
         <div id="catalog-section" className="flex items-center justify-between mb-3 sm:mb-4 scroll-mt-28">

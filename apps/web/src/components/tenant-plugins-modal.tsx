@@ -29,6 +29,7 @@ import {
   Globe,
   MessageCircle,
   Sliders,
+  LayoutTemplate,
 } from "lucide-react";
 
 interface TenantPluginsModalProps {
@@ -211,6 +212,23 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
       "Ficha de Taller & Anticipos: Hoja técnica sin precios y control de hitos (50% anticipo)",
     ],
     themeColor: "indigo",
+  },
+  {
+    id: "storefront_pro",
+    name: "Vitrina Visual Pro & Layout Studio",
+    badge: "v1.0.0 • 10 Bloques Modulares",
+    category: "Marketing & Ventas",
+    categoryShort: "Vitrina Pro",
+    description:
+      "Transforma tu tienda con un maquetador modular de 10 bloques activables: Sliders dinámicos, Stories de categorías, rieles curados, testimonios con estrellas, ticker animado, contador regresivo flash, reels de video y acordeón FAQ.",
+    icon: <LayoutTemplate className="w-5 h-5 text-rose-500" />,
+    features: [
+      "10 Bloques Modulares: Sliders, Banners, Stories, Rieles de Más Vendidos, FAQ y Reseñas",
+      "Prueba Social Real: Testimonios con 5 estrellas, avatares y check de comprador verificado",
+      "Venta Flash & FOMO: Contador regresivo en tiempo real con horas, minutos y segundos",
+      "100% Personalizable: Activa, desactiva y reordena cada bloque desde el panel de control",
+    ],
+    themeColor: "purple",
   },
 ];
 

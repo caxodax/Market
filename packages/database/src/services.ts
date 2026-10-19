@@ -271,6 +271,7 @@ export class MarketOSRepository {
         operational_settings: updated.operational_settings,
         billing_settings: updated.billing_settings,
         custom_domain: updated.custom_domain,
+        storefront_config: updated.storefront_config,
         updated_at: new Date().toISOString(),
       };
 
@@ -290,6 +291,7 @@ export class MarketOSRepository {
         delete safePayload.billing_settings;
         delete safePayload.font_family;
         delete safePayload.custom_domain;
+        delete (safePayload as any).storefront_config;
         await supabase
           .from("tenant_settings")
           .update(safePayload)

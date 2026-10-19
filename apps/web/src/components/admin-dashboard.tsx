@@ -44,7 +44,9 @@ import {
   saveRawMaterialAction,
   deleteRawMaterialAction,
   saveProductRecipeAction,
+  updateTenantSettingsAction,
 } from "../app/admin/actions";
+import { AdminStorefrontStudio } from "@marketos/plugin-storefront-pro";
 import { stopImpersonationAction } from "../app/platform/actions";
 import { logoutUserAction } from "../app/login/actions";
 import { ProductModal } from "./product-modal";
@@ -94,6 +96,7 @@ import {
   Sparkles,
   Landmark,
   Sliders,
+  LayoutTemplate,
   Ticket,
   BellRing,
   BarChart3,
@@ -204,6 +207,7 @@ export function AdminDashboard({
     | "RAW_MATERIALS"
     | "RECIPES"
     | "PLUGINS"
+    | "STOREFRONT_STUDIO"
   >("PAYMENTS");
   const [settingsState, setSettingsState] = useState(settings);
   const [products, setProducts] = useState(initialProducts);
@@ -877,7 +881,8 @@ export function AdminDashboard({
       | "STORES"
       | "RAW_MATERIALS"
       | "RECIPES"
-      | "PLUGINS";
+      | "PLUGINS"
+      | "STOREFRONT_STUDIO";
     category: ModuleCategory;
     label: string;
     shortLabel: string;
@@ -997,6 +1002,20 @@ export function AdminDashboard({
       badge: "PWA",
       badgeClassName: "bg-amber-500/10 text-amber-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
     },
+    ...(activeModuleIds.includes("storefront_pro")
+      ? [
+          {
+            id: "STOREFRONT_STUDIO" as const,
+            category: "CATALOG" as const,
+            label: "Vitrina Visual Pro & Studio",
+            shortLabel: "Vitrina Pro",
+            description: "Banners, sliders, reseñas y maquetador",
+            icon: <LayoutTemplate className="w-4 h-4 shrink-0" />,
+            badge: "10 Bloques",
+            badgeClassName: "bg-rose-500/10 text-rose-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+          },
+        ]
+      : []),
 
     // 3. Finanzas
     {
@@ -3078,6 +3097,36 @@ export function AdminDashboard({
             )}
           </div>
         ); })()}
+
+        {/* TAB: STOREFRONT STUDIO (VITRINA PRO) */}
+        {activeTab === "STOREFRONT_STUDIO" && (
+          <div className="space-y-6 animate-in fade-in">
+            <AdminStorefrontStudio
+              initialConfig={settingsState.storefront_config}
+              businessName={settingsState.business_name}
+              categories={categories}
+              products={products}
+              stores={stores}
+              exchangeRate={rate}
+              onSave={async (newConfig) => {
+                const res = await updateTenantSettingsAction(settings.tenant_id, {
+                  storefront_config: newConfig,
+                });
+                if (res.success && res.settings) {
+                  setSettingsState(res.settings);
+                  setToast({
+                    id: String(Date.now()),
+                    type: "success",
+                    title: "Vitrina Visual Actualizada",
+                    message: "Los bloques y el diseño de la tienda pública se han publicado con éxito.",
+                  });
+                } else {
+                  throw new Error(res.error || "Error al guardar");
+                }
+              }}
+            />
+          </div>
+        )}
 
         {/* TAB 8: STORE SETTINGS & BRANDING */}
         {activeTab === "SETTINGS" && (

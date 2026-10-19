@@ -119,6 +119,7 @@ export interface TenantSettings {
   operational_settings?: StoreOperationalSettings;
   billing_settings?: TenantBillingSettings;
   custom_domain?: string | null;
+  storefront_config?: import("./storefront-pro").StorefrontConfig;
 }
 
 export interface Store {
@@ -1056,3 +1057,6 @@ export interface PlatformSettings {
 export type UpdatePlatformSettingsInput = Partial<
   Omit<PlatformSettings, "id" | "created_at" | "updated_at">
 >;
+
+export * from "./storefront-pro";
+

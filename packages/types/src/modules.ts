@@ -12,7 +12,8 @@ export type TenantModuleId =
   | "local_global"          // Localización: Stripe, PayPal, Tarjetas internacionales
   | "promotions_coupons"    // Marketing: Cupones de descuento, 2x1, combos
   | "delivery_fleet"        // Logística: Repartidores propios, asignación de rutas
-  | "mto_cpq";              // Fabricación & CPQ: Make-to-Order, dimensiones, costeo y cotizaciones
+  | "mto_cpq"               // Fabricación & CPQ: Make-to-Order, dimensiones, costeo y cotizaciones
+  | "storefront_pro";       // Vitrina Pro: Banners, sliders, reels, testimonios y maquetador visual
 
 export type PluginCategory =
   | "location"              // Localización por país
