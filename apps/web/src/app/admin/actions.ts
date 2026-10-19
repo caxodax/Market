@@ -532,6 +532,16 @@ export async function updateTenantSettingsAction(
   updates: Partial<TenantSettings>
 ) {
   try {
+    const { getCurrentUser } = await import("../login/actions");
+    const user = await getCurrentUser();
+    const isSuperAdmin =
+      user?.role === "PLATFORM_SUPER_ADMIN" || Boolean(user?.impersonation);
+
+    // Custom domain routing and DNS must be managed strictly by Platform Super Admin
+    if (!isSuperAdmin && updates.custom_domain !== undefined) {
+      delete updates.custom_domain;
+    }
+
     const settings = await MarketOSRepository.updateTenantSettings(tenantId, updates);
     invalidateSettingsCache(tenantId);
     revalidatePath("/admin");

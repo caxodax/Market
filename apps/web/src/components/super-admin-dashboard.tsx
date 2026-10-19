@@ -3122,6 +3122,7 @@ export function SuperAdminDashboard({
           tenant={pluginsModalTenant}
           isOpen={Boolean(pluginsModalTenant)}
           onClose={() => setPluginsModalTenant(null)}
+          isSuperAdmin={true}
         />
       )}
     </div>

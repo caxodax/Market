@@ -602,16 +602,29 @@ export class MarketOSRepository {
             }
           }
 
-          // Self-healing: if rate in database is older than 6 hours, trigger background sync
-          const lastUpdated = new Date(data.updated_at).getTime();
-          const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000;
-          if (isNaN(lastUpdated) || lastUpdated < sixHoursAgo) {
-            MarketOSRepository.syncBcvRateFromApi(tenantId).catch((err) =>
-              console.warn("[MarketOS] Stale rate background refresh warning:", err)
-            );
-          }
-
           return rate;
+        }
+
+        // Fallback: read directly from latest database history (0 external API calls)
+        const { data: latestHist } = await supabase
+          .from("exchange_rate_history")
+          .select("*")
+          .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+          .order("date_rate", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (latestHist) {
+          return {
+            id: latestHist.id,
+            tenant_id: tenantId,
+            currency: "VES",
+            value: Number(latestHist.rate),
+            eur_value: latestHist.rate_eur ? Number(latestHist.rate_eur) : undefined,
+            usdt_value: latestHist.usdt_promedio ? Number(latestHist.usdt_promedio) : undefined,
+            source: latestHist.source,
+            updated_at: latestHist.created_at || new Date().toISOString(),
+          };
         }
       } catch (err) {
         console.warn("[MarketOS] Exchange rate fetch error, using resilient fallback:", err);

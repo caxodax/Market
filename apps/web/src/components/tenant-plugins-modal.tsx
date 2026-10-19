@@ -27,6 +27,7 @@ import {
   Ticket,
   Shirt,
   Globe,
+  MessageCircle,
 } from "lucide-react";
 
 interface TenantPluginsModalProps {
@@ -34,6 +35,8 @@ interface TenantPluginsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onModulesUpdated?: () => void;
+  isSuperAdmin?: boolean;
+  supportPhone?: string;
 }
 
 export interface PluginMetadata {
@@ -194,6 +197,8 @@ export function TenantPluginsModal({
   isOpen,
   onClose,
   onModulesUpdated,
+  isSuperAdmin = false,
+  supportPhone,
 }: TenantPluginsModalProps) {
   const [modules, setModules] = useState<TenantModule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -250,6 +255,10 @@ export function TenantPluginsModal({
   };
 
   const handleToggleModule = async (moduleId: TenantModuleId) => {
+    if (!isSuperAdmin) {
+      setError("Solo el Super Administrador de Plataforma puede activar o desactivar plugins.");
+      return;
+    }
     const currentEnabled = isModuleActive(moduleId);
     const nextEnabled = !currentEnabled;
 
@@ -360,11 +369,16 @@ export function TenantPluginsModal({
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-sm sm:text-base font-black text-foreground truncate">
-                  Gestión de Plugins & Módulos
+                  {isSuperAdmin ? "Gestión de Plugins & Módulos" : "Catálogo de Plugins & Extensiones"}
                 </h2>
                 <span className="text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-600 px-2.5 py-0.5 rounded-full border border-purple-500/20 whitespace-nowrap">
                   {activeCount} de {AVAILABLE_PLUGINS.length} activos
                 </span>
+                {!isSuperAdmin && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 px-2.5 py-0.5 rounded-full border border-amber-500/20 whitespace-nowrap">
+                    Modo Consulta & Cotización
+                  </span>
+                )}
               </div>
               <p className="text-xs text-muted-foreground mt-0.5 truncate">
                 Comercio: <strong className="text-foreground">{tenant.name}</strong> ({tenant.slug})
@@ -385,7 +399,15 @@ export function TenantPluginsModal({
         <div className="px-4 py-2.5 bg-muted/40 border-b border-border/60 flex items-start gap-2.5 text-xs text-muted-foreground shrink-0">
           <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
           <p className="leading-relaxed">
-            Como <strong>Super Admin</strong>, puedes encender o apagar plugins según el giro comercial de cada cliente. La tienda cargará dinámicamente sus paneles de control sin afectar a otros comercios.
+            {isSuperAdmin ? (
+              <>
+                Como <strong>Super Admin</strong>, puedes encender o apagar plugins según el giro comercial de cada cliente. La tienda cargará dinámicamente sus paneles de control sin afectar a otros comercios.
+              </>
+            ) : (
+              <>
+                Explora el catálogo de módulos disponibles para tu negocio. Para habilitar o cotizar extensiones en tu tienda, solicita la activación directamente a la Administración de Plataforma.
+              </>
+            )}
           </p>
         </div>
 
@@ -594,46 +616,66 @@ export function TenantPluginsModal({
 
                         {/* Symmetrical Action Button (Identical dimensions w-32 sm:w-full h-9) */}
                         <div className="w-full flex items-center justify-end sm:justify-center">
-                          {isActive ? (
-                            <button
-                              type="button"
-                              disabled={isBusy}
-                              onClick={() => handleToggleModule(plugin.id)}
-                              className="w-32 sm:w-full h-9 rounded-xl border border-destructive/40 bg-destructive/5 hover:bg-destructive/15 text-destructive font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-2xs"
-                              title="Desactivar plugin para esta tienda"
-                            >
-                              {isBusy ? (
-                                <>
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  <span>Guardando...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <PowerOff className="w-3.5 h-3.5" />
-                                  <span>Desactivar</span>
-                                </>
-                              )}
-                            </button>
+                          {isSuperAdmin ? (
+                            isActive ? (
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => handleToggleModule(plugin.id)}
+                                className="w-32 sm:w-full h-9 rounded-xl border border-destructive/40 bg-destructive/5 hover:bg-destructive/15 text-destructive font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-2xs"
+                                title="Desactivar plugin para esta tienda"
+                              >
+                                {isBusy ? (
+                                  <>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    <span>Guardando...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <PowerOff className="w-3.5 h-3.5" />
+                                    <span>Desactivar</span>
+                                  </>
+                                )}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => handleToggleModule(plugin.id)}
+                                className="w-32 sm:w-full h-9 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-sm hover:shadow"
+                                title="Activar e instalar plugin para esta tienda"
+                              >
+                                {isBusy ? (
+                                  <>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    <span>Guardando...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Power className="w-3.5 h-3.5" />
+                                    <span>Activar Módulo</span>
+                                  </>
+                                )}
+                              </button>
+                            )
+                          ) : isActive ? (
+                            <div className="w-32 sm:w-full h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Activo en Plan</span>
+                            </div>
                           ) : (
-                            <button
-                              type="button"
-                              disabled={isBusy}
-                              onClick={() => handleToggleModule(plugin.id)}
-                              className="w-32 sm:w-full h-9 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-sm hover:shadow"
-                              title="Activar e instalar plugin para esta tienda"
+                            <a
+                              href={`https://wa.me/${(supportPhone || "584120000000").replace(/\D/g, "")}?text=${encodeURIComponent(
+                                `Hola, me gustaría cotizar y solicitar la activación del plugin "${plugin.name}" (${plugin.id}) para mi comercio "${tenant.name}".`
+                              )}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="w-32 sm:w-full h-9 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm hover:shadow"
+                              title="Solicitar cotización y activación al Administrador"
                             >
-                              {isBusy ? (
-                                <>
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  <span>Guardando...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Power className="w-3.5 h-3.5" />
-                                  <span>Activar Módulo</span>
-                                </>
-                              )}
-                            </button>
+                              <MessageCircle className="w-3.5 h-3.5" />
+                              <span>Cotizar / Activar</span>
+                            </a>
                           )}
                         </div>
                       </div>

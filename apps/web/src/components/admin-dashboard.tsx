@@ -3061,6 +3061,7 @@ export function AdminDashboard({
             settings={settingsState}
             activeModuleIds={activeModuleIds}
             onUpdateSuccess={(updated) => setSettingsState(updated)}
+            isSuperAdmin={currentUser?.role === "PLATFORM_SUPER_ADMIN" || Boolean(currentUser?.impersonation)}
           />
         )}
 
@@ -3082,7 +3083,7 @@ export function AdminDashboard({
                 </div>
               </div>
 
-              {(currentUser?.role === "PLATFORM_SUPER_ADMIN" || currentUser?.impersonation) && (
+              {(currentUser?.role === "PLATFORM_SUPER_ADMIN" || currentUser?.impersonation) ? (
                 <button
                   type="button"
                   onClick={() => setIsPluginsModalOpen(true)}
@@ -3091,6 +3092,16 @@ export function AdminDashboard({
                 >
                   <Sparkles className="w-4 h-4" />
                   <span>Gestionar Plugins (Activar / Desactivar)</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsPluginsModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition-all shadow-sm cursor-pointer shrink-0"
+                  title="Ver catálogo y cotizar módulos para tu comercio"
+                >
+                  <Puzzle className="w-4 h-4" />
+                  <span>Ver Catálogo Completo & Cotizar</span>
                 </button>
               )}
             </div>
@@ -3192,9 +3203,17 @@ export function AdminDashboard({
                           Configurar módulo →
                         </button>
                       ) : (
-                        <span className="text-[11px] text-muted-foreground">
-                          Disponible para activación
-                        </span>
+                        <a
+                          href={`https://wa.me/${(settingsState.whatsapp_number || settingsState.phone || "584120000000").replace(/\D/g, "")}?text=${encodeURIComponent(
+                            `Hola, quisiera cotizar y solicitar la activación del plugin "${plugin.name}" (${plugin.id}) para mi comercio "${settingsState.business_name}".`
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 cursor-pointer"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          <span>Cotizar / Solicitar Activación →</span>
+                        </a>
                       )}
                     </div>
                   </div>
@@ -3306,6 +3325,8 @@ export function AdminDashboard({
         }
         isOpen={isPluginsModalOpen}
         onClose={() => setIsPluginsModalOpen(false)}
+        isSuperAdmin={currentUser?.role === "PLATFORM_SUPER_ADMIN" || Boolean(currentUser?.impersonation)}
+        supportPhone={settingsState.whatsapp_number || settingsState.phone}
         onModulesUpdated={() => {
           setIsPluginsModalOpen(false);
           window.location.reload();
