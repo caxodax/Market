@@ -943,6 +943,7 @@ export interface PlatformBiAnalyticsFilter {
   dateRange?: "today" | "week" | "month" | "all";
   deliveryType?: "ALL" | "DELIVERY" | "PICKUP";
   deliveryZoneId?: string | "ALL";
+  tenantId?: string | "ALL";
 }
 
 export interface PlatformBiAnalytics {
@@ -950,6 +951,7 @@ export interface PlatformBiAnalytics {
   exchangeRate: number; // Tasa BCV oficial aplicada
   appliedDeliveryType: "ALL" | "DELIVERY" | "PICKUP";
   appliedZoneId: string | "ALL";
+  appliedTenantId?: string | "ALL";
   // Global Network Totals & AOV
   totalNetworkGmvUsd: number;
   totalNetworkGmvVes: number;

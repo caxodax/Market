@@ -7,6 +7,7 @@ import {
   TenantGmvRankingItem,
   ConsolidatedPaymentMethodStat,
   PaymentMethodType,
+  TenantWithDetails,
 } from "@marketos/types";
 import { formatCurrency } from "@marketos/utils";
 import { getPlatformBiAnalyticsAction } from "../app/platform/actions";
@@ -38,6 +39,7 @@ import {
 
 interface PlatformBiAnalyticsTabProps {
   initialAnalytics?: PlatformBiAnalytics;
+  tenants?: TenantWithDetails[];
 }
 
 const DEFAULT_ANALYTICS: PlatformBiAnalytics = {
@@ -79,6 +81,7 @@ const DEFAULT_ANALYTICS: PlatformBiAnalytics = {
 
 export function PlatformBiAnalyticsTab({
   initialAnalytics,
+  tenants = [],
 }: PlatformBiAnalyticsTabProps) {
   const [analytics, setAnalytics] = useState<PlatformBiAnalytics>(
     initialAnalytics || DEFAULT_ANALYTICS
@@ -86,15 +89,22 @@ export function PlatformBiAnalyticsTab({
   const [selectedRange, setSelectedRange] = useState<"today" | "week" | "month" | "all">(
     initialAnalytics?.dateRange || "all"
   );
+  const [selectedTenantId, setSelectedTenantId] = useState<string | "ALL">(
+    initialAnalytics?.appliedTenantId || "ALL"
+  );
   const [isPending, startTransition] = useTransition();
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedSummary, setCopiedSummary] = useState(false);
 
   // Core fetch function
-  const fetchFilteredAnalytics = (range: "today" | "week" | "month" | "all") => {
+  const fetchFilteredAnalytics = (
+    range: "today" | "week" | "month" | "all",
+    tenantId: string | "ALL" = selectedTenantId
+  ) => {
     startTransition(async () => {
       const filter: PlatformBiAnalyticsFilter = {
         dateRange: range,
+        tenantId: tenantId === "ALL" ? undefined : tenantId,
       };
       const res = await getPlatformBiAnalyticsAction(filter);
       if (res.success && res.analytics) {
@@ -105,19 +115,28 @@ export function PlatformBiAnalyticsTab({
 
   React.useEffect(() => {
     if (!initialAnalytics) {
-      fetchFilteredAnalytics("all");
+      fetchFilteredAnalytics("all", "ALL");
     }
   }, [initialAnalytics]);
 
   const handleRangeChange = (range: "today" | "week" | "month" | "all") => {
     setSelectedRange(range);
-    fetchFilteredAnalytics(range);
+    fetchFilteredAnalytics(range, selectedTenantId);
+  };
+
+  const handleTenantChange = (tenantId: string | "ALL") => {
+    setSelectedTenantId(tenantId);
+    fetchFilteredAnalytics(selectedRange, tenantId);
   };
 
   // Copy Executive Summary to clipboard
   const handleCopySummary = () => {
-    const summaryText = `📊 MARKETOS BI EXECUTIVE SUMMARY (${selectedRange.toUpperCase()})
-• GMV Total Red: $${analytics.totalNetworkGmvUsd.toLocaleString("es-VE", { minimumFractionDigits: 2 })} USD
+    const activeTenantName =
+      selectedTenantId !== "ALL"
+        ? tenants.find((t) => t.id === selectedTenantId)?.name || "Comercio"
+        : "TODA LA RED";
+    const summaryText = `📊 MARKETOS BI EXECUTIVE SUMMARY (${activeTenantName} - ${selectedRange.toUpperCase()})
+• GMV Total: $${analytics.totalNetworkGmvUsd.toLocaleString("es-VE", { minimumFractionDigits: 2 })} USD
 • Ticket Promedio Global (AOV): $${analytics.networkAverageTicketUsd} USD
 • Pedidos Totales: ${analytics.totalNetworkOrders} (${analytics.completedOrdersCount} completados, ${analytics.cancelledOrdersCount} cancelados)
 • Tasa de Éxito: ${analytics.orderSuccessRatePercent}%
@@ -242,8 +261,29 @@ ${analytics.paymentMethodsConsolidated
           </div>
         </div>
 
-        {/* Date Filter Pills & Refresh */}
-        <div className="flex flex-wrap items-center gap-2 self-stretch md:self-auto">
+        {/* Filters: Tenant Selector & Date Range Pills */}
+        <div className="flex flex-wrap items-center gap-2.5 self-stretch md:self-auto">
+          {/* Tenant Selector Dropdown */}
+          <div className="flex items-center gap-2 bg-muted/60 px-3 py-1.5 rounded-xl border border-border">
+            <Building2 className="w-3.5 h-3.5 text-primary shrink-0" />
+            <select
+              value={selectedTenantId}
+              onChange={(e) => handleTenantChange(e.target.value)}
+              disabled={isPending}
+              className="bg-transparent text-xs font-semibold text-foreground focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="ALL" className="bg-card text-foreground">
+                🌐 Toda la Red ({tenants.length} comercios)
+              </option>
+              {tenants.map((t) => (
+                <option key={t.id} value={t.id} className="bg-card text-foreground">
+                  🏪 {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Date Filter Pills */}
           <div className="flex items-center bg-muted/50 p-1 rounded-xl border border-border">
             <button
               onClick={() => handleRangeChange("today")}
@@ -320,15 +360,37 @@ ${analytics.paymentMethodsConsolidated
         </div>
       </div>
 
+      {/* Filter Active Alert Banner */}
+      {selectedTenantId !== "ALL" && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-primary/10 border border-primary/25 rounded-2xl text-xs text-primary shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <Building2 className="w-4 h-4 shrink-0 text-primary" />
+            <span>
+              Filtrando métricas consolidadas exclusivamente para el comercio:{" "}
+              <strong className="text-foreground text-sm font-bold ml-1">
+                {tenants.find((t) => t.id === selectedTenantId)?.name || selectedTenantId}
+              </strong>
+            </span>
+          </div>
+          <button
+            onClick={() => handleTenantChange("ALL")}
+            className="self-start sm:self-auto px-3 py-1.5 text-xs font-bold bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition cursor-pointer flex items-center gap-1.5"
+          >
+            <span>Ver Toda la Red</span>
+            <span>✕</span>
+          </button>
+        </div>
+      )}
+
       {/* ────────────────────────────────────────────────────────── */}
       {/* GLOBAL NETWORK KPIS STRIP */}
       {/* ────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* KPI 1: GMV TOTAL RED */}
+        {/* KPI 1: GMV TOTAL RED / COMERCIO */}
         <div className="bg-card p-4 rounded-2xl border border-border shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              GMV Total de la Red
+              {selectedTenantId !== "ALL" ? "GMV del Comercio" : "GMV Total de la Red"}
             </span>
             <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
               <DollarSign className="w-4 h-4" />
@@ -340,12 +402,16 @@ ${analytics.paymentMethodsConsolidated
               <span className="text-xs font-semibold text-muted-foreground ml-1.5">USD</span>
             </div>
             <div className="text-xs font-medium text-muted-foreground mt-0.5">
-              Volumen bruto procesado
+              {selectedTenantId !== "ALL" ? "Volumen procesado por tienda" : "Volumen bruto procesado"}
             </div>
           </div>
           <div className="mt-3 pt-2.5 border-t border-border/60 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>Facturación de la red</span>
-            <span className="font-semibold text-foreground">Multi-Tenant SaaS</span>
+            <span>{selectedTenantId !== "ALL" ? "Facturación tienda" : "Facturación de la red"}</span>
+            <span className="font-semibold text-foreground truncate max-w-[120px]">
+              {selectedTenantId !== "ALL"
+                ? tenants.find((t) => t.id === selectedTenantId)?.name || "Comercio"
+                : "Multi-Tenant SaaS"}
+            </span>
           </div>
         </div>
 
@@ -353,7 +419,7 @@ ${analytics.paymentMethodsConsolidated
         <div className="bg-card p-4 rounded-2xl border border-border shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Ticket Promedio Global
+              {selectedTenantId !== "ALL" ? "Ticket Promedio (AOV)" : "Ticket Promedio Global"}
             </span>
             <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center border border-blue-500/20">
               <Receipt className="w-4 h-4" />
@@ -370,7 +436,9 @@ ${analytics.paymentMethodsConsolidated
           </div>
           <div className="mt-3 pt-2.5 border-t border-border/60 flex items-center justify-between text-[11px] text-muted-foreground">
             <span>Gasto medio por pedido</span>
-            <span className="font-semibold text-foreground">AOV Red</span>
+            <span className="font-semibold text-foreground">
+              {selectedTenantId !== "ALL" ? "AOV Comercio" : "AOV Red"}
+            </span>
           </div>
         </div>
 
@@ -378,7 +446,7 @@ ${analytics.paymentMethodsConsolidated
         <div className="bg-card p-4 rounded-2xl border border-border shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Pedidos & Tasa de Éxito
+              {selectedTenantId !== "ALL" ? "Pedidos del Comercio" : "Pedidos & Tasa de Éxito"}
             </span>
             <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center border border-purple-500/20">
               <ShoppingBag className="w-4 h-4" />
@@ -404,26 +472,46 @@ ${analytics.paymentMethodsConsolidated
         <div className="bg-card p-4 rounded-2xl border border-border shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Comercios Transaccionando
+              {selectedTenantId !== "ALL" ? "Comercio Seleccionado" : "Comercios Transaccionando"}
             </span>
             <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/20">
               <Building2 className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-black text-foreground tracking-tight flex items-baseline gap-2">
-              <span>{analytics.sellingTenantsCount}</span>
-              <span className="text-sm font-normal text-muted-foreground">/ {analytics.activeTenantsCount}</span>
-            </div>
-            <div className="text-xs font-semibold text-amber-400 mt-0.5">
-              {analytics.activeTenantsCount > 0
-                ? `${Math.round((analytics.sellingTenantsCount / analytics.activeTenantsCount) * 100)}% de la red vendiendo`
-                : "Sin comercios"}
-            </div>
+            {selectedTenantId !== "ALL" ? (
+              <>
+                <div className="text-xl font-black text-foreground truncate">
+                  {tenants.find((t) => t.id === selectedTenantId)?.name || "Comercio"}
+                </div>
+                <div className="text-xs font-semibold text-emerald-400 mt-0.5 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Filtro de comercio activo</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-black text-foreground tracking-tight flex items-baseline gap-2">
+                  <span>{analytics.sellingTenantsCount}</span>
+                  <span className="text-sm font-normal text-muted-foreground">/ {analytics.activeTenantsCount}</span>
+                </div>
+                <div className="text-xs font-semibold text-amber-400 mt-0.5">
+                  {analytics.activeTenantsCount > 0
+                    ? `${Math.round((analytics.sellingTenantsCount / analytics.activeTenantsCount) * 100)}% de la red vendiendo`
+                    : "Sin comercios"}
+                </div>
+              </>
+            )}
           </div>
           <div className="mt-3 pt-2.5 border-t border-border/60 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>Comercios activos</span>
-            <span className="font-semibold text-foreground">SaaS Network</span>
+            <span>{selectedTenantId !== "ALL" ? "Plan suscripción" : "Comercios activos"}</span>
+            <span className="font-semibold text-foreground uppercase">
+              {selectedTenantId !== "ALL"
+                ? tenants.find((t) => t.id === selectedTenantId)?.plan?.name ||
+                  tenants.find((t) => t.id === selectedTenantId)?.subscription?.plan_id ||
+                  "Estándar"
+                : "SaaS Network"}
+            </span>
           </div>
         </div>
       </div>

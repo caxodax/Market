@@ -3628,16 +3628,18 @@ export class MarketOSRepository {
   ): Promise<PlatformBiAnalytics> {
     const filter: PlatformBiAnalyticsFilter =
       typeof filterInput === "string"
-        ? { dateRange: filterInput, deliveryType: "ALL", deliveryZoneId: "ALL" }
+        ? { dateRange: filterInput, deliveryType: "ALL", deliveryZoneId: "ALL", tenantId: "ALL" }
         : {
             dateRange: filterInput?.dateRange || "all",
             deliveryType: filterInput?.deliveryType || "ALL",
             deliveryZoneId: filterInput?.deliveryZoneId || "ALL",
+            tenantId: filterInput?.tenantId || "ALL",
           };
 
     const range = filter.dateRange || "all";
     const selectedDeliveryType = filter.deliveryType || "ALL";
     const selectedZoneId = filter.deliveryZoneId || "ALL";
+    const selectedTenantId = filter.tenantId || "ALL";
 
     const { startUtc, endUtc } = getCaracasRangeBounds(range);
     const rate = await this.getExchangeRate("shop-market-ca");
@@ -3731,7 +3733,12 @@ export class MarketOSRepository {
       { totalUsd: number; totalVes: number; orderCount: number }
     >();
 
-    for (const t of allTenants) {
+    const targetTenants =
+      selectedTenantId && selectedTenantId !== "ALL"
+        ? allTenants.filter((t) => t.id === selectedTenantId || t.slug === selectedTenantId)
+        : allTenants;
+
+    for (const t of targetTenants) {
       const orders = await this.getTenantOrders(t.id);
 
       // Date range filter
@@ -4093,6 +4100,7 @@ export class MarketOSRepository {
       exchangeRate: activeRateValue,
       appliedDeliveryType: selectedDeliveryType,
       appliedZoneId: selectedZoneId,
+      appliedTenantId: selectedTenantId,
       totalNetworkGmvUsd,
       totalNetworkGmvVes,
       networkAverageTicketUsd,

@@ -1026,71 +1026,6 @@ export function SuperAdminDashboard({
           </div>
         )}
 
-        {/* KPI Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          {/* Active Tenants */}
-          <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">
-            <div className="flex items-center justify-between text-muted-foreground mb-1">
-              <span className="text-xs font-semibold">Comercios Activos</span>
-              <Building2 className="w-4 h-4 text-primary" />
-            </div>
-            <div className="text-2xl font-black text-foreground">
-              {metrics.activeTenants}
-              <span className="text-xs font-normal text-muted-foreground ml-1.5">
-                / {metrics.totalTenants} total
-              </span>
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              Escala multi-tenant activa
-            </p>
-          </div>
-
-          {/* Monthly Recurring Revenue */}
-          <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">
-            <div className="flex items-center justify-between text-muted-foreground mb-1">
-              <span className="text-xs font-semibold">MRR Suscripciones</span>
-              <DollarSign className="w-4 h-4 text-emerald-500" />
-            </div>
-            <div className="text-2xl font-black text-foreground">
-              {formatCurrency(metrics.mrrUsd, "USD")}
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              Ingresos mensuales recurrentes
-            </p>
-          </div>
-
-          {/* Platform GMV */}
-          <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">
-            <div className="flex items-center justify-between text-muted-foreground mb-1">
-              <span className="text-xs font-semibold">GMV Transaccionado</span>
-              <TrendingUp className="w-4 h-4 text-blue-500" />
-            </div>
-            <div className="text-2xl font-black text-foreground">
-              {formatCurrency(metrics.totalGmvUsd, "USD")}
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-0.5 font-mono truncate">
-              Bs. {metrics.totalGmvVes.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
-            </p>
-          </div>
-
-          {/* Total Orders & Stores */}
-          <div className="p-4 rounded-2xl border border-border bg-card shadow-xs">
-            <div className="flex items-center justify-between text-muted-foreground mb-1">
-              <span className="text-xs font-semibold">Pedidos & Sucursales</span>
-              <Package className="w-4 h-4 text-amber-500" />
-            </div>
-            <div className="text-2xl font-black text-foreground">
-              {metrics.totalOrders}
-              <span className="text-xs font-normal text-muted-foreground ml-1.5">
-                en {metrics.totalStores} sucursales
-              </span>
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              {metrics.totalProducts} productos catalogados
-            </p>
-          </div>
-        </div>
-
         {/* Navigation Tabs */}
         <div className="flex border-b border-border gap-2 overflow-x-auto pb-1 no-scrollbar">
           <button
@@ -1920,7 +1855,7 @@ export function SuperAdminDashboard({
 
       {/* TAB: BI ANALYTICS & GLOBAL INTELLIGENCE */}
       {activeTab === "BI" && (
-        <PlatformBiAnalyticsTab initialAnalytics={initialBiAnalytics} />
+        <PlatformBiAnalyticsTab initialAnalytics={initialBiAnalytics} tenants={tenants} />
       )}
 
       {/* TAB: CLOUDFLARE R2 STORAGE TELEMETRY */}
