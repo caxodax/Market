@@ -19,6 +19,7 @@ interface StaffModalProps {
   isOpen: boolean;
   onClose: () => void;
   onStaffAdded: (profile: UserProfile) => void;
+  callerRole?: UserRole;
 }
 
 export const ROLE_LABELS: Record<UserRole, { label: string; desc: string }> = {
@@ -57,6 +58,7 @@ export function StaffModal({
   isOpen,
   onClose,
   onStaffAdded,
+  callerRole,
 }: StaffModalProps) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -197,7 +199,9 @@ export function StaffModal({
               <option value="TENANT_MANAGER">Encargado de Sucursal</option>
               <option value="TENANT_INVENTORY">Encargado de Inventario</option>
               <option value="TENANT_DELIVERY">Repartidor / Delivery</option>
-              <option value="TENANT_OWNER">Dueño del Comercio (Admin)</option>
+              {(callerRole === "PLATFORM_SUPER_ADMIN" || callerRole === "TENANT_OWNER") && (
+                <option value="TENANT_OWNER">Dueño del Comercio (Admin)</option>
+              )}
             </select>
             <p className="text-[10px] text-muted-foreground pt-0.5">
               {ROLE_LABELS[role]?.desc}

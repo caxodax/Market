@@ -368,8 +368,36 @@ export async function deleteProductAction(tenantId: string, productId: string) {
   }
 }
 
+async function assertCanManageStaff(tenantId: string) {
+  const user = await getCurrentUser();
+  if (!user) {
+    throw new Error("No autenticado. Inicie sesión para continuar.");
+  }
+  if (user.role === "PLATFORM_SUPER_ADMIN" || user.impersonation) {
+    return user;
+  }
+  if (user.tenant_id && user.tenant_id !== tenantId) {
+    throw new Error("Acceso denegado: No tiene permisos sobre este comercio.");
+  }
+  const allowedStaffManagers: UserRole[] = ["TENANT_OWNER", "TENANT_MANAGER"];
+  if (!allowedStaffManagers.includes(user.role)) {
+    throw new Error(
+      "Acceso denegado: Solo el Dueño del Comercio o el Gerente pueden administrar usuarios y colaboradores."
+    );
+  }
+  return user;
+}
+
 export async function inviteStaffMemberAction(input: InviteStaffInput) {
   try {
+    const actor = await assertCanManageStaff(input.tenantId);
+    if (
+      input.role === "TENANT_OWNER" &&
+      actor.role !== "TENANT_OWNER" &&
+      actor.role !== "PLATFORM_SUPER_ADMIN"
+    ) {
+      throw new Error("Solo el Dueño del Comercio puede asignar el rol de Dueño.");
+    }
     const profile = await MarketOSRepository.inviteStaffMember(input);
     revalidatePath("/admin");
     return { success: true, profile };
@@ -388,6 +416,14 @@ export async function updateStaffRoleAction(
   role: UserRole
 ) {
   try {
+    const actor = await assertCanManageStaff(tenantId);
+    if (
+      role === "TENANT_OWNER" &&
+      actor.role !== "TENANT_OWNER" &&
+      actor.role !== "PLATFORM_SUPER_ADMIN"
+    ) {
+      throw new Error("Solo el Dueño del Comercio puede transferir o asignar el rol de Dueño.");
+    }
     const profile = await MarketOSRepository.updateStaffRole(tenantId, profileId, role);
     revalidatePath("/admin");
     return { success: true, profile };
@@ -396,6 +432,38 @@ export async function updateStaffRoleAction(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Error al actualizar rol",
+    };
+  }
+}
+
+export async function revokeStaffMemberAction(
+  tenantId: string,
+  profileId: string
+) {
+  try {
+    const actor = await assertCanManageStaff(tenantId);
+    const target = await MarketOSRepository.getUserProfile(profileId);
+    if (!target || target.tenant_id !== tenantId) {
+      throw new Error("El colaborador no pertenece a este comercio.");
+    }
+    if (target.role === "TENANT_OWNER") {
+      throw new Error("No se puede revocar al Dueño del Comercio.");
+    }
+    if (
+      target.role === "TENANT_MANAGER" &&
+      actor.role !== "TENANT_OWNER" &&
+      actor.role !== "PLATFORM_SUPER_ADMIN"
+    ) {
+      throw new Error("Solo el Dueño del Comercio puede revocar a un Gerente.");
+    }
+    const deleted = await MarketOSRepository.deleteUserProfile(profileId);
+    revalidatePath("/admin");
+    return { success: deleted };
+  } catch (error) {
+    console.error("Error revoking staff member:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al revocar acceso del colaborador",
     };
   }
 }

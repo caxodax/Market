@@ -2224,6 +2224,7 @@ export function SuperAdminDashboard({
             }
             initialHistory={ratesHistory}
             isSuperAdmin={true}
+            onRateUpdated={(newRate) => setCurrentRate(newRate)}
           />
         </div>
       )}

@@ -36,6 +36,7 @@ import {
   syncBcvRateAction,
   updateOrderStatusAction,
   updateStaffRoleAction,
+  revokeStaffMemberAction,
   getLatestOrdersAction,
   getLatestPaymentsAction,
   createStoreAction,
@@ -77,11 +78,13 @@ import {
   MapPin,
   ExternalLink,
   UserCheck,
+  UserX,
   History,
   Volume2,
   VolumeX,
   MessageCircle,
   ShieldCheck,
+  ShieldAlert,
   Users,
   LogOut,
   User,
@@ -351,11 +354,61 @@ export function AdminDashboard({
         setStaff((prev) =>
           prev.map((s) => (s.id === profileId ? res.profile! : s))
         );
+        showToast({
+          type: "success",
+          title: "Rol Actualizado",
+          message: `El permiso se ha modificado a ${newRole}.`,
+        });
+      } else {
+        showToast({
+          type: "error",
+          title: "Error al cambiar rol",
+          message: res.error || "No se pudo actualizar el rol.",
+        });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error updating role:", err);
+      showToast({
+        type: "error",
+        title: "Error",
+        message: err.message || "Error al actualizar rol.",
+      });
     } finally {
       setUpdatingStaffId(null);
+    }
+  };
+
+  const [revokingStaffId, setRevokingStaffId] = useState<string | null>(null);
+
+  const handleRevokeStaff = async (profileId: string, name: string) => {
+    if (!window.confirm(`¿Estás seguro de revocar el acceso de "${name}" a esta tienda?`)) {
+      return;
+    }
+    setRevokingStaffId(profileId);
+    try {
+      const res = await revokeStaffMemberAction(settings.tenant_id, profileId);
+      if (res.success) {
+        setStaff((prev) => prev.filter((s) => s.id !== profileId));
+        showToast({
+          type: "success",
+          title: "Colaborador Revocado",
+          message: `Se ha revocado el acceso de ${name} a este comercio.`,
+        });
+      } else {
+        showToast({
+          type: "error",
+          title: "Error al revocar acceso",
+          message: res.error || "No se pudo revocar al colaborador.",
+        });
+      }
+    } catch (err: any) {
+      showToast({
+        type: "error",
+        title: "Error inesperado",
+        message: err.message || "Error al procesar revocación.",
+      });
+    } finally {
+      setRevokingStaffId(null);
     }
   };
 
@@ -820,7 +873,7 @@ export function AdminDashboard({
     { id: "MANAGEMENT", title: "Administración" },
   ];
 
-  const modulesList: ModuleItem[] = [
+  const rawModulesList: ModuleItem[] = [
     // 1. Operaciones
     {
       id: "PAYMENTS",
@@ -1020,13 +1073,56 @@ export function AdminDashboard({
     },
   ];
 
+  // Matriz estricta de permisos por rol (RBAC)
+  const MODULE_ROLE_PERMISSIONS: Record<string, UserRole[]> = {
+    // 1. Operaciones
+    PAYMENTS: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_CASHIER"],
+    ORDERS: [
+      "PLATFORM_SUPER_ADMIN",
+      "TENANT_OWNER",
+      "TENANT_MANAGER",
+      "TENANT_CASHIER",
+      "TENANT_INVENTORY",
+      "TENANT_DELIVERY",
+    ],
+    DELIVERY: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_DELIVERY"],
+
+    // 2. Catálogo & Marketing
+    INVENTORY: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_INVENTORY"],
+    RAW_MATERIALS: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_INVENTORY"],
+    RECIPES: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_INVENTORY"],
+    COUPONS: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER"],
+    PUSH: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER"],
+
+    // 3. Finanzas
+    REPORTS: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER"],
+    RATES: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_CASHIER"],
+
+    // 4. Administración & Gobierno (Exclusivo Dueño / Super Admin / Gerente)
+    STORES: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER"],
+    STAFF: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER"],
+    AUDIT: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER"],
+    SETTINGS: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER"],
+    PLUGINS: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER"],
+  };
+
+  const userRole: UserRole = currentUser?.role || "TENANT_OWNER";
+  const isSuperAdminOrImpersonating =
+    userRole === "PLATFORM_SUPER_ADMIN" || Boolean(currentUser?.impersonation);
+
+  const modulesList: ModuleItem[] = rawModulesList.filter((m) => {
+    if (isSuperAdminOrImpersonating) return true;
+    const allowed = MODULE_ROLE_PERMISSIONS[m.id];
+    return !allowed || allowed.includes(userRole);
+  });
+
   const currentModule = modulesList.find((m) => m.id === activeTab) || modulesList[0];
 
-  // Auto-correct activeTab if current tab is not enabled for this tenant
+  // Auto-correct activeTab if current tab is not permitted or enabled for this role/tenant
   useEffect(() => {
     const isCurrentTabValid = modulesList.some((m) => m.id === activeTab);
-    if (!isCurrentTabValid) {
-      setActiveTab("PAYMENTS");
+    if (!isCurrentTabValid && modulesList.length > 0) {
+      setActiveTab(modulesList[0].id);
     }
   }, [activeModuleIds, activeTab, modulesList]);
 
@@ -2515,6 +2611,7 @@ export function AdminDashboard({
               tenantId={settings.tenant_id}
               initialRate={rate}
               initialHistory={ratesHistory}
+              onRateUpdated={(newRate) => setRate(newRate)}
             />
           </div>
         )}
@@ -2625,19 +2722,46 @@ export function AdminDashboard({
                         </label>
                         <select
                           value={member.role}
-                          disabled={updatingStaffId === member.id}
+                          disabled={
+                            updatingStaffId === member.id ||
+                            revokingStaffId === member.id ||
+                            member.id === currentUser?.id ||
+                            (member.role === "TENANT_OWNER" &&
+                              currentUser?.role !== "PLATFORM_SUPER_ADMIN" &&
+                              currentUser?.role !== "TENANT_OWNER")
+                          }
                           onChange={(e) =>
                             handleRoleChange(member.id, e.target.value as UserRole)
                           }
                           className="bg-muted border border-border text-foreground text-xs rounded-xl px-3 py-1.5 font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50 cursor-pointer"
                         >
-                          <option value="TENANT_OWNER">Dueño del Comercio</option>
+                          {(currentUser?.role === "PLATFORM_SUPER_ADMIN" ||
+                            currentUser?.role === "TENANT_OWNER") && (
+                            <option value="TENANT_OWNER">Dueño del Comercio</option>
+                          )}
                           <option value="TENANT_MANAGER">Encargada de Sucursal</option>
                           <option value="TENANT_CASHIER">Cajero / Operador</option>
                           <option value="TENANT_INVENTORY">Control de Inventario</option>
                           <option value="TENANT_DELIVERY">Repartidor / Delivery</option>
                         </select>
                       </div>
+
+                      {member.id !== currentUser?.id && member.role !== "TENANT_OWNER" && (
+                        <button
+                          type="button"
+                          disabled={revokingStaffId === member.id || updatingStaffId === member.id}
+                          onClick={() => handleRevokeStaff(member.id, member.full_name)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 border border-border hover:border-rose-500/20 transition-all cursor-pointer disabled:opacity-50"
+                          title="Revocar acceso al comercio"
+                        >
+                          {revokingStaffId === member.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <UserX className="w-3.5 h-3.5" />
+                          )}
+                          <span className="hidden sm:inline">Revocar</span>
+                        </button>
+                      )}
 
                       {updatingStaffId === member.id && (
                         <Loader2 className="w-4 h-4 animate-spin text-primary" />
@@ -3090,6 +3214,32 @@ export function AdminDashboard({
             </div>
           </div>
         )}
+
+        {/* FALLBACK: UNAUTHORIZED TAB / ROLE RESTRICTION */}
+        {!modulesList.some((m) => m.id === activeTab) && (
+          <div className="p-8 rounded-3xl border border-destructive/20 bg-destructive/5 text-center space-y-4 max-w-lg mx-auto my-12 animate-in fade-in">
+            <div className="w-14 h-14 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center mx-auto shadow-inner">
+              <ShieldAlert className="w-7 h-7" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-foreground">
+                Acceso Restringido por Rol (RBAC)
+              </h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Tu rol de usuario actual ({currentUser?.role ? (ROLE_LABELS[currentUser.role]?.label || currentUser.role) : "Invitado"}) no dispone de permisos para acceder a esta sección.
+              </p>
+            </div>
+            {modulesList.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setActiveTab(modulesList[0].id)}
+                className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold shadow-sm hover:opacity-90 transition-opacity cursor-pointer"
+              >
+                Volver a {modulesList[0].label}
+              </button>
+            )}
+          </div>
+        )}
       </main>
       </div>
 
@@ -3114,6 +3264,7 @@ export function AdminDashboard({
         isOpen={isStaffModalOpen}
         onClose={() => setIsStaffModalOpen(false)}
         onStaffAdded={handleStaffAdded}
+        callerRole={currentUser?.role}
       />
 
       {/* Order Details & Operational Modal */}

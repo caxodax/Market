@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { ExchangeRate, RateHistoryItem } from "@marketos/types";
 import {
   Landmark,
@@ -28,6 +29,7 @@ interface ExchangeRateManagerProps {
   initialRate: ExchangeRate;
   initialHistory: RateHistoryItem[];
   isSuperAdmin?: boolean;
+  onRateUpdated?: (rate: ExchangeRate) => void;
 }
 
 export function ExchangeRateManager({
@@ -35,9 +37,19 @@ export function ExchangeRateManager({
   initialRate,
   initialHistory = [],
   isSuperAdmin = false,
+  onRateUpdated,
 }: ExchangeRateManagerProps) {
+  const router = useRouter();
   const [currentRate, setCurrentRate] = useState<ExchangeRate>(initialRate);
   const [history, setHistory] = useState<RateHistoryItem[]>(initialHistory);
+
+  useEffect(() => {
+    setCurrentRate(initialRate);
+  }, [initialRate]);
+
+  useEffect(() => {
+    setHistory(initialHistory);
+  }, [initialHistory]);
 
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<{
@@ -111,6 +123,8 @@ export function ExchangeRateManager({
         });
 
         const todayStr = new Date().toISOString().split("T")[0];
+        onRateUpdated?.(res.rate);
+        router.refresh();
         setHistory((prev) => {
           const exists = prev.findIndex((h) => h.date_rate === todayStr);
           const newItem: RateHistoryItem = {
@@ -172,6 +186,8 @@ export function ExchangeRateManager({
 
       if (res.success && res.rate) {
         setCurrentRate(res.rate);
+        onRateUpdated?.(res.rate);
+        router.refresh();
         setManualMessage({
           type: "success",
           text: "Tasa de contingencia registrada exitosamente.",

@@ -581,6 +581,27 @@ export class MarketOSRepository {
             updated_at: data.updated_at,
           };
 
+          // If eur_value or usdt_value are missing (since exchange_rates table only stores USD value),
+          // hydrate them seamlessly from the latest record in exchange_rate_history
+          if (!rate.eur_value || !rate.usdt_value) {
+            try {
+              const { data: hist } = await supabase
+                .from("exchange_rate_history")
+                .select("rate_eur, usdt_promedio")
+                .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+                .order("date_rate", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+              if (hist) {
+                if (hist.rate_eur && !rate.eur_value) rate.eur_value = Number(hist.rate_eur);
+                if (hist.usdt_promedio && !rate.usdt_value) rate.usdt_value = Number(hist.usdt_promedio);
+              }
+            } catch {
+              // Non-blocking fallback
+            }
+          }
+
           // Self-healing: if rate in database is older than 6 hours, trigger background sync
           const lastUpdated = new Date(data.updated_at).getTime();
           const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000;
@@ -695,25 +716,30 @@ export class MarketOSRepository {
           .eq("tenant_id", tenantId)
           .maybeSingle();
 
-        const ratePayload: any = {
+        // exchange_rates table strictly has (id, tenant_id, currency, value, source, updated_at)
+        const ratePayload = {
           value: bcv.usdRate,
           source: bcv.source,
           updated_at: bcv.timestamp,
         };
-        if (bcv.eurRate) ratePayload.eur_value = bcv.eurRate;
-        if (bcv.usdtRate) ratePayload.usdt_value = bcv.usdtRate;
 
         if (existing) {
-          await supabase
+          const { error: updateErr } = await supabase
             .from("exchange_rates")
             .update(ratePayload)
             .eq("id", existing.id);
+          if (updateErr) {
+            console.error("[MarketOS] Error updating exchange_rates:", updateErr);
+          }
         } else {
-          await supabase.from("exchange_rates").insert({
+          const { error: insertErr } = await supabase.from("exchange_rates").insert({
             tenant_id: tenantId,
             currency: "VES",
             ...ratePayload,
           });
+          if (insertErr) {
+            console.error("[MarketOS] Error inserting exchange_rates:", insertErr);
+          }
         }
 
         // 2. Upsert into exchange_rate_history
@@ -818,25 +844,30 @@ export class MarketOSRepository {
           .eq("tenant_id", tenantId)
           .maybeSingle();
 
-        const ratePayload: any = {
+        // exchange_rates table strictly has (id, tenant_id, currency, value, source, updated_at)
+        const ratePayload = {
           value: data.usd_rate,
           source,
           updated_at: nowIso,
         };
-        if (data.eur_rate) ratePayload.eur_value = data.eur_rate;
-        if (data.usdt_rate) ratePayload.usdt_value = data.usdt_rate;
 
         if (existing) {
-          await supabase
+          const { error: updateErr } = await supabase
             .from("exchange_rates")
             .update(ratePayload)
             .eq("id", existing.id);
+          if (updateErr) {
+            console.error("[MarketOS] Error updating manual exchange_rates:", updateErr);
+          }
         } else {
-          await supabase.from("exchange_rates").insert({
+          const { error: insertErr } = await supabase.from("exchange_rates").insert({
             tenant_id: tenantId,
             currency: "VES",
             ...ratePayload,
           });
+          if (insertErr) {
+            console.error("[MarketOS] Error inserting manual exchange_rates:", insertErr);
+          }
         }
 
         // 2. Upsert in exchange_rate_history
