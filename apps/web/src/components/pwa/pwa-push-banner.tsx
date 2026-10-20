@@ -15,6 +15,7 @@ import {
   getDevicePwaStatus,
   registerServiceWorker,
 } from "@/lib/pushClient";
+import { DEFAULT_VAPID_PUBLIC_KEY } from "@/lib/push-constants";
 import { savePushSubscriptionAction } from "@/app/admin/push-actions";
 import { IosInstallGuideModal } from "./ios-install-guide-modal";
 import { AndroidInstallGuideModal } from "./android-install-guide-modal";
@@ -238,7 +239,8 @@ export function PwaPushBanner({
       } catch {}
 
       const reg = await navigator.serviceWorker.ready;
-      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      const vapidPublicKey =
+        process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
 
       if (!vapidPublicKey) {
         throw new Error("Clave pública VAPID no encontrada en la configuración.");

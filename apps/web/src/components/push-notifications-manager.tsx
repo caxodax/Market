@@ -32,6 +32,7 @@ import {
   savePushSubscriptionAction,
 } from "@/app/admin/push-actions";
 import { urlBase64ToUint8Array } from "@/lib/pushClient";
+import { DEFAULT_VAPID_PUBLIC_KEY } from "@/lib/push-constants";
 import { formatCaracasDateTime } from "@marketos/utils";
 import type {
   TenantSettings,
@@ -255,7 +256,8 @@ export function PushNotificationsManager({
         let sub = await reg.pushManager.getSubscription();
 
         if (!sub) {
-          const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+          const vapidPublicKey =
+            process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
           if (!vapidPublicKey) {
             throw new Error("Clave VAPID pública no configurada.");
           }

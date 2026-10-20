@@ -1,11 +1,16 @@
 import webpush from "web-push";
 import { MarketOSRepository } from "@marketos/database";
 import type { PushNotificationLog, SendPushBroadcastInput } from "@marketos/types";
+import {
+  DEFAULT_VAPID_PUBLIC_KEY,
+  DEFAULT_VAPID_PRIVATE_KEY,
+  DEFAULT_VAPID_SUBJECT,
+} from "./push-constants";
 
 // Inicializar configuración VAPID
-const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
-const privateKey = process.env.VAPID_PRIVATE_KEY || "";
-const subject = process.env.VAPID_SUBJECT || "mailto:admin@marketos.app";
+const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
+const privateKey = process.env.VAPID_PRIVATE_KEY || DEFAULT_VAPID_PRIVATE_KEY;
+const subject = process.env.VAPID_SUBJECT || DEFAULT_VAPID_SUBJECT;
 
 if (publicKey && privateKey) {
   try {
