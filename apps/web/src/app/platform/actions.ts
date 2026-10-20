@@ -1,6 +1,7 @@
 "use server";
 
 import { MarketOSRepository } from "@marketos/database";
+import { signSessionPayload, verifySessionPayload } from "@marketos/auth";
 import {
   OnboardTenantInput,
   SubscriptionPlanTier,
@@ -292,7 +293,7 @@ export async function impersonateTenantAction(tenantId: string) {
     const cookieStore = await cookies();
     cookieStore.set(
       "marketos_impersonation",
-      JSON.stringify(impersonationSession),
+      signSessionPayload(impersonationSession),
       {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -351,22 +352,24 @@ export async function stopImpersonationAction() {
 
     if (impersonationCookie) {
       try {
-        const parsed: ImpersonationSession = JSON.parse(impersonationCookie);
-        await MarketOSRepository.recordAuditLog({
-          tenantId: parsed.targetTenantId,
-          tenantName: parsed.targetTenantName,
-          actorId: parsed.originalSuperAdmin.id,
-          actorName: parsed.originalSuperAdmin.fullName,
-          actorEmail: parsed.originalSuperAdmin.email,
-          actorRole: parsed.originalSuperAdmin.role,
-          action: "SUPPORT_IMPERSONATION_ENDED",
-          entity: "tenants",
-          entityId: parsed.targetTenantId,
-          newData: {
+        const parsed = verifySessionPayload<ImpersonationSession>(impersonationCookie);
+        if (parsed) {
+          await MarketOSRepository.recordAuditLog({
+            tenantId: parsed.targetTenantId,
             tenantName: parsed.targetTenantName,
-            endedAt: new Date().toISOString(),
-          },
-        });
+            actorId: parsed.originalSuperAdmin.id,
+            actorName: parsed.originalSuperAdmin.fullName,
+            actorEmail: parsed.originalSuperAdmin.email,
+            actorRole: parsed.originalSuperAdmin.role,
+            action: "SUPPORT_IMPERSONATION_ENDED",
+            entity: "tenants",
+            entityId: parsed.targetTenantId,
+            newData: {
+              tenantName: parsed.targetTenantName,
+              endedAt: new Date().toISOString(),
+            },
+          });
+        }
       } catch (err) {
         console.error("Error logging stop impersonation audit:", err);
       }

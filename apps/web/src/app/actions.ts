@@ -106,6 +106,71 @@ export async function submitPaymentProofAction(input: SubmitPaymentInput) {
   }
 }
 
+export interface CreateOrderWithPaymentInput {
+  order: CreateOrderInput;
+  payment: {
+    method: "PAGO_MOVIL" | "BANK_TRANSFER" | "ZELLE" | "CASH_USD";
+    bankName?: string;
+    referenceNumber: string;
+    amount: number;
+    currency?: "USD" | "VES";
+    proofImageUrl?: string;
+  };
+}
+
+export type CreateOrderWithPaymentResult =
+  | { success: true; order: Order; error?: never }
+  | { success: false; error: string; order?: never };
+
+/**
+ * Atomic Order + Payment Submission Action
+ * Creates order and registers payment proof in a single atomic server round-trip,
+ * eliminating client-side race conditions and unlinked orphaned orders.
+ */
+export async function createOrderWithPaymentAction(
+  input: CreateOrderWithPaymentInput
+): Promise<CreateOrderWithPaymentResult> {
+  const orderRes = await createOrderAction(input.order);
+  if (!orderRes.success || !orderRes.order) {
+    return {
+      success: false,
+      error: orderRes.error || "No se pudo generar la orden",
+    };
+  }
+
+  const createdOrder = orderRes.order;
+
+  try {
+    await MarketOSRepository.submitPaymentProof({
+      tenantId: input.order.tenantId,
+      orderId: createdOrder.id,
+      method: input.payment.method,
+      bankName: input.payment.bankName,
+      referenceNumber: input.payment.referenceNumber,
+      amount: input.payment.amount,
+      currency: input.payment.currency || "USD",
+      proofImageUrl: input.payment.proofImageUrl,
+    });
+  } catch (payErr) {
+    console.error("[createOrderWithPaymentAction] Error submitting payment proof:", payErr);
+  }
+
+  const completedOrder: Order = {
+    ...createdOrder,
+    customer_id_number: input.order.customerIdNumber || createdOrder.customer_id_number,
+    payment_method: input.payment.method,
+    payment_reference: input.payment.referenceNumber,
+    payment_status: "PENDING",
+    proof_image_url: input.payment.proofImageUrl || null,
+  };
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+
+  return { success: true, order: completedOrder };
+}
+
+
 /**
  * Validate discount coupon code for tenant
  */

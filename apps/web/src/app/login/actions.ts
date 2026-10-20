@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { MarketOSRepository, createServerComponentClient } from "@marketos/database";
+import { signSessionPayload, verifySessionPayload } from "@marketos/auth";
 import { UserProfile, UserRole } from "@marketos/types";
 
 const TENANT_ID = process.env.DEFAULT_TENANT_ID || "shop-market-ca";
@@ -157,7 +158,9 @@ export async function loginUserAction(email: string, password?: string) {
       loggedInAt: new Date().toISOString(),
     };
 
-    cookieStore.set("marketos_session", JSON.stringify(sessionPayload), {
+    const signedToken = signSessionPayload(sessionPayload);
+
+    cookieStore.set("marketos_session", signedToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -166,7 +169,7 @@ export async function loginUserAction(email: string, password?: string) {
     });
 
     // Also set legacy cookie for compatibility
-    cookieStore.set("marketos_admin_session", JSON.stringify(sessionPayload), {
+    cookieStore.set("marketos_admin_session", signedToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -228,17 +231,22 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
   if (!sessionCookie) return null;
 
   try {
-    const parsed = JSON.parse(sessionCookie);
+    const parsed = verifySessionPayload<{
+      id: string;
+      email: string;
+      fullName: string;
+      role: UserRole;
+      tenantId: string;
+      loggedInAt: string;
+    }>(sessionCookie);
+
+    if (!parsed) return null;
 
     // Check for active support impersonation session
     const impersonationCookie = cookieStore.get("marketos_impersonation")?.value;
     let impersonation = null;
     if (impersonationCookie) {
-      try {
-        impersonation = JSON.parse(impersonationCookie);
-      } catch {
-        impersonation = null;
-      }
+      impersonation = verifySessionPayload<any>(impersonationCookie);
     }
 
     return {
