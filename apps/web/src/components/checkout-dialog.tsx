@@ -164,6 +164,7 @@ export function CheckoutDialog({
     savedPercent: number;
   } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [cashTenderedInput, setCashTenderedInput] = useState<string>("");
 
   // Lock body scroll when checkout dialog is open
   useEffect(() => {
@@ -300,7 +301,8 @@ export function CheckoutDialog({
     const res = await validateCouponAction(
       settings.tenant_id,
       couponCode.trim(),
-      subtotalUsd
+      subtotalUsd,
+      customerPhone.trim() || undefined
     );
 
     setCouponLoading(false);
@@ -453,6 +455,13 @@ export function CheckoutDialog({
       const fullCi =
         isVenezuelaActive && ciNumber.trim() ? `${ciPrefix}-${ciNumber.trim()}` : "N/A";
 
+      // Calculate cash and change if cash payment
+      const parsedCashTendered = parseFloat(cashTenderedInput);
+      const validCashTendered = !isNaN(parsedCashTendered) && parsedCashTendered > 0 ? parsedCashTendered : undefined;
+      const calculatedChangeDue = validCashTendered && validCashTendered > totalUsd
+        ? Number((validCashTendered - totalUsd).toFixed(2))
+        : undefined;
+
       // Atomic Order + Payment Submission
       const result = await createOrderWithPaymentAction({
         order: {
@@ -467,6 +476,8 @@ export function CheckoutDialog({
           deliveryFeeUsd,
           couponCode: appliedCoupon?.code,
           discountUsd,
+          cashTenderedUsd: validCashTendered,
+          changeRequiredUsd: calculatedChangeDue,
           idempotencyKey,
           items: items.map((i) => ({
             productId: i.product.id,
@@ -479,7 +490,7 @@ export function CheckoutDialog({
             deliveryType === "DELIVERY"
               ? `Delivery: ${selectedZone?.name}`
               : "Retiro en Tienda"
-          }`,
+          }${validCashTendered ? ` | Paga con: $${validCashTendered.toFixed(2)} (Vuelto: $${(calculatedChangeDue || 0).toFixed(2)})` : ""}`,
         },
         payment: {
           method: paymentMethod,
@@ -1296,17 +1307,54 @@ export function CheckoutDialog({
 
                 {/* Cash Details */}
                 {activePaymentMethod === "CASH_USD" && (
-                  <div className="text-muted-foreground leading-relaxed pt-1 p-3 rounded-xl bg-background border border-border">
-                    <p className="font-semibold text-foreground flex items-center gap-1.5">
-                      <Receipt className="w-3.5 h-3.5 text-amber-500" />
-                      Pago en efectivo contra entrega / tienda física:
-                    </p>
-                    <p className="mt-1 text-[11px]">{cashInstructions}</p>
-                    <div className="mt-2 pt-2 border-t border-border flex items-center justify-between font-bold text-foreground">
-                      <span>Total exacto a entregar:</span>
-                      <span className="font-mono text-primary font-black">
+                  <div className="text-muted-foreground leading-relaxed pt-1 p-3.5 rounded-2xl bg-background border border-border space-y-3">
+                    <div>
+                      <p className="font-semibold text-foreground flex items-center gap-1.5 text-xs">
+                        <Receipt className="w-3.5 h-3.5 text-amber-500" />
+                        Pago en efectivo contra entrega / tienda física:
+                      </p>
+                      <p className="mt-1 text-[11px]">{cashInstructions}</p>
+                    </div>
+
+                    <div className="pt-2 border-t border-border flex items-center justify-between font-bold text-foreground">
+                      <span className="text-xs">Total exacto de la orden:</span>
+                      <span className="font-mono text-primary font-black text-sm">
                         {formatCurrency(totalUsd, "USD")}
                       </span>
+                    </div>
+
+                    {/* Cash Tendered & Change calculator */}
+                    <div className="pt-2 border-t border-border space-y-2">
+                      <label className="block text-[11px] font-bold text-foreground">
+                        💵 ¿Con qué denominación o billete pagarás? (Opcional)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-xs">
+                          $
+                        </span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min={totalUsd}
+                          placeholder={totalUsd.toFixed(2)}
+                          value={cashTenderedInput}
+                          onChange={(e) => setCashTenderedInput(e.target.value)}
+                          className="w-full h-10 pl-7 pr-3 rounded-xl border border-input bg-card text-xs font-mono font-bold focus:ring-2 focus:ring-primary focus:outline-none"
+                        />
+                      </div>
+                      {parseFloat(cashTenderedInput) > totalUsd && (
+                        <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs font-medium flex items-center justify-between animate-fadeIn">
+                          <span className="font-semibold">🔄 Cambio que debe llevar el repartidor:</span>
+                          <span className="font-mono font-black text-sm text-emerald-700 dark:text-emerald-200">
+                            ${(parseFloat(cashTenderedInput) - totalUsd).toFixed(2)} USD
+                          </span>
+                        </div>
+                      )}
+                      {parseFloat(cashTenderedInput) < totalUsd && parseFloat(cashTenderedInput) > 0 && (
+                        <p className="text-[11px] text-destructive font-semibold">
+                          ⚠️ El monto ingresado (${parseFloat(cashTenderedInput).toFixed(2)}) no cubre el total del pedido (${totalUsd.toFixed(2)}).
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}

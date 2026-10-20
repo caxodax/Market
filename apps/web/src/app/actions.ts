@@ -177,13 +177,15 @@ export async function createOrderWithPaymentAction(
 export async function validateCouponAction(
   tenantId: string,
   code: string,
-  orderAmountUsd: number
+  orderAmountUsd: number,
+  customerPhone?: string
 ) {
   try {
     const res = await MarketOSRepository.validateCoupon(
       tenantId,
       code,
-      orderAmountUsd
+      orderAmountUsd,
+      customerPhone
     );
     return { success: true, ...res };
   } catch (error) {

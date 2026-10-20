@@ -110,6 +110,8 @@ export interface CreateOrderInput {
     is_tax_exempt?: boolean;
   }[];
   notes?: string;
+  cashTenderedUsd?: number;
+  changeRequiredUsd?: number;
   idempotencyKey?: string;
 }
 

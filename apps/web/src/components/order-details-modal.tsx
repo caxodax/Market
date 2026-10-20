@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Order, OrderStatus, TenantSettings, Driver, TenantModuleId } from "@marketos/types";
 import { formatCurrency, generateOrderStatusNotificationWhatsAppLink } from "@marketos/utils";
+import { buildDriverWhatsAppDispatchUrl } from "@marketos/plugin-delivery-fleet";
 import { BottomSheetModal } from "./bottom-sheet-modal";
 import {
   X,
@@ -114,6 +115,9 @@ export function OrderDetailsModal({
   );
   const [isRegisteringFiscal, setIsRegisteringFiscal] = useState(false);
   const [fiscalSuccessMsg, setFiscalSuccessMsg] = useState<string | null>(null);
+  const [selectedDriverId, setSelectedDriverId] = useState<string>(
+    order?.driver_id || (drivers[0]?.id ?? "")
+  );
 
   if (!isOpen || !order) return null;
 
@@ -155,7 +159,20 @@ export function OrderDetailsModal({
     icon: null,
   };
 
-  const assignedDriver = drivers.find((d) => d.id === order.driver_id) || drivers[0];
+  const assignedDriver =
+    drivers.find((d) => d.id === selectedDriverId) ||
+    drivers.find((d) => d.id === order.driver_id) ||
+    drivers[0];
+
+  const driverDispatchUrl =
+    assignedDriver && order.delivery_type === "DELIVERY"
+      ? buildDriverWhatsAppDispatchUrl({
+          order,
+          driver: assignedDriver,
+          storeName: settings.business_name || "MarketOS",
+        })
+      : null;
+
   const items = order.items || [];
   const totalItemsCount = items.reduce((acc, it) => acc + it.quantity, 0);
 
@@ -337,13 +354,66 @@ export function OrderDetailsModal({
               </p>
             )}
 
-            {/* Repartidor asignado si es delivery */}
-            {order.delivery_type === "DELIVERY" && drivers.length > 0 && (
-              <div className="pt-1.5 border-t border-border flex items-center justify-between text-[11px]">
-                <span className="text-muted-foreground">Repartidor Asignado:</span>
-                <span className="font-semibold text-foreground">
-                  {assignedDriver ? assignedDriver.name : "Sin asignar"}
-                </span>
+            {/* Detalle de efectivo y vuelto para chofer */}
+            {order.delivery_type === "DELIVERY" && (
+              <div className="pt-2 border-t border-border space-y-2.5 text-[11px]">
+                {(order.cash_tendered_usd != null || order.change_required_usd != null) && (
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 space-y-1">
+                    <div className="flex items-center justify-between font-bold text-xs">
+                      <span>💵 Cliente paga con:</span>
+                      <span className="font-mono text-sm">${Number(order.cash_tendered_usd || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between font-black text-amber-700 dark:text-amber-300 border-t border-amber-500/20 pt-1 text-xs">
+                      <span>🔄 Llevar de vuelto:</span>
+                      <span className="font-mono text-sm underline">${Number(order.change_required_usd || 0).toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+
+                {drivers.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                      <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                        <Truck className="w-3.5 h-3.5 text-primary" />
+                        <span>Asignar Motorizado / Repartidor:</span>
+                      </span>
+                      <select
+                        value={selectedDriverId}
+                        onChange={(e) => {
+                          const newDrvId = e.target.value;
+                          setSelectedDriverId(newDrvId);
+                          if (onUpdateStatus && order.status === "DELIVERING") {
+                            onUpdateStatus(order.id, "DELIVERING", newDrvId);
+                          }
+                        }}
+                        className="bg-card border border-border rounded-xl px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-xs cursor-pointer"
+                      >
+                        {drivers.map((drv) => (
+                          <option key={drv.id} value={drv.id}>
+                            {drv.name} ({drv.vehicle_type}{drv.plate_number ? ` · ${drv.plate_number}` : ""})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {driverDispatchUrl && (
+                      <a
+                        href={driverDispatchUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all active:scale-98"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        <span>📲 Despachar Comanda por WhatsApp a {assignedDriver?.name}</span>
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between text-muted-foreground italic text-xs py-1">
+                    <span>Repartidor:</span>
+                    <span>Sin motorizados activos registrados</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -736,7 +806,7 @@ export function OrderDetailsModal({
                 <button
                   type="button"
                   disabled={isProcessing}
-                  onClick={() => onUpdateStatus(order.id, "DELIVERING", assignedDriver?.id)}
+                  onClick={() => onUpdateStatus(order.id, "DELIVERING", selectedDriverId || assignedDriver?.id)}
                   className="px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
                 >
                   <Truck className="w-3.5 h-3.5" />

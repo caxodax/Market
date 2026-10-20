@@ -132,6 +132,8 @@ export interface CreateOrderInput {
     is_tax_exempt?: boolean;
   }[];
   notes?: string;
+  cashTenderedUsd?: number;
+  changeRequiredUsd?: number;
   idempotencyKey?: string;
 }
 
@@ -1164,7 +1166,8 @@ export class MarketOSRepository {
   static async validateCoupon(
     tenantId: string,
     rawCode: string,
-    orderAmountUsd: number
+    orderAmountUsd: number,
+    customerPhone?: string
   ): Promise<{
     valid: boolean;
     coupon?: Coupon;
@@ -1218,6 +1221,46 @@ export class MarketOSRepository {
         discountUsd: 0,
         message: "Este cupón ha alcanzado su límite de usos",
       };
+    }
+
+    if (coupon.usage_limit_per_customer && customerPhone) {
+      const cleanPhone = customerPhone.replace(/\D/g, "");
+      let customerUsageCount = 0;
+
+      if (supabase && cleanPhone.length >= 7) {
+        try {
+          const { count } = await supabase
+            .from("orders")
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_id", tenantId)
+            .eq("coupon_id", coupon.id)
+            .neq("status", "CANCELLED")
+            .ilike("customer_phone", `%${cleanPhone.slice(-7)}%`);
+          customerUsageCount = count || 0;
+        } catch (e) {
+          console.warn("[MarketOS] Could not count customer coupon orders in Supabase:", e);
+        }
+      }
+
+      if (!customerUsageCount) {
+        customerUsageCount = state.orders.filter(
+          (o) =>
+            o.tenant_id === tenantId &&
+            o.coupon_id === coupon?.id &&
+            o.status !== "CANCELLED" &&
+            (o.customer_phone?.replace(/\D/g, "").slice(-7) === cleanPhone.slice(-7) ||
+              o.customer_phone === customerPhone)
+        ).length;
+      }
+
+      if (customerUsageCount >= coupon.usage_limit_per_customer) {
+        return {
+          valid: false,
+          coupon,
+          discountUsd: 0,
+          message: `Has alcanzado el límite de ${coupon.usage_limit_per_customer} uso(s) permitido(s) para este cupón`,
+        };
+      }
     }
 
     if (coupon.starts_at) {
@@ -1309,6 +1352,7 @@ export class MarketOSRepository {
       min_order_amount_usd: Number(input.minOrderAmountUsd) || 0,
       max_discount_usd: input.maxDiscountUsd ? Number(input.maxDiscountUsd) : null,
       usage_limit: input.usageLimit ? Number(input.usageLimit) : null,
+      usage_limit_per_customer: input.usageLimitPerCustomer ? Number(input.usageLimitPerCustomer) : null,
       usage_count: 0,
       is_active: true,
       starts_at: input.startsAt || null,
@@ -1329,6 +1373,7 @@ export class MarketOSRepository {
           min_order_amount_usd: newCoupon.min_order_amount_usd,
           max_discount_usd: newCoupon.max_discount_usd,
           usage_limit: newCoupon.usage_limit,
+          usage_limit_per_customer: newCoupon.usage_limit_per_customer,
           usage_count: 0,
           is_active: true,
           starts_at: newCoupon.starts_at,
@@ -1376,6 +1421,7 @@ export class MarketOSRepository {
     if (input.minOrderAmountUsd !== undefined) updatePayload.min_order_amount_usd = Number(input.minOrderAmountUsd);
     if (input.maxDiscountUsd !== undefined) updatePayload.max_discount_usd = input.maxDiscountUsd ? Number(input.maxDiscountUsd) : null;
     if (input.usageLimit !== undefined) updatePayload.usage_limit = input.usageLimit ? Number(input.usageLimit) : null;
+    if (input.usageLimitPerCustomer !== undefined) updatePayload.usage_limit_per_customer = input.usageLimitPerCustomer ? Number(input.usageLimitPerCustomer) : null;
     if (input.startsAt !== undefined) updatePayload.starts_at = input.startsAt || null;
     if (input.expiresAt !== undefined) updatePayload.expires_at = input.expiresAt || null;
     if (input.isActive !== undefined) updatePayload.is_active = input.isActive;
@@ -1401,6 +1447,7 @@ export class MarketOSRepository {
       if (input.minOrderAmountUsd !== undefined) c.min_order_amount_usd = Number(input.minOrderAmountUsd);
       if (input.maxDiscountUsd !== undefined) c.max_discount_usd = input.maxDiscountUsd ? Number(input.maxDiscountUsd) : null;
       if (input.usageLimit !== undefined) c.usage_limit = input.usageLimit ? Number(input.usageLimit) : null;
+      if (input.usageLimitPerCustomer !== undefined) c.usage_limit_per_customer = input.usageLimitPerCustomer ? Number(input.usageLimitPerCustomer) : null;
       if (input.startsAt !== undefined) c.starts_at = input.startsAt || null;
       if (input.expiresAt !== undefined) c.expires_at = input.expiresAt || null;
       if (input.isActive !== undefined) c.is_active = input.isActive;
@@ -1728,7 +1775,8 @@ export class MarketOSRepository {
       const couponRes = await this.validateCoupon(
         input.tenantId,
         input.couponCode,
-        subtotalUsd
+        subtotalUsd,
+        input.customerPhone
       );
       if (couponRes.valid) {
         discountUsd = couponRes.discountUsd;
@@ -1962,6 +2010,8 @@ export class MarketOSRepository {
       iva_amount_usd: ivaAmountUsd,
       iva_amount_ves: ivaAmountVes,
       notes: input.notes || null,
+      cash_tendered_usd: input.cashTenderedUsd ?? null,
+      change_required_usd: input.changeRequiredUsd ?? null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       customer_name: input.customerName,
@@ -2004,6 +2054,8 @@ export class MarketOSRepository {
             total_ves: newOrder.total_ves,
             exchange_rate_applied: newOrder.exchange_rate_applied,
             notes: newOrder.notes,
+            cash_tendered_usd: newOrder.cash_tendered_usd,
+            change_required_usd: newOrder.change_required_usd,
           })
           .select("id")
           .single();
@@ -2096,6 +2148,31 @@ export class MarketOSRepository {
     }
 
     state.orders.unshift(newOrder);
+
+    // Increment coupon usage count if a valid coupon was applied
+    if (validCouponId) {
+      if (supabase) {
+        try {
+          const { data: coupRow } = await supabase
+            .from("coupons")
+            .select("usage_count")
+            .eq("id", validCouponId)
+            .maybeSingle();
+          if (coupRow) {
+            await supabase
+              .from("coupons")
+              .update({ usage_count: (Number(coupRow.usage_count) || 0) + 1 })
+              .eq("id", validCouponId);
+          }
+        } catch (e) {
+          console.warn("[MarketOS] Coupon usage increment warning in Supabase:", e);
+        }
+      }
+      const memCoup = state.coupons.find((c) => c.id === validCouponId);
+      if (memCoup) {
+        memCoup.usage_count = (memCoup.usage_count || 0) + 1;
+      }
+    }
 
     // Decrement stock in memory state
     for (const item of input.items) {
@@ -2831,6 +2908,25 @@ export class MarketOSRepository {
 
         if (status === "CANCELLED") {
           await MarketOSRepository.restoreOrderInventoryStock(tenantId, orderId);
+          // Restore coupon usage if order used a coupon
+          const { data: ordWithCoupon } = await supabase
+            .from("orders")
+            .select("coupon_id")
+            .eq("id", orderId)
+            .maybeSingle();
+          if (ordWithCoupon?.coupon_id) {
+            const { data: cData } = await supabase
+              .from("coupons")
+              .select("usage_count")
+              .eq("id", ordWithCoupon.coupon_id)
+              .maybeSingle();
+            if (cData && Number(cData.usage_count) > 0) {
+              await supabase
+                .from("coupons")
+                .update({ usage_count: Math.max(0, Number(cData.usage_count) - 1) })
+                .eq("id", ordWithCoupon.coupon_id);
+            }
+          }
         }
       } catch (e) {
         console.warn("[MarketOS] Update order status in Supabase error:", e);
@@ -2853,6 +2949,12 @@ export class MarketOSRepository {
 
       if (status === "CANCELLED" && oldStatus !== "CANCELLED") {
         await MarketOSRepository.restoreOrderInventoryStock(tenantId, orderId);
+        if (order.coupon_id) {
+          const memCoupon = state.coupons.find((c) => c.id === order.coupon_id);
+          if (memCoupon && memCoupon.usage_count > 0) {
+            memCoupon.usage_count -= 1;
+          }
+        }
       }
 
       if (status === "PREPARING" && oldStatus !== "PREPARING") {

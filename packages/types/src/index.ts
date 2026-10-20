@@ -286,6 +286,7 @@ export interface Coupon {
   min_order_amount_usd: number;
   max_discount_usd?: number | null;
   usage_limit?: number | null;
+  usage_limit_per_customer?: number | null;
   usage_count: number;
   is_active: boolean;
   starts_at?: string | null;
@@ -302,6 +303,7 @@ export interface CreateCouponInput {
   minOrderAmountUsd?: number;
   maxDiscountUsd?: number;
   usageLimit?: number;
+  usageLimitPerCustomer?: number | null;
   startsAt?: string | null;
   expiresAt?: string | null;
 }
@@ -316,6 +318,7 @@ export interface UpdateCouponInput {
   minOrderAmountUsd?: number;
   maxDiscountUsd?: number;
   usageLimit?: number | null;
+  usageLimitPerCustomer?: number | null;
   startsAt?: string | null;
   expiresAt?: string | null;
   isActive?: boolean;
@@ -490,6 +493,9 @@ export interface Order {
   physical_invoice_number?: string | null;
   physical_machine_serial?: string | null;
   physical_fiscal_registered_at?: string | null;
+  // Delivery Cash & Change Management
+  cash_tendered_usd?: number | null;
+  change_required_usd?: number | null;
 }
 
 export interface SalesAnalytics {

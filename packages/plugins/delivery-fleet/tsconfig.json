@@ -1,0 +1,9 @@
+{
+  "extends": "@marketos/typescript-config/base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["src/__tests__/**/*"]
+}

@@ -45,6 +45,7 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
   const [minOrderAmount, setMinOrderAmount] = useState<number | "">("");
   const [maxDiscountUsd, setMaxDiscountUsd] = useState<number | "">("");
   const [usageLimit, setUsageLimit] = useState<number | "">("");
+  const [usageLimitPerCustomer, setUsageLimitPerCustomer] = useState<number | "">("");
   const [startsAt, setStartsAt] = useState<string>("");
   const [expiresAt, setExpiresAt] = useState<string>("");
 
@@ -72,6 +73,7 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
     setMinOrderAmount("");
     setMaxDiscountUsd("");
     setUsageLimit("");
+    setUsageLimitPerCustomer("");
     setStartsAt("");
     setExpiresAt("");
     setError(null);
@@ -87,6 +89,7 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
     setMinOrderAmount(coupon.min_order_amount_usd || "");
     setMaxDiscountUsd(coupon.max_discount_usd || "");
     setUsageLimit(coupon.usage_limit || "");
+    setUsageLimitPerCustomer(coupon.usage_limit_per_customer || "");
     setStartsAt(coupon.starts_at ? coupon.starts_at.slice(0, 10) : "");
     setExpiresAt(coupon.expires_at ? coupon.expires_at.slice(0, 10) : "");
     setError(null);
@@ -127,6 +130,7 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
         minOrderAmountUsd: minOrderAmount ? Number(minOrderAmount) : 0,
         maxDiscountUsd: maxDiscountUsd ? Number(maxDiscountUsd) : undefined,
         usageLimit: usageLimit ? Number(usageLimit) : null,
+        usageLimitPerCustomer: usageLimitPerCustomer ? Number(usageLimitPerCustomer) : null,
         startsAt: isoStarts,
         expiresAt: isoExpires,
       };
@@ -152,6 +156,7 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
         minOrderAmountUsd: minOrderAmount ? Number(minOrderAmount) : 0,
         maxDiscountUsd: maxDiscountUsd ? Number(maxDiscountUsd) : undefined,
         usageLimit: usageLimit ? Number(usageLimit) : undefined,
+        usageLimitPerCustomer: usageLimitPerCustomer ? Number(usageLimitPerCustomer) : undefined,
         startsAt: isoStarts,
         expiresAt: isoExpires,
       };
@@ -354,6 +359,15 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
                       {coupon.usage_count} {coupon.usage_limit ? `/ ${coupon.usage_limit}` : "usos"}
                     </span>
                   </div>
+
+                  {coupon.usage_limit_per_customer ? (
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-muted-foreground font-medium">Límite por cliente:</span>
+                      <span className="font-mono text-primary font-bold">
+                        Máx {coupon.usage_limit_per_customer} por persona
+                      </span>
+                    </div>
+                  ) : null}
 
                   {/* Dates: Starts and Expires */}
                   <div className="pt-2 border-t border-border/60 space-y-1.5 text-[11px]">
@@ -596,7 +610,7 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
                 </div>
               </div>
 
-              {/* Min Order Amount & Usage Limit */}
+              {/* Min Order Amount & Max Discount Cap (if percentage) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-muted-foreground block mb-1.5">
@@ -618,7 +632,7 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
                 {discountType === "PERCENTAGE" ? (
                   <div>
                     <label className="font-semibold text-muted-foreground block mb-1.5">
-                      Tope Máximo Descuento ($)
+                      Tope Máximo Descuento ($ USD)
                     </label>
                     <input
                       type="number"
@@ -628,27 +642,48 @@ export function CouponManager({ tenantId, initialCoupons }: CouponManagerProps) 
                       onChange={(e) =>
                         setMaxDiscountUsd(e.target.value === "" ? "" : parseFloat(e.target.value))
                       }
-                      placeholder="Sin tope"
+                      placeholder="Sin tope máximo"
                       className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-mono font-bold focus:ring-2 focus:ring-primary focus:outline-none"
                     />
                   </div>
                 ) : (
-                  <div>
-                    <label className="font-semibold text-muted-foreground block mb-1.5">
-                      Límite de Usos Totales
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={usageLimit}
-                      onChange={(e) =>
-                        setUsageLimit(e.target.value === "" ? "" : parseInt(e.target.value))
-                      }
-                      placeholder="Ilimitado"
-                      className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-mono font-bold focus:ring-2 focus:ring-primary focus:outline-none"
-                    />
-                  </div>
+                  <div className="hidden sm:block" />
                 )}
+              </div>
+
+              {/* Limits: Global and Per-Customer */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-muted-foreground block mb-1.5">
+                    Límite Total de Canjes (Global)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={usageLimit}
+                    onChange={(e) =>
+                      setUsageLimit(e.target.value === "" ? "" : parseInt(e.target.value))
+                    }
+                    placeholder="Ilimitado"
+                    className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-mono font-bold focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold text-muted-foreground block mb-1.5">
+                    Límite por Cliente (Canjes por persona)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={usageLimitPerCustomer}
+                    onChange={(e) =>
+                      setUsageLimitPerCustomer(e.target.value === "" ? "" : parseInt(e.target.value))
+                    }
+                    placeholder="Ej. 1 (1 por persona)"
+                    className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-mono font-bold focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
+                </div>
               </div>
 
               {/* Description */}
