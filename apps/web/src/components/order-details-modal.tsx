@@ -27,7 +27,10 @@ import {
   ZoomIn,
   ShieldCheck,
   Download,
+  Printer,
+  Hash,
 } from "lucide-react";
+import { registerPhysicalFiscalInvoiceAction } from "../app/actions";
 
 interface OrderDetailsModalProps {
   order: Order | null;
@@ -38,6 +41,7 @@ interface OrderDetailsModalProps {
   activeModuleIds?: TenantModuleId[];
   onUpdateStatus?: (orderId: string, newStatus: OrderStatus, driverId?: string) => Promise<void>;
   onReviewPayment?: (paymentId: string, status: "APPROVED" | "REJECTED") => Promise<void>;
+  onOrderUpdated?: (order: Order) => void;
   paymentId?: string;
   isProcessing?: boolean;
 }
@@ -99,12 +103,45 @@ export function OrderDetailsModal({
   onReviewPayment,
   paymentId,
   isProcessing = false,
+  onOrderUpdated,
 }: OrderDetailsModalProps) {
   const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [physicalInvoiceInput, setPhysicalInvoiceInput] = useState(order?.physical_invoice_number || "");
+  const [physicalSerialInput, setPhysicalSerialInput] = useState(
+    order?.physical_machine_serial || settings.billing_settings?.fiscal_machine_serial || ""
+  );
+  const [isRegisteringFiscal, setIsRegisteringFiscal] = useState(false);
+  const [fiscalSuccessMsg, setFiscalSuccessMsg] = useState<string | null>(null);
 
   if (!isOpen || !order) return null;
+
+  const handleRegisterPhysicalInvoice = async () => {
+    if (!physicalInvoiceInput.trim()) return;
+    setIsRegisteringFiscal(true);
+    setFiscalSuccessMsg(null);
+    try {
+      const res = await registerPhysicalFiscalInvoiceAction(
+        order.tenant_id,
+        order.id,
+        physicalInvoiceInput.trim(),
+        physicalSerialInput.trim() || undefined
+      );
+      if (res.success && res.order) {
+        setFiscalSuccessMsg(`Factura fiscal #${physicalInvoiceInput.trim()} vinculada exitosamente.`);
+        if (onOrderUpdated) {
+          onOrderUpdated(res.order);
+        }
+      } else {
+        alert(res.error || "No se pudo vincular la factura fiscal física.");
+      }
+    } catch (e: any) {
+      alert(e.message || "Error al vincular factura fiscal.");
+    } finally {
+      setIsRegisteringFiscal(false);
+    }
+  };
 
   const copyToClipboard = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
@@ -526,6 +563,106 @@ export function OrderDetailsModal({
               <span>Notas del Pedido:</span>
             </span>
             <p className="leading-relaxed">{order.notes}</p>
+          </div>
+        )}
+
+        {/* Control Fiscal SENIAT (Caja Mostrador / Facturación) */}
+        {isVenezuelaActive && (
+          <div className="p-3.5 rounded-2xl bg-card border border-border shadow-xs space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                <Printer className="w-4 h-4 text-primary" />
+                <span>Control Fiscal SENIAT (Mostrador / Caja)</span>
+              </span>
+              {order.physical_invoice_number ? (
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                  Facturado en Caja
+                </span>
+              ) : order.is_fiscal_invoice ? (
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                  Factura Digital
+                </span>
+              ) : (
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                  Preventa / Pendiente Caja
+                </span>
+              )}
+            </div>
+
+            {order.physical_invoice_number ? (
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300 space-y-1">
+                <div className="flex items-center justify-between font-mono font-bold">
+                  <span>Factura Fiscal Física N° {order.physical_invoice_number}</span>
+                  {order.physical_machine_serial && (
+                    <span>MF: {order.physical_machine_serial}</span>
+                  )}
+                </div>
+                {order.physical_fiscal_registered_at && (
+                  <p className="text-[10px] opacity-80">
+                    Registrado en caja el: {new Date(order.physical_fiscal_registered_at).toLocaleString("es-VE")}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2 text-xs">
+                {/* Divisas IGTF reminder if payment was foreign currency */}
+                {(order.payment_method === "CASH_USD" || order.payment_method === "ZELLE") &&
+                  settings.billing_settings?.apply_igtf && (
+                    <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-800 dark:text-amber-300">
+                      <strong>💡 Recordatorio para Máquina Fiscal:</strong> Pago en divisas sujeto a IGTF 3%:{" "}
+                      <span className="font-mono font-bold">${order.total_usd.toFixed(2)} (Bs. {order.total_ves.toFixed(2)})</span>. Registrar en registradora bajo concepto Divisas.
+                    </div>
+                  )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[11px] font-semibold text-muted-foreground block mb-1">
+                      N° Factura Fiscal (de la registradora)
+                    </label>
+                    <input
+                      type="text"
+                      value={physicalInvoiceInput}
+                      onChange={(e) => setPhysicalInvoiceInput(e.target.value.toUpperCase())}
+                      placeholder="ej. 0004521"
+                      className="w-full h-9 px-3 rounded-xl border border-input bg-background text-xs font-mono font-bold uppercase focus:ring-2 focus:ring-primary focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-muted-foreground block mb-1">
+                      Serial Máquina Fiscal
+                    </label>
+                    <input
+                      type="text"
+                      value={physicalSerialInput}
+                      onChange={(e) => setPhysicalSerialInput(e.target.value.toUpperCase())}
+                      placeholder="ej. Z4A1234567"
+                      className="w-full h-9 px-3 rounded-xl border border-input bg-background text-xs font-mono font-bold uppercase focus:ring-2 focus:ring-primary focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <p className="text-[10px] text-muted-foreground">
+                    Vincula el ticket de la registradora física para el Libro de Ventas.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleRegisterPhysicalInvoice}
+                    disabled={isRegisteringFiscal || !physicalInvoiceInput.trim()}
+                    className="px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold shadow-xs hover:bg-primary/90 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {isRegisteringFiscal ? "Registrando..." : "Vincular Factura"}
+                  </button>
+                </div>
+
+                {fiscalSuccessMsg && (
+                  <p className="text-[11px] text-emerald-600 font-bold mt-1">
+                    ✓ {fiscalSuccessMsg}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
 

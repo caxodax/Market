@@ -107,6 +107,7 @@ export interface CreateOrderInput {
     quantity: number;
     unitPriceUsd: number;
     selected_modifiers?: import("@marketos/types").SelectedModifier[];
+    is_tax_exempt?: boolean;
   }[];
   notes?: string;
   idempotencyKey?: string;
@@ -447,6 +448,16 @@ export interface IOrderRepository {
       storeId?: string;
     }
   ): Promise<SalesAnalytics>;
+
+  /**
+   * Asociar factura física de máquina fiscal de mostrador a un pedido (Providencia 00071)
+   */
+  registerPhysicalFiscalInvoice(
+    tenantId: string,
+    orderId: string,
+    physicalInvoiceNumber: string,
+    physicalMachineSerial?: string
+  ): Promise<Order>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

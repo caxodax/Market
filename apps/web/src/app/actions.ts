@@ -320,3 +320,35 @@ export async function setTenantModuleStatusAction(
     return { success: false, error: "Error al actualizar el estado del módulo" };
   }
 }
+
+/**
+ * Asociar factura física de máquina fiscal de mostrador a un pedido (Providencia 00071)
+ */
+export async function registerPhysicalFiscalInvoiceAction(
+  tenantId: string,
+  orderId: string,
+  physicalInvoiceNumber: string,
+  physicalMachineSerial?: string
+) {
+  try {
+    const order = await MarketOSRepository.registerPhysicalFiscalInvoice(
+      tenantId,
+      orderId,
+      physicalInvoiceNumber,
+      physicalMachineSerial
+    );
+    revalidatePath("/");
+    revalidatePath("/admin");
+    return { success: true, order };
+  } catch (error) {
+    console.error("Error registering physical fiscal invoice:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Error al registrar la factura fiscal física",
+    };
+  }
+}
+

@@ -74,4 +74,91 @@ assert.strictEqual(sanitizeSafeUrl("data:text/html;base64,PHNjcmlwdD4="), null, 
 assert.strictEqual(sanitizeSafeUrl("https://r2.marketos.lat/proof.jpg"), "https://r2.marketos.lat/proof.jpg", "Valid https URL allowed");
 assert.strictEqual(sanitizeSafeUrl("/media/proof.png"), "/media/proof.png", "Valid relative path allowed");
 
-console.log("✅ [Ponytail Check] All 7 local-venezuela & security tests passed successfully!");
+// 8. SENIAT Fiscal Calculations & Providencia 00071 Compliance
+import {
+  calculateSeniatFiscalBreakdown,
+  formatSeniatControlNumber,
+  formatSeniatInvoiceNumber,
+  validateSeniatRif,
+  SENIAT_LEGAL_CONSTANTS,
+} from "../fiscal/seniat.ts";
+import { generateSeniatSalesBookCsv } from "../fiscal/salesBook.ts";
+
+// Test 8.1: Mixed Cart (Exempt items + Taxable items + Delivery + IGTF 3%)
+const fiscalRes = calculateSeniatFiscalBreakdown({
+  items: [
+    { name: "Harina PAN", quantity: 2, unitPriceUsd: 1.20, isTaxExempt: true },
+    { name: "Refresco", quantity: 1, unitPriceUsd: 2.00, isTaxExempt: false },
+  ],
+  deliveryFeeUsd: 2.50, // Taxable transport
+  applyIgtf: true,
+  paymentMethod: "CASH_USD",
+  exchangeRate: 45,
+});
+
+assert.strictEqual(fiscalRes.subtotalExemptUsd, 2.40, "Exempt subtotal should be 2.40 USD");
+assert.strictEqual(fiscalRes.subtotalTaxableUsd, 4.50, "Taxable subtotal should be 2.00 + 2.50 = 4.50 USD");
+assert.strictEqual(fiscalRes.ivaAmountUsd, 0.72, "16% IVA on 4.50 is 0.72 USD");
+assert.strictEqual(fiscalRes.igtfAmountUsd, 0.23, "3% IGTF on 7.62 is 0.23 USD");
+assert.strictEqual(fiscalRes.totalUsd, 7.85, "Total USD should be 7.85");
+assert.strictEqual(fiscalRes.totalVes, 353.25, "Total VES should be 7.85 * 45 = 353.25 Bs.");
+
+// Test 8.2: SENIAT Control & Invoice Numbering Formats
+assert.strictEqual(formatSeniatControlNumber(1), "00-00000001", "Control number 1 must be 00-00000001");
+assert.strictEqual(formatSeniatControlNumber(1045, "01-"), "01-00001045", "Control number with custom prefix");
+assert.strictEqual(formatSeniatInvoiceNumber(1001), "FACT-00001001", "Invoice number must be FACT-00001001");
+
+// Test 8.3: RIF Validation
+const validRif = validateSeniatRif("j-50123456-7");
+assert.strictEqual(validRif.isValid, true);
+assert.strictEqual(validRif.normalizedRif, "J-50123456-7");
+
+const validRifNoHyphens = validateSeniatRif("V123456789");
+assert.strictEqual(validRifNoHyphens.isValid, true);
+assert.strictEqual(validRifNoHyphens.normalizedRif, "V-12345678-9");
+
+const invalidRif = validateSeniatRif("ABC12345");
+assert.strictEqual(invalidRif.isValid, false);
+
+// Test 8.4: SENIAT Libro de Ventas CSV Generation
+const dummyOrder: any = {
+  id: "ord-test-1",
+  tenant_id: "shop-market-ca",
+  order_number: "ORD-123456",
+  status: "COMPLETED",
+  created_at: new Date().toISOString(),
+  total_usd: 10.00,
+  total_ves: 450.00,
+  exchange_rate_applied: 45,
+  customer_name: "Juan Perez",
+  customer_id_number: "V-12345678",
+  subtotal_exempt_usd: 4.00,
+  subtotal_taxable_usd: 6.00,
+  iva_amount_usd: 0.96,
+  physical_invoice_number: "0001245",
+  physical_machine_serial: "Z4A1234567",
+};
+
+const dummySettings: any = {
+  business_name: "Shop Market C.A.",
+  billing_settings: {
+    emitter_fiscal_data: {
+      rif: "J-50123456-7",
+      business_name: "Shop Market C.A.",
+    },
+  },
+};
+
+const csv = generateSeniatSalesBookCsv({
+  orders: [dummyOrder],
+  settings: dummySettings,
+  periodLabel: "OCTUBRE 2026",
+});
+
+assert.strictEqual(csv.includes("LIBRO DE VENTAS E INGRESOS"), true, "Must have SENIAT header");
+assert.strictEqual(csv.includes("J-50123456-7"), true, "Must have emitter RIF");
+assert.strictEqual(csv.includes("0001245"), true, "Must include invoice number");
+assert.strictEqual(csv.includes("MF:Z4A1234567"), true, "Must include physical fiscal machine serial");
+
+console.log("✅ [Ponytail & ECC Check] All 11 local-venezuela & SENIAT fiscal tests passed successfully!");
+

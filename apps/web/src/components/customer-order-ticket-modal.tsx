@@ -230,10 +230,18 @@ export function CustomerOrderTicketModal({
           <div className="text-right">
             <span
               className={`inline-block text-white text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider ${
-                isFiscal ? "bg-emerald-700" : "bg-slate-950"
+                isFiscal
+                  ? "bg-emerald-700"
+                  : order.physical_invoice_number
+                  ? "bg-blue-700"
+                  : "bg-slate-900"
               }`}
             >
-              {isFiscal ? "FACTURA FISCAL DIGITAL" : "Ticket de Compra"}
+              {isFiscal
+                ? "FACTURA FISCAL DIGITAL"
+                : order.physical_invoice_number
+                ? `FACTURA FÍSICA N° ${order.physical_invoice_number}`
+                : "COMPROBANTE DE COMPRA"}
             </span>
             <div className="mt-1 font-mono font-black text-base text-slate-950">
               {isFiscal ? invoiceNumber : `#${order.order_number}`}
@@ -243,11 +251,27 @@ export function CustomerOrderTicketModal({
                 N° Control: {controlNumber}
               </div>
             )}
+            {!isFiscal && order.physical_machine_serial && (
+              <div className="text-[10px] font-mono font-black text-slate-700">
+                MF: {order.physical_machine_serial}
+              </div>
+            )}
             <div className="text-[10px] text-slate-600 font-medium">
               {formattedDate}
             </div>
           </div>
         </div>
+
+        {/* Providencia 00071 Mandatory Non-Fiscal Warning Banner */}
+        {!isFiscal && (
+          <div className="mb-3 py-1.5 px-3 rounded border border-slate-400 bg-slate-100 text-center">
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-900">
+              {order.physical_invoice_number
+                ? `FACTURA FISCAL EMITIDA EN CAJA N° ${order.physical_invoice_number} ${order.physical_machine_serial ? `• SERIAL: ${order.physical_machine_serial}` : ""}`
+                : (billingSettings?.non_fiscal_warning_legend || "DOCUMENTO NO FISCAL - EXIJA SU FACTURA FISCAL EN CAJA")}
+            </p>
+          </div>
+        )}
 
         {/* Customer & Delivery Information Block */}
         <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border border-slate-300 bg-slate-50/70 text-xs mb-4">
@@ -457,7 +481,9 @@ export function CustomerOrderTicketModal({
         <div className="text-center text-[10px] text-slate-500 pt-2 border-t border-slate-200">
           {isFiscal
             ? `Factura digital emitida conforme a la Providencia Administrativa SNAT/2011/00071 y normativas de Facturación Digital para Comercio Electrónico. Proveedor: ${billingSettings?.fiscal_provider || "The Factory HKA"} • Control: ${controlNumber}`
-            : `¡Gracias por su compra en ${settings.business_name}! Este comprobante certifica su orden de compra digital.`}
+            : order.physical_invoice_number
+            ? `Pedido amparado por Factura Fiscal Física N° ${order.physical_invoice_number} emitida en mostrador. ¡Gracias por su compra en ${settings.business_name}!`
+            : `DOCUMENTO NO FISCAL (Providencia SNAT/2011/00071) • Comprobante interno de preventa y despacho. ¡Gracias por su compra en ${settings.business_name}!`}
         </div>
       </div>
 
@@ -566,6 +592,25 @@ export function CustomerOrderTicketModal({
                     </span>
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-muted text-muted-foreground border border-border">
                       N° Control: {controlNumber}
+                    </span>
+                  </div>
+                )}
+                {!isFiscal && order.physical_invoice_number && (
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                      Factura Física en Caja: N° {order.physical_invoice_number}
+                    </span>
+                    {order.physical_machine_serial && (
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-muted text-muted-foreground border border-border">
+                        MF: {order.physical_machine_serial}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {!isFiscal && !order.physical_invoice_number && (
+                  <div className="mt-1.5">
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                      {billingSettings?.non_fiscal_warning_legend || "DOCUMENTO NO FISCAL - EXIJA SU FACTURA EN CAJA"}
                     </span>
                   </div>
                 )}
@@ -916,6 +961,14 @@ export function CustomerOrderTicketModal({
 
                 {isFiscal ? (
                   <div className="pt-1.5 pb-0.5 border-t border-border space-y-1 text-[11px] text-muted-foreground">
+                    {subtotalExemptUsd > 0 && (
+                      <div className="flex justify-between">
+                        <span>Subtotal Exento (IVA 0%):</span>
+                        <span className="font-mono text-foreground font-semibold">
+                          {formatCurrency(subtotalExemptUsd, "USD")}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span>Base Gravable (16%):</span>
                       <span className="font-mono text-foreground font-semibold">

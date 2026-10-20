@@ -3411,6 +3411,10 @@ export function AdminDashboard({
           payments.find((p) => p.order_id === selectedOrderForModal?.id)?.id
         }
         isProcessing={processingId !== null}
+        onOrderUpdated={(updated) => {
+          setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+          setSelectedOrderForModal(updated);
+        }}
       />
 
       {/* Tenant Plugins Modal for Super Admin & Support Impersonation */}

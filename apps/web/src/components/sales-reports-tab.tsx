@@ -37,6 +37,7 @@ import {
   Search,
   FileSpreadsheet,
   Loader2,
+  Receipt,
 } from "lucide-react";
 import { OrderDetailsModal } from "./order-details-modal";
 
@@ -184,6 +185,38 @@ export function SalesReportsTab({
     document.body.removeChild(link);
   };
 
+  // Export Libro de Ventas Fiscal SENIAT (Art. 56 Ley del IVA / Providencia 00071)
+  const handleExportSeniatSalesBook = async () => {
+    if (!dateFilteredOrders || dateFilteredOrders.length === 0) {
+      alert("No hay pedidos registrados en el período seleccionado para exportar.");
+      return;
+    }
+
+    try {
+      const { generateSeniatSalesBookCsv } = await import("@marketos/plugin-local-venezuela");
+      const csv = generateSeniatSalesBookCsv({
+        orders: dateFilteredOrders,
+        settings,
+        periodLabel: dateRange.toUpperCase(),
+      });
+
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute(
+        "download",
+        `Libro_de_Ventas_SENIAT_${settings.business_name.replace(/[^a-zA-Z0-9]/g, "_")}_${new Date().toISOString().split("T")[0]}.csv`
+      );
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error("Error exportando Libro de Ventas SENIAT:", err);
+      alert("Ocurrió un error al generar el Libro de Ventas SENIAT.");
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* Header con Período y Acciones */}
@@ -278,6 +311,19 @@ export function SalesReportsTab({
             )}
             <span>Exportar Excel</span>
           </button>
+
+          {/* Exportar Libro de Ventas SENIAT (Art. 56 Ley del IVA / Providencia 00071) */}
+          {isVenezuelaActive && (
+            <button
+              type="button"
+              onClick={handleExportSeniatSalesBook}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-xs font-bold text-primary-foreground transition-all cursor-pointer shadow-xs active:scale-95"
+              title="Descargar Libro de Ventas Fiscal oficial (Formato SENIAT / Providencia 00071)"
+            >
+              <Receipt className="w-3.5 h-3.5" />
+              <span>Libro SENIAT</span>
+            </button>
+          )}
 
           {/* Exportar CSV */}
           <button

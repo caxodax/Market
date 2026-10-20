@@ -278,6 +278,11 @@ export function StoreSettingsTab({
   const [providerApiKey, setProviderApiKey] = useState(defaultBilling.provider_credentials?.api_key || "");
   const [providerToken, setProviderToken] = useState(defaultBilling.provider_credentials?.token || "");
   const [providerEnv, setProviderEnv] = useState<"SANDBOX" | "PRODUCTION">(defaultBilling.provider_credentials?.environment || "SANDBOX");
+  const [fiscalMachineSerial, setFiscalMachineSerial] = useState(defaultBilling.fiscal_machine_serial || "");
+  const [nextInvoiceNumber, setNextInvoiceNumber] = useState(defaultBilling.next_invoice_number || 1);
+  const [nextControlNumber, setNextControlNumber] = useState(defaultBilling.next_control_number || 1);
+  const [controlPrefix, setControlPrefix] = useState(defaultBilling.control_prefix || "00-");
+  const [nonFiscalWarningLegend, setNonFiscalWarningLegend] = useState(defaultBilling.non_fiscal_warning_legend || "DOCUMENTO NO FISCAL - EXIJA SU FACTURA FISCAL EN CAJA");
 
   // Toggle payment method
   const togglePaymentMethod = (methodId: PaymentMethodType) => {
@@ -398,6 +403,11 @@ export function StoreSettingsTab({
         fiscal_address: emitterFiscalAddress.trim(),
         phone: emitterPhone.trim(),
       },
+      fiscal_machine_serial: fiscalMachineSerial.trim(),
+      next_invoice_number: Number(nextInvoiceNumber) || 1,
+      next_control_number: Number(nextControlNumber) || 1,
+      control_prefix: controlPrefix.trim(),
+      non_fiscal_warning_legend: nonFiscalWarningLegend.trim(),
       provider_credentials: {
         api_key: providerApiKey.trim(),
         token: providerToken.trim(),
@@ -1695,6 +1705,16 @@ export function StoreSettingsTab({
           setProviderApiKey={setProviderApiKey}
           providerEnv={providerEnv}
           setProviderEnv={setProviderEnv}
+          fiscalMachineSerial={fiscalMachineSerial}
+          setFiscalMachineSerial={setFiscalMachineSerial}
+          nextInvoiceNumber={nextInvoiceNumber}
+          setNextInvoiceNumber={setNextInvoiceNumber}
+          nextControlNumber={nextControlNumber}
+          setNextControlNumber={setNextControlNumber}
+          controlPrefix={controlPrefix}
+          setControlPrefix={setControlPrefix}
+          nonFiscalWarningLegend={nonFiscalWarningLegend}
+          setNonFiscalWarningLegend={setNonFiscalWarningLegend}
         />
       )}
 

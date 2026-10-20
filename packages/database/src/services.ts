@@ -129,6 +129,7 @@ export interface CreateOrderInput {
     quantity: number;
     unitPriceUsd: number;
     selected_modifiers?: SelectedModifier[];
+    is_tax_exempt?: boolean;
   }[];
   notes?: string;
   idempotencyKey?: string;
@@ -1666,7 +1667,8 @@ export class MarketOSRepository {
     const supabase = getSupabase();
 
     // 1. Ponytail Security Guard: Validate authentic product prices and verify stock before placing order
-    const validatedItems = input.items.map((it) => ({ ...it }));
+    const validatedItems: (CreateOrderInput["items"][number] & { is_tax_exempt?: boolean })[] =
+      input.items.map((it) => ({ ...it, is_tax_exempt: it.is_tax_exempt }));
 
     if (supabase) {
       const productIds = input.items
@@ -1676,7 +1678,7 @@ export class MarketOSRepository {
       if (productIds.length > 0) {
         const { data: dbProducts } = await supabase
           .from("products")
-          .select("id, name, price_usd, is_active, inventory(quantity, store_id)")
+          .select("id, name, price_usd, is_active, is_tax_exempt, inventory(quantity, store_id)")
           .eq("tenant_id", input.tenantId)
           .in("id", productIds);
 
@@ -1690,10 +1692,11 @@ export class MarketOSRepository {
                 throw new Error(`El producto "${dbProd.name}" no está disponible actualmente.`);
               }
 
-              // Overwrite with authentic server price from database
+              // Overwrite with authentic server price and fiscal status from database
               const basePrice = Number(dbProd.price_usd);
               const modifiersDelta = item.selected_modifiers?.reduce((sum, m) => sum + (m.price_usd || 0), 0) || 0;
               item.unitPriceUsd = Number((basePrice + modifiersDelta).toFixed(2));
+              item.is_tax_exempt = Boolean(dbProd.is_tax_exempt);
 
               // Pre-order stock verification
               const invForStore = Array.isArray(dbProd.inventory)
@@ -1759,13 +1762,48 @@ export class MarketOSRepository {
       }
     }
 
-    // 5. Compute final totals
+    // 5. Compute final totals and fiscal breakdown (Art. 18 Ley del IVA)
     const finalTotalUsd = Number(
       Math.max(0, subtotalUsd - discountUsd + deliveryFeeUsd).toFixed(2)
     );
     const totalVes = isVenezuelaActive ? convertUsdToVes(finalTotalUsd, rate.value) : 0;
     const exchangeRateApplied = isVenezuelaActive ? rate.value : 1;
     const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
+
+    // Calculate exempt vs taxable portions
+    let rawExemptUsd = 0;
+    let rawTaxableUsd = 0;
+    for (const item of validatedItems) {
+      if (!item.is_tax_exempt && typeof item.productId === "string") {
+        const memProd = state.products.find((p) => p.id === item.productId);
+        if (memProd?.is_tax_exempt) {
+          item.is_tax_exempt = true;
+        }
+      }
+      const lineTotal = item.unitPriceUsd * item.quantity;
+      if (item.is_tax_exempt) {
+        rawExemptUsd += lineTotal;
+      } else {
+        rawTaxableUsd += lineTotal;
+      }
+    }
+
+    let subtotalExemptUsd = rawExemptUsd;
+    let subtotalTaxableUsd = rawTaxableUsd;
+    if (discountUsd > 0 && subtotalUsd > 0) {
+      const exemptRatio = rawExemptUsd / subtotalUsd;
+      subtotalExemptUsd = Math.max(0, rawExemptUsd - discountUsd * exemptRatio);
+      subtotalTaxableUsd = Math.max(0, rawTaxableUsd - discountUsd * (1 - exemptRatio));
+    }
+    if (deliveryFeeUsd > 0) {
+      subtotalTaxableUsd += deliveryFeeUsd;
+    }
+    subtotalExemptUsd = Number(subtotalExemptUsd.toFixed(2));
+    subtotalTaxableUsd = Number(subtotalTaxableUsd.toFixed(2));
+
+    const ivaRate = 0.16;
+    const ivaAmountUsd = Number((subtotalTaxableUsd * ivaRate).toFixed(2));
+    const ivaAmountVes = Number((ivaAmountUsd * exchangeRateApplied).toFixed(2));
 
     const validCouponId = isUuid(couponId) ? couponId : null;
 
@@ -1919,6 +1957,10 @@ export class MarketOSRepository {
       total_usd: finalTotalUsd,
       total_ves: totalVes,
       exchange_rate_applied: exchangeRateApplied,
+      subtotal_exempt_usd: subtotalExemptUsd,
+      subtotal_taxable_usd: subtotalTaxableUsd,
+      iva_amount_usd: ivaAmountUsd,
+      iva_amount_ves: ivaAmountVes,
       notes: input.notes || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -1935,6 +1977,7 @@ export class MarketOSRepository {
         quantity: it.quantity,
         unit_price_usd: it.unitPriceUsd,
         total_price_usd: Number((it.quantity * it.unitPriceUsd).toFixed(2)),
+        is_tax_exempt: Boolean(it.is_tax_exempt),
         selected_modifiers: it.selected_modifiers,
       })),
     };
@@ -2848,6 +2891,54 @@ export class MarketOSRepository {
     }
 
     return null;
+  }
+
+  /**
+   * Asociar factura física de máquina fiscal de mostrador a un pedido (Providencia 00071)
+   */
+  static async registerPhysicalFiscalInvoice(
+    tenantId: string,
+    orderId: string,
+    physicalInvoiceNumber: string,
+    physicalMachineSerial?: string
+  ): Promise<Order> {
+    const supabase = getSupabase();
+    const cleanInvoiceNumber = physicalInvoiceNumber.trim().toUpperCase();
+    const cleanSerial = physicalMachineSerial ? physicalMachineSerial.trim().toUpperCase() : null;
+    const nowIso = new Date().toISOString();
+
+    if (supabase) {
+      try {
+        await supabase
+          .from("orders")
+          .update({
+            physical_invoice_number: cleanInvoiceNumber,
+            physical_machine_serial: cleanSerial,
+            physical_fiscal_registered_at: nowIso,
+            updated_at: nowIso,
+          })
+          .eq("id", orderId)
+          .eq("tenant_id", tenantId);
+      } catch (e) {
+        console.warn("[MarketOS] registerPhysicalFiscalInvoice Supabase warning:", e);
+      }
+    }
+
+    const order = state.orders.find((o) => o.id === orderId && o.tenant_id === tenantId);
+    if (order) {
+      order.physical_invoice_number = cleanInvoiceNumber;
+      order.physical_machine_serial = cleanSerial;
+      order.physical_fiscal_registered_at = nowIso;
+      order.updated_at = nowIso;
+      return order;
+    }
+
+    const allOrders = await this.getTenantOrders(tenantId);
+    const fetched = allOrders.find((o) => o.id === orderId);
+    if (!fetched) {
+      throw new Error(`Pedido no encontrado: ${orderId}`);
+    }
+    return fetched;
   }
 
   /**
@@ -4774,6 +4865,7 @@ export class MarketOSRepository {
       image_url: input.imageUrl || null,
       price_usd: input.priceUsd,
       is_active: true,
+      is_tax_exempt: Boolean(input.isTaxExempt),
       stock: initialStock,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -4794,6 +4886,7 @@ export class MarketOSRepository {
             image_url: input.imageUrl || null,
             price_usd: input.priceUsd,
             is_active: true,
+            is_tax_exempt: Boolean(input.isTaxExempt),
           })
           .select("id")
           .single();
@@ -4873,6 +4966,7 @@ export class MarketOSRepository {
         if (input.barcode !== undefined) updatePayload.barcode = input.barcode;
         if (input.imageUrl !== undefined) updatePayload.image_url = input.imageUrl;
         if (input.isActive !== undefined) updatePayload.is_active = input.isActive;
+        if (input.isTaxExempt !== undefined) updatePayload.is_tax_exempt = input.isTaxExempt;
 
         await supabase
           .from("products")
@@ -4923,6 +5017,7 @@ export class MarketOSRepository {
       if (input.barcode !== undefined) prod.barcode = input.barcode;
       if (input.imageUrl !== undefined) prod.image_url = input.imageUrl;
       if (input.isActive !== undefined) prod.is_active = input.isActive;
+      if (input.isTaxExempt !== undefined) prod.is_tax_exempt = input.isTaxExempt;
       if (input.stock !== undefined) prod.stock = input.stock;
       prod.updated_at = new Date().toISOString();
 

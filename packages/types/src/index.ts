@@ -88,6 +88,12 @@ export interface TenantBillingSettings {
   default_iva_rate?: number; // Default 16.0
   fiscal_provider?: FiscalProvider; // Default "THE_FACTORY_HKA"
   emitter_fiscal_data?: FiscalEmitterData;
+  fiscal_machine_serial?: string; // Serial de máquina fiscal de mostrador (ej. "Z4A1234567")
+  next_invoice_number?: number; // Próximo número correlativo de factura
+  next_control_number?: number; // Próximo número correlativo de control SENIAT
+  control_prefix?: string; // Prefijo de control (ej. "00-")
+  invoice_prefix?: string; // Prefijo de factura (ej. "FACT-")
+  non_fiscal_warning_legend?: string; // Leyenda preventiva Providencia 00071 ("DOCUMENTO NO FISCAL - EXIJA SU FACTURA FISCAL EN CAJA")
   provider_credentials?: {
     api_key?: string;
     token?: string;
@@ -381,6 +387,7 @@ export interface Product {
   image_url: string | null;
   price_usd: number;
   is_active: boolean;
+  is_tax_exempt?: boolean; // Exento de IVA (Art. 18 Ley del IVA - Alimentos básicos / Medicinas)
   external_product_id?: string | null;
   created_at: string;
   updated_at: string;
@@ -430,6 +437,7 @@ export interface OrderItem {
   quantity: number;
   unit_price_usd: number;
   total_price_usd: number;
+  is_tax_exempt?: boolean; // Exento de IVA
   selected_modifiers?: SelectedModifier[];
 }
 
@@ -478,6 +486,10 @@ export interface Order {
   iva_amount_ves?: number;
   igtf_amount_usd?: number;
   igtf_amount_ves?: number;
+  // SENIAT Physical Fiscal Machine (Emisión en mostrador físico)
+  physical_invoice_number?: string | null;
+  physical_machine_serial?: string | null;
+  physical_fiscal_registered_at?: string | null;
 }
 
 export interface SalesAnalytics {
@@ -766,6 +778,7 @@ export interface CreateProductInput {
   barcode?: string;
   imageUrl?: string;
   initialStock?: number;
+  isTaxExempt?: boolean; // Exento de IVA (Art. 18 Ley del IVA)
   storeId?: string;
   actorId?: string | null;
   actorName?: string | null;
@@ -785,6 +798,7 @@ export interface UpdateProductInput {
   imageUrl?: string;
   stock?: number;
   isActive?: boolean;
+  isTaxExempt?: boolean; // Exento de IVA (Art. 18 Ley del IVA)
   storeId?: string;
   actorId?: string | null;
   actorName?: string | null;

@@ -61,6 +61,9 @@ export function ProductModal({
   const [isActive, setIsActive] = useState(
     product ? product.is_active : true
   );
+  const [isTaxExempt, setIsTaxExempt] = useState(
+    product ? Boolean(product.is_tax_exempt) : false
+  );
 
   // Image & Compression State
   const [imageUrl, setImageUrl] = useState(product?.image_url || "");
@@ -154,6 +157,7 @@ export function ProductModal({
           description: description || undefined,
           imageUrl: finalImageUrl,
           isActive,
+          isTaxExempt,
         });
 
         if (!res.success || !res.product) {
@@ -171,6 +175,7 @@ export function ProductModal({
           barcode: barcode || undefined,
           description: description || undefined,
           imageUrl: finalImageUrl || undefined,
+          isTaxExempt,
         });
 
         if (!res.success || !res.product) {
@@ -430,6 +435,28 @@ export function ProductModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full p-3 rounded-xl border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+            />
+          </div>
+
+          {/* SENIAT Fiscal Exemption (Art. 18 Ley del IVA) */}
+          <div className="p-3 rounded-xl border border-border bg-muted/20 flex items-center justify-between gap-3">
+            <div>
+              <label htmlFor="isTaxExemptToggle" className="text-xs font-bold text-foreground cursor-pointer flex items-center gap-1.5">
+                <span>Producto Exento de IVA (Art. 18)</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">
+                  IVA 0%
+                </span>
+              </label>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Alimentos básicos (harina, arroz, huevos, leche, carnes, pan) o medicinas.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              id="isTaxExemptToggle"
+              checked={isTaxExempt}
+              onChange={(e) => setIsTaxExempt(e.target.checked)}
+              className="rounded border-border text-primary focus:ring-primary h-4 w-4 cursor-pointer shrink-0"
             />
           </div>
 
