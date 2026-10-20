@@ -77,6 +77,7 @@ import {
   CpqQuote,
   CpqQuoteItem,
   CpqOrderMilestone,
+  convertUnitQuantity,
 } from "@marketos/types";
 
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
@@ -1977,6 +1978,7 @@ export class MarketOSRepository {
             quantity: it.quantity,
             unit_price_usd: it.unitPriceUsd,
             total_price_usd: Number((it.quantity * it.unitPriceUsd).toFixed(2)),
+            selected_modifiers: it.selected_modifiers || [],
           }));
 
           // Insert order items
@@ -1988,6 +1990,7 @@ export class MarketOSRepository {
             quantity: it.quantity,
             unit_price_usd: it.unitPriceUsd,
             total_price_usd: Number((it.quantity * it.unitPriceUsd).toFixed(2)),
+            selected_modifiers: it.selected_modifiers || [],
           }));
 
           // Resolve any non-uuid product IDs (e.g. from mock data fallback)
@@ -2725,6 +2728,7 @@ export class MarketOSRepository {
           prod.stock += item.quantity;
         }
       }
+      await MarketOSRepository.restoreRecipeInventoryForOrder(memOrder);
     }
   }
 
@@ -5931,6 +5935,11 @@ export class MarketOSRepository {
    * Automatically deduct raw material stock when a gastronomy order is processed
    * (e.g. 1 Hot dog sold = -1 Bread, -1 Sausage, etc.)
    */
+  /**
+   * Automatically deduct raw material stock when a gastronomy order is processed
+   * (e.g. 1 Hot dog sold = -1 Bread, -1 Sausage, etc.)
+   * Applies unit conversion (KG <-> G, L <-> ML) and cooking shrinkage factor.
+   */
   static async deductRecipeInventoryForOrder(
     order: Order
   ): Promise<{ success: boolean; deductedItemsCount: number }> {
@@ -5938,113 +5947,146 @@ export class MarketOSRepository {
       return { success: true, deductedItemsCount: 0 };
     }
 
-    let deductedCount = 0;
-
-    const supabase = getSupabase();
-    if (supabase) {
-      try {
-        for (const item of order.items) {
-          // 1. Deduct Base Recipe
-          const recipe = await this.getProductRecipe(order.tenant_id, item.product_id);
-          if (recipe && recipe.items.length > 0) {
-            for (const ingredient of recipe.items) {
-              const totalQtyToDeduct = ingredient.quantity * item.quantity;
-              const { data: raw } = await supabase
-                .from("raw_materials")
-                .select("current_stock")
-                .eq("id", ingredient.raw_material_id)
-                .eq("tenant_id", order.tenant_id)
-                .single();
-              if (raw) {
-                const updatedStock = Math.max(
-                  0,
-                  Number((Number(raw.current_stock) - totalQtyToDeduct).toFixed(3))
-                );
-                await supabase
-                  .from("raw_materials")
-                  .update({ current_stock: updatedStock, updated_at: new Date().toISOString() })
-                  .eq("id", ingredient.raw_material_id)
-                  .eq("tenant_id", order.tenant_id);
-                deductedCount++;
-              }
-            }
-          }
-
-          // 2. Deduct Extra Modifiers (e.g. Extra Bacon)
-          if (item.selected_modifiers && item.selected_modifiers.length > 0) {
-            for (const mod of item.selected_modifiers) {
-              if (mod.raw_material_id) {
-                const { data: raw } = await supabase
-                  .from("raw_materials")
-                  .select("current_stock")
-                  .eq("id", mod.raw_material_id)
-                  .eq("tenant_id", order.tenant_id)
-                  .single();
-                if (raw) {
-                  const updatedStock = Math.max(
-                    0,
-                    Number((Number(raw.current_stock) - item.quantity).toFixed(3))
-                  );
-                  await supabase
-                    .from("raw_materials")
-                    .update({ current_stock: updatedStock, updated_at: new Date().toISOString() })
-                    .eq("id", mod.raw_material_id)
-                    .eq("tenant_id", order.tenant_id);
-                  deductedCount++;
-                }
-              }
-            }
-          }
-        }
-
-        if (deductedCount > 0) {
-          return { success: true, deductedItemsCount: deductedCount };
-        }
-      } catch (err) {
-        console.warn("[MarketOS] Could not deduct raw materials in Supabase:", err);
-      }
+    const rawMaterialsList = await this.getRawMaterials(order.tenant_id, order.store_id);
+    if (!rawMaterialsList || rawMaterialsList.length === 0) {
+      return { success: true, deductedItemsCount: 0 };
     }
 
-    for (const item of order.items) {
-      // 1. Deduct Base Recipe in memory fallback
-      const recipe = await this.getProductRecipe(order.tenant_id, item.product_id);
-      if (recipe && recipe.items.length > 0) {
-        for (const ingredient of recipe.items) {
-          const totalQtyToDeduct = ingredient.quantity * item.quantity;
-          const rawMaterial = (state.rawMaterials || []).find(
-            (r) => r.id === ingredient.raw_material_id && r.tenant_id === order.tenant_id
-          );
+    const rawMaterialMap = new Map<string, RawMaterial>();
+    for (const rm of rawMaterialsList) {
+      rawMaterialMap.set(rm.id, { ...rm });
+    }
 
+    const deductionsAccumulator = new Map<string, number>();
+
+    for (const item of order.items) {
+      // 1. Deduct Base Recipe
+      const recipe = await this.getProductRecipe(order.tenant_id, item.product_id);
+      if (recipe && recipe.items && recipe.items.length > 0) {
+        for (const ingredient of recipe.items) {
+          const rawMaterial = rawMaterialMap.get(ingredient.raw_material_id);
           if (rawMaterial) {
-            rawMaterial.current_stock = Math.max(
-              0,
-              Number((rawMaterial.current_stock - totalQtyToDeduct).toFixed(3))
-            );
-            deductedCount++;
+            const recipeUnit = ingredient.unit || rawMaterial.unit;
+            const wastePct = Math.max(0, Math.min(90, ingredient.waste_percentage || 0));
+            const shrinkageMultiplier = wastePct > 0 ? 1 / (1 - wastePct / 100) : 1;
+
+            const effectiveRecipeQty = ingredient.quantity * item.quantity * shrinkageMultiplier;
+            const storageQtyNeeded = convertUnitQuantity(recipeUnit, rawMaterial.unit, effectiveRecipeQty);
+
+            const currentDeduction = deductionsAccumulator.get(rawMaterial.id) || 0;
+            deductionsAccumulator.set(rawMaterial.id, currentDeduction + storageQtyNeeded);
           }
         }
       }
 
-      // 2. Deduct Extra Modifiers (e.g. Extra Bacon, Extra Sausage)
+      // 2. Deduct Extra Modifiers (e.g. Extra Bacon, Extra Cheese)
       if (item.selected_modifiers && item.selected_modifiers.length > 0) {
         for (const mod of item.selected_modifiers) {
           if (mod.raw_material_id) {
-            const rawMaterial = (state.rawMaterials || []).find(
-              (r) => r.id === mod.raw_material_id && r.tenant_id === order.tenant_id
-            );
+            const rawMaterial = rawMaterialMap.get(mod.raw_material_id);
             if (rawMaterial) {
-              rawMaterial.current_stock = Math.max(
-                0,
-                Number((rawMaterial.current_stock - item.quantity).toFixed(3))
-              );
-              deductedCount++;
+              const modUnit = mod.raw_material_unit || rawMaterial.unit;
+              const rawQty = (mod.raw_material_quantity || 1) * item.quantity;
+              const storageQtyNeeded = convertUnitQuantity(modUnit, rawMaterial.unit, rawQty);
+
+              const currentDeduction = deductionsAccumulator.get(rawMaterial.id) || 0;
+              deductionsAccumulator.set(rawMaterial.id, currentDeduction + storageQtyNeeded);
             }
           }
         }
       }
     }
 
-    return { success: true, deductedItemsCount: deductedCount };
+    let totalDeductions = 0;
+    for (const [rawMaterialId, qtyToDeduct] of deductionsAccumulator.entries()) {
+      const rawMaterial = rawMaterialMap.get(rawMaterialId);
+      if (!rawMaterial) continue;
+
+      const newStock = Math.max(0, Number((rawMaterial.current_stock - qtyToDeduct).toFixed(3)));
+      await this.saveRawMaterial({
+        ...rawMaterial,
+        current_stock: newStock,
+        updated_at: new Date().toISOString(),
+      });
+      totalDeductions++;
+    }
+
+    return { success: true, deductedItemsCount: totalDeductions };
+  }
+
+  /**
+   * Revert / Return raw material stock when a gastronomy order is cancelled
+   */
+  static async restoreRecipeInventoryForOrder(
+    order: Order
+  ): Promise<{ success: boolean; restoredItemsCount: number }> {
+    if (!order.items || order.items.length === 0) {
+      return { success: true, restoredItemsCount: 0 };
+    }
+
+    const rawMaterialsList = await this.getRawMaterials(order.tenant_id, order.store_id);
+    if (!rawMaterialsList || rawMaterialsList.length === 0) {
+      return { success: true, restoredItemsCount: 0 };
+    }
+
+    const rawMaterialMap = new Map<string, RawMaterial>();
+    for (const rm of rawMaterialsList) {
+      rawMaterialMap.set(rm.id, { ...rm });
+    }
+
+    const restoreAccumulator = new Map<string, number>();
+
+    for (const item of order.items) {
+      const recipe = await this.getProductRecipe(order.tenant_id, item.product_id);
+      if (recipe && recipe.items && recipe.items.length > 0) {
+        for (const ingredient of recipe.items) {
+          const rawMaterial = rawMaterialMap.get(ingredient.raw_material_id);
+          if (rawMaterial) {
+            const recipeUnit = ingredient.unit || rawMaterial.unit;
+            const wastePct = Math.max(0, Math.min(90, ingredient.waste_percentage || 0));
+            const shrinkageMultiplier = wastePct > 0 ? 1 / (1 - wastePct / 100) : 1;
+
+            const effectiveRecipeQty = ingredient.quantity * item.quantity * shrinkageMultiplier;
+            const storageQtyToReturn = convertUnitQuantity(recipeUnit, rawMaterial.unit, effectiveRecipeQty);
+
+            const currentRestored = restoreAccumulator.get(rawMaterial.id) || 0;
+            restoreAccumulator.set(rawMaterial.id, currentRestored + storageQtyToReturn);
+          }
+        }
+      }
+
+      if (item.selected_modifiers && item.selected_modifiers.length > 0) {
+        for (const mod of item.selected_modifiers) {
+          if (mod.raw_material_id) {
+            const rawMaterial = rawMaterialMap.get(mod.raw_material_id);
+            if (rawMaterial) {
+              const modUnit = mod.raw_material_unit || rawMaterial.unit;
+              const rawQty = (mod.raw_material_quantity || 1) * item.quantity;
+              const storageQtyToReturn = convertUnitQuantity(modUnit, rawMaterial.unit, rawQty);
+
+              const currentRestored = restoreAccumulator.get(rawMaterial.id) || 0;
+              restoreAccumulator.set(rawMaterial.id, currentRestored + storageQtyToReturn);
+            }
+          }
+        }
+      }
+    }
+
+    let totalRestored = 0;
+    for (const [rawMaterialId, qtyToReturn] of restoreAccumulator.entries()) {
+      const rawMaterial = rawMaterialMap.get(rawMaterialId);
+      if (!rawMaterial) continue;
+
+      const restoredStock = Number((rawMaterial.current_stock + qtyToReturn).toFixed(3));
+      await this.saveRawMaterial({
+        ...rawMaterial,
+        current_stock: restoredStock,
+        updated_at: new Date().toISOString(),
+      });
+      totalRestored++;
+    }
+
+    return { success: true, restoredItemsCount: totalRestored };
   }
 
   /**

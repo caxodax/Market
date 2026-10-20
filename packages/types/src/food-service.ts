@@ -34,11 +34,16 @@ export interface RawMaterial {
 /**
  * Relación de Insumo dentro de una Receta
  */
+/**
+ * Relación de Insumo dentro de una Receta (Escandallo)
+ */
 export interface ProductRecipeItem {
   raw_material_id: string;
   raw_material_name?: string;
   quantity: number;
   unit?: RawMaterialUnit;
+  waste_percentage?: number; // Merma gastronómica o encogimiento en cocción (ej. 10 para 10%)
+  cost_per_portion_usd?: number; // Costo unitario calculado en la receta
 }
 
 /**
@@ -50,8 +55,44 @@ export interface ProductRecipe {
   tenant_id: string;
   product_id: string;
   items: ProductRecipeItem[];
+  target_food_cost_percentage?: number; // Meta de costo de comida (default: 30.0%)
+  total_cost_usd?: number;
+  food_cost_percentage?: number;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Clasificación de Salud Financiera del Plato (Semáforo Food Cost)
+ */
+export type FoodCostHealth = "OPTIMAL" | "ACCEPTABLE" | "CRITICAL";
+
+/**
+ * Cálculo detallado del Escandallo & Rentabilidad
+ */
+export interface RecipeCostItemBreakdown {
+  raw_material_id: string;
+  raw_material_name: string;
+  recipeQuantity: number;
+  recipeUnit: RawMaterialUnit;
+  storageUnit: RawMaterialUnit;
+  effectiveQuantity: number; // Cantidad consumida tras aplicar factor de merma
+  unitCostUsd: number;
+  totalCostUsd: number;
+  wastePercentage: number;
+}
+
+export interface RecipeCostCalculation {
+  recipeId?: string;
+  productId: string;
+  productPriceUsd: number;
+  totalIngredientCostUsd: number;
+  foodCostPercentage: number;
+  health: FoodCostHealth;
+  grossMarginUsd: number;
+  grossMarginPercentage: number;
+  suggestedRetailPriceUsd: number;
+  items: RecipeCostItemBreakdown[];
 }
 
 /**
@@ -63,6 +104,7 @@ export interface ProductModifierOption {
   price_adjustment_usd: number; // 0.00 para gratis, > 0 para extra con costo
   raw_material_id?: string | null; // Insumo asociado para descontar de inventario
   raw_material_quantity?: number | null;
+  raw_material_unit?: RawMaterialUnit;
   is_default?: boolean;
   is_available?: boolean;
 }
@@ -95,4 +137,61 @@ export interface SelectedModifier {
   option_name: string;
   price_usd: number;
   raw_material_id?: string | null;
+  raw_material_quantity?: number | null;
+  raw_material_unit?: RawMaterialUnit;
 }
+
+/**
+ * Kitchen Display System (KDS / Comanda de Cocina)
+ */
+export type KitchenTicketStatus = "PENDING" | "PREPARING" | "READY" | "SERVED";
+
+export interface KitchenTicketItem {
+  id: string;
+  product_name: string;
+  quantity: number;
+  notes?: string;
+  selected_modifiers?: SelectedModifier[];
+  exclusions?: string[]; // Ej. ["SIN CEBOLLA", "SIN MAYONESA"]
+}
+
+export interface KitchenTicket {
+  id: string;
+  order_id: string;
+  order_number: string;
+  table_number?: string;
+  delivery_type: "delivery" | "pickup" | "dine_in";
+  status: KitchenTicketStatus;
+  customer_name?: string;
+  created_at: string;
+  elapsed_minutes?: number;
+  items: KitchenTicketItem[];
+}
+
+/**
+ * Normalizes raw material units into standard mass, volume or discrete count.
+ * Returns the multiplier to convert from `sourceUnit` into `targetUnit`.
+ * e.g. convertUnitQuantity("G", "KG", 150) -> 0.150
+ *      convertUnitQuantity("KG", "G", 2.5) -> 2500
+ *      convertUnitQuantity("ML", "L", 50) -> 0.050
+ */
+export function convertUnitQuantity(
+  sourceUnit: RawMaterialUnit,
+  targetUnit: RawMaterialUnit,
+  quantity: number
+): number {
+  if (sourceUnit === targetUnit) return quantity;
+
+  // Mass Family: KG <-> G
+  if (sourceUnit === "G" && targetUnit === "KG") return quantity / 1000;
+  if (sourceUnit === "KG" && targetUnit === "G") return quantity * 1000;
+
+  // Volume Family: ML <-> L
+  if (sourceUnit === "ML" && targetUnit === "L") return quantity / 1000;
+  if (sourceUnit === "L" && targetUnit === "ML") return quantity * 1000;
+
+  // Discrete / fallback
+  return quantity;
+}
+
+
