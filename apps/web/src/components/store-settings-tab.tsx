@@ -104,7 +104,7 @@ const AVAILABLE_PAYMENT_METHODS: {
 ];
 
 const PRESET_COLORS = [
-  { name: "Rojo Shop Market", hex: "#DC2626" },
+  { name: "Rojo Carmesí", hex: "#DC2626" },
   { name: "Azul Real", hex: "#2563EB" },
   { name: "Verde Esmeralda", hex: "#059669" },
   { name: "Violeta Tech", hex: "#7C3AED" },
@@ -616,7 +616,7 @@ export function StoreSettingsTab({
                   type="text"
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
-                  placeholder="Ej: Shop Market C.A."
+                  placeholder="Ej: Mi Comercio C.A."
                   className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
                 />
               </div>
@@ -1101,7 +1101,7 @@ export function StoreSettingsTab({
                     type="text"
                     value={pmName}
                     onChange={(e) => setPmName(e.target.value)}
-                    placeholder="Shop Market C.A."
+                    placeholder="Ej. Razón Social / Titular"
                     className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
                   />
                 </div>
@@ -1189,7 +1189,7 @@ export function StoreSettingsTab({
                     type="text"
                     value={btName}
                     onChange={(e) => setBtName(e.target.value)}
-                    placeholder="Shop Market C.A."
+                    placeholder="Ej. Razón Social / Titular"
                     className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
                   />
                 </div>
@@ -1219,7 +1219,7 @@ export function StoreSettingsTab({
                     type="email"
                     value={zelleEmail}
                     onChange={(e) => setZelleEmail(e.target.value)}
-                    placeholder="pagos@shopmarket.com"
+                    placeholder="pagos@micomercio.com"
                     className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
                   />
                 </div>
@@ -1232,7 +1232,7 @@ export function StoreSettingsTab({
                     type="text"
                     value={zelleName}
                     onChange={(e) => setZelleName(e.target.value)}
-                    placeholder="Shop Market C.A. / Luis Montes"
+                    placeholder="Ej. Nombre o Razón Social del Titular"
                     className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
                   />
                 </div>
@@ -1476,7 +1476,7 @@ export function StoreSettingsTab({
                       className="p-2 rounded-lg bg-card border border-border/60 text-xs font-semibold text-foreground tracking-tight"
                       style={{ fontFamily: f.id }}
                     >
-                      {businessName || "Shop Market"} • Bs. 875,65
+                      {businessName || "Mi Comercio"} • {isVenezuelaActive ? "Bs. 875,65" : "$45.00"}
                     </div>
                   </button>
                 );

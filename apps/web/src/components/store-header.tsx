@@ -116,7 +116,7 @@ export function StoreHeader({
               {settings.business_name}
             </h1>
             <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate block">
-              Barquisimeto • {settings.category}
+              {selectedStore?.name || settings.category || "Tienda Oficial"}
             </p>
           </div>
         </div>

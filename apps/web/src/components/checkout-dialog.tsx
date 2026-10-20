@@ -277,7 +277,7 @@ export function CheckoutDialog({
   const totalVes = convertUsdToVes(totalUsd, exchangeRate);
   const selectedStore = stores[0] || {
     id: "default-store",
-    name: "Shop Market Principal",
+    name: settings.business_name || "Sede Principal",
   };
 
   // 1-Click Copy helper

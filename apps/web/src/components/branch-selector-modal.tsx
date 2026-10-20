@@ -75,12 +75,13 @@ export function BranchSelectorModal({
     let minDistance = Infinity;
 
     for (const store of stores) {
-      // Fallback coordinates based on code or index
+      // Coordinates from store record or known store code
       const coords =
-        STORE_COORDINATES[store.code] ||
-        (store.code.includes("NS")
-          ? { lat: 10.054, lng: -69.298 }
-          : { lat: 10.029, lng: -69.261 });
+        (store as any).latitude && (store as any).longitude
+          ? { lat: Number((store as any).latitude), lng: Number((store as any).longitude) }
+          : STORE_COORDINATES[store.code] || null;
+
+      if (!coords) continue;
 
       const dist = calculateDistanceKm(lat, lng, coords.lat, coords.lng);
       calculated[store.id] = dist;

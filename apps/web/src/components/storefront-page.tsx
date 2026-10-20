@@ -166,7 +166,7 @@ export function StorefrontPage({
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="space-y-1 text-center sm:text-left">
               <p className="font-bold text-foreground">
-                {settings.business_name} • Barquisimeto
+                {settings.business_name} {settings.category ? `• ${settings.category}` : ""}
               </p>
               <p className="text-[11px]">
                 {selectedStore.address} {selectedStore.phone && `• ${selectedStore.phone}`}

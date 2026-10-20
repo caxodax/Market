@@ -218,7 +218,7 @@ export function CustomerOrderTicketModal({
                 </p>
               )}
               <p className="text-xs text-slate-600 mt-0.5">
-                {settings.category || "Comercio Digital"} • Barquisimeto, Venezuela
+                {settings.category || "Comercio Digital"} {settings.address ? `• ${settings.address}` : ""}
               </p>
               <p className="text-[11px] text-slate-500">
                 {(isFiscal ? emitterAddress : settings.address) && `${isFiscal ? emitterAddress : settings.address} • `}
@@ -734,12 +734,12 @@ export function CustomerOrderTicketModal({
                     <p className="text-muted-foreground leading-relaxed flex items-start gap-1">
                       <MapPin className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
                       <span>
-                        {store?.address || "Calle 3 entre Carreras 1 y 2, Urb. Nueva Segovia, Barquisimeto"}
+                        {store?.address || settings.address || "Dirección de retiro en tienda"}
                       </span>
                     </p>
                     <div className="pt-1 text-[11px] text-muted-foreground space-y-0.5">
                       <p>
-                        <strong>Horario de Atención:</strong> Lun a Sáb 8:00 AM – 7:00 PM | Dom 9:00 AM – 5:00 PM
+                        <strong>Horario de Atención:</strong> {settings.operational_settings?.schedule || "Lunes a Sábado en horario comercial"}
                       </p>
                       {(store?.phone || settings.phone) && (
                         <p>
