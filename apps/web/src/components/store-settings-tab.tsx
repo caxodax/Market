@@ -965,6 +965,11 @@ export function StoreSettingsTab({
                 <p className="text-muted-foreground leading-relaxed">
                   Una vez guardados los registros en tu registrador DNS, la propagación suele tardar entre 5 y 30 minutos. Vercel emitirá y renovará automáticamente tu certificado de seguridad SSL HTTPS de forma gratuita.
                 </p>
+                {isSuperAdmin && (
+                  <p className="text-[11px] text-primary font-medium pt-1 border-t border-primary/10">
+                    💡 <strong>Paso de Aprovisionamiento Super Admin:</strong> Recuerda dar de alta también este dominio en tu panel de Vercel (<em>Project Settings &gt; Domains</em>) para que la red de Vercel enrute el tráfico y emita el SSL.
+                  </p>
+                )}
               </div>
             </div>
           </div>

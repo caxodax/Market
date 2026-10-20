@@ -51,8 +51,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     targetTenantId = currentUser.tenant_id;
   }
 
-  // Verificar si la tienda está suspendida
+  // Verificar si la tienda está suspendida y resolver ID auténtico del tenant
   const targetTenant = await MarketOSRepository.getTenant(targetTenantId);
+  if (targetTenant?.id) {
+    targetTenantId = targetTenant.id;
+  }
 
   // BLOQUEO INMEDIATO: Si la tienda está suspendida y el usuario no es Super Admin ni está en modo soporte
   if (
