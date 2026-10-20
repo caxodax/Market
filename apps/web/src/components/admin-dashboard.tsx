@@ -26,6 +26,8 @@ import {
   ProductRecipe,
 } from "@marketos/types";
 import { RawMaterialsAdmin, RecipeManagerAdmin } from "@marketos/plugin-food-service";
+import { MtoCpqAdminPanel } from "@marketos/plugin-mto-cpq";
+
 import {
   formatCurrency,
   generateOrderStatusNotificationWhatsAppLink,
@@ -209,7 +211,9 @@ export function AdminDashboard({
     | "RECIPES"
     | "PLUGINS"
     | "STOREFRONT_STUDIO"
+    | "MTO_CPQ"
   >("PAYMENTS");
+
   const [settingsState, setSettingsState] = useState(settings);
   const [products, setProducts] = useState(initialProducts);
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>(initialRawMaterials);
@@ -884,7 +888,9 @@ export function AdminDashboard({
       | "RAW_MATERIALS"
       | "RECIPES"
       | "PLUGINS"
-      | "STOREFRONT_STUDIO";
+      | "STOREFRONT_STUDIO"
+      | "MTO_CPQ";
+
     category: ModuleCategory;
     label: string;
     shortLabel: string;
@@ -1018,6 +1024,21 @@ export function AdminDashboard({
           },
         ]
       : []),
+    ...(activeModuleIds.includes("mto_cpq")
+      ? [
+          {
+            id: "MTO_CPQ" as const,
+            category: "CATALOG" as const,
+            label: "Cotizador MTO / Taller",
+            shortLabel: "Taller & MTO",
+            description: "Matrices por m²/lineal, costeo CPQ y anticipos",
+            icon: <Layers className="w-4 h-4 shrink-0" />,
+            badge: "Taller Activo",
+            badgeClassName: "bg-indigo-500/10 text-indigo-600 border border-indigo-500/20 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+          },
+        ]
+      : []),
+
 
     // 3. Finanzas
     {
@@ -1136,7 +1157,9 @@ export function AdminDashboard({
     INVENTORY: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_INVENTORY"],
     RAW_MATERIALS: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_INVENTORY"],
     RECIPES: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_INVENTORY"],
+    MTO_CPQ: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_INVENTORY"],
     COUPONS: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER"],
+
     PUSH: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER"],
 
     // 3. Finanzas
@@ -2589,6 +2612,18 @@ export function AdminDashboard({
           />
         )}
 
+        {/* PLUGIN MTO & CPQ: WORKSHOP & CUSTOM FABRICATION */}
+        {activeTab === "MTO_CPQ" && (
+          <MtoCpqAdminPanel
+            tenantId={settings.tenant_id}
+            businessName={settingsState.business_name}
+            businessPhone={settingsState.whatsapp_number || settingsState.phone}
+            orders={orders}
+            formatCurrency={(val) => `$${val.toFixed(2)}`}
+          />
+        )}
+
+
         {/* TAB 4: DELIVERY & DRIVERS */}
         {activeTab === "DELIVERY" && (
           <DeliveryManager
@@ -3266,7 +3301,16 @@ export function AdminDashboard({
                           >
                             Ir a Insumos →
                           </button>
+                        ) : plugin.id === "mto_cpq" ? (
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("MTO_CPQ")}
+                            className="text-xs font-bold text-indigo-600 hover:underline cursor-pointer"
+                          >
+                            Ir a Taller MTO →
+                          </button>
                         ) : (
+
                           <span className="text-[10px] text-emerald-600 font-medium">
                             Habilitado
                           </span>
@@ -3412,7 +3456,9 @@ export function AdminDashboard({
             else if (pluginId === "local_venezuela") setActiveTab("RATES");
             else if (pluginId === "food_service") setActiveTab("RAW_MATERIALS");
             else if (pluginId === "storefront_pro") setActiveTab("STOREFRONT_STUDIO");
+            else if (pluginId === "mto_cpq") setActiveTab("MTO_CPQ");
             else setActiveTab("PLUGINS");
+
           }}
           supportPhone={settingsState.whatsapp_number || settingsState.phone}
           tenantName={settingsState.business_name}

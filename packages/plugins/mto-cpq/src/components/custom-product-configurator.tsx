@@ -9,8 +9,10 @@ import {
   CpqDimensions,
   CpqCalculationResult,
 } from "@marketos/types";
-import { calculateCpqPrice } from "../services/pricing-engine";
-import { Sliders, Check, Layers, Info, ShoppingCart, Tag } from "lucide-react";
+import { calculateCpqPrice, sanitizeCalculationForClient } from "../services/pricing-engine";
+import { DimensionVisualizer } from "./dimension-visualizer";
+import { buildWhatsAppQuoteUrl } from "../services/quote-sharing";
+import { Sliders, Check, Layers, Info, ShoppingCart, Tag, MessageCircle } from "lucide-react";
 
 export interface CustomProductConfiguratorProps {
   matrix: CpqPricingMatrix;
@@ -19,6 +21,9 @@ export interface CustomProductConfiguratorProps {
   volumeTiers?: CpqVolumeTier[];
   initialDimensions?: CpqDimensions;
   initialQuantity?: number;
+  productName?: string;
+  businessName?: string;
+  businessPhone?: string;
   isAdmin?: boolean;
   formatCurrency?: (val: number) => string;
   onConfigurationChange?: (config: {
@@ -33,7 +38,9 @@ export interface CustomProductConfiguratorProps {
     quantity: number;
     calculation: CpqCalculationResult;
   }) => void;
+  onRequestWhatsAppQuote?: (quoteUrl: string) => void;
 }
+
 
 const DEFAULT_CURRENCY = (val: number) => val.toFixed(2);
 
@@ -44,10 +51,14 @@ export function CustomProductConfigurator({
   volumeTiers = [],
   initialDimensions,
   initialQuantity = 1,
+  productName,
+  businessName = "Taller & Fabricación",
+  businessPhone,
   isAdmin = false,
   formatCurrency = DEFAULT_CURRENCY,
   onConfigurationChange,
   onAddToCart,
+  onRequestWhatsAppQuote,
 }: CustomProductConfiguratorProps) {
   const [dimensions, setDimensions] = useState<CpqDimensions>(
     initialDimensions || {
@@ -96,9 +107,53 @@ export function CustomProductConfigurator({
       dimensions,
       selectedOptions,
       quantity,
-      calculation,
+      calculation: isAdmin ? calculation : (sanitizeCalculationForClient(calculation) as any),
     });
-  }, [dimensions, selectedOptions, quantity, calculation, onConfigurationChange]);
+  }, [dimensions, selectedOptions, quantity, calculation, onConfigurationChange, isAdmin]);
+
+  const handleWhatsAppQuoteClick = () => {
+    const quotePayload = {
+      quote: {
+        id: "temp",
+        tenant_id: matrix.tenant_id,
+        quote_number: `COT-${Date.now().toString().slice(-4)}`,
+        status: "DRAFT" as const,
+        total_cost: calculation.totalCost,
+        total_price: calculation.totalPrice,
+        net_margin_amount: calculation.netMarginAmount,
+        deposit_percentage: calculation.depositPercentage,
+        deposit_amount: calculation.depositAmount,
+        customer_name: "Cliente",
+      },
+      items: [
+        {
+          id: "temp-item",
+          quote_id: "temp",
+          product_id: "custom-mto-product",
+          product_name: productName || matrix.name,
+          dimensions,
+          selected_attributes: selectedOptions.reduce((acc, opt) => {
+            acc[opt.attribute_name] = opt.label;
+            return acc;
+          }, {} as Record<string, string>),
+          cost_breakdown: calculation.costBreakdown,
+          unit_cost: calculation.unitCost,
+          unit_price: calculation.unitPrice,
+          quantity,
+          total_price: calculation.totalPrice,
+        },
+      ],
+
+      businessName,
+    };
+
+    const url = buildWhatsAppQuoteUrl(businessPhone || "", quotePayload);
+    if (onRequestWhatsAppQuote) {
+      onRequestWhatsAppQuote(url);
+    } else if (businessPhone && typeof window !== "undefined") {
+      window.open(url, "_blank");
+    }
+  };
 
   const toggleOption = (groupName: string, option: CpqAttributeOption) => {
     setSelectedOptionIds((prev) => {
@@ -121,6 +176,7 @@ export function CustomProductConfigurator({
   const handleApplyPreset = (preset: { width: number; height: number; unit: "cm" | "m" | "mm" | "in" }) => {
     setDimensions((prev) => ({ ...prev, ...preset }));
   };
+
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm space-y-6">
@@ -273,6 +329,15 @@ export function CustomProductConfigurator({
         </div>
       )}
 
+      {/* 2D Interactive Dimension Visualizer */}
+      <div className="pt-2">
+        <DimensionVisualizer
+          dimensions={dimensions}
+          calculationType={matrix.calculation_type}
+        />
+      </div>
+
+
       {/* Attribute Options Selectors */}
       {Object.keys(groupedAttributes).length > 0 && (
         <div className="space-y-4 pt-2">
@@ -391,11 +456,11 @@ export function CustomProductConfigurator({
         </div>
       )}
 
-      {/* Footer / Total & Action */}
-      <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <span className="text-xs text-zinc-500 dark:text-zinc-400 block">Total Estimado ({quantity} u.)</span>
+      {/* Footer / Total, Configurable Deposit & Actions */}
+      <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1">
           <div className="flex items-baseline gap-2">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">Total ({quantity} u.):</span>
             <span className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
               {formatCurrency(calculation.totalPrice)}
             </span>
@@ -403,26 +468,50 @@ export function CustomProductConfigurator({
               ({formatCurrency(calculation.unitPrice)} / u)
             </span>
           </div>
+
+          {/* Configurable Deposit Breakdown */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+              💳 Anticipo ({calculation.depositPercentage}%): {formatCurrency(calculation.depositAmount)}
+            </span>
+            <span className="text-zinc-500 dark:text-zinc-400">
+              📦 Saldo contra entrega: {formatCurrency(Math.max(0, calculation.totalPrice - calculation.depositAmount))}
+            </span>
+          </div>
         </div>
 
-        {onAddToCart && (
-          <button
-            type="button"
-            onClick={() =>
-              onAddToCart({
-                dimensions,
-                selectedOptions,
-                quantity,
-                calculation,
-              })
-            }
-            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm transition-colors shadow-sm"
-          >
-            <ShoppingCart className="w-4 h-4" />
-            <span>Agregar al Carrito</span>
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {(businessPhone || onRequestWhatsAppQuote) && (
+            <button
+              type="button"
+              onClick={handleWhatsAppQuoteClick}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm transition-colors shadow-sm"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>Cotizar por WhatsApp</span>
+            </button>
+          )}
+
+          {onAddToCart && (
+            <button
+              type="button"
+              onClick={() =>
+                onAddToCart({
+                  dimensions,
+                  selectedOptions,
+                  quantity,
+                  calculation: isAdmin ? calculation : (sanitizeCalculationForClient(calculation) as any),
+                })
+              }
+              className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm transition-colors shadow-sm"
+            >
+              <ShoppingCart className="w-4 h-4" />
+              <span>Agregar al Carrito</span>
+            </button>
+          )}
+        </div>
       </div>
+
     </div>
   );
 }

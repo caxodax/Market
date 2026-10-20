@@ -6,35 +6,55 @@ import {
   ShieldAlert,
   ShieldCheck,
   CreditCard,
-  AlertCircle,
-  CheckCircle,
   Lock,
   Unlock,
   Plus,
+  MessageCircle,
+  Percent,
 } from "lucide-react";
+import { buildWhatsAppBalanceReminderUrl } from "../services/quote-sharing";
 
 export interface MilestonePaymentTrackerProps {
   milestone: CpqOrderMilestone;
   formatCurrency?: (val: number) => string;
   onRecordPayment?: (amount: number, note?: string) => void;
   onToggleAllowDispatchWithBalance?: (allow: boolean) => void;
+  customerPhone?: string;
+  orderNumber?: string;
+  customerName?: string;
+  businessName?: string;
+  paymentInstructions?: string;
   readOnly?: boolean;
   className?: string;
 }
 
 const DEFAULT_CURRENCY = (val: number) => val.toFixed(2);
+const PRESET_DEPOSIT_PERCENTAGES = [30, 40, 50, 70, 100];
 
 export function MilestonePaymentTracker({
   milestone,
   formatCurrency = DEFAULT_CURRENCY,
   onRecordPayment,
   onToggleAllowDispatchWithBalance,
+  customerPhone,
+  orderNumber,
+  customerName,
+  businessName = "Taller & Fabricación",
+  paymentInstructions,
   readOnly = false,
   className = "",
 }: MilestonePaymentTrackerProps) {
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState<string>("");
   const [paymentNote, setPaymentNote] = useState<string>("");
+
+  // Configurable deposit percentage state (defaults to milestone config or 50%)
+  const defaultDepositPct =
+    milestone.required_deposit_percentage !== undefined &&
+    milestone.required_deposit_percentage !== null
+      ? milestone.required_deposit_percentage
+      : 50;
+  const [activeDepositPct, setActiveDepositPct] = useState<number>(defaultDepositPct);
 
   const total = milestone.total_amount || 0;
   const paid = milestone.paid_amount || 0;
@@ -43,6 +63,8 @@ export function MilestonePaymentTracker({
 
   const isFullyPaid = pending <= 0.001;
   const isDispatchBlocked = !isFullyPaid && !milestone.allow_dispatch_with_balance;
+
+  const calculatedDepositAmount = (total * activeDepositPct) / 100;
 
   const handleQuickPayment = (amount: number, note: string) => {
     if (!onRecordPayment || amount <= 0) return;
@@ -60,6 +82,19 @@ export function MilestonePaymentTracker({
     }
   };
 
+  const balanceReminderUrl =
+    customerPhone && pending > 0
+      ? buildWhatsAppBalanceReminderUrl(customerPhone, {
+          orderNumber,
+          customerName,
+          businessName,
+          totalAmount: total,
+          paidAmount: paid,
+          pendingBalance: pending,
+          paymentInstructions,
+        })
+      : null;
+
   return (
     <div
       className={`bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm space-y-6 ${className}`}
@@ -74,7 +109,7 @@ export function MilestonePaymentTracker({
             </h3>
           </div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Gestión de pagos por hitos (50% anticipo de producción y liquidación contra entrega).
+            Gestión de pagos por hitos (anticipo configurable para inicio de obra y liquidación contra entrega).
           </p>
         </div>
 
@@ -108,7 +143,7 @@ export function MilestonePaymentTracker({
             className={`h-full transition-all duration-500 rounded-full ${
               percentPaid >= 100
                 ? "bg-emerald-500"
-                : percentPaid >= 50
+                : percentPaid >= (milestone.required_deposit_percentage || 50)
                 ? "bg-indigo-600"
                 : "bg-amber-500"
             }`}
@@ -154,6 +189,49 @@ export function MilestonePaymentTracker({
         </div>
       </div>
 
+      {/* Deposit Rate Selector Chips */}
+      {!readOnly && paid === 0 && (
+        <div className="bg-zinc-50/80 dark:bg-zinc-800/30 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+              <Percent className="w-3.5 h-3.5 text-indigo-500" />
+              Porcentaje de Anticipo Requerido:
+            </span>
+            <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+              {activeDepositPct}% = {formatCurrency(calculatedDepositAmount)}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            {PRESET_DEPOSIT_PERCENTAGES.map((pct) => (
+              <button
+                key={pct}
+                type="button"
+                onClick={() => setActiveDepositPct(pct)}
+                className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-all ${
+                  activeDepositPct === pct
+                    ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                    : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300"
+                }`}
+              >
+                {pct}%
+              </button>
+            ))}
+            <div className="flex items-center gap-1 ml-auto">
+              <input
+                type="number"
+                min="1"
+                max="100"
+                value={activeDepositPct}
+                onChange={(e) => setActiveDepositPct(Math.min(100, Math.max(1, parseInt(e.target.value, 10) || 50)))}
+                className="w-14 px-2 py-0.5 text-xs text-center rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+              />
+              <span className="text-xs text-zinc-400">%</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Warning Alert if Dispatch is Blocked */}
       {isDispatchBlocked && (
         <div className="flex items-start gap-3 p-4 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-rose-800 dark:text-rose-300 text-xs">
@@ -170,19 +248,24 @@ export function MilestonePaymentTracker({
       )}
 
       {/* Actions & Payment Registration */}
-      {!readOnly && onRecordPayment && (
+      {!readOnly && (
         <div className="space-y-3 pt-2">
           {!showPaymentForm ? (
             <div className="flex flex-wrap items-center gap-2">
-              {pending > 0 && (
+              {onRecordPayment && pending > 0 && (
                 <>
                   {paid === 0 && (
                     <button
                       type="button"
-                      onClick={() => handleQuickPayment(total * 0.5, "Anticipo 50% de Producción")}
+                      onClick={() =>
+                        handleQuickPayment(
+                          calculatedDepositAmount,
+                          `Anticipo ${activeDepositPct}% de Producción`
+                        )
+                      }
                       className="px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 text-xs font-medium border border-indigo-200 dark:border-indigo-800 transition-colors"
                     >
-                      Registrar Anticipo (50%: {formatCurrency(total * 0.5)})
+                      Registrar Anticipo ({activeDepositPct}%: {formatCurrency(calculatedDepositAmount)})
                     </button>
                   )}
                   <button
@@ -192,16 +275,29 @@ export function MilestonePaymentTracker({
                   >
                     Liquidar Saldo Completo ({formatCurrency(pending)})
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPaymentForm(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-medium transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Monto Personalizado</span>
+                  </button>
                 </>
               )}
-              <button
-                type="button"
-                onClick={() => setShowPaymentForm(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-medium transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Registrar Monto Personalizado</span>
-              </button>
+
+              {/* WhatsApp Balance Settlement Link */}
+              {balanceReminderUrl && (
+                <a
+                  href={balanceReminderUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium transition-colors shadow-sm ml-auto"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>Solicitar Saldo por WhatsApp</span>
+                </a>
+              )}
             </div>
           ) : (
             <form
@@ -292,3 +388,4 @@ export function MilestonePaymentTracker({
     </div>
   );
 }
+

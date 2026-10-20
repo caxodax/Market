@@ -262,6 +262,12 @@ export function calculateCpqPrice(input: CalculateCpqPriceInput): CpqCalculation
     productionNotes.push(`Descuento por escala (${qty} unid): -${round(discountPercentage, 1)}%`);
   }
 
+  // 7. Configurable Advance Deposit
+  const rawDepositPct =
+    matrix.deposit_percentage ?? costSettings.default_deposit_percentage ?? 50;
+  const depositPercentage = Math.max(0, Math.min(rawDepositPct, 100));
+  const depositAmount = round((totalPrice * depositPercentage) / 100, 2);
+
   return {
     unitCost: round(unitCost, 2),
     baseUnitPrice: round(baseUnitPrice, 2),
@@ -272,7 +278,18 @@ export function calculateCpqPrice(input: CalculateCpqPriceInput): CpqCalculation
     profitMargin: round(profitMargin, 2),
     netMarginAmount: round(netMarginAmount, 2),
     discountPercentage: round(discountPercentage, 2),
+    depositPercentage: round(depositPercentage, 2),
+    depositAmount: round(depositAmount, 2),
     costBreakdown,
     productionNotes,
   };
+}
+
+/**
+ * Sanitizes calculation result for public storefront or non-admin clients,
+ * ensuring internal cost breakdowns and profit margins are never leaked.
+ */
+export function sanitizeCalculationForClient(calc: CpqCalculationResult): import("@marketos/types").SanitizedCpqCalculationResult {
+  const { unitCost, totalCost, profitMargin, netMarginAmount, costBreakdown, ...safeData } = calc;
+  return safeData;
 }

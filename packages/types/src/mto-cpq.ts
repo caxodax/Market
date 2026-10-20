@@ -14,6 +14,7 @@ export interface CpqCostSettings {
   id: string;
   tenant_id: string;
   default_margin_percentage: number; // e.g. 45.00 (%)
+  default_deposit_percentage?: number; // Configurable advance payment % (default 50.00%)
   hourly_labor_rate: number;         // Labor cost per hour (e.g. 15.00)
   machine_cost_per_hour: number;     // Depreciation / energy per machine hour (e.g. 5.00)
   created_at?: string;
@@ -28,6 +29,7 @@ export interface CpqPricingMatrix {
   min_billable_unit: number;         // Minimum chargeable area/length/unit (e.g. 1.0)
   setup_fee: number;                 // Fixed startup cost (e.g. 10.00)
   waste_factor: number;              // Waste multiplier (e.g. 0.05 for 5%)
+  deposit_percentage?: number | null; // Matrix-level advance payment % override (e.g. 30, 70, 100)
   base_material_cost_per_unit?: number;
   base_labor_minutes?: number;
   is_active?: boolean;
@@ -85,18 +87,28 @@ export interface CpqCostBreakdown {
 }
 
 export interface CpqCalculationResult {
-  unitCost: number;                  // Internal cost per unit
+  unitCost: number;                  // Internal cost per unit (Owner only)
   baseUnitPrice: number;             // Base price before volume tier discount
   unitPrice: number;                 // Final selling price per unit
   quantity: number;
-  totalCost: number;                 // unitCost * quantity
+  totalCost: number;                 // unitCost * quantity (Owner only)
   totalPrice: number;                // unitPrice * quantity
-  profitMargin: number;              // Effective gross margin %
-  netMarginAmount: number;           // totalPrice - totalCost (net profit)
+  profitMargin: number;              // Effective gross margin % (Owner only)
+  netMarginAmount: number;           // totalPrice - totalCost (net profit) (Owner only)
   discountPercentage: number;        // Applied volume discount %
-  costBreakdown: CpqCostBreakdown;
+  depositPercentage: number;         // Configurable advance % (e.g. 30%, 50%, 70%)
+  depositAmount: number;             // Required initial payment to start manufacturing
+  costBreakdown: CpqCostBreakdown;   // Detailed internal BOM (Owner only)
   productionNotes?: string[];
 }
+
+/**
+ * Public client-facing calculation result stripped of all internal costs and profit margins.
+ */
+export type SanitizedCpqCalculationResult = Omit<
+  CpqCalculationResult,
+  "unitCost" | "totalCost" | "profitMargin" | "netMarginAmount" | "costBreakdown"
+>;
 
 export type CpqQuoteStatus = "DRAFT" | "SENT" | "ACCEPTED" | "CONVERTED";
 
@@ -111,6 +123,8 @@ export interface CpqQuote {
   total_cost: number;                // Internal total cost (Owner only)
   total_price: number;               // Public client price
   net_margin_amount: number;         // Projected net profit (Owner only)
+  deposit_percentage: number;        // Configurable required advance % (e.g. 50.00)
+  deposit_amount: number;            // Total advance required in currency
   valid_until?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -166,6 +180,8 @@ export interface CpqOrderMilestone {
   total_amount: number;
   paid_amount: number;
   pending_balance: number;
+  required_deposit_percentage?: number; // Configurable advance percentage (e.g. 30%, 50%, 70%)
+  required_deposit_amount?: number;     // Advance dollar value required before starting work
   allow_dispatch_with_balance: boolean;
   created_at?: string;
   updated_at?: string;
