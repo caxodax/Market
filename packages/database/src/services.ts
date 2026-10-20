@@ -2669,15 +2669,19 @@ export class MarketOSRepository {
           .from("orders")
           .select("id, store_id, tenant_id")
           .eq("id", orderId)
+          .eq("tenant_id", tenantId)
           .maybeSingle();
 
-        const storeId = ord?.store_id;
-        const targetTenantId = ord?.tenant_id || tenantId;
+        if (!ord) return;
+
+        const storeId = ord.store_id;
+        const targetTenantId = ord.tenant_id;
 
         const { data: items } = await supabase
           .from("order_items")
           .select("product_id, quantity, product_name")
-          .eq("order_id", orderId);
+          .eq("order_id", orderId)
+          .eq("tenant_id", tenantId);
 
         if (items && items.length > 0 && storeId) {
           for (const item of items) {

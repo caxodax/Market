@@ -19,20 +19,37 @@ export function CartDrawer({
   const { items, isOpen, setIsOpen, removeItem, updateQuantity, totalUsd, totalItems } =
     useCart();
 
+  // WCAG AA: Handle Escape key to dismiss drawer
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, setIsOpen]);
+
   if (!isOpen) return null;
 
   const totalVes = convertUsdToVes(totalUsd, exchangeRate);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
+    <div
+      className="fixed inset-0 z-50 overflow-hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Carrito de compras"
+    >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+        className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
         onClick={() => setIsOpen(false)}
       />
 
       <div className="fixed inset-y-0 right-0 flex max-w-full pl-10">
-        <div className="w-screen max-w-md bg-background shadow-2xl flex flex-col border-l border-border">
+        <div className="w-screen max-w-md bg-background shadow-2xl flex flex-col border-l border-border animate-in slide-in-from-right duration-200">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
             <div className="flex items-center gap-2">
@@ -43,7 +60,8 @@ export function CartDrawer({
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+              aria-label="Cerrar carrito"
             >
               <X className="w-5 h-5" />
             </button>
@@ -55,9 +73,16 @@ export function CartDrawer({
               <div className="h-full flex flex-col items-center justify-center text-center p-6 text-muted-foreground">
                 <ShoppingBag className="w-12 h-12 stroke-[1.2] mb-3 text-muted-foreground/60" />
                 <p className="font-semibold text-foreground">Tu carrito está vacío</p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-1 mb-4 max-w-xs">
                   Agrega productos del catálogo para comenzar tu pedido.
                 </p>
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Explorar Catálogo
+                </button>
               </div>
             ) : (
               items.map((item) => {
