@@ -9,6 +9,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "test": "node --experimental-strip-types src/__tests__/run-checks.ts",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {

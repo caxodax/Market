@@ -17,16 +17,18 @@ import {
   ArrowUp,
   ArrowDown,
   Check,
-  Plus,
-  Trash2,
-  Sparkles,
-  Save,
   RotateCcw,
   Sliders,
-  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  Settings2,
+  Save,
+  Globe,
+  Sparkles,
 } from "lucide-react";
-import { createDefaultStorefrontConfig } from "../defaults";
+import { createDefaultStorefrontConfig, createVenezuelaStorefrontConfig } from "../defaults";
 import { StorefrontProRenderer } from "./storefront-pro-renderer";
+import { BlockConfigForm } from "./block-config-forms";
 
 interface AdminStorefrontStudioProps {
   initialConfig?: StorefrontConfig | null;
@@ -56,6 +58,7 @@ export function AdminStorefrontStudio({
   const [previewDevice, setPreviewDevice] = useState<"mobile" | "desktop">("mobile");
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [expandedBlockId, setExpandedBlockId] = useState<string | null>(null);
 
   // Toggle block enabled/disabled
@@ -64,6 +67,7 @@ export function AdminStorefrontStudio({
       ...prev,
       blocks: prev.blocks.map((b) => (b.id === blockId ? { ...b, enabled: !b.enabled } : b)),
     }));
+    setHasUnsavedChanges(true);
   };
 
   // Move block up or down
@@ -87,12 +91,28 @@ export function AdminStorefrontStudio({
     });
 
     setConfig((prev) => ({ ...prev, blocks: newBlocks }));
+    setHasUnsavedChanges(true);
+  };
+
+  // Update specific block configuration
+  const handleUpdateBlockConfig = (blockId: string, updatedConfig: any) => {
+    setConfig((prev) => ({
+      ...prev,
+      blocks: prev.blocks.map((b) => (b.id === blockId ? { ...b, config: updatedConfig } : b)),
+    }));
+    setHasUnsavedChanges(true);
   };
 
   // Reset to default layout
-  const handleResetDefaults = () => {
-    if (confirm("¿Deseas restaurar la configuración visual y todos los bloques a los valores por defecto?")) {
-      setConfig(createDefaultStorefrontConfig(businessName));
+  const handleApplyPreset = (preset: "global" | "venezuela") => {
+    const label = preset === "venezuela" ? "Venezuela (BCV & Pagos Locales)" : "Global E-Commerce";
+    if (confirm(`¿Deseas inicializar todos los bloques con la plantilla ${label}?`)) {
+      setConfig(
+        preset === "venezuela"
+          ? createVenezuelaStorefrontConfig(businessName)
+          : createDefaultStorefrontConfig({ businessName, preset: "global" })
+      );
+      setHasUnsavedChanges(true);
     }
   };
 
@@ -103,6 +123,7 @@ export function AdminStorefrontStudio({
     try {
       await onSave(config);
       setSaveSuccess(true);
+      setHasUnsavedChanges(false);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
       console.error(err);
@@ -117,8 +138,8 @@ export function AdminStorefrontStudio({
     tenant_id: "default",
     name: "Sede Principal",
     code: "SP-01",
-    address: "Urb. Nueva Segovia, Barquisimeto",
-    phone: "+58 424-5919577",
+    address: "Sede Principal",
+    phone: null,
     is_active: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -139,21 +160,39 @@ export function AdminStorefrontStudio({
             <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
               Live Modular
             </span>
+            {hasUnsavedChanges && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 animate-pulse">
+                • Cambios sin guardar
+              </span>
+            )}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Activa, desactiva y reorganiza los 10 bloques visuales de tu tienda pública.
+            Activa, reorganiza y edita en vivo los 10 bloques visuales de tu tienda pública.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleResetDefaults}
-            className="px-3 py-2 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Restaurar</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Preset selector */}
+          <div className="flex items-center gap-1 bg-muted p-1 rounded-xl text-xs">
+            <span className="text-[11px] font-semibold text-muted-foreground px-1.5 flex items-center gap-1">
+              <Globe className="w-3 h-3" />
+              <span>Plantilla:</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => handleApplyPreset("global")}
+              className="px-2 py-1 rounded-lg text-[11px] font-bold hover:bg-background transition-colors text-foreground cursor-pointer"
+            >
+              Global
+            </button>
+            <button
+              type="button"
+              onClick={() => handleApplyPreset("venezuela")}
+              className="px-2 py-1 rounded-lg text-[11px] font-bold hover:bg-background transition-colors text-foreground cursor-pointer"
+            >
+              Venezuela
+            </button>
+          </div>
 
           <button
             type="button"
@@ -188,24 +227,31 @@ export function AdminStorefrontStudio({
                 <Layers className="w-4 h-4 text-primary" />
                 <span>Estructura de la Tienda ({config.blocks.filter((b) => b.enabled).length} Activos)</span>
               </span>
+              <span className="text-[11px] text-muted-foreground">
+                Haz clic en <Settings2 className="w-3 h-3 inline text-primary" /> para editar
+              </span>
             </div>
 
-            {/* List of 10 Blocks */}
+            {/* List of 10 Blocks with Expandable Configuration Drawers */}
             <div className="space-y-2">
               {config.blocks.map((block, idx) => {
                 const isFirst = idx === 0;
                 const isLast = idx === config.blocks.length - 1;
+                const isExpanded = expandedBlockId === block.id;
 
                 return (
                   <div
                     key={block.id}
-                    className={`p-3 rounded-xl border transition-all ${
+                    className={`rounded-xl border transition-all overflow-hidden ${
                       block.enabled
-                        ? "border-border bg-card shadow-2xs"
+                        ? isExpanded
+                          ? "border-primary/60 bg-card shadow-sm ring-1 ring-primary/20"
+                          : "border-border bg-card shadow-2xs"
                         : "border-dashed border-border/60 bg-muted/30 opacity-60"
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-2">
+                    {/* Header Row */}
+                    <div className="p-3 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2.5 min-w-0">
                         {/* Order Handle */}
                         <div className="flex flex-col gap-0.5">
@@ -245,14 +291,36 @@ export function AdminStorefrontStudio({
                         </div>
                       </div>
 
-                      {/* Enable / Disable Toggle Switch */}
+                      {/* Right Action: Configure Button + Enable/Disable Switch */}
                       <div className="flex items-center gap-2 shrink-0">
+                        {/* Configure / Edit Content Button */}
+                        <button
+                          type="button"
+                          onClick={() => setExpandedBlockId(isExpanded ? null : block.id)}
+                          className={`px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                            isExpanded
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                          }`}
+                          title="Editar contenidos del bloque"
+                        >
+                          <Settings2 className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Editar</span>
+                          {isExpanded ? (
+                            <ChevronUp className="w-3 h-3" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3" />
+                          )}
+                        </button>
+
+                        {/* Enable / Disable Toggle Switch */}
                         <button
                           type="button"
                           onClick={() => handleToggleBlock(block.id)}
                           className={`w-11 h-6 rounded-full transition-colors p-0.5 relative cursor-pointer ${
                             block.enabled ? "bg-primary" : "bg-muted-foreground/30"
                           }`}
+                          title={block.enabled ? "Desactivar bloque" : "Activar bloque"}
                         >
                           <div
                             className={`w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${
@@ -262,6 +330,18 @@ export function AdminStorefrontStudio({
                         </button>
                       </div>
                     </div>
+
+                    {/* Expandable Configuration Drawer */}
+                    {isExpanded && (
+                      <div className="px-3.5 pb-3.5 pt-1 border-t border-border/80 bg-muted/20 animate-in fade-in duration-200">
+                        <BlockConfigForm
+                          block={block}
+                          categories={categories}
+                          products={products}
+                          onChange={(updated) => handleUpdateBlockConfig(block.id, updated)}
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -270,7 +350,7 @@ export function AdminStorefrontStudio({
         </div>
 
         {/* Right Column: Live Interactive Preview (7 cols) */}
-        <div className="lg:col-span-7 flex flex-col items-center">
+        <div className="lg:col-span-7 flex flex-col items-center sticky top-4">
           {/* Device Switcher */}
           <div className="flex items-center gap-2 mb-3 bg-muted p-1 rounded-xl">
             <button
@@ -334,7 +414,7 @@ export function AdminStorefrontStudio({
                   {businessName}
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold">
-                  Vista Previa
+                  Vista Previa en Vivo
                 </span>
               </div>
 

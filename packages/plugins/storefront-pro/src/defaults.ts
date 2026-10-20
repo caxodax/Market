@@ -1,6 +1,195 @@
-import { StorefrontConfig, StorefrontBlock } from "@marketos/types";
+import type { StorefrontConfig, StorefrontBlock } from "@marketos/types";
 
-export function createDefaultStorefrontConfig(businessName: string = "Nuestra Tienda"): StorefrontConfig {
+export interface CreateStorefrontConfigOptions {
+  businessName?: string;
+  preset?: "global" | "venezuela";
+}
+
+export function createDefaultStorefrontConfig(
+  businessNameOrOptions: string | CreateStorefrontConfigOptions = "Nuestra Tienda"
+): StorefrontConfig {
+  const options: CreateStorefrontConfigOptions =
+    typeof businessNameOrOptions === "string"
+      ? { businessName: businessNameOrOptions, preset: "global" }
+      : { businessName: businessNameOrOptions.businessName || "Nuestra Tienda", preset: businessNameOrOptions.preset || "global" };
+
+  const businessName = options.businessName || "Nuestra Tienda";
+  const isVenezuela = options.preset === "venezuela";
+
+  const marqueeMessages = isVenezuela
+    ? [
+        "⚡ Envíos express en menos de 45 minutos",
+        "💵 Pagos en Bolívares a Tasa Oficial BCV",
+        "💳 Aceptamos Pago Móvil, Zelle, Efectivo y Binance",
+        "🎉 Delivery GRATIS en compras seleccionadas",
+      ]
+    : [
+        "⚡ Envíos express directos a tu puerta",
+        "💳 Múltiples métodos de pago seguros y protegidos",
+        "🛡️ Garantía de satisfacción y atención directa",
+        "🎉 Envío GRATIS en órdenes seleccionadas",
+      ];
+
+  const trustBadges = isVenezuela
+    ? [
+        {
+          id: "badge_1",
+          icon: "Truck" as const,
+          title: "Delivery Rápido",
+          description: "Envíos directos a tu dirección.",
+        },
+        {
+          id: "badge_2",
+          icon: "CreditCard" as const,
+          title: "Múltiples Pagos",
+          description: "Pago Móvil, Zelle y Efectivo.",
+        },
+        {
+          id: "badge_3",
+          icon: "ShieldCheck" as const,
+          title: "Tasa Oficial BCV",
+          description: "Actualizada automáticamente en cada pedido.",
+        },
+        {
+          id: "badge_4",
+          icon: "MessageCircle" as const,
+          title: "Soporte WhatsApp",
+          description: "Atención directa ante cualquier consulta.",
+        },
+      ]
+    : [
+        {
+          id: "badge_1",
+          icon: "Truck" as const,
+          title: "Envío Rápido y Seguro",
+          description: "Despacho directo y seguimiento de orden.",
+        },
+        {
+          id: "badge_2",
+          icon: "CreditCard" as const,
+          title: "Pagos 100% Protegidos",
+          description: "Tarjetas, transferencias y pagos digitales.",
+        },
+        {
+          id: "badge_3",
+          icon: "ShieldCheck" as const,
+          title: "Calidad Garantizada",
+          description: "Productos seleccionados con los más altos estándares.",
+        },
+        {
+          id: "badge_4",
+          icon: "MessageCircle" as const,
+          title: "Atención Personalizada",
+          description: "Soporte directo y respuesta inmediata a tus consultas.",
+        },
+      ];
+
+  const testimonials = isVenezuela
+    ? [
+        {
+          id: "rev_1",
+          authorName: "Carlos Mendoza",
+          authorLocation: "Zona Este",
+          rating: 5,
+          comment: "Excelente servicio, el pedido llegó en menos de 30 minutos y los productos perfectamente embalados.",
+          verifiedBuyer: true,
+          dateText: "Ayer",
+        },
+        {
+          id: "rev_2",
+          authorName: "Mariana Silva",
+          authorLocation: "Centro Urbano",
+          rating: 5,
+          comment: "Pagar con Pago Móvil a la tasa del día es súper transparente y el seguimiento por WhatsApp funciona de maravilla.",
+          verifiedBuyer: true,
+          dateText: "Hace 3 días",
+        },
+        {
+          id: "rev_3",
+          authorName: "Roberto González",
+          authorLocation: "Sede Norte",
+          rating: 5,
+          comment: "Los mejores precios de la zona y la atención al cliente es A1. 100% recomendados.",
+          verifiedBuyer: true,
+          dateText: "Esta semana",
+        },
+      ]
+    : [
+        {
+          id: "rev_1",
+          authorName: "Carlos Mendoza",
+          authorLocation: "Cliente Verificado",
+          rating: 5,
+          comment: "Excelente servicio, el pedido llegó súper rápido y los productos perfectamente embalados y frescos.",
+          verifiedBuyer: true,
+          dateText: "Ayer",
+        },
+        {
+          id: "rev_2",
+          authorName: "Mariana Silva",
+          authorLocation: "Cliente Frecuente",
+          rating: 5,
+          comment: "La experiencia de compra digital fue intuitiva, rápida y el seguimiento en vivo del pedido funciona excelente.",
+          verifiedBuyer: true,
+          dateText: "Hace 3 días",
+        },
+        {
+          id: "rev_3",
+          authorName: "Roberto González",
+          authorLocation: "Comprador Registrado",
+          rating: 5,
+          comment: "Gran variedad, precios competitivos y una atención al cliente de primera calidad. Totalmente recomendados.",
+          verifiedBuyer: true,
+          dateText: "Esta semana",
+        },
+      ];
+
+  const faqItems = isVenezuela
+    ? [
+        {
+          id: "faq_1",
+          question: "¿Cuáles son los métodos de pago aceptados?",
+          answer: "Aceptamos Pago Móvil interbancario, Transferencias bancarias nacionales, Efectivo en Bolívares o Dólares, Zelle y Binance Pay.",
+        },
+        {
+          id: "faq_2",
+          question: "¿A qué tasa se calculan los precios en Bolívares?",
+          answer: "Todos los montos en Bolívares se calculan automáticamente con la tasa oficial publicada por el Banco Central de Venezuela (BCV) del día.",
+        },
+        {
+          id: "faq_3",
+          question: "¿Cómo funciona el servicio de Delivery?",
+          answer: "Despachamos tu pedido con nuestra flota o aliados motorizados tan pronto como se confirma tu comprobante de pago.",
+        },
+        {
+          id: "faq_4",
+          question: "¿Puedo retirar mi pedido personalmente en la tienda?",
+          answer: "¡Sí! Puedes seleccionar la opción 'Retiro en Tienda' (Pick-up) sin ningún costo adicional y recoger tu pedido listo en nuestra sede.",
+        },
+      ]
+    : [
+        {
+          id: "faq_1",
+          question: "¿Cuáles son los métodos de pago aceptados?",
+          answer: "Aceptamos tarjetas de débito/crédito, transferencias bancarias, pagos móviles digitales y efectivo al momento de la entrega o retiro.",
+        },
+        {
+          id: "faq_2",
+          question: "¿Cómo funciona el servicio de envío o delivery?",
+          answer: "Preparamos tu orden al instante y la despachamos de manera express hacia tu dirección seleccionada con seguimiento en tiempo real.",
+        },
+        {
+          id: "faq_3",
+          question: "¿Puedo retirar mi pedido personalmente en la tienda?",
+          answer: "¡Por supuesto! Puedes elegir la modalidad de retiro en tienda (Pick-up) sin costos adicionales y pasar por ella cuando esté lista.",
+        },
+        {
+          id: "faq_4",
+          question: "¿Qué garantía tengo sobre los productos?",
+          answer: "Garantizamos la frescura y estado óptimo de cada producto. Si tienes cualquier inconveniente, nuestro equipo de soporte te atiende de inmediato.",
+        },
+      ];
+
   const blocks: StorefrontBlock[] = [
     // 1. Ticker / Marquesina
     {
@@ -10,12 +199,7 @@ export function createDefaultStorefrontConfig(businessName: string = "Nuestra Ti
       enabled: true,
       order: 1,
       config: {
-        messages: [
-          "⚡ Envíos express en menos de 45 minutos",
-          "💵 Pagos en Bolívares a Tasa Oficial BCV",
-          "💳 Aceptamos Pago Móvil, Zelle, Efectivo y Binance",
-          "🎉 Delivery GRATIS en compras seleccionadas",
-        ],
+        messages: marqueeMessages,
         speedSeconds: 22,
         bgVariant: "primary",
         iconName: "Zap",
@@ -47,7 +231,7 @@ export function createDefaultStorefrontConfig(businessName: string = "Nuestra Ti
           {
             id: "slide_2",
             title: "Ahorra con Nuestros Combos Especiales",
-            subtitle: "Aprovecha descuentos exclusivos diseñados para tu familia y negocio.",
+            subtitle: "Aprovecha descuentos exclusivos diseñados para ti y tu negocio.",
             imageUrl: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1600&auto=format&fit=crop&q=80",
             ctaText: "Ver Ofertas",
             ctaLink: "category:promociones",
@@ -81,9 +265,9 @@ export function createDefaultStorefrontConfig(businessName: string = "Nuestra Ti
       enabled: true,
       order: 4,
       config: {
-        title: "⚡ Venta Flash de Fin de Semana",
+        title: "⚡ Venta Flash de Temporada",
         subtitle: "Precios de liquidación en productos seleccionados por tiempo limitado.",
-        endsAt: new Date(Date.now() + 24 * 3600 * 1000 * 2).toISOString(), // 48 horas hacia el futuro
+        endsAt: new Date(Date.now() + 24 * 3600 * 1000 * 2).toISOString(),
         discountBadgeText: "HASTA 40% OFF",
       },
     },
@@ -113,7 +297,7 @@ export function createDefaultStorefrontConfig(businessName: string = "Nuestra Ti
       id: "block_product_reels",
       type: "product_reels",
       label: "Videos Cortos / Reels de Productos",
-      enabled: false, // Desactivado por defecto, activable si suben video
+      enabled: false,
       order: 6,
       config: {
         autoplayOnHover: true,
@@ -130,32 +314,7 @@ export function createDefaultStorefrontConfig(businessName: string = "Nuestra Ti
       order: 7,
       config: {
         columns: 4,
-        badges: [
-          {
-            id: "badge_1",
-            icon: "Truck",
-            title: "Delivery Rápido",
-            description: "Envíos en moto o auto directo a tu dirección.",
-          },
-          {
-            id: "badge_2",
-            icon: "CreditCard",
-            title: "Múltiples Pagos",
-            description: "Pago Móvil, Zelle, Transferencia y Efectivo.",
-          },
-          {
-            id: "badge_3",
-            icon: "ShieldCheck",
-            title: "Tasa Oficial BCV",
-            description: "Actualizada automáticamente en cada pedido.",
-          },
-          {
-            id: "badge_4",
-            icon: "MessageCircle",
-            title: "Soporte WhatsApp",
-            description: "Atención directa ante cualquier consulta.",
-          },
-        ],
+        badges: trustBadges,
       },
     },
 
@@ -169,35 +328,7 @@ export function createDefaultStorefrontConfig(businessName: string = "Nuestra Ti
       config: {
         title: "Lo que opinan nuestros clientes",
         subtitle: "Comentarios reales y verificados de compradores recientes",
-        items: [
-          {
-            id: "rev_1",
-            authorName: "Carlos Mendoza",
-            authorLocation: "Barquisimeto",
-            rating: 5,
-            comment: "Excelente servicio, el pedido llegó en menos de 30 minutos y los productos perfectamente embalados.",
-            verifiedBuyer: true,
-            dateText: "Ayer",
-          },
-          {
-            id: "rev_2",
-            authorName: "Mariana Silva",
-            authorLocation: "Cabudare",
-            rating: 5,
-            comment: "Pagar con Pago Móvil a la tasa del día es súper transparente y el seguimiento por WhatsApp funciona de maravilla.",
-            verifiedBuyer: true,
-            dateText: "Hace 3 días",
-          },
-          {
-            id: "rev_3",
-            authorName: "Roberto González",
-            authorLocation: "Nueva Segovia",
-            rating: 5,
-            comment: "Los mejores precios de la zona y la atención al cliente es A1. 100% recomendados.",
-            verifiedBuyer: true,
-            dateText: "Esta semana",
-          },
-        ],
+        items: testimonials,
       },
     },
 
@@ -229,28 +360,7 @@ export function createDefaultStorefrontConfig(businessName: string = "Nuestra Ti
       config: {
         title: "Preguntas Frecuentes",
         subtitle: "Todo lo que necesitas saber antes de realizar tu compra",
-        items: [
-          {
-            id: "faq_1",
-            question: "¿Cuáles son los métodos de pago aceptados?",
-            answer: "Aceptamos Pago Móvil interbancario, Transferencias bancarias nacionales, Efectivo en Bolívares o Dólares, Zelle y Binance Pay.",
-          },
-          {
-            id: "faq_2",
-            question: "¿A qué tasa se calculan los precios en Bolívares?",
-            answer: "Todos los montos en Bolívares se calculan automáticamente con la tasa oficial publicada por el Banco Central de Venezuela (BCV) del día.",
-          },
-          {
-            id: "faq_3",
-            question: "¿Cómo funciona el servicio de Delivery?",
-            answer: "Despachamos tu pedido con nuestra flota propia o aliados motorizados tan pronto como se confirma tu comprobante de pago. Puedes consultar los tiempos y costos por zona al momento de pagar.",
-          },
-          {
-            id: "faq_4",
-            question: "¿Puedo retirar mi pedido personalmente en la tienda?",
-            answer: "¡Sí! Puedes seleccionar la opción 'Retiro en Tienda' (Pick-up) sin ningún costo adicional y recoger tu pedido listo en nuestra sede.",
-          },
-        ],
+        items: faqItems,
       },
     },
   ];
@@ -261,4 +371,8 @@ export function createDefaultStorefrontConfig(businessName: string = "Nuestra Ti
     containerWidth: "standard",
     blocks,
   };
+}
+
+export function createVenezuelaStorefrontConfig(businessName: string = "Nuestra Tienda"): StorefrontConfig {
+  return createDefaultStorefrontConfig({ businessName, preset: "venezuela" });
 }

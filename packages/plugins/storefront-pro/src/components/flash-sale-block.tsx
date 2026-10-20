@@ -40,8 +40,6 @@ export function FlashSaleBlock({ config, onExploreSale }: FlashSaleBlockProps) {
     return () => clearInterval(interval);
   }, [config.endsAt]);
 
-  if (timeLeft.isExpired) return null;
-
   const pad = (n: number) => String(n).padStart(2, "0");
 
   return (
@@ -54,7 +52,7 @@ export function FlashSaleBlock({ config, onExploreSale }: FlashSaleBlockProps) {
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-xs text-[10px] sm:text-xs font-black uppercase tracking-wider">
               <Zap className="w-3 h-3 fill-amber-300 text-amber-300" />
-              <span>{config.discountBadgeText || "OFERTA RELÁMPAGO"}</span>
+              <span>{timeLeft.isExpired ? "OFERTA CONCLUIDA" : (config.discountBadgeText || "OFERTA RELÁMPAGO")}</span>
             </span>
           </div>
           <h3 className="text-base sm:text-xl font-extrabold tracking-tight">

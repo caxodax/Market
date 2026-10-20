@@ -1,4 +1,4 @@
-import { PluginManifest } from "@marketos/types";
+import type { PluginManifest } from "@marketos/types";
 
 export const STOREFRONT_PRO_MANIFEST: PluginManifest = {
   id: "storefront_pro",

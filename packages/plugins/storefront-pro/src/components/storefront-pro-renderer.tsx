@@ -19,6 +19,30 @@ import { TestimonialsBlock } from "./testimonials-block";
 import { BrandStoryBlock } from "./brand-story-block";
 import { FaqAccordionBlock } from "./faq-accordion-block";
 
+// Resilient Error Boundary per block to prevent single block crashes from breaking the whole store
+class SafeBlockWrapper extends React.Component<
+  { id: string; children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: any) {
+    console.error(`[StorefrontPro] Error rendering block "${this.props.id}":`, error);
+  }
+
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
+}
+
 interface StorefrontProRendererProps {
   config?: StorefrontConfig | null;
   position?: "top" | "body";
@@ -62,101 +86,95 @@ export function StorefrontProRenderer({
 
   return (
     <div className="w-full flex flex-col">
-      {activeBlocks.map((block) => {
-        switch (block.type) {
-          case "announcement_marquee":
-            return (
-              <AnnouncementMarqueeBlock
-                key={block.id}
-                config={block.config as import("@marketos/types").AnnouncementMarqueeConfig}
-              />
-            );
+      {activeBlocks.map((block) => (
+        <SafeBlockWrapper key={block.id} id={block.id}>
+          {(() => {
+            switch (block.type) {
+              case "announcement_marquee":
+                return (
+                  <AnnouncementMarqueeBlock
+                    config={block.config as import("@marketos/types").AnnouncementMarqueeConfig}
+                  />
+                );
 
-          case "hero_slider":
-            return (
-              <HeroSliderBlock
-                key={block.id}
-                config={block.config as import("@marketos/types").HeroSliderConfig}
-                onActionClick={onActionClick}
-              />
-            );
+              case "hero_slider":
+                return (
+                  <HeroSliderBlock
+                    config={block.config as import("@marketos/types").HeroSliderConfig}
+                    onActionClick={onActionClick}
+                  />
+                );
 
-          case "category_bubbles":
-            return (
-              <CategoryBubblesBlock
-                key={block.id}
-                config={block.config as import("@marketos/types").CategoryBubblesConfig}
-                categories={categories}
-                selectedCategoryId={selectedCategoryId}
-                onSelectCategory={onSelectCategory}
-              />
-            );
+              case "category_bubbles":
+                return (
+                  <CategoryBubblesBlock
+                    config={block.config as import("@marketos/types").CategoryBubblesConfig}
+                    categories={categories}
+                    selectedCategoryId={selectedCategoryId}
+                    onSelectCategory={onSelectCategory}
+                  />
+                );
 
-          case "flash_sale":
-            return (
-              <FlashSaleBlock
-                key={block.id}
-                config={block.config as import("@marketos/types").FlashSaleConfig}
-                onExploreSale={(catId) => onSelectCategory(catId ?? null)}
-              />
-            );
+              case "flash_sale":
+                return (
+                  <FlashSaleBlock
+                    config={block.config as import("@marketos/types").FlashSaleConfig}
+                    onExploreSale={(catId) => onSelectCategory(catId ?? null)}
+                  />
+                );
 
-          case "featured_rails":
-            return (
-              <FeaturedRailsBlock
-                key={block.id}
-                config={block.config as import("@marketos/types").FeaturedRailsConfig}
-                products={products}
-                exchangeRate={exchangeRate}
-                onAddToCart={onAddToCart}
-              />
-            );
+              case "featured_rails":
+                return (
+                  <FeaturedRailsBlock
+                    config={block.config as import("@marketos/types").FeaturedRailsConfig}
+                    products={products}
+                    exchangeRate={exchangeRate}
+                    onAddToCart={onAddToCart}
+                  />
+                );
 
-          case "product_reels":
-            return (
-              <ProductReelsBlock
-                key={block.id}
-                config={block.config as import("@marketos/types").ProductReelsConfig}
-              />
-            );
+              case "product_reels":
+                return (
+                  <ProductReelsBlock
+                    config={block.config as import("@marketos/types").ProductReelsConfig}
+                  />
+                );
 
-          case "trust_badges":
-            return (
-              <TrustBadgesBlock
-                key={block.id}
-                config={block.config as import("@marketos/types").TrustBadgesConfig}
-              />
-            );
+              case "trust_badges":
+                return (
+                  <TrustBadgesBlock
+                    config={block.config as import("@marketos/types").TrustBadgesConfig}
+                  />
+                );
 
-          case "testimonials":
-            return (
-              <TestimonialsBlock
-                key={block.id}
-                config={block.config as import("@marketos/types").TestimonialsConfig}
-              />
-            );
+              case "testimonials":
+                return (
+                  <TestimonialsBlock
+                    config={block.config as import("@marketos/types").TestimonialsConfig}
+                  />
+                );
 
-          case "brand_story":
-            return (
-              <BrandStoryBlock
-                key={block.id}
-                config={block.config as import("@marketos/types").BrandStoryConfig}
-                selectedStore={selectedStore}
-              />
-            );
+              case "brand_story":
+                return (
+                  <BrandStoryBlock
+                    config={block.config as import("@marketos/types").BrandStoryConfig}
+                    selectedStore={selectedStore}
+                  />
+                );
 
-          case "faq_accordion":
-            return (
-              <FaqAccordionBlock
-                key={block.id}
-                config={block.config as import("@marketos/types").FaqAccordionConfig}
-              />
-            );
+              case "faq_accordion":
+                return (
+                  <FaqAccordionBlock
+                    config={block.config as import("@marketos/types").FaqAccordionConfig}
+                  />
+                );
 
-          default:
-            return null;
-        }
-      })}
+              default:
+                return null;
+            }
+          })()}
+        </SafeBlockWrapper>
+      ))}
     </div>
   );
 }

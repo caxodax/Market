@@ -12,3 +12,4 @@ export * from "./components/brand-story-block";
 export * from "./components/faq-accordion-block";
 export * from "./components/storefront-pro-renderer";
 export * from "./components/admin-storefront-studio";
+export * from "./components/block-config-forms";

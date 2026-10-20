@@ -29,10 +29,13 @@ export function AnnouncementMarqueeBlock({ config }: AnnouncementMarqueeBlockPro
     muted: "bg-muted text-foreground border-b border-border",
   }[config.bgVariant || "primary"];
 
-  const speed = config.speedSeconds || 25;
+  const speed = Math.max(10, config.speedSeconds || 22);
 
   return (
-    <div className={`w-full overflow-hidden py-2 text-xs font-bold select-none ${bgClasses}`}>
+    <aside
+      aria-label="Anuncios destacados de la tienda"
+      className={`w-full overflow-hidden py-2 text-xs font-bold select-none ${bgClasses}`}
+    >
       <style
         dangerouslySetInnerHTML={{
           __html: `
@@ -40,27 +43,40 @@ export function AnnouncementMarqueeBlock({ config }: AnnouncementMarqueeBlockPro
               0% { transform: translateX(0%); }
               100% { transform: translateX(-50%); }
             }
-            .animate-marquee-continuous {
+            .marketos-marquee-track {
               display: flex;
               width: max-content;
-              animation: marqueeLoop ${speed}s linear infinite;
+              animation: marqueeLoop var(--marquee-duration, 22s) linear infinite;
             }
-            .animate-marquee-continuous:hover {
+            .marketos-marquee-track:hover,
+            .marketos-marquee-track:focus-within {
               animation-play-state: paused;
+            }
+            @media (prefers-reduced-motion: reduce) {
+              .marketos-marquee-track {
+                animation: none !important;
+                transform: none !important;
+                overflow-x: auto;
+              }
             }
           `,
         }}
       />
-      <div className="animate-marquee-continuous flex items-center gap-8 px-4 cursor-default">
+      <div
+        className="marketos-marquee-track flex items-center gap-8 px-4 cursor-default"
+        style={{ ["--marquee-duration" as any]: `${speed}s` }}
+      >
         {/* Render twice for continuous infinite seamless loop */}
         {[...config.messages, ...config.messages].map((msg, idx) => (
           <div key={idx} className="flex items-center gap-2 shrink-0">
-            <IconComponent className="w-3.5 h-3.5 opacity-90 shrink-0" />
+            <IconComponent className="w-3.5 h-3.5 opacity-90 shrink-0" aria-hidden="true" />
             <span className="tracking-tight">{msg}</span>
-            <span className="opacity-40 ml-4 font-normal">•</span>
+            <span className="opacity-40 ml-4 font-normal" aria-hidden="true">
+              •
+            </span>
           </div>
         ))}
       </div>
-    </div>
+    </aside>
   );
 }

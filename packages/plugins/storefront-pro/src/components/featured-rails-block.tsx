@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { FeaturedRailsConfig, Product, ExchangeRate } from "@marketos/types";
 import { ChevronLeft, ChevronRight, Plus, Sparkles, Check } from "lucide-react";
 import { formatCurrency, convertUsdToVes } from "@marketos/utils";
@@ -68,6 +68,7 @@ function RailItemView({
   onAddToCart: (product: Product) => void;
 }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [recentlyAddedId, setRecentlyAddedId] = useState<string | null>(null);
 
   const scroll = (direction: "left" | "right") => {
     if (!scrollContainerRef.current) return;
@@ -75,13 +76,21 @@ function RailItemView({
     scrollContainerRef.current.scrollBy({ left: offset, behavior: "smooth" });
   };
 
+  const handleAdd = (prod: Product) => {
+    onAddToCart(prod);
+    setRecentlyAddedId(prod.id);
+    setTimeout(() => {
+      setRecentlyAddedId((curr) => (curr === prod.id ? null : curr));
+    }, 1300);
+  };
+
   return (
-    <div className="space-y-2.5">
+    <section aria-label={title} className="space-y-2.5">
       {/* Header with Title and Scroll Controls */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm sm:text-base font-extrabold text-foreground flex items-center gap-1.5">
-            <Sparkles className="w-4 h-4 text-primary" />
+            <Sparkles className="w-4 h-4 text-primary" aria-hidden="true" />
             <span>{title}</span>
           </h3>
           {subtitle && (
@@ -95,7 +104,7 @@ function RailItemView({
           <button
             type="button"
             onClick={() => scroll("left")}
-            aria-label="Desplazar hacia la izquierda"
+            aria-label={`Desplazar hacia la izquierda ${title}`}
             className="w-7 h-7 rounded-lg border border-border bg-card text-foreground flex items-center justify-center hover:bg-muted transition-colors cursor-pointer"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -103,7 +112,7 @@ function RailItemView({
           <button
             type="button"
             onClick={() => scroll("right")}
-            aria-label="Desplazar hacia la derecha"
+            aria-label={`Desplazar hacia la derecha ${title}`}
             className="w-7 h-7 rounded-lg border border-border bg-card text-foreground flex items-center justify-center hover:bg-muted transition-colors cursor-pointer"
           >
             <ChevronRight className="w-4 h-4" />
@@ -119,6 +128,7 @@ function RailItemView({
         {products.map((prod) => {
           const priceVes = convertUsdToVes(prod.price_usd, exchangeRate.value);
           const isOutOfStock = prod.stock <= 0;
+          const isJustAdded = recentlyAddedId === prod.id;
 
           return (
             <div
@@ -164,21 +174,32 @@ function RailItemView({
                 <button
                   type="button"
                   disabled={isOutOfStock}
-                  onClick={() => onAddToCart(prod)}
+                  onClick={() => handleAdd(prod)}
                   className={`w-full py-1.5 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
                     isOutOfStock
                       ? "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
-                      : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xs active:scale-98"
+                      : isJustAdded
+                        ? "bg-emerald-600 text-white shadow-xs scale-102"
+                        : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xs active:scale-98"
                   }`}
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Agregar</span>
+                  {isJustAdded ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      <span>¡Agregado!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Agregar</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }
