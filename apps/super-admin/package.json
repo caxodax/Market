@@ -12,6 +12,7 @@
   "dependencies": {
     "@marketos/auth": "workspace:*",
     "@marketos/database": "workspace:*",
+    "@marketos/plugin-barcode-retail": "workspace:*",
     "@marketos/plugin-food-service": "workspace:*",
     "@marketos/plugin-local-venezuela": "workspace:*",
     "@marketos/types": "workspace:*",

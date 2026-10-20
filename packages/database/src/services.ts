@@ -68,6 +68,8 @@ import {
   SelectedModifier,
   PlatformSettings,
   UpdatePlatformSettingsInput,
+  ProductBarcode,
+  WarehouseLocation,
 } from "@marketos/types";
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
 import {
@@ -6127,5 +6129,186 @@ export class MarketOSRepository {
 
     state.platformSettings = updated;
     return updated;
+  }
+
+  // =====================================================================
+  // BARCODE RETAIL & PACKAGING METHODS
+  // =====================================================================
+
+  static async getProductBarcodes(productId: string): Promise<ProductBarcode[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("product_barcodes")
+          .select("*")
+          .eq("product_id", productId)
+          .order("created_at", { ascending: true });
+
+        if (!error && data) {
+          return data as ProductBarcode[];
+        }
+      } catch (e) {
+        console.warn("[MarketOS] getProductBarcodes error:", e);
+      }
+    }
+    return [];
+  }
+
+  static async upsertProductBarcode(
+    input: Omit<ProductBarcode, "id" | "created_at">
+  ): Promise<ProductBarcode | null> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("product_barcodes")
+          .upsert(
+            {
+              tenant_id: input.tenant_id,
+              product_id: input.product_id,
+              barcode: input.barcode,
+              pack_name: input.pack_name,
+              units_per_pack: input.units_per_pack,
+              price_usd: input.price_usd,
+              is_primary: input.is_primary,
+            },
+            { onConflict: "tenant_id,barcode" }
+          )
+          .select("*")
+          .single();
+
+        if (!error && data) {
+          return data as ProductBarcode;
+        }
+      } catch (e) {
+        console.warn("[MarketOS] upsertProductBarcode error:", e);
+      }
+    }
+    return null;
+  }
+
+  static async deleteProductBarcode(id: string): Promise<boolean> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from("product_barcodes")
+          .delete()
+          .eq("id", id);
+        return !error;
+      } catch (e) {
+        console.warn("[MarketOS] deleteProductBarcode error:", e);
+      }
+    }
+    return false;
+  }
+
+  static async findProductByBarcode(
+    tenantId: string,
+    rawBarcode: string
+  ): Promise<{ product: Product; barcodeRecord?: ProductBarcode; unitsPerPack: number; priceUsd: number } | null> {
+    const clean = rawBarcode.trim();
+    if (!clean) return null;
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
+    try {
+      // 1. Try secondary packaging barcodes table first
+      const { data: packBarcode } = await supabase
+        .from("product_barcodes")
+        .select("*, products(*)")
+        .eq("tenant_id", tenantId)
+        .eq("barcode", clean)
+        .maybeSingle();
+
+      if (packBarcode && packBarcode.products) {
+        const p = packBarcode.products as Product;
+        const units = packBarcode.units_per_pack || 1;
+        const finalPrice =
+          packBarcode.price_usd !== null && packBarcode.price_usd !== undefined
+            ? Number(packBarcode.price_usd)
+            : Number(p.price_usd) * units;
+
+        return {
+          product: p,
+          barcodeRecord: packBarcode as ProductBarcode,
+          unitsPerPack: units,
+          priceUsd: finalPrice,
+        };
+      }
+
+      // 2. Try primary products table barcode
+      const { data: directProduct } = await supabase
+        .from("products")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("barcode", clean)
+        .maybeSingle();
+
+      if (directProduct) {
+        return {
+          product: directProduct as Product,
+          unitsPerPack: 1,
+          priceUsd: Number(directProduct.price_usd),
+        };
+      }
+
+      // 3. Fallback for GS1 Scale Barcode (prefixes 20-29): e.g. 2001452...
+      if (clean.length === 13 && clean.startsWith("2")) {
+        const itemCode = clean.slice(2, 7);
+        // Look up product by SKU or external_product_id or trailing code
+        const { data: scaleProd } = await supabase
+          .from("products")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .or(`sku.eq.${itemCode},barcode.ilike.%${itemCode}%,external_product_id.eq.${itemCode}`)
+          .maybeSingle();
+
+        if (scaleProd) {
+          const isPriceMode = clean.startsWith("23") || clean.startsWith("24");
+          const payloadNum = parseInt(clean.slice(7, 12), 10);
+          const computedPrice = isPriceMode
+            ? payloadNum / 100
+            : Number(scaleProd.price_usd) * (payloadNum / 1000);
+
+          return {
+            product: scaleProd as Product,
+            unitsPerPack: 1,
+            priceUsd: computedPrice,
+          };
+        }
+      }
+    } catch (e) {
+      console.warn("[MarketOS] findProductByBarcode error:", e);
+    }
+
+    return null;
+  }
+
+  static async updateInventoryLocation(
+    storeId: string,
+    productId: string,
+    location: WarehouseLocation
+  ): Promise<boolean> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from("inventory")
+          .update({
+            aisle: location.aisle || "01",
+            shelf: location.shelf || "A",
+            bin: location.bin || "01",
+          })
+          .eq("store_id", storeId)
+          .eq("product_id", productId);
+
+        return !error;
+      } catch (e) {
+        console.warn("[MarketOS] updateInventoryLocation error:", e);
+      }
+    }
+    return false;
   }
 }
