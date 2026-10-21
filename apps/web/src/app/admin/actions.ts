@@ -177,7 +177,7 @@ export async function updateOrderStatusAction(
 ) {
   try {
     const actor = await getAuditActor();
-    const order = await MarketOSRepository.updateOrderStatus(
+    let order = await MarketOSRepository.updateOrderStatus(
       tenantId,
       orderId,
       status,
@@ -185,6 +185,10 @@ export async function updateOrderStatusAction(
       actor,
       cancellationReason
     );
+    if (!order) {
+      const allOrders = await MarketOSRepository.getTenantOrders(tenantId);
+      order = allOrders.find((o) => o.id === orderId) || null;
+    }
     if (!order) throw new Error("Orden no encontrada");
 
     // Enviar notificación push al cliente si tiene alertas activas en su dispositivo

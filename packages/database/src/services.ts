@@ -3101,6 +3101,9 @@ export class MarketOSRepository {
     let custName = "";
     let custPhone = "";
     let totalUsd = 0;
+    let oldStatus: OrderStatus = "CREATED";
+    let isDbUpdated = false;
+    let ordRowData: any = null;
 
     if (supabase) {
       try {
@@ -3112,25 +3115,31 @@ export class MarketOSRepository {
 
         const { data: ordRow } = await supabase
           .from("orders")
-          .select("order_number, customer_name, customer_phone, total_usd")
+          .select("order_number, customer_name, customer_phone, total_usd, status, customer_id, store_id, total_ves, exchange_rate_applied, delivery_type")
           .eq("id", orderId)
           .eq("tenant_id", tenantId)
           .maybeSingle();
 
         if (ordRow) {
+          ordRowData = ordRow;
           orderNum = ordRow.order_number || "";
           custName = ordRow.customer_name || "";
           custPhone = ordRow.customer_phone || "";
           totalUsd = Number(ordRow.total_usd || 0);
+          if (ordRow.status) oldStatus = ordRow.status as OrderStatus;
         }
 
-        await supabase
+        const { error: updErr } = await supabase
           .from("orders")
           .update(updateData)
           .eq("id", orderId)
           .eq("tenant_id", tenantId);
 
-        if (status === "CANCELLED") {
+        if (!updErr) {
+          isDbUpdated = true;
+        }
+
+        if (status === "CANCELLED" && oldStatus !== "CANCELLED") {
           await MarketOSRepository.restoreOrderInventoryStock(tenantId, orderId);
           // Restore coupon usage if order used a coupon
           const { data: ordWithCoupon } = await supabase
@@ -3157,24 +3166,26 @@ export class MarketOSRepository {
       }
     }
 
-    const order = state.orders.find(
+    const isCancellation = status === "CANCELLED";
+
+    const memOrder = state.orders.find(
       (o) => o.id === orderId && o.tenant_id === tenantId
     );
-    if (order) {
-      const oldStatus = order.status;
-      order.status = status;
-      if (driverId) order.driver_id = driverId;
-      order.updated_at = new Date().toISOString();
+    if (memOrder) {
+      oldStatus = memOrder.status;
+      memOrder.status = status;
+      if (driverId) memOrder.driver_id = driverId;
+      memOrder.updated_at = new Date().toISOString();
 
-      if (!orderNum && order.order_number) orderNum = order.order_number;
-      if (!custName && order.customer_name) custName = order.customer_name;
-      if (!custPhone && order.customer_phone) custPhone = order.customer_phone;
-      if (!totalUsd && order.total_usd) totalUsd = order.total_usd;
+      if (!orderNum && memOrder.order_number) orderNum = memOrder.order_number;
+      if (!custName && memOrder.customer_name) custName = memOrder.customer_name;
+      if (!custPhone && memOrder.customer_phone) custPhone = memOrder.customer_phone;
+      if (!totalUsd && memOrder.total_usd) totalUsd = memOrder.total_usd;
 
       if (status === "CANCELLED" && oldStatus !== "CANCELLED") {
         await MarketOSRepository.restoreOrderInventoryStock(tenantId, orderId);
-        if (order.coupon_id) {
-          const memCoupon = state.coupons.find((c) => c.id === order.coupon_id);
+        if (memOrder.coupon_id) {
+          const memCoupon = state.coupons.find((c) => c.id === memOrder.coupon_id);
           if (memCoupon && memCoupon.usage_count > 0) {
             memCoupon.usage_count -= 1;
           }
@@ -3182,38 +3193,82 @@ export class MarketOSRepository {
       }
 
       if (status === "PREPARING" && oldStatus !== "PREPARING") {
-        await MarketOSRepository.deductRecipeInventoryForOrder(order);
+        await MarketOSRepository.deductRecipeInventoryForOrder(memOrder);
       }
+    }
 
-      const isCancellation = status === "CANCELLED";
+    // Always record audit log for status change
+    await MarketOSRepository.recordAuditLog({
+      tenantId,
+      actorId: actorObj.id,
+      actorName: actorObj.name,
+      actorEmail: actorObj.email,
+      actorRole: actorObj.role,
+      action: isCancellation ? "ORDER_CANCELLED" : "ORDER_STATUS_CHANGED",
+      entity: "orders",
+      entityId: orderId,
+      oldData: { status: oldStatus },
+      newData: {
+        status,
+        driver_id: driverId,
+        order_number: orderNum || orderId,
+        customer_name: custName,
+        customer_phone: custPhone,
+        total_usd: totalUsd,
+        ...(isCancellation
+          ? {
+              cancellation_reason:
+                cancellationReason || "Anulación administrativa de orden",
+              inventory_restored: true,
+            }
+          : {}),
+      },
+    });
 
-      await MarketOSRepository.recordAuditLog({
-        tenantId,
-        actorId: actorObj.id,
-        actorName: actorObj.name,
-        actorEmail: actorObj.email,
-        actorRole: actorObj.role,
-        action: isCancellation ? "ORDER_CANCELLED" : "ORDER_STATUS_CHANGED",
-        entity: "orders",
-        entityId: orderId,
-        oldData: { status: oldStatus },
-        newData: {
-          status,
-          driver_id: driverId,
-          order_number: orderNum || orderId,
-          customer_name: custName,
-          customer_phone: custPhone,
-          total_usd: totalUsd,
-          ...(isCancellation
-            ? {
-                cancellation_reason:
-                  cancellationReason || "Anulación administrativa de orden",
-                inventory_restored: true,
-              }
-            : {}),
-        },
-      });
-      return order;
+    if (memOrder) {
+      return memOrder;
+    }
+
+    // If order was in Supabase, fetch and return the fresh enriched order
+    if (isDbUpdated || supabase) {
+      try {
+        const tenantOrders = await MarketOSRepository.getTenantOrders(tenantId);
+        const fresh = tenantOrders.find((o) => o.id === orderId);
+        if (fresh) {
+          const existingIdx = state.orders.findIndex((o) => o.id === orderId);
+          if (existingIdx >= 0) {
+            state.orders[existingIdx] = fresh;
+          } else {
+            state.orders.unshift(fresh);
+          }
+          return fresh;
+        }
+      } catch (e) {
+        console.warn("[MarketOS] getTenantOrders fallback warning in updateOrderStatus:", e);
+      }
+    }
+
+    if (isDbUpdated) {
+      const fallbackOrder: Order = {
+        id: orderId,
+        tenant_id: tenantId,
+        store_id: ordRowData?.store_id || "",
+        customer_id: ordRowData?.customer_id || "cust-guest",
+        order_number: orderNum || `ORD-${orderId.slice(-6)}`,
+        customer_name: custName || "Cliente",
+        customer_phone: custPhone || "",
+        total_usd: totalUsd,
+        total_ves: ordRowData?.total_ves ? Number(ordRowData.total_ves) : 0,
+        exchange_rate_applied: ordRowData?.exchange_rate_applied ? Number(ordRowData.exchange_rate_applied) : 0,
+        status,
+        driver_id: driverId || null,
+        delivery_type: (ordRowData?.delivery_type || "delivery") as any,
+        items: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      state.orders.unshift(fallbackOrder);
+      return fallbackOrder;
     }
 
     return null;

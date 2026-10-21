@@ -725,7 +725,7 @@ export function AdminDashboard({
         driverId
       );
 
-      if (res.success && res.order) {
+      if (res.success) {
         // 2. Refresh latest orders and payments internally from server (No global F5 needed!)
         const [oRes, pRes] = await Promise.all([
           getLatestOrdersAction(settings.tenant_id),

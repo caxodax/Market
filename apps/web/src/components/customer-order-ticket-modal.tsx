@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Order, OrderStatus, TenantSettings, Store, TenantModuleId } from "@marketos/types";
 import { formatCurrency, generateCustomerOrderWhatsAppLink } from "@marketos/utils";
 import { BottomSheetModal } from "./bottom-sheet-modal";
+import { trackOrderAction } from "../app/actions";
 import {
   X,
   ShoppingBag,
@@ -24,6 +25,7 @@ import {
   ExternalLink,
   Receipt,
   Scale,
+  RefreshCw,
 } from "lucide-react";
 
 interface CustomerOrderTicketModalProps {
@@ -43,7 +45,7 @@ interface StepInfo {
 }
 
 export function CustomerOrderTicketModal({
-  order,
+  order: initialOrder,
   isOpen,
   onClose,
   settings,
@@ -53,6 +55,78 @@ export function CustomerOrderTicketModal({
   const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
   const [copiedOrder, setCopiedOrder] = useState(false);
   const [copiedCi, setCopiedCi] = useState(false);
+
+  // Live order state with automatic background refresh
+  const [order, setOrder] = useState<Order | null>(initialOrder);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [statusUpdatedNotice, setStatusUpdatedNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialOrder) {
+      setOrder(initialOrder);
+    }
+  }, [initialOrder]);
+
+  // Real-time polling every 4 seconds while modal is open
+  useEffect(() => {
+    if (!isOpen || !order) return;
+
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const queryTerm = order.order_number || order.id;
+        const res = await trackOrderAction(settings.tenant_id, queryTerm);
+        if (isMounted && res.success && res.orders && res.orders.length > 0) {
+          const fresh = res.orders.find(
+            (o) => o.id === order.id || o.order_number === order.order_number
+          );
+          if (fresh) {
+            setOrder((prev) => {
+              if (!prev) return fresh;
+              if (
+                prev.status !== fresh.status ||
+                prev.payment_status !== fresh.payment_status ||
+                prev.driver_id !== fresh.driver_id
+              ) {
+                setStatusUpdatedNotice(`¡Estado actualizado: ${fresh.status}!`);
+                setTimeout(() => setStatusUpdatedNotice(null), 4000);
+                return fresh;
+              }
+              return prev;
+            });
+          }
+        }
+      } catch {
+        // Silent polling error
+      }
+    }, 4000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [isOpen, order?.id, order?.order_number, settings.tenant_id]);
+
+  const handleManualRefresh = async () => {
+    if (!order) return;
+    setIsRefreshing(true);
+    try {
+      const queryTerm = order.order_number || order.id;
+      const res = await trackOrderAction(settings.tenant_id, queryTerm);
+      if (res.success && res.orders && res.orders.length > 0) {
+        const fresh = res.orders.find(
+          (o) => o.id === order.id || o.order_number === order.order_number
+        );
+        if (fresh) {
+          setOrder(fresh);
+          setStatusUpdatedNotice("Actualizado");
+          setTimeout(() => setStatusUpdatedNotice(null), 2500);
+        }
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   if (!isOpen || !order) return null;
 
@@ -656,9 +730,32 @@ export function CustomerOrderTicketModal({
             {/* Visual Progress Stepper (Only if not cancelled) */}
             {order.status !== "CANCELLED" ? (
               <div className="pt-3 border-t border-border">
-                <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block mb-2.5">
-                  Estado del Pedido en Tiempo Real
-                </span>
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                      Seguimiento en Vivo
+                    </span>
+                    {statusUpdatedNotice && (
+                      <span className="ml-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 animate-pulse">
+                        {statusUpdatedNotice}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleManualRefresh}
+                    disabled={isRefreshing}
+                    className="flex items-center gap-1 text-[11px] font-bold text-primary hover:text-primary/80 transition-colors px-2 py-0.5 rounded-md hover:bg-primary/10 cursor-pointer"
+                    title="Actualizar estado del pedido"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isRefreshing ? "animate-spin" : ""}`} />
+                    <span>{isRefreshing ? "Actualizando..." : "Actualizar"}</span>
+                  </button>
+                </div>
                 <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
                   {steps.map((st, idx) => {
                     const stepNum = idx + 1;

@@ -19,6 +19,7 @@ import {
   Eye,
   ShoppingBag,
   ShieldCheck,
+  RefreshCw,
 } from "lucide-react";
 
 interface OrderTrackerModalProps {
@@ -82,6 +83,7 @@ export function OrderTrackerModal({
   const [searched, setSearched] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Auto-fill and search if initialQuery or saved credentials exist
   useEffect(() => {
@@ -130,6 +132,49 @@ export function OrderTrackerModal({
       }
     } catch {}
   }, [isOpen, initialQuery, settings.tenant_id]);
+
+  // Periodic background polling every 4 seconds when tracker is open and active
+  useEffect(() => {
+    if (!isOpen || !query.trim() || !searched) return;
+
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const res = await trackOrderAction(settings.tenant_id, query.trim());
+        if (isMounted && res.success && res.orders) {
+          setOrders(res.orders);
+          if (selectedOrderForDetails) {
+            const fresh = res.orders.find((o) => o.id === selectedOrderForDetails.id);
+            if (fresh) setSelectedOrderForDetails(fresh);
+          }
+        }
+      } catch {
+        // silent polling
+      }
+    }, 4000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [isOpen, query, searched, selectedOrderForDetails?.id, settings.tenant_id]);
+
+  const handleManualRefresh = async () => {
+    if (!query.trim()) return;
+    setIsRefreshing(true);
+    try {
+      const res = await trackOrderAction(settings.tenant_id, query.trim());
+      if (res.success && res.orders) {
+        setOrders(res.orders);
+        if (selectedOrderForDetails) {
+          const fresh = res.orders.find((o) => o.id === selectedOrderForDetails.id);
+          if (fresh) setSelectedOrderForDetails(fresh);
+        }
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -209,6 +254,28 @@ export function OrderTrackerModal({
 
         {/* Results List */}
         <div className="p-4 overflow-y-auto space-y-3 flex-1">
+          {orders.length > 0 && (
+            <div className="flex items-center justify-between pb-1 text-xs">
+              <span className="text-[11px] font-bold text-muted-foreground flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span>{orders.length} {orders.length === 1 ? "pedido en seguimiento" : "pedidos en seguimiento"}</span>
+              </span>
+              <button
+                type="button"
+                onClick={handleManualRefresh}
+                disabled={isRefreshing}
+                className="flex items-center gap-1 text-[11px] font-bold text-primary hover:text-primary/80 transition-colors px-2 py-0.5 rounded-md hover:bg-primary/10 cursor-pointer"
+                title="Actualizar estado de pedidos"
+              >
+                <RefreshCw className={`w-3 h-3 ${isRefreshing ? "animate-spin" : ""}`} />
+                <span>{isRefreshing ? "Actualizando..." : "Actualizar"}</span>
+              </button>
+            </div>
+          )}
+
           {searched && !loading && orders.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
               <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-40" />
