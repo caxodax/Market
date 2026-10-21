@@ -64,6 +64,7 @@ export async function createOrderAction(input: CreateOrderInput): Promise<Create
       const order = await MarketOSRepository.createOrder(input);
       revalidatePath("/");
       revalidatePath("/admin");
+      revalidatePath("/admin", "page");
       const res: CreateOrderResult = { success: true, order };
       const current = inFlightOrders.get(dedupKey);
       if (current) {
@@ -166,6 +167,7 @@ export async function createOrderWithPaymentAction(
 
   revalidatePath("/");
   revalidatePath("/admin");
+  revalidatePath("/admin", "page");
 
   return { success: true, order: completedOrder };
 }

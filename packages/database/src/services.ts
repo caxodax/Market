@@ -96,7 +96,7 @@ import { isSupabaseOffline } from "./circuit-breaker";
 
 function isUuid(value: unknown): boolean {
   if (typeof value !== "string") return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.trim());
 }
 
 function generateUuid(): string {
@@ -2035,72 +2035,119 @@ export class MarketOSRepository {
     // 6. Insert Order into Supabase
     if (supabase) {
       try {
-        const { data: insertedOrder, error: orderInsertErr } = await supabase
+        // Build cash notes if applicable
+        const extraCashNotes: string[] = [];
+        if (newOrder.cash_tendered_usd) {
+          extraCashNotes.push(`Paga con: $${newOrder.cash_tendered_usd.toFixed(2)}`);
+        }
+        if (newOrder.change_required_usd) {
+          extraCashNotes.push(`Vuelto: $${newOrder.change_required_usd.toFixed(2)}`);
+        }
+        const combinedNotes = [newOrder.notes, ...extraCashNotes].filter(Boolean).join(" | ");
+
+        // Strictly safe columns matching Supabase orders table schema
+        const orderInsertPayload: any = {
+          tenant_id: newOrder.tenant_id,
+          store_id: validStoreId,
+          customer_id: customerId,
+          customer_id_number: newOrder.customer_id_number,
+          order_number: newOrder.order_number,
+          status: newOrder.status,
+          delivery_type: newOrder.delivery_type,
+          delivery_zone_id: validDeliveryZoneId,
+          delivery_address: newOrder.delivery_address,
+          delivery_fee_usd: newOrder.delivery_fee_usd,
+          coupon_id: validCouponId,
+          discount_usd: newOrder.discount_usd,
+          total_usd: newOrder.total_usd,
+          total_ves: newOrder.total_ves,
+          exchange_rate_applied: newOrder.exchange_rate_applied,
+          notes: combinedNotes || null,
+        };
+
+        let { data: insertedOrder, error: orderInsertErr } = await supabase
           .from("orders")
-          .insert({
-            tenant_id: newOrder.tenant_id,
-            store_id: validStoreId,
-            customer_id: customerId,
-            customer_id_number: newOrder.customer_id_number,
-            order_number: newOrder.order_number,
-            status: newOrder.status,
-            delivery_type: newOrder.delivery_type,
-            delivery_zone_id: validDeliveryZoneId,
-            delivery_address: newOrder.delivery_address,
-            delivery_fee_usd: newOrder.delivery_fee_usd,
-            coupon_id: validCouponId,
-            discount_usd: newOrder.discount_usd,
-            total_usd: newOrder.total_usd,
-            total_ves: newOrder.total_ves,
-            exchange_rate_applied: newOrder.exchange_rate_applied,
-            notes: newOrder.notes,
-            cash_tendered_usd: newOrder.cash_tendered_usd,
-            change_required_usd: newOrder.change_required_usd,
-          })
+          .insert(orderInsertPayload)
           .select("id")
           .single();
 
         if (orderInsertErr) {
-          console.error("[MarketOS] Failed to insert order into Supabase:", orderInsertErr);
-        } else if (insertedOrder && isUuid(insertedOrder.id)) {
+          console.error("[MarketOS] Primary order insert failed, attempting safe fallback:", orderInsertErr);
+          // Retry without optional foreign key columns (delivery_zone_id, coupon_id) in case of constraint mismatch
+          const safeRetryPayload = {
+            tenant_id: newOrder.tenant_id,
+            store_id: validStoreId,
+            customer_id: customerId,
+            order_number: newOrder.order_number,
+            status: newOrder.status,
+            delivery_type: newOrder.delivery_type,
+            delivery_address: newOrder.delivery_address,
+            total_usd: newOrder.total_usd,
+            total_ves: newOrder.total_ves,
+            exchange_rate_applied: newOrder.exchange_rate_applied,
+            notes: combinedNotes || null,
+          };
+          const retryRes = await supabase
+            .from("orders")
+            .insert(safeRetryPayload)
+            .select("id")
+            .single();
+
+          if (!retryRes.error && retryRes.data) {
+            insertedOrder = retryRes.data;
+            orderInsertErr = null;
+          } else {
+            console.error("[MarketOS] Critical: Safe retry also failed:", retryRes.error);
+          }
+        }
+
+        if (insertedOrder && isUuid(insertedOrder.id)) {
           newOrder.id = insertedOrder.id;
-          newOrder.items = validatedItems.map((it, idx) => ({
-            id: `item-${insertedOrder.id}-${idx}`,
-            order_id: insertedOrder.id,
-            tenant_id: input.tenantId,
-            product_id: it.productId,
-            product_name: it.productName,
-            quantity: it.quantity,
-            unit_price_usd: it.unitPriceUsd,
-            total_price_usd: Number((it.quantity * it.unitPriceUsd).toFixed(2)),
-            selected_modifiers: it.selected_modifiers || [],
-          }));
+          newOrder.notes = combinedNotes || null;
 
-          // Insert order items
-          const itemsPayload = validatedItems.map((it) => ({
-            tenant_id: input.tenantId,
-            order_id: insertedOrder.id,
-            product_id: isUuid(it.productId) ? it.productId : null,
-            product_name: it.productName,
-            quantity: it.quantity,
-            unit_price_usd: it.unitPriceUsd,
-            total_price_usd: Number((it.quantity * it.unitPriceUsd).toFixed(2)),
-            selected_modifiers: it.selected_modifiers || [],
-          }));
+          // Fetch fallback product id for tenant to ensure NOT NULL constraint on order_items.product_id
+          let fallbackProductId: string | null = null;
+          const { data: tenantProds } = await supabase
+            .from("products")
+            .select("id")
+            .eq("tenant_id", input.tenantId)
+            .eq("is_active", true)
+            .limit(1);
+          if (tenantProds && tenantProds.length > 0 && isUuid(tenantProds[0].id)) {
+            fallbackProductId = tenantProds[0].id;
+          }
 
-          // Resolve any non-uuid product IDs (e.g. from mock data fallback)
-          for (const item of itemsPayload) {
-            if (!item.product_id) {
+          // Build order_items strictly matching Supabase schema (no selected_modifiers column)
+          const itemsPayload: any[] = [];
+          for (const it of validatedItems) {
+            let targetProductId = isUuid(it.productId) ? it.productId : null;
+            if (!targetProductId) {
               const { data: p } = await supabase
                 .from("products")
                 .select("id")
                 .eq("tenant_id", input.tenantId)
-                .ilike("name", item.product_name)
+                .ilike("name", it.productName)
                 .maybeSingle();
               if (p && isUuid(p.id)) {
-                item.product_id = p.id;
+                targetProductId = p.id;
+              } else {
+                targetProductId = fallbackProductId;
               }
             }
+
+            const modText = it.selected_modifiers && it.selected_modifiers.length > 0
+              ? ` (${it.selected_modifiers.map((m: any) => m.name).join(", ")})`
+              : "";
+
+            itemsPayload.push({
+              tenant_id: input.tenantId,
+              order_id: insertedOrder.id,
+              product_id: targetProductId,
+              product_name: `${it.productName}${modText}`.slice(0, 255),
+              quantity: it.quantity,
+              unit_price_usd: it.unitPriceUsd,
+              total_price_usd: Number((it.quantity * it.unitPriceUsd).toFixed(2)),
+            });
           }
 
           const { error: itemsInsertErr } = await supabase.from("order_items").insert(itemsPayload);
@@ -2109,10 +2156,10 @@ export class MarketOSRepository {
           }
 
           // Decrement inventory stock & record inventory movements in Supabase
-          for (const item of validatedItems) {
-            const targetProductId = isUuid(item.productId)
-              ? item.productId
-              : itemsPayload.find((p) => p.product_name === item.productName)?.product_id;
+          for (const it of validatedItems) {
+            const targetProductId = isUuid(it.productId)
+              ? it.productId
+              : itemsPayload.find((p) => p.product_name.startsWith(it.productName))?.product_id;
 
             if (targetProductId) {
               const { data: inv } = await supabase
@@ -2123,7 +2170,7 @@ export class MarketOSRepository {
                 .maybeSingle();
 
               if (inv) {
-                const newQty = Math.max(0, inv.quantity - item.quantity);
+                const newQty = Math.max(0, inv.quantity - it.quantity);
                 await supabase
                   .from("inventory")
                   .update({ quantity: newQty, updated_at: new Date().toISOString() })
@@ -2133,7 +2180,7 @@ export class MarketOSRepository {
                   tenant_id: input.tenantId,
                   store_id: validStoreId,
                   product_id: targetProductId,
-                  quantity_change: -item.quantity,
+                  quantity_change: -it.quantity,
                   previous_quantity: inv.quantity,
                   new_quantity: newQty,
                   reason: "SALE",
@@ -2141,9 +2188,14 @@ export class MarketOSRepository {
               }
             }
           }
+        } else if (orderInsertErr) {
+          throw new Error(`No se pudo persistir la orden en el servidor: ${orderInsertErr.message}`);
         }
-      } catch (e) {
-        console.warn("[Supabase] Insert order fallback to state:", e);
+      } catch (e: any) {
+        if (e.message && e.message.includes("No se pudo persistir")) {
+          throw e;
+        }
+        console.warn("[Supabase] Insert order fallback warning:", e);
       }
     }
 
@@ -2277,13 +2329,16 @@ export class MarketOSRepository {
    * Get Orders for Tenant Admin with full enrichment (items, customer, payment details)
    */
   static async getTenantOrders(tenantId: string): Promise<Order[]> {
+    const resolvedTenant = await this.getTenant(tenantId);
+    const actualTenantId = resolvedTenant?.id || tenantId;
+
     const supabase = getSupabase();
     if (supabase) {
       try {
         const { data: rawOrders, error } = await supabase
           .from("orders")
           .select("*")
-          .eq("tenant_id", tenantId)
+          .or(`tenant_id.eq.${actualTenantId},tenant_id.eq.${tenantId}`)
           .order("created_at", { ascending: false });
 
         if (!error && rawOrders) {
@@ -2330,6 +2385,12 @@ export class MarketOSRepository {
             const pay = payMap.get(o.id);
             const storeName = storeMap.get(o.store_id);
 
+            // Parse cash & change from notes if not present directly
+            const cashMatch = o.notes ? o.notes.match(/Paga con:\s*\$([0-9.]+)/) : null;
+            const changeMatch = o.notes ? o.notes.match(/Vuelto:\s*\$([0-9.]+)/) : null;
+            const parsedCash = cashMatch ? parseFloat(cashMatch[1]) : (o.cash_tendered_usd ?? null);
+            const parsedChange = changeMatch ? parseFloat(changeMatch[1]) : (o.change_required_usd ?? null);
+
             return {
               ...o,
               items: itemsMap.get(o.id) || [],
@@ -2342,6 +2403,8 @@ export class MarketOSRepository {
               payment_status: pay?.status || o.payment_status,
               proof_image_url: pay?.proof_image_url || o.proof_image_url || null,
               store_name: storeName,
+              cash_tendered_usd: parsedCash,
+              change_required_usd: parsedChange,
             } as Order;
           });
         }
@@ -2352,7 +2415,7 @@ export class MarketOSRepository {
 
     // In-memory fallback enriched with payments and stores
     return state.orders
-      .filter((o) => o.tenant_id === tenantId)
+      .filter((o) => o.tenant_id === actualTenantId || o.tenant_id === tenantId)
       .map((o) => {
         const pay = state.payments.find((p) => p.order_id === o.id);
         const cust = state.customers.find((c) => c.id === o.customer_id);
@@ -2540,12 +2603,15 @@ export class MarketOSRepository {
    * Get Payments for Tenant Admin
    */
   static async getTenantPayments(tenantId: string): Promise<PaymentProof[]> {
+    const resolvedTenant = await this.getTenant(tenantId);
+    const actualTenantId = resolvedTenant?.id || tenantId;
+
     const supabase = getSupabase();
     if (supabase) {
       const { data, error } = await supabase
         .from("payments")
         .select("*")
-        .eq("tenant_id", tenantId)
+        .or(`tenant_id.eq.${actualTenantId},tenant_id.eq.${tenantId}`)
         .order("created_at", { ascending: false });
 
       if (!error && data) {
@@ -2553,7 +2619,7 @@ export class MarketOSRepository {
       }
     }
 
-    return state.payments.filter((p) => p.tenant_id === tenantId);
+    return state.payments.filter((p) => p.tenant_id === actualTenantId || p.tenant_id === tenantId);
   }
 
   /**
