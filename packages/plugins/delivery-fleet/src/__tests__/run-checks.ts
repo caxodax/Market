@@ -138,4 +138,44 @@ assert.ok(paidDispatchMsg.includes("PAGADO / NO COBRAR"), "Paid orders must inst
 assert.strictEqual(paidDispatchMsg.includes("El cliente paga con:"), false, "Must not mention cash tendered on paid order");
 console.log("  ✔ Pre-paid orders explicitly safeguard against accidental double-charging");
 
+// 7. Geolocation Engine, Distance & Sector tests
+import {
+  calculateDistanceKm,
+  calculateStoreProximities,
+  matchNearestMetropolitanSector,
+  BARQUISIMETO_METROPOLITAN_SECTORS,
+} from "../services/delivery-geo-engine.ts";
+
+// Distance between Nueva Segovia (10.054, -69.298) and Zona Norte (10.140, -69.312)
+const distNorth = calculateDistanceKm(10.054, -69.298, 10.140, -69.312);
+assert.ok(distNorth >= 9.5 && distNorth <= 10.0, `Zona Norte distance must be ~9.7 km, got ${distNorth}`);
+console.log(`  ✔ Zona Norte distance accurately calculates to ~${distNorth} km`);
+
+// Distance to Valencia IP Gateway (10.18, -67.99)
+const distValencia = calculateDistanceKm(10.054, -69.298, 10.18, -67.99);
+assert.ok(distValencia > 140, "Valencia distance must exceed 140 km");
+console.log(`  ✔ Out-of-bounds Valencia IP accurately calculates to ~${distValencia} km`);
+
+// Proximity calculations and sanity check (35km boundary)
+const testStores = [
+  { id: "store-ns", code: "NS-01", name: "Sucursal Nueva Segovia" },
+];
+
+const proxNorth = calculateStoreProximities(testStores, 10.140, -69.312);
+assert.strictEqual(proxNorth.nearestStore?.id, "store-ns");
+assert.strictEqual(proxNorth.isWithinMetroPerimeter, true);
+assert.strictEqual(proxNorth.proximityBadge, "📍 a 9.7 km");
+console.log("  ✔ calculateStoreProximities correctly marks Zona Norte as within metro perimeter");
+
+const proxValencia = calculateStoreProximities(testStores, 10.18, -67.99);
+assert.strictEqual(proxValencia.isWithinMetroPerimeter, false);
+assert.strictEqual(proxValencia.proximityBadge, "📍 Despacho en Barquisimeto");
+console.log("  ✔ calculateStoreProximities correctly sanitizes out-of-bounds locations (>35km)");
+
+// Sector matching
+const matchedSector = matchNearestMetropolitanSector(10.140, -69.312);
+assert.strictEqual(matchedSector?.id, "norte");
+assert.strictEqual(matchedSector?.name, "Zona Norte");
+console.log("  ✔ matchNearestMetropolitanSector correctly identifies Zona Norte from coordinates");
+
 console.log("🎉 All @marketos/plugin-delivery-fleet tests passed successfully!\n");

@@ -1745,11 +1745,18 @@ export class MarketOSRepository {
               item.unitPriceUsd = Number((basePrice + modifiersDelta).toFixed(2));
               item.is_tax_exempt = Boolean(dbProd.is_tax_exempt);
 
-              // Pre-order stock verification
+              // Pre-order stock verification with resilient inventory row fallback
               const invForStore = Array.isArray(dbProd.inventory)
                 ? dbProd.inventory.find((inv: any) => inv.store_id === validStoreId)
                 : null;
-              const currentStock = invForStore?.quantity ?? 0;
+              const memProdMatch = state.products.find(
+                (p) => p.id === dbProd.id || p.name === dbProd.name
+              );
+              const fallbackStock = memProdMatch?.stock !== undefined ? memProdMatch.stock : 20;
+              const currentStock =
+                invForStore?.quantity !== undefined && invForStore?.quantity !== null
+                  ? Number(invForStore.quantity)
+                  : fallbackStock;
 
               if (currentStock < item.quantity) {
                 throw new Error(
@@ -2182,6 +2189,37 @@ export class MarketOSRepository {
                   product_id: targetProductId,
                   quantity_change: -it.quantity,
                   previous_quantity: inv.quantity,
+                  new_quantity: newQty,
+                  reason: "SALE",
+                });
+              } else {
+                // Upsert resilient inventory row if not yet initialized for this store
+                const memProdMatch = state.products.find(
+                  (p) => p.id === targetProductId || p.name === it.productName
+                );
+                const initialStock = memProdMatch?.stock !== undefined ? memProdMatch.stock : 20;
+                const newQty = Math.max(0, initialStock - it.quantity);
+
+                await supabase
+                  .from("inventory")
+                  .upsert(
+                    {
+                      tenant_id: input.tenantId,
+                      store_id: validStoreId,
+                      product_id: targetProductId,
+                      quantity: newQty,
+                      min_quantity: 5,
+                      updated_at: new Date().toISOString(),
+                    },
+                    { onConflict: "store_id, product_id" }
+                  );
+
+                await supabase.from("inventory_movements").insert({
+                  tenant_id: input.tenantId,
+                  store_id: validStoreId,
+                  product_id: targetProductId,
+                  quantity_change: -it.quantity,
+                  previous_quantity: initialStock,
                   new_quantity: newQty,
                   reason: "SALE",
                 });
@@ -2898,6 +2936,30 @@ export class MarketOSRepository {
                   new_quantity: newQty,
                   reason: "CANCELLATION",
                 });
+              } else {
+                await supabase
+                  .from("inventory")
+                  .upsert(
+                    {
+                      tenant_id: targetTenantId,
+                      store_id: storeId,
+                      product_id: item.product_id,
+                      quantity: item.quantity,
+                      min_quantity: 5,
+                      updated_at: new Date().toISOString(),
+                    },
+                    { onConflict: "store_id, product_id" }
+                  );
+
+                await supabase.from("inventory_movements").insert({
+                  tenant_id: targetTenantId,
+                  store_id: storeId,
+                  product_id: item.product_id,
+                  quantity_change: item.quantity,
+                  previous_quantity: 0,
+                  new_quantity: item.quantity,
+                  reason: "CANCELLATION",
+                });
               }
             }
           }
@@ -3164,6 +3226,49 @@ export class MarketOSRepository {
             entity: "inventory",
             entityId: productId,
             oldData: { quantity: inv.quantity },
+            newData: { quantity: newQty, delta },
+          });
+
+          return newQty;
+        } else {
+          const memProd = state.products.find((p) => p.id === productId);
+          const initialStock = memProd?.stock !== undefined ? memProd.stock : 20;
+          const newQty = Math.max(0, initialStock + delta);
+
+          await supabase
+            .from("inventory")
+            .upsert(
+              {
+                tenant_id: tenantId,
+                store_id: targetStoreId,
+                product_id: productId,
+                quantity: newQty,
+                min_quantity: 5,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "store_id, product_id" }
+            );
+
+          await supabase.from("inventory_movements").insert({
+            tenant_id: tenantId,
+            store_id: targetStoreId,
+            product_id: productId,
+            quantity_change: delta,
+            previous_quantity: initialStock,
+            new_quantity: newQty,
+            reason: delta > 0 ? "RESTOCK" : "ADJUSTMENT",
+          });
+
+          await MarketOSRepository.recordAuditLog({
+            tenantId,
+            actorId: actorObj.id,
+            actorName: actorObj.name,
+            actorEmail: actorObj.email,
+            actorRole: actorObj.role,
+            action: "STOCK_ADJUSTED",
+            entity: "inventory",
+            entityId: productId,
+            oldData: { quantity: initialStock },
             newData: { quantity: newQty, delta },
           });
 
@@ -5162,6 +5267,30 @@ export class MarketOSRepository {
               product_id: input.productId,
               quantity_change: input.stock - inv.quantity,
               previous_quantity: inv.quantity,
+              new_quantity: input.stock,
+              reason: "ADJUSTMENT",
+            });
+          } else {
+            await supabase
+              .from("inventory")
+              .upsert(
+                {
+                  tenant_id: input.tenantId,
+                  store_id: storeId,
+                  product_id: input.productId,
+                  quantity: input.stock,
+                  min_quantity: 5,
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: "store_id, product_id" }
+              );
+
+            await supabase.from("inventory_movements").insert({
+              tenant_id: input.tenantId,
+              store_id: storeId,
+              product_id: input.productId,
+              quantity_change: input.stock,
+              previous_quantity: 0,
               new_quantity: input.stock,
               reason: "ADJUSTMENT",
             });

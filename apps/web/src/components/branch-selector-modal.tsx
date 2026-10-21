@@ -4,6 +4,11 @@ import React, { useState } from "react";
 import { Store } from "@marketos/types";
 import { BottomSheetModal } from "./bottom-sheet-modal";
 import {
+  calculateStoreProximities,
+  BARQUISIMETO_METROPOLITAN_SECTORS,
+  type MetropolitanSector,
+} from "@marketos/plugin-delivery-fleet";
+import {
   MapPin,
   Navigation,
   CheckCircle2,
@@ -16,72 +21,6 @@ import {
   AlertCircle,
   Compass,
 } from "lucide-react";
-
-// Default reference coordinates for Barquisimeto & Cabudare stores if not in DB
-const STORE_COORDINATES: Record<string, { lat: number; lng: number }> = {
-  "NS-01": { lat: 10.054, lng: -69.298 }, // Calle 3 entre Carreras 1 y 2, Nueva Segovia, Barquisimeto
-  "CBD-01": { lat: 10.029, lng: -69.261 }, // Cabudare Intercomunal
-  "EST-01": { lat: 10.062, lng: -69.285 }, // Los Leones / Este
-};
-
-// Sectores metropolitanos de Barquisimeto y Cabudare para selección rápida y precisa
-export const METROPOLITAN_SECTORS = [
-  {
-    id: "norte",
-    name: "Zona Norte",
-    detail: "El Cují / Tamaca / Carorita",
-    icon: "🧭",
-    coords: { lat: 10.140, lng: -69.312 }, // ~9.7 km de Sucursal Nueva Segovia
-  },
-  {
-    id: "este",
-    name: "Este / Nueva Segovia",
-    detail: "Nueva Segovia / Los Leones / Lara",
-    icon: "🏢",
-    coords: { lat: 10.058, lng: -69.295 }, // ~0.6 km de Sucursal Nueva Segovia
-  },
-  {
-    id: "centro",
-    name: "Centro",
-    detail: "Carrera 19 / Av. Vargas / 20",
-    icon: "🏙️",
-    coords: { lat: 10.068, lng: -69.317 }, // ~2.6 km de Sucursal Nueva Segovia
-  },
-  {
-    id: "oeste",
-    name: "Oeste",
-    detail: "Obelisco / Pedro León Torres",
-    icon: "🌳",
-    coords: { lat: 10.066, lng: -69.355 }, // ~6.4 km de Sucursal Nueva Segovia
-  },
-  {
-    id: "cabudare",
-    name: "Cabudare",
-    detail: "Valle Hondo / La Mora / Intercomunal",
-    icon: "🛵",
-    coords: { lat: 10.030, lng: -69.260 }, // ~5.0 km de Sucursal Nueva Segovia
-  },
-];
-
-// Haversine formula to calculate distance in km
-function calculateDistanceKm(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
-  const R = 6371; // Earth's radius in km
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return Math.round(R * c * 10) / 10;
-}
 
 interface BranchSelectorModalProps {
   isOpen: boolean;
@@ -111,47 +50,28 @@ export function BranchSelectorModal({
     sourceLabel?: string,
     sectorId?: string
   ) => {
-    const calculated: Record<string, number> = {};
-    let nearestStore: Store | null = null;
-    let minDistance = Infinity;
+    // Encapsulated in @marketos/plugin-delivery-fleet
+    const proximity = calculateStoreProximities(stores, lat, lng);
 
-    for (const store of stores) {
-      // Coordinates from store record or known store code
-      const coords =
-        (store as any).latitude && (store as any).longitude
-          ? { lat: Number((store as any).latitude), lng: Number((store as any).longitude) }
-          : STORE_COORDINATES[store.code] || null;
-
-      if (!coords) continue;
-
-      const dist = calculateDistanceKm(lat, lng, coords.lat, coords.lng);
-      calculated[store.id] = dist;
-
-      if (dist < minDistance) {
-        minDistance = dist;
-        nearestStore = store;
-      }
-    }
-
-    setDistances(calculated);
+    setDistances(proximity.allDistances);
     setDetectingGps(false);
     if (sectorId) {
       setActiveSectorId(sectorId);
     }
 
-    if (nearestStore !== null) {
-      const matchedStore: Store = nearestStore;
-      onSelectStore(matchedStore, minDistance, sourceLabel);
+    if (proximity.nearestStore) {
+      const matchedStore = proximity.nearestStore;
+      onSelectStore(matchedStore, proximity.minDistanceKm, sourceLabel);
 
       // Sanity check: Barquisimeto metro perimeter is within ~35 km
-      if (minDistance > 35) {
+      if (!proximity.isWithinMetroPerimeter) {
         setGpsMessage(
-          `Detectamos una ubicación fuera del área metropolitana de Barquisimeto (~${minDistance} km). Se asignó ${matchedStore.name} para tus compras y envíos a familiares en la ciudad.`
+          `Detectamos una ubicación fuera del área metropolitana de Barquisimeto (~${proximity.minDistanceKm} km). Se asignó ${matchedStore.name} para tus compras y envíos a familiares en la ciudad.`
         );
       } else {
         const tag = sourceLabel ? ` (${sourceLabel})` : "";
         setGpsMessage(
-          `¡Ubicación detectada${tag}! Te encuentras a ~${minDistance} km de ${matchedStore.name}. Delivery y stock calculados con precisión.`
+          `¡Ubicación detectada${tag}! Te encuentras a ~${proximity.minDistanceKm} km de ${matchedStore.name}. Delivery y stock calculados con precisión.`
         );
       }
     }
@@ -306,7 +226,7 @@ export function BranchSelectorModal({
           <span className="text-[10px] text-muted-foreground/70 font-medium">1 toque</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {METROPOLITAN_SECTORS.map((sector) => {
+          {BARQUISIMETO_METROPOLITAN_SECTORS.map((sector: MetropolitanSector) => {
             const isSectorActive = activeSectorId === sector.id;
             return (
               <button
@@ -355,7 +275,7 @@ export function BranchSelectorModal({
             <button
               key={store.id}
               onClick={() => {
-                const sectorObj = METROPOLITAN_SECTORS.find((s) => s.id === activeSectorId);
+                const sectorObj = BARQUISIMETO_METROPOLITAN_SECTORS.find((s: MetropolitanSector) => s.id === activeSectorId);
                 onSelectStore(store, distance, sectorObj?.name);
                 onClose();
               }}
