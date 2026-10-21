@@ -1,7 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Order, OrderStatus, TenantSettings, Store, TenantModuleId } from "@marketos/types";
+import {
+  Order,
+  OrderStatus,
+  TenantSettings,
+  Store,
+  TenantModuleId,
+  extractGpsCoordinates,
+} from "@marketos/types";
 import { formatCurrency, generateCustomerOrderWhatsAppLink } from "@marketos/utils";
 import { BottomSheetModal } from "./bottom-sheet-modal";
 import { trackOrderAction } from "../app/actions";
@@ -186,6 +193,14 @@ export function CustomerOrderTicketModal({
 
   const currentStep = getStepStatus(order.status);
   const isPickup = order.delivery_type === "PICKUP";
+  const gpsInfo = extractGpsCoordinates(order.delivery_address);
+  const displayDeliveryAddress = gpsInfo.cleanAddress || order.delivery_address;
+  const deliveryMapsUrl =
+    order.delivery_maps_url ||
+    gpsInfo.mapsUrl ||
+    (order.delivery_latitude != null && order.delivery_longitude != null
+      ? `https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`
+      : null);
 
   const steps: StepInfo[] = [
     {
@@ -381,7 +396,12 @@ export function CustomerOrderTicketModal({
                 </>
               ) : (
                 <>
-                  <strong>Dirección:</strong> {order.delivery_address || "Indicada por el cliente"}
+                  <strong>Dirección:</strong> {displayDeliveryAddress || "Indicada por el cliente"}
+                  {deliveryMapsUrl && (
+                    <span className="block mt-0.5 text-slate-500 text-[10px]">
+                      📍 Pin Satelital GPS: {deliveryMapsUrl}
+                    </span>
+                  )}
                 </>
               )}
             </p>
@@ -897,8 +917,21 @@ export function CustomerOrderTicketModal({
                     </p>
                     <p className="text-muted-foreground leading-relaxed flex items-start gap-1">
                       <MapPin className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
-                      <span>{order.delivery_address || "Dirección indicada por el cliente"}</span>
+                      <span>{displayDeliveryAddress || "Dirección indicada por el cliente"}</span>
                     </p>
+                    {deliveryMapsUrl && (
+                      <div className="pt-2">
+                        <a
+                          href={deliveryMapsUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:underline bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20 shadow-2xs transition-all active:scale-98"
+                        >
+                          <ExternalLink className="w-3 h-3 text-emerald-600" />
+                          <span>📍 Ver Pin Satelital en Google Maps</span>
+                        </a>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

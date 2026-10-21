@@ -496,6 +496,43 @@ export interface Order {
   // Delivery Cash & Change Management
   cash_tendered_usd?: number | null;
   change_required_usd?: number | null;
+  // Precise GPS Coordinates & Satellite Pin Navigation
+  delivery_latitude?: number | null;
+  delivery_longitude?: number | null;
+  delivery_maps_url?: string | null;
+}
+
+/**
+ * Extracts GPS coordinates [GPS: lat,lng] embedded in an address string
+ * with clean textual address and direct Google Maps navigation URL.
+ */
+export function extractGpsCoordinates(address?: string | null): {
+  lat: number | null;
+  lng: number | null;
+  cleanAddress: string;
+  mapsUrl: string | null;
+} {
+  if (!address) {
+    return { lat: null, lng: null, cleanAddress: "", mapsUrl: null };
+  }
+  const match = address.match(/\[GPS:\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\]/i);
+  if (match) {
+    const lat = parseFloat(match[1]);
+    const lng = parseFloat(match[2]);
+    const cleanAddress = address.replace(match[0], "").replace(/\s+/g, " ").trim();
+    return {
+      lat,
+      lng,
+      cleanAddress,
+      mapsUrl: `https://www.google.com/maps?q=${lat},${lng}`,
+    };
+  }
+  return {
+    lat: null,
+    lng: null,
+    cleanAddress: address.trim(),
+    mapsUrl: null,
+  };
 }
 
 export interface SalesAnalytics {

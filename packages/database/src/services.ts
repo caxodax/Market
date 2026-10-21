@@ -79,6 +79,7 @@ import {
   CpqQuoteItem,
   CpqOrderMilestone,
   convertUnitQuantity,
+  extractGpsCoordinates,
 } from "@marketos/types";
 
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
@@ -121,6 +122,8 @@ export interface CreateOrderInput {
   deliveryType: DeliveryType;
   deliveryZoneId?: string;
   deliveryAddress?: string;
+  deliveryLatitude?: number | null;
+  deliveryLongitude?: number | null;
   deliveryFeeUsd?: number;
   couponCode?: string;
   discountUsd?: number;
@@ -1997,6 +2000,21 @@ export class MarketOSRepository {
       return memRecentOrder;
     }
 
+    // Format delivery address with optional precise GPS tag
+    let formattedDeliveryAddress = input.deliveryAddress?.trim() || null;
+    const hasGpsCoords =
+      typeof input.deliveryLatitude === "number" &&
+      typeof input.deliveryLongitude === "number";
+
+    if (hasGpsCoords) {
+      const gpsTag = `[GPS: ${input.deliveryLatitude!.toFixed(6)},${input.deliveryLongitude!.toFixed(6)}]`;
+      if (!formattedDeliveryAddress) {
+        formattedDeliveryAddress = gpsTag;
+      } else if (!formattedDeliveryAddress.includes("[GPS:")) {
+        formattedDeliveryAddress = `${formattedDeliveryAddress} ${gpsTag}`;
+      }
+    }
+
     const newOrder: Order = {
       id: generateUuid(),
       tenant_id: input.tenantId,
@@ -2006,7 +2024,12 @@ export class MarketOSRepository {
       status: "PAYMENT_PENDING",
       delivery_type: input.deliveryType,
       delivery_zone_id: validDeliveryZoneId,
-      delivery_address: input.deliveryAddress || null,
+      delivery_address: formattedDeliveryAddress,
+      delivery_latitude: input.deliveryLatitude ?? null,
+      delivery_longitude: input.deliveryLongitude ?? null,
+      delivery_maps_url: hasGpsCoords
+        ? `https://www.google.com/maps?q=${input.deliveryLatitude},${input.deliveryLongitude}`
+        : null,
       delivery_fee_usd: deliveryFeeUsd,
       coupon_id: validCouponId,
       discount_usd: discountUsd,
@@ -2474,6 +2497,12 @@ export class MarketOSRepository {
             const parsedCash = cashMatch ? parseFloat(cashMatch[1]) : (o.cash_tendered_usd ?? null);
             const parsedChange = changeMatch ? parseFloat(changeMatch[1]) : (o.change_required_usd ?? null);
 
+            // Parse GPS coordinates from delivery_address
+            const gpsInfo = extractGpsCoordinates(o.delivery_address);
+            const deliveryLat = gpsInfo.lat ?? o.delivery_latitude ?? null;
+            const deliveryLng = gpsInfo.lng ?? o.delivery_longitude ?? null;
+            const deliveryMapsUrl = gpsInfo.mapsUrl || (deliveryLat && deliveryLng ? `https://www.google.com/maps?q=${deliveryLat},${deliveryLng}` : null);
+
             return {
               ...o,
               items: itemsMap.get(o.id) || [],
@@ -2488,6 +2517,9 @@ export class MarketOSRepository {
               store_name: storeName,
               cash_tendered_usd: parsedCash,
               change_required_usd: parsedChange,
+              delivery_latitude: deliveryLat,
+              delivery_longitude: deliveryLng,
+              delivery_maps_url: deliveryMapsUrl,
             } as Order;
           });
         }
@@ -2503,6 +2535,11 @@ export class MarketOSRepository {
         const pay = state.payments.find((p) => p.order_id === o.id);
         const cust = state.customers.find((c) => c.id === o.customer_id);
         const st = state.stores.find((s) => s.id === o.store_id);
+        const gpsInfo = extractGpsCoordinates(o.delivery_address);
+        const deliveryLat = gpsInfo.lat ?? o.delivery_latitude ?? null;
+        const deliveryLng = gpsInfo.lng ?? o.delivery_longitude ?? null;
+        const deliveryMapsUrl = gpsInfo.mapsUrl || (deliveryLat && deliveryLng ? `https://www.google.com/maps?q=${deliveryLat},${deliveryLng}` : null);
+
         return {
           ...o,
           customer_name: cust?.name || o.customer_name,
@@ -2514,6 +2551,9 @@ export class MarketOSRepository {
           payment_status: pay?.status || o.payment_status,
           proof_image_url: pay?.proof_image_url || o.proof_image_url || null,
           store_name: st?.name || o.store_name,
+          delivery_latitude: deliveryLat,
+          delivery_longitude: deliveryLng,
+          delivery_maps_url: deliveryMapsUrl,
         };
       });
   }
@@ -3891,6 +3931,10 @@ export class MarketOSRepository {
             enrichedOrders = orderList.map((o) => {
               const pay = payMap.get(o.id);
               const storeName = storeMap.get(o.store_id);
+              const gpsInfo = extractGpsCoordinates(o.delivery_address);
+              const deliveryLat = gpsInfo.lat ?? (o as any).delivery_latitude ?? null;
+              const deliveryLng = gpsInfo.lng ?? (o as any).delivery_longitude ?? null;
+              const deliveryMapsUrl = gpsInfo.mapsUrl || (deliveryLat && deliveryLng ? `https://www.google.com/maps?q=${deliveryLat},${deliveryLng}` : null);
 
               return {
                 ...o,
@@ -3904,6 +3948,9 @@ export class MarketOSRepository {
                 payment_status: pay?.status,
                 proof_image_url: pay?.proof_image_url,
                 store_name: storeName,
+                delivery_latitude: deliveryLat,
+                delivery_longitude: deliveryLng,
+                delivery_maps_url: deliveryMapsUrl,
               } as Order;
             });
           }
@@ -4120,6 +4167,10 @@ export class MarketOSRepository {
               const cust = custMap.get(o.customer_id);
               const pay = payMap.get(o.id);
               const storeName = storeMap.get(o.store_id);
+              const gpsInfo = extractGpsCoordinates(o.delivery_address);
+              const deliveryLat = gpsInfo.lat ?? o.delivery_latitude ?? null;
+              const deliveryLng = gpsInfo.lng ?? o.delivery_longitude ?? null;
+              const deliveryMapsUrl = gpsInfo.mapsUrl || (deliveryLat && deliveryLng ? `https://www.google.com/maps?q=${deliveryLat},${deliveryLng}` : null);
 
               return {
                 ...o,
@@ -4133,6 +4184,9 @@ export class MarketOSRepository {
                 payment_status: pay?.status,
                 proof_image_url: pay?.proof_image_url,
                 store_name: storeName,
+                delivery_latitude: deliveryLat,
+                delivery_longitude: deliveryLng,
+                delivery_maps_url: deliveryMapsUrl,
               } as Order;
             });
           }
@@ -4187,6 +4241,11 @@ export class MarketOSRepository {
         const pay = state.payments.find((p) => p.order_id === o.id);
         const cust = state.customers.find((c) => c.id === o.customer_id);
         const st = state.stores.find((s) => s.id === o.store_id);
+        const gpsInfo = extractGpsCoordinates(o.delivery_address);
+        const deliveryLat = gpsInfo.lat ?? o.delivery_latitude ?? null;
+        const deliveryLng = gpsInfo.lng ?? o.delivery_longitude ?? null;
+        const deliveryMapsUrl = gpsInfo.mapsUrl || (deliveryLat && deliveryLng ? `https://www.google.com/maps?q=${deliveryLat},${deliveryLng}` : null);
+
         return {
           ...o,
           customer_name: cust?.name || o.customer_name,
@@ -4198,6 +4257,9 @@ export class MarketOSRepository {
           payment_status: pay?.status || o.payment_status,
           proof_image_url: pay?.proof_image_url || o.proof_image_url,
           store_name: st?.name || o.store_name,
+          delivery_latitude: deliveryLat,
+          delivery_longitude: deliveryLng,
+          delivery_maps_url: deliveryMapsUrl,
         };
       });
   }

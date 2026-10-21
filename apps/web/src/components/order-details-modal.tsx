@@ -1,7 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import { Order, OrderStatus, TenantSettings, Driver, TenantModuleId } from "@marketos/types";
+import {
+  Order,
+  OrderStatus,
+  TenantSettings,
+  Driver,
+  TenantModuleId,
+  extractGpsCoordinates,
+} from "@marketos/types";
 import { formatCurrency, generateOrderStatusNotificationWhatsAppLink } from "@marketos/utils";
 import { buildDriverWhatsAppDispatchUrl } from "@marketos/plugin-delivery-fleet";
 import { BottomSheetModal } from "./bottom-sheet-modal";
@@ -163,6 +170,15 @@ export function OrderDetailsModal({
     drivers.find((d) => d.id === selectedDriverId) ||
     drivers.find((d) => d.id === order.driver_id) ||
     drivers[0];
+
+  const gpsInfo = extractGpsCoordinates(order.delivery_address);
+  const displayDeliveryAddress = gpsInfo.cleanAddress || order.delivery_address;
+  const deliveryMapsUrl =
+    order.delivery_maps_url ||
+    gpsInfo.mapsUrl ||
+    (order.delivery_latitude != null && order.delivery_longitude != null
+      ? `https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`
+      : null);
 
   const driverDispatchUrl =
     assignedDriver && order.delivery_type === "DELIVERY"
@@ -344,10 +360,25 @@ export function OrderDetailsModal({
               {order.delivery_type === "DELIVERY" ? "Envío a Domicilio" : "Retiro en Sucursal"}
             </p>
             {order.delivery_address ? (
-              <p className="text-muted-foreground leading-relaxed flex items-start gap-1">
-                <MapPin className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
-                <span>{order.delivery_address}</span>
-              </p>
+              <div className="space-y-1.5">
+                <p className="text-muted-foreground leading-relaxed flex items-start gap-1">
+                  <MapPin className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                  <span>{displayDeliveryAddress}</span>
+                </p>
+                {deliveryMapsUrl && (
+                  <div className="pt-0.5">
+                    <a
+                      href={deliveryMapsUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:underline bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/20 shadow-2xs transition-all active:scale-98"
+                    >
+                      <ExternalLink className="w-3 h-3 text-emerald-600" />
+                      <span>📍 Abrir Pin Satelital en Google Maps</span>
+                    </a>
+                  </div>
+                )}
+              </div>
             ) : (
               <p className="text-muted-foreground">
                 Retiro presencial en mostrador de la tienda.

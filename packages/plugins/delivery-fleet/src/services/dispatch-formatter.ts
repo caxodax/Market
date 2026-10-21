@@ -1,4 +1,4 @@
-import type { Order, Driver } from "@marketos/types";
+import { Order, Driver, extractGpsCoordinates } from "@marketos/types";
 
 export interface DriverDispatchPayload {
   order: Order;
@@ -7,10 +7,20 @@ export interface DriverDispatchPayload {
 }
 
 /**
- * Builds a direct Google Maps search / navigation URL for an address.
+ * Builds a direct Google Maps search / navigation URL for an address or GPS point.
  */
-export function buildGoogleMapsUrl(address: string): string {
-  const cleanAddr = address.trim();
+export function buildGoogleMapsUrl(address: string, order?: Order): string {
+  if (order?.delivery_maps_url) {
+    return order.delivery_maps_url;
+  }
+  if (order?.delivery_latitude != null && order?.delivery_longitude != null) {
+    return `https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}`;
+  }
+  const gpsInfo = extractGpsCoordinates(address);
+  if (gpsInfo.mapsUrl) {
+    return gpsInfo.mapsUrl;
+  }
+  const cleanAddr = (gpsInfo.cleanAddress || address).trim();
   if (!cleanAddr) return "";
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cleanAddr)}`;
 }
@@ -45,12 +55,24 @@ export function formatDriverWhatsAppDispatchMessage({
   lines.push(`👤 *Cliente:* ${order.customer_name || "Cliente"}`);
   lines.push(`📞 *Teléfono:* ${order.customer_phone || "No especificado"}`);
   
-  const destAddress = order.delivery_address?.trim() || "Dirección no especificada";
-  lines.push(`📍 *Dirección de Entrega:* ${destAddress}`);
+  const gpsInfo = extractGpsCoordinates(order.delivery_address);
+  const displayAddress = gpsInfo.cleanAddress || (order.delivery_address?.trim() || "Dirección no especificada");
+  const exactLat = gpsInfo.lat ?? order.delivery_latitude ?? null;
+  const exactLng = gpsInfo.lng ?? order.delivery_longitude ?? null;
+  const hasExactGps = exactLat !== null && exactLng !== null;
 
-  const mapsUrl = buildGoogleMapsUrl(destAddress);
-  if (mapsUrl) {
-    lines.push(`🗺️ *Ruta Google Maps:* ${mapsUrl}`);
+  lines.push(`📍 *Dirección de Entrega:* ${displayAddress}`);
+
+  const finalMapsUrl = hasExactGps
+    ? `https://www.google.com/maps?q=${exactLat},${exactLng}`
+    : (order.delivery_maps_url || buildGoogleMapsUrl(displayAddress, order));
+
+  if (finalMapsUrl) {
+    if (hasExactGps) {
+      lines.push(`🛰️ *PIN GPS EXACTO DEL CLIENTE:* ${finalMapsUrl}`);
+    } else {
+      lines.push(`🗺️ *Ruta Google Maps:* ${finalMapsUrl}`);
+    }
   }
 
   lines.push(`────────────────────────`);
