@@ -9,6 +9,7 @@ import {
   OrderItem,
   SalesAnalytics,
   PaymentProof,
+  CurrencyCode,
   DeliveryType,
   PaymentMethodType,
   PaymentStatus,
@@ -2192,6 +2193,28 @@ export class MarketOSRepository {
                   new_quantity: newQty,
                   reason: "SALE",
                 });
+
+                await MarketOSRepository.recordAuditLog({
+                  tenantId: input.tenantId,
+                  action: "STOCK_ADJUSTED",
+                  entity: "inventory",
+                  entityId: targetProductId,
+                  actorName: "Venta en Línea",
+                  actorRole: "SYSTEM",
+                  oldData: {
+                    product_id: targetProductId,
+                    name: it.productName,
+                    stock_quantity: inv.quantity,
+                  },
+                  newData: {
+                    product_id: targetProductId,
+                    name: it.productName,
+                    delta: -it.quantity,
+                    quantity: newQty,
+                    reason: "VENTA",
+                    note: `Deducción por venta #${newOrder.order_number}`,
+                  },
+                });
               } else {
                 // Upsert resilient inventory row if not yet initialized for this store
                 const memProdMatch = state.products.find(
@@ -2222,6 +2245,28 @@ export class MarketOSRepository {
                   previous_quantity: initialStock,
                   new_quantity: newQty,
                   reason: "SALE",
+                });
+
+                await MarketOSRepository.recordAuditLog({
+                  tenantId: input.tenantId,
+                  action: "STOCK_ADJUSTED",
+                  entity: "inventory",
+                  entityId: targetProductId,
+                  actorName: "Venta en Línea",
+                  actorRole: "SYSTEM",
+                  oldData: {
+                    product_id: targetProductId,
+                    name: it.productName,
+                    stock_quantity: initialStock,
+                  },
+                  newData: {
+                    product_id: targetProductId,
+                    name: it.productName,
+                    delta: -it.quantity,
+                    quantity: newQty,
+                    reason: "VENTA",
+                    note: `Deducción por venta #${newOrder.order_number}`,
+                  },
                 });
               }
             }
@@ -2676,6 +2721,7 @@ export class MarketOSRepository {
         : actor || { id: null, name: "Admin Operativo", email: null, role: "ADMIN" };
 
     const supabase = getSupabase();
+    let updatedSupabasePayment: PaymentProof | null = null;
     let orderIdToUpdate: string | null = null;
     let paymentCurrency = "VES";
     let paymentAmount = 0;
@@ -2698,7 +2744,7 @@ export class MarketOSRepository {
         if (paymentRow?.method) paymentMethod = paymentRow.method;
         if (paymentRow?.reference_number) paymentRef = paymentRow.reference_number;
 
-        await supabase
+        const { data: updatedPaymentRow } = await supabase
           .from("payments")
           .update({
             status,
@@ -2706,7 +2752,29 @@ export class MarketOSRepository {
             rejection_reason: rejectionReason || null,
           })
           .eq("id", paymentId)
-          .eq("tenant_id", tenantId);
+          .eq("tenant_id", tenantId)
+          .select("*")
+          .maybeSingle();
+
+        if (updatedPaymentRow) {
+          updatedSupabasePayment = {
+            id: updatedPaymentRow.id,
+            tenant_id: updatedPaymentRow.tenant_id,
+            order_id: updatedPaymentRow.order_id,
+            method: updatedPaymentRow.method,
+            bank_name: updatedPaymentRow.bank_name || null,
+            reference_number: updatedPaymentRow.reference_number || null,
+            amount: Number(updatedPaymentRow.amount),
+            currency: (updatedPaymentRow.currency === "USD" ? "USD" : "VES") as CurrencyCode,
+            payment_date: updatedPaymentRow.payment_date,
+            proof_image_url: updatedPaymentRow.proof_image_url || null,
+            status: updatedPaymentRow.status,
+            reviewed_by: updatedPaymentRow.reviewed_by || null,
+            reviewed_at: updatedPaymentRow.reviewed_at,
+            rejection_reason: updatedPaymentRow.rejection_reason || null,
+            created_at: updatedPaymentRow.created_at,
+          };
+        }
 
         if (orderIdToUpdate) {
           const newOrderStatus: OrderStatus =
@@ -2875,7 +2943,35 @@ export class MarketOSRepository {
       },
     });
 
-    return payment || null;
+    if (updatedSupabasePayment) {
+      return updatedSupabasePayment;
+    }
+
+    if (payment) {
+      return payment;
+    }
+
+    if (targetOrderId) {
+      return {
+        id: paymentId,
+        tenant_id: tenantId,
+        order_id: targetOrderId,
+        method: (paymentMethod || "PAGO_MOVIL") as any,
+        bank_name: null,
+        reference_number: paymentRef || null,
+        amount: paymentAmount,
+        currency: (paymentCurrency === "USD" ? "USD" : "VES") as CurrencyCode,
+        payment_date: new Date().toISOString().split("T")[0],
+        proof_image_url: null,
+        status,
+        reviewed_by: actorObj.id || null,
+        reviewed_at: new Date().toISOString(),
+        rejection_reason: rejectionReason || null,
+        created_at: new Date().toISOString(),
+      };
+    }
+
+    return null;
   }
 
   /**
@@ -3425,47 +3521,141 @@ export class MarketOSRepository {
 
         const { data, error } = await query;
 
-        if (!error && data && data.length > 0) {
-          const mapped: AuditLog[] = data.map((d: any) => {
-            const actorFromMeta =
-              (d.new_data && typeof d.new_data === "object" && d.new_data._actor) || {};
-            const tName =
-              d.tenant_name ||
-              (d.new_data && d.new_data._tenant_name) ||
-              tenantMap.get(d.tenant_id) ||
-              (d.tenant_id === "platform" ? "Plataforma Central" : "Tienda");
+        // Also fetch physical stock movements from inventory_movements
+        let invData: any[] = [];
+        try {
+          let invQuery = supabase
+            .from("inventory_movements")
+            .select("*, products(name)")
+            .order("created_at", { ascending: false })
+            .limit(limit);
 
-            return {
-              id: d.id,
-              tenant_id: d.tenant_id,
-              tenant_name: tName,
-              actor_id: d.actor_id || actorFromMeta.id || null,
-              actor_name: d.actor_name || actorFromMeta.name || "Admin Operativo",
-              actor_email: d.actor_email || actorFromMeta.email || null,
-              actor_role: d.actor_role || actorFromMeta.role || null,
-              action: d.action,
-              entity: d.entity,
-              entity_id: d.entity_id,
-              old_data: d.old_data,
-              new_data: d.new_data,
-              created_at: d.created_at,
-            };
-          });
-
-          if (filters?.search && filters.search.trim()) {
-            const term = filters.search.trim().toLowerCase();
-            return mapped.filter(
-              (l) =>
-                (l.actor_name && l.actor_name.toLowerCase().includes(term)) ||
-                (l.actor_email && l.actor_email.toLowerCase().includes(term)) ||
-                (l.action && l.action.toLowerCase().includes(term)) ||
-                (l.entity_id && l.entity_id.toLowerCase().includes(term)) ||
-                (l.tenant_name && l.tenant_name.toLowerCase().includes(term)) ||
-                JSON.stringify(l.new_data || {}).toLowerCase().includes(term)
-            );
+          if (filters?.tenantId && filters.tenantId !== "ALL") {
+            invQuery = invQuery.eq("tenant_id", filters.tenantId);
+          }
+          if (filters?.startDate) {
+            invQuery = invQuery.gte("created_at", filters.startDate);
+          }
+          if (filters?.endDate) {
+            invQuery = invQuery.lte("created_at", filters.endDate);
           }
 
-          return mapped;
+          const { data: idata, error: ierr } = await invQuery;
+          if (!ierr && idata) {
+            invData = idata;
+          }
+        } catch (invErr) {
+          console.warn("[MarketOS] inventory_movements fetch warning:", invErr);
+        }
+
+        const mappedInv: AuditLog[] = invData.map((im: any) => {
+          const prodName =
+            im.products?.name ||
+            state.products.find((p) => p.id === im.product_id)?.name ||
+            "Producto";
+          const reasonLabel =
+            im.reason === "SALE"
+              ? "VENTA"
+              : im.reason === "CANCELLATION"
+              ? "CANCELACIÓN"
+              : im.reason === "RESTOCK"
+              ? "REABASTECIMIENTO"
+              : im.reason || "AJUSTE";
+
+          return {
+            id: `inv-${im.id}`,
+            tenant_id: im.tenant_id,
+            tenant_name: tenantMap.get(im.tenant_id) || "Tienda",
+            actor_id: im.created_by || null,
+            actor_name: im.reason === "SALE" ? "Venta en Línea" : "Sistema de Inventario",
+            actor_email: null,
+            actor_role: "SYSTEM",
+            action: "STOCK_ADJUSTED",
+            entity: "inventory",
+            entity_id: im.product_id,
+            old_data: {
+              product_id: im.product_id,
+              name: prodName,
+              stock_quantity: im.previous_quantity,
+            },
+            new_data: {
+              product_id: im.product_id,
+              name: prodName,
+              delta: im.quantity_change,
+              quantity: im.new_quantity,
+              reason: reasonLabel,
+              note:
+                im.reason === "SALE"
+                  ? "Deducción automática por venta de comercio"
+                  : im.reason === "CANCELLATION"
+                  ? "Reintegro por orden cancelada"
+                  : undefined,
+            },
+            created_at: im.created_at,
+          };
+        });
+
+        const mappedAudit: AuditLog[] = (!error && data)
+          ? data.map((d: any) => {
+              const actorFromMeta =
+                (d.new_data && typeof d.new_data === "object" && d.new_data._actor) || {};
+              const tName =
+                d.tenant_name ||
+                (d.new_data && d.new_data._tenant_name) ||
+                tenantMap.get(d.tenant_id) ||
+                (d.tenant_id === "platform" ? "Plataforma Central" : "Tienda");
+
+              return {
+                id: d.id,
+                tenant_id: d.tenant_id,
+                tenant_name: tName,
+                actor_id: d.actor_id || actorFromMeta.id || null,
+                actor_name: d.actor_name || actorFromMeta.name || "Admin Operativo",
+                actor_email: d.actor_email || actorFromMeta.email || null,
+                actor_role: d.actor_role || actorFromMeta.role || null,
+                action: d.action,
+                entity: d.entity,
+                entity_id: d.entity_id,
+                old_data: d.old_data,
+                new_data: d.new_data,
+                created_at: d.created_at,
+              };
+            })
+          : [];
+
+        // Deduplicate: if an entry for the exact movement exists in audit_logs, don't duplicate
+        const existingAuditKeys = new Set(
+          mappedAudit
+            .filter((a) => a.action === "STOCK_ADJUSTED")
+            .map((a) => `${a.entity_id}_${a.new_data?.delta}_${a.created_at?.slice(0, 16)}`)
+        );
+        const filteredInv = mappedInv.filter(
+          (im) => !existingAuditKeys.has(`${im.entity_id}_${im.new_data?.delta}_${im.created_at?.slice(0, 16)}`)
+        );
+
+        let combined = [...mappedAudit, ...filteredInv].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+
+        if (filters?.action && filters.action !== "ALL") {
+          combined = combined.filter((l) => l.action === filters.action);
+        }
+
+        if (filters?.search && filters.search.trim()) {
+          const term = filters.search.trim().toLowerCase();
+          combined = combined.filter(
+            (l) =>
+              (l.actor_name && l.actor_name.toLowerCase().includes(term)) ||
+              (l.actor_email && l.actor_email.toLowerCase().includes(term)) ||
+              (l.action && l.action.toLowerCase().includes(term)) ||
+              (l.entity_id && l.entity_id.toLowerCase().includes(term)) ||
+              (l.tenant_name && l.tenant_name.toLowerCase().includes(term)) ||
+              JSON.stringify(l.new_data || {}).toLowerCase().includes(term)
+          );
+        }
+
+        if (combined.length > 0) {
+          return combined.slice(0, limit);
         }
       } catch (e) {
         console.warn("[MarketOS] Error fetching global audit logs from Supabase:", e);

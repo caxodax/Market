@@ -617,16 +617,17 @@ export function AdminDashboard({
       );
 
       const res = await reviewPaymentAction(settings.tenant_id, paymentId, status);
-      if (res.success && res.payment) {
+      if (res.success) {
         // 2. Fresh internal sync of orders and payments without global F5
         const [oRes, pRes] = await Promise.all([
           getLatestOrdersAction(settings.tenant_id),
           getLatestPaymentsAction(settings.tenant_id),
         ]);
+        const targetOrderId = res.payment?.order_id || selectedOrderForModal?.id;
         if (oRes.success && oRes.orders) {
           setOrders(oRes.orders);
-          if (selectedOrderForModal?.id === res.payment.order_id) {
-            const fresh = oRes.orders.find((o) => o.id === res.payment?.order_id);
+          if (targetOrderId) {
+            const fresh = oRes.orders.find((o) => o.id === targetOrderId);
             if (fresh) setSelectedOrderForModal(fresh);
           }
         }
