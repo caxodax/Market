@@ -23,6 +23,7 @@ interface StoreHeaderProps {
   settings: TenantSettings;
   exchangeRate: ExchangeRate;
   selectedStore?: Store;
+  locationLabel?: string;
   activeModuleIds?: import("@marketos/types").TenantModuleId[];
   onOpenBranchSelector?: () => void;
   onOpenTracker?: () => void;
@@ -34,6 +35,7 @@ export function StoreHeader({
   settings,
   exchangeRate,
   selectedStore,
+  locationLabel,
   activeModuleIds = [],
   onOpenBranchSelector,
   onOpenTracker,
@@ -73,6 +75,11 @@ export function StoreHeader({
               <MapPin className="w-3 h-3 text-primary shrink-0 group-hover:scale-110 transition-transform" />
               <span className="truncate">
                 Sede: <strong>{selectedStore ? selectedStore.name : settings.address}</strong>
+                {locationLabel && (
+                  <span className="ml-1.5 text-[10px] text-emerald-400 font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15">
+                    {locationLabel}
+                  </span>
+                )}
               </span>
               <ChevronDown className="w-2.5 h-2.5 opacity-70 shrink-0" />
             </button>

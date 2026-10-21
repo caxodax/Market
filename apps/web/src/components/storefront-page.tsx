@@ -89,6 +89,8 @@ export function StorefrontPage({
       created_at: new Date().toISOString(),
     }
   );
+  const [selectedSector, setSelectedSector] = useState<string | null>(null);
+  const [selectedDistanceKm, setSelectedDistanceKm] = useState<number | null>(null);
   const [isBranchSelectorOpen, setIsBranchSelectorOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
@@ -138,6 +140,13 @@ export function StorefrontPage({
             settings={settings}
             exchangeRate={exchangeRate}
             selectedStore={selectedStore}
+            locationLabel={
+              selectedSector
+                ? `${selectedSector}${selectedDistanceKm !== null && selectedDistanceKm <= 35 ? ` ~${selectedDistanceKm}km` : ""}`
+                : selectedDistanceKm !== null && selectedDistanceKm <= 35
+                  ? `~${selectedDistanceKm}km`
+                  : undefined
+            }
             activeModuleIds={activeModuleIds}
             onOpenBranchSelector={() => setIsBranchSelectorOpen(true)}
             onOpenTracker={() => setIsTrackerOpen(true)}
@@ -200,7 +209,11 @@ export function StorefrontPage({
           onClose={() => setIsBranchSelectorOpen(false)}
           stores={stores}
           selectedStore={selectedStore}
-          onSelectStore={(store) => setSelectedStore(store)}
+          onSelectStore={(store, distanceKm, sectorName) => {
+            setSelectedStore(store);
+            if (distanceKm !== undefined) setSelectedDistanceKm(distanceKm);
+            if (sectorName) setSelectedSector(sectorName);
+          }}
         />
 
         {/* Customer Profile & Loyalty Lookup Modal */}
