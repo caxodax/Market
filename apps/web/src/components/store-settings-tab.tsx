@@ -50,6 +50,7 @@ import {
   Scale,
   ShieldCheck,
   FileText,
+  Megaphone,
 } from "lucide-react";
 
 interface StoreSettingsTabProps {
@@ -1621,63 +1622,117 @@ export function StoreSettingsTab({
             </div>
 
             {/* Announcement Banner Card */}
-            <div className="p-4 rounded-xl border border-border bg-muted/20 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <label className="font-bold text-xs text-foreground block">
-                    Banner de Anuncio Superior (Barra Promocional Roja)
-                  </label>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Activa o desactiva con un clic el cintillo superior de la tienda para promociones o avisos de delivery.
+            <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Megaphone className="w-4 h-4 text-primary" />
+                    <label className="font-bold text-sm text-foreground">
+                      Cintillo de Anuncio Superior (Barra Promocional)
+                    </label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Barra roja destacada que se muestra en la parte superior de la tienda para promociones o avisos de delivery.
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setShowAnnouncementBanner(!showAnnouncementBanner)}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    showAnnouncementBanner ? "bg-emerald-600" : "bg-muted-foreground/30"
-                  }`}
-                  aria-label="Activar o desactivar banner de anuncio"
-                >
+                <div className="flex items-center gap-3">
                   <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                      showAnnouncementBanner ? "translate-x-5" : "translate-x-0"
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-colors ${
+                      showAnnouncementBanner
+                        ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                        : "bg-muted text-muted-foreground border border-border"
                     }`}
-                  />
-                </button>
+                  >
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        showAnnouncementBanner ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground/40"
+                      }`}
+                    />
+                    {showAnnouncementBanner ? "Activado (Visible en tienda)" : "Desactivado (Oculto)"}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowAnnouncementBanner(!showAnnouncementBanner)}
+                    className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      showAnnouncementBanner ? "bg-emerald-600" : "bg-muted-foreground/30"
+                    }`}
+                    aria-label="Activar o desactivar banner de anuncio"
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        showAnnouncementBanner ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
 
-              {showAnnouncementBanner && (
-                <div className="space-y-2 pt-1 animate-in fade-in duration-150">
-                  <input
-                    type="text"
-                    value={announcementBanner}
-                    onChange={(e) => setAnnouncementBanner(e.target.value)}
-                    placeholder="Ej. ¡Envíos gratis en Barquisimeto en compras mayores a $30! 🛵🎉"
-                    className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
-                  />
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-muted-foreground font-medium">
-                      Vista previa de cómo se ve en la tienda:
-                    </span>
-                    {announcementBanner && (
-                      <button
-                        type="button"
-                        onClick={() => setAnnouncementBanner("")}
-                        className="text-xs text-rose-500 hover:underline font-semibold cursor-pointer"
-                      >
-                        Limpiar texto
-                      </button>
-                    )}
-                  </div>
+              {/* Input is ALWAYS visible so user never thinks it disappeared */}
+              <div className="space-y-2 pt-2 border-t border-border/60">
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-xs text-foreground block">
+                    Texto del Anuncio:
+                  </label>
                   {announcementBanner && (
-                    <div className="bg-primary text-primary-foreground text-xs py-1.5 px-3 rounded-lg text-center font-bold shadow-xs truncate">
+                    <button
+                      type="button"
+                      onClick={() => setAnnouncementBanner("")}
+                      className="text-xs text-rose-500 hover:underline font-semibold cursor-pointer"
+                    >
+                      Limpiar texto
+                    </button>
+                  )}
+                </div>
+
+                <input
+                  type="text"
+                  value={announcementBanner}
+                  onChange={(e) => setAnnouncementBanner(e.target.value)}
+                  placeholder="Ej. ¡Bienvenidos a Shop Market! Delivery rápido en Barquisimeto y Cabudare 🛵"
+                  className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
+                />
+
+                {!showAnnouncementBanner && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1.5 pt-0.5">
+                    <span>ℹ️</span>
+                    <span>
+                      El texto se mantiene guardado, pero <strong>NO será visible</strong> para los clientes en la tienda mientras el interruptor esté desactivado.
+                    </span>
+                  </p>
+                )}
+
+                {/* Live Preview */}
+                <div className="pt-2">
+                  <span className="text-[11px] text-muted-foreground font-semibold block mb-1.5">
+                    {showAnnouncementBanner
+                      ? "Vista previa en vivo (Así se verá arriba de la tienda):"
+                      : "Vista previa (Desactivado actualmente):"}
+                  </span>
+
+                  {announcementBanner.trim() ? (
+                    <div
+                      className={`text-xs py-2 px-4 rounded-xl text-center font-bold shadow-xs truncate transition-all ${
+                        showAnnouncementBanner
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground border border-dashed border-border opacity-70"
+                      }`}
+                    >
                       {announcementBanner}
+                      {!showAnnouncementBanner && (
+                        <span className="ml-2 text-[10px] font-normal uppercase tracking-wider bg-background/50 px-2 py-0.5 rounded-md">
+                          (Oculto)
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-muted/50 border border-dashed border-border text-muted-foreground text-xs py-2 px-4 rounded-xl text-center italic">
+                      Escribe un texto arriba para previsualizar el anuncio
                     </div>
                   )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
 

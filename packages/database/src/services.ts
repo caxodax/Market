@@ -239,7 +239,7 @@ export class MarketOSRepository {
           },
           billing_settings: {
             ...INITIAL_SETTINGS.billing_settings,
-            ...(data.billing_settings || {}),
+            ...(data.billing_settings || data.operational_settings?.billing_settings || {}),
           },
         };
       }
@@ -274,6 +274,12 @@ export class MarketOSRepository {
         : current.billing_settings,
     };
 
+    // Embed billing_settings inside operational_settings JSONB so it persists reliably
+    const operationalPayload = {
+      ...(updated.operational_settings || {}),
+      ...(updated.billing_settings ? { billing_settings: updated.billing_settings } : {}),
+    };
+
     const supabase = getSupabase();
     if (supabase) {
       const payload: Record<string, any> = {
@@ -293,9 +299,7 @@ export class MarketOSRepository {
         supported_currencies: updated.supported_currencies,
         default_currency: updated.default_currency,
         payment_settings: updated.payment_settings,
-        operational_settings: updated.operational_settings,
-        billing_settings: updated.billing_settings,
-        custom_domain: updated.custom_domain,
+        operational_settings: operationalPayload,
         storefront_config: updated.storefront_config,
         updated_at: new Date().toISOString(),
       };
@@ -307,20 +311,19 @@ export class MarketOSRepository {
 
       if (error) {
         console.warn(
-          "[MarketOS] updateTenantSettings Supabase error, retrying without extended columns:",
+          "[MarketOS] updateTenantSettings Supabase error, retrying without optional columns:",
           error.message
         );
         const safePayload = { ...payload };
-        delete safePayload.payment_settings;
-        delete safePayload.operational_settings;
-        delete safePayload.billing_settings;
         delete safePayload.font_family;
-        delete safePayload.custom_domain;
         delete (safePayload as any).storefront_config;
-        await supabase
+        const retryRes = await supabase
           .from("tenant_settings")
           .update(safePayload)
           .eq("tenant_id", tenantId);
+        if (retryRes.error) {
+          console.error("[MarketOS] updateTenantSettings fallback error:", retryRes.error.message);
+        }
       }
 
       // Also keep public.tenants table in sync if logo or name changed
