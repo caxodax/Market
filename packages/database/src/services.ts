@@ -225,9 +225,22 @@ export class MarketOSRepository {
         .maybeSingle();
 
       if (!error && data) {
+        let resolvedLogoUrl = data.logo_url;
+        if (!resolvedLogoUrl) {
+          const { data: tenantData } = await supabase
+            .from("tenants")
+            .select("logo_url")
+            .eq("id", tenantId)
+            .maybeSingle();
+          if (tenantData?.logo_url) {
+            resolvedLogoUrl = tenantData.logo_url;
+          }
+        }
+
         return {
           ...INITIAL_SETTINGS,
           ...(data as TenantSettings),
+          logo_url: resolvedLogoUrl || null,
           custom_domain: data.custom_domain || null,
           payment_settings: {
             ...INITIAL_SETTINGS.payment_settings,
