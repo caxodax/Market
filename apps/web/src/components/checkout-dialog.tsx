@@ -72,6 +72,14 @@ export function CheckoutDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Reset scroll position to top when switching between wizard steps
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+  }, [step]);
 
   // Form states - Step 1: Customer Data & Delivery (Fresh start on every checkout for shared phone privacy)
   const [customerName, setCustomerName] = useState("");
@@ -132,13 +140,46 @@ export function CheckoutDialog({
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [cashTenderedInput, setCashTenderedInput] = useState<string>("");
 
-  // Lock body scroll when checkout dialog is open
+  // Robust mobile body scroll lock preventing window panning and keyboard displacement
   useEffect(() => {
     if (!isOpen) return;
-    const originalStyle = window.getComputedStyle(document.body).overflow;
+
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const originalPosition = document.body.style.position;
+    const originalTop = document.body.style.top;
+    const originalWidth = document.body.style.width;
+    const originalOverflow = document.body.style.overflow;
+
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
     document.body.style.overflow = "hidden";
+
+    const resetWindowScroll = () => {
+      window.scrollTo(0, 0);
+      if (document.documentElement) document.documentElement.scrollTop = 0;
+      if (document.body) document.body.scrollTop = 0;
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", resetWindowScroll);
+      window.visualViewport.addEventListener("scroll", resetWindowScroll);
+    }
+    window.addEventListener("focus", resetWindowScroll);
+    window.addEventListener("orientationchange", resetWindowScroll);
+
     return () => {
-      document.body.style.overflow = originalStyle;
+      document.body.style.position = originalPosition;
+      document.body.style.top = originalTop;
+      document.body.style.width = originalWidth;
+      document.body.style.overflow = originalOverflow;
+      window.scrollTo(0, scrollY);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener("resize", resetWindowScroll);
+        window.visualViewport.removeEventListener("scroll", resetWindowScroll);
+      }
+      window.removeEventListener("focus", resetWindowScroll);
+      window.removeEventListener("orientationchange", resetWindowScroll);
     };
   }, [isOpen]);
 
@@ -338,6 +379,11 @@ export function CheckoutDialog({
 
   // Image upload with WebP compression
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (typeof window !== "undefined") {
+      window.scrollTo(0, 0);
+      if (document.documentElement) document.documentElement.scrollTop = 0;
+      if (document.body) document.body.scrollTop = 0;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -591,7 +637,7 @@ export function CheckoutDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200 overflow-hidden touch-none sm:touch-auto">
       {/* Background click dismiss */}
       <div
         className="fixed inset-0 bg-transparent cursor-pointer"
@@ -604,7 +650,7 @@ export function CheckoutDialog({
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className="relative z-10 bg-card w-full max-w-lg rounded-t-[28px] sm:rounded-2xl border border-border shadow-2xl flex flex-col max-h-[94vh] sm:max-h-[90vh] overflow-hidden animate-in slide-in-from-bottom-6 sm:slide-in-from-bottom-0 sm:zoom-in-95"
+        className="relative z-10 bg-card w-full max-w-lg rounded-t-[28px] sm:rounded-2xl border border-border shadow-2xl flex flex-col max-h-[92dvh] sm:max-h-[88dvh] overflow-hidden animate-in slide-in-from-bottom-6 sm:slide-in-from-bottom-0 sm:zoom-in-95 touch-auto"
       >
         {/* Mobile drag handle bar */}
         <div className="pt-3 pb-1 flex justify-center sm:hidden shrink-0">
@@ -681,11 +727,16 @@ export function CheckoutDialog({
           </div>
         )}
 
-        {/* Scrollable Wizard Form Container */}
+        {/* Wizard Form Shell */}
         <form
           onSubmit={handleSubmit}
-          className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1 overscroll-contain"
+          className="flex flex-col flex-1 min-h-0 overflow-hidden"
         >
+          {/* Scrollable Step Content Container */}
+          <div
+            ref={scrollContainerRef}
+            className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1 min-h-0 overscroll-contain"
+          >
           {step === 1 ? (
             /* ============================================================== */
             /* STEP 1: DESTINATARIO Y MODALIDAD DE ENTREGA                   */
@@ -1011,16 +1062,6 @@ export function CheckoutDialog({
                   )}
                 </div>
               </div>
-
-              {/* Next Step Button */}
-              <button
-                type="button"
-                onClick={handleProceedToStep2}
-                className="w-full h-12 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 flex items-center justify-center gap-2 transition-transform active:scale-[0.98] shadow-md cursor-pointer"
-              >
-                <span>Continuar al Pago</span>
-                <ChevronRight className="w-4 h-4" />
-              </button>
             </div>
           ) : (
             /* ============================================================== */
@@ -1555,8 +1596,23 @@ export function CheckoutDialog({
                 </div>
               )}
 
-              {/* Bottom Confirmation Action Buttons */}
-              <div className="pt-2 flex gap-2.5">
+            </div>
+          )}
+          </div>
+
+          {/* Sticky Bottom Action Bar (Pinned, Ergonomic Mobile Thumb-Zone) */}
+          <div className="p-3.5 sm:p-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] border-t border-border bg-card/95 backdrop-blur-xs shrink-0 shadow-lg">
+            {step === 1 ? (
+              <button
+                type="button"
+                onClick={handleProceedToStep2}
+                className="w-full h-12 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 flex items-center justify-center gap-2 transition-transform active:scale-[0.98] shadow-md cursor-pointer"
+              >
+                <span>Continuar al Pago</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            ) : (
+              <div className="flex gap-2.5">
                 <button
                   type="button"
                   onClick={() => setStep(1)}
@@ -1584,8 +1640,8 @@ export function CheckoutDialog({
                   )}
                 </button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </form>
       </div>
     </div>
