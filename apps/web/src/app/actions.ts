@@ -7,6 +7,7 @@ import {
 } from "@marketos/database";
 import type { Order } from "@marketos/types";
 import { revalidatePath } from "next/cache";
+import { invalidateProductsCache } from "@/lib/cached-queries";
 
 export type CreateOrderResult =
   | { success: true; order: Order; error?: never }
@@ -62,6 +63,7 @@ export async function createOrderAction(input: CreateOrderInput): Promise<Create
   const orderPromise: Promise<CreateOrderResult> = (async (): Promise<CreateOrderResult> => {
     try {
       const order = await MarketOSRepository.createOrder(input);
+      invalidateProductsCache(input.tenantId);
       revalidatePath("/");
       revalidatePath("/admin");
       revalidatePath("/admin", "page");
@@ -165,6 +167,7 @@ export async function createOrderWithPaymentAction(
     proof_image_url: input.payment.proofImageUrl || null,
   };
 
+  invalidateProductsCache(input.order.tenantId);
   revalidatePath("/");
   revalidatePath("/admin");
   revalidatePath("/admin", "page");

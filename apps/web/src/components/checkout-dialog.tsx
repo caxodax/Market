@@ -73,56 +73,11 @@ export function CheckoutDialog({
   const [error, setError] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
 
-  // Form states - Step 1: Customer Data & Delivery
-  const [customerName, setCustomerName] = useState(() => {
-    if (typeof window !== "undefined") {
-      return (
-        localStorage.getItem(`marketos_customer_name_${settings.tenant_id}`) ||
-        localStorage.getItem("marketos_customer_name") ||
-        ""
-      );
-    }
-    return "";
-  });
-
-  const [customerPhone, setCustomerPhone] = useState(() => {
-    if (typeof window !== "undefined") {
-      return (
-        localStorage.getItem(`marketos_customer_phone_${settings.tenant_id}`) ||
-        localStorage.getItem("marketos_customer_phone") ||
-        ""
-      );
-    }
-    return "";
-  });
-
-  const [ciPrefix, setCiPrefix] = useState<"V" | "E" | "J" | "G">(() => {
-    if (typeof window !== "undefined") {
-      const saved =
-        localStorage.getItem(`marketos_customer_ci_${settings.tenant_id}`) ||
-        localStorage.getItem("marketos_customer_ci") ||
-        "";
-      if (saved.startsWith("E-")) return "E";
-      if (saved.startsWith("J-")) return "J";
-      if (saved.startsWith("G-")) return "G";
-      return "V";
-    }
-    return "V";
-  });
-
-  const [ciNumber, setCiNumber] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved =
-        localStorage.getItem(`marketos_customer_ci_${settings.tenant_id}`) ||
-        localStorage.getItem("marketos_customer_ci") ||
-        "";
-      if (saved.includes("-")) {
-        return saved.split("-")[1] || "";
-      }
-      return saved.replace(/\D/g, "");
-    }
-    return "";
-  });
+  // Form states - Step 1: Customer Data & Delivery (Fresh start on every checkout for shared phone privacy)
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [ciPrefix, setCiPrefix] = useState<"V" | "E" | "J" | "G">("V");
+  const [ciNumber, setCiNumber] = useState("");
 
   const [deliveryType, setDeliveryType] = useState<"PICKUP" | "DELIVERY">("PICKUP");
   const [selectedZoneId, setSelectedZoneId] = useState<string>(
@@ -573,13 +528,14 @@ export function CheckoutDialog({
         throw new Error(result.error || "No se pudo procesar tu pedido");
       }
 
-      // Persist customer data locally for subsequent visits
+      // Clean up any customer keys in localStorage so shared phones start completely blank
       try {
-        localStorage.setItem(`marketos_customer_ci_${settings.tenant_id}`, fullCi);
-        localStorage.setItem(`marketos_customer_phone_${settings.tenant_id}`, customerPhone);
-        localStorage.setItem(`marketos_customer_name_${settings.tenant_id}`, customerName);
-        localStorage.setItem("marketos_customer_ci", fullCi);
-        localStorage.setItem("marketos_customer_phone", customerPhone);
+        localStorage.removeItem(`marketos_customer_ci_${settings.tenant_id}`);
+        localStorage.removeItem(`marketos_customer_phone_${settings.tenant_id}`);
+        localStorage.removeItem(`marketos_customer_name_${settings.tenant_id}`);
+        localStorage.removeItem("marketos_customer_ci");
+        localStorage.removeItem("marketos_customer_phone");
+        localStorage.removeItem("marketos_customer_name");
 
         if (
           typeof window !== "undefined" &&
@@ -608,6 +564,20 @@ export function CheckoutDialog({
             .catch(() => {});
         }
       } catch {}
+
+      // Reset form states so next order starts 100% clean
+      setCustomerName("");
+      setCustomerPhone("");
+      setCiPrefix("V");
+      setCiNumber("");
+      setDeliveryAddress("");
+      setDeliveryReference("");
+      setGpsCoords(null);
+      setReferenceNumber("");
+      setProofFile(null);
+      setProofPreview(null);
+      setCashTenderedInput("");
+      setStep(1);
 
       clearCart();
       onOrderCompleted(result.order);

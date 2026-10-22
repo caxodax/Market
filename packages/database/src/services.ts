@@ -176,11 +176,30 @@ export class MarketOSRepository {
       const { data, error } = await supabase
         .from("tenants")
         .select("*")
-        .or(`id.eq.${cleanSearch},slug.eq.${cleanSearch},custom_domain.eq.${cleanSearch}`)
+        .or(`id.eq.${cleanSearch},slug.eq.${cleanSearch}`)
         .maybeSingle();
 
       if (!error && data) {
         return data as Tenant;
+      }
+
+      // Check tenant_settings for custom_domain lookup if not found by id or slug
+      const { data: settingsData } = await supabase
+        .from("tenant_settings")
+        .select("tenant_id")
+        .eq("custom_domain", cleanSearch)
+        .maybeSingle();
+
+      if (settingsData?.tenant_id) {
+        const { data: tenantByDomain } = await supabase
+          .from("tenants")
+          .select("*")
+          .eq("id", settingsData.tenant_id)
+          .maybeSingle();
+
+        if (tenantByDomain) {
+          return tenantByDomain as Tenant;
+        }
       }
     }
 
@@ -206,22 +225,10 @@ export class MarketOSRepository {
         .maybeSingle();
 
       if (!error && data) {
-        let customDomain = data.custom_domain || null;
-        if (!customDomain) {
-          const { data: tenantData } = await supabase
-            .from("tenants")
-            .select("custom_domain")
-            .eq("id", tenantId)
-            .maybeSingle();
-          if (tenantData?.custom_domain) {
-            customDomain = tenantData.custom_domain;
-          }
-        }
-
         return {
           ...INITIAL_SETTINGS,
           ...(data as TenantSettings),
-          custom_domain: customDomain,
+          custom_domain: data.custom_domain || null,
           payment_settings: {
             ...INITIAL_SETTINGS.payment_settings,
             ...(data.payment_settings || {}),
@@ -316,14 +323,13 @@ export class MarketOSRepository {
           .eq("tenant_id", tenantId);
       }
 
-      // Also keep public.tenants table in sync if logo, name, or custom_domain changed
-      if (updated.logo_url || updated.business_name || updates.custom_domain !== undefined) {
+      // Also keep public.tenants table in sync if logo or name changed
+      if (updated.logo_url || updated.business_name) {
         await supabase
           .from("tenants")
           .update({
             ...(updated.logo_url ? { logo_url: updated.logo_url } : {}),
             ...(updated.business_name ? { name: updated.business_name } : {}),
-            ...(updates.custom_domain !== undefined ? { custom_domain: updates.custom_domain } : {}),
             updated_at: new Date().toISOString(),
           })
           .eq("id", tenantId);
@@ -2193,12 +2199,27 @@ export class MarketOSRepository {
               : itemsPayload.find((p) => p.product_name.startsWith(it.productName))?.product_id;
 
             if (targetProductId) {
-              const { data: inv } = await supabase
+              let { data: inv } = await supabase
                 .from("inventory")
-                .select("id, quantity")
+                .select("id, quantity, store_id")
                 .eq("store_id", validStoreId)
                 .eq("product_id", targetProductId)
                 .maybeSingle();
+
+              if (!inv) {
+                const { data: fallbackInv } = await supabase
+                  .from("inventory")
+                  .select("id, quantity, store_id")
+                  .eq("tenant_id", input.tenantId)
+                  .eq("product_id", targetProductId)
+                  .limit(1)
+                  .maybeSingle();
+                if (fallbackInv) {
+                  inv = fallbackInv;
+                }
+              }
+
+              const targetStoreId = inv?.store_id || validStoreId;
 
               if (inv) {
                 const newQty = Math.max(0, inv.quantity - it.quantity);
@@ -2209,7 +2230,7 @@ export class MarketOSRepository {
 
                 await supabase.from("inventory_movements").insert({
                   tenant_id: input.tenantId,
-                  store_id: validStoreId,
+                  store_id: targetStoreId,
                   product_id: targetProductId,
                   quantity_change: -it.quantity,
                   previous_quantity: inv.quantity,
