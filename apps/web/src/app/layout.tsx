@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { PwaUpdateManager } from "../components/pwa/pwa-update-manager";
 
 export const viewport: Viewport = {
   themeColor: "#DC2626",
@@ -38,6 +39,7 @@ export default function RootLayout({
     <html lang="es" className="overflow-x-hidden">
       <body className="min-h-screen bg-background text-foreground antialiased overflow-x-hidden w-full max-w-full">
         {children}
+        <PwaUpdateManager />
       </body>
     </html>
   );

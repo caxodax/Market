@@ -10,7 +10,23 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    Promise.all([
+      self.clients.claim(),
+      self.clients.matchAll({ type: 'window' }).then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({ type: 'MARKETOS_SW_ACTIVATED' });
+        });
+      }),
+    ])
+  );
+});
+
+// Escucha mensajes de la aplicación web (ej. forzar activación inmediata)
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.action === 'skipWaiting') {
+    self.skipWaiting();
+  }
 });
 
 // 2. Recepción de Notificaciones Push (Web Push API)
