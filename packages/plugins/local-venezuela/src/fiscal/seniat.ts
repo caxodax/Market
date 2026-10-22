@@ -23,10 +23,22 @@ export interface SeniatFiscalCalculationOptions {
   items: SeniatFiscalItemInput[];
   discountUsd?: number;
   deliveryFeeUsd?: number;
+  deliveryBillingMode?: "INVOICE_ITEM" | "THIRD_PARTY";
   ivaRatePercentage?: number;
   applyIgtf?: boolean;
   paymentMethod?: string;
   exchangeRate?: number;
+}
+
+export interface SeniatFiscalDisplayItem {
+  id?: string;
+  name: string;
+  quantity: number;
+  unitPriceUsd: number;
+  totalPriceUsd: number;
+  isTaxExempt?: boolean;
+  taxRateTag: "(E)" | "(G 16%)";
+  isDeliveryService?: boolean;
 }
 
 export interface SeniatFiscalCalculationResult {
@@ -37,6 +49,7 @@ export interface SeniatFiscalCalculationResult {
   subtotalTaxableVes: number;
   discountUsd: number;
   deliveryFeeUsd: number;
+  deliveryBillingMode: "INVOICE_ITEM" | "THIRD_PARTY";
   ivaRatePercentage: number;
   ivaAmountUsd: number;
   ivaAmountVes: number;
@@ -50,9 +63,61 @@ export interface SeniatFiscalCalculationResult {
 }
 
 /**
+ * Normalizes and formats the list of items for invoice / ticket presentation,
+ * appending the delivery fee as an itemized service line when billed by the store.
+ */
+export function getFiscalLineItems(
+  items: Array<{
+    id?: string;
+    product_name?: string;
+    name?: string;
+    quantity: number;
+    unit_price_usd?: number;
+    unitPriceUsd?: number;
+    total_price_usd?: number;
+    totalPriceUsd?: number;
+    is_tax_exempt?: boolean;
+    isTaxExempt?: boolean;
+  }>,
+  deliveryFeeUsd: number = 0,
+  deliveryBillingMode: "INVOICE_ITEM" | "THIRD_PARTY" = "INVOICE_ITEM"
+): SeniatFiscalDisplayItem[] {
+  const result: SeniatFiscalDisplayItem[] = items.map((it) => {
+    const isExempt = Boolean(it.is_tax_exempt ?? it.isTaxExempt);
+    const unitPrice = it.unit_price_usd ?? it.unitPriceUsd ?? 0;
+    const totalPrice = it.total_price_usd ?? it.totalPriceUsd ?? Number((it.quantity * unitPrice).toFixed(2));
+    return {
+      id: it.id,
+      name: it.product_name || it.name || "Producto",
+      quantity: it.quantity,
+      unitPriceUsd: unitPrice,
+      totalPriceUsd: totalPrice,
+      isTaxExempt: isExempt,
+      taxRateTag: isExempt ? "(E)" : "(G 16%)",
+      isDeliveryService: false,
+    };
+  });
+
+  if (deliveryFeeUsd > 0 && deliveryBillingMode !== "THIRD_PARTY") {
+    result.push({
+      id: "delivery-service-item",
+      name: "Servicio de Entrega a Domicilio (Flete)",
+      quantity: 1,
+      unitPriceUsd: deliveryFeeUsd,
+      totalPriceUsd: deliveryFeeUsd,
+      isTaxExempt: false,
+      taxRateTag: "(G 16%)",
+      isDeliveryService: true,
+    });
+  }
+
+  return result;
+}
+
+/**
  * Calculates itemized fiscal breakdown according to Venezuelan tax law:
  * - Articles 18 & 27 Ley del IVA (Distinction between Exempt 'E' and Taxable 'G 16%')
- * - Delivery fee is classified as a taxable transport service (16%)
+ * - Delivery fee is classified as a taxable transport service (16%) when billed in store account
  * - Proportionate discount application
  * - IGTF (3%) applied to foreign currency payments (Cash USD, Zelle)
  */
@@ -63,6 +128,7 @@ export function calculateSeniatFiscalBreakdown(
     items = [],
     discountUsd = 0,
     deliveryFeeUsd = 0,
+    deliveryBillingMode = "INVOICE_ITEM",
     ivaRatePercentage = SENIAT_LEGAL_CONSTANTS.DEFAULT_IVA_RATE,
     applyIgtf = false,
     paymentMethod = "",
@@ -98,8 +164,9 @@ export function calculateSeniatFiscalBreakdown(
     adjustedTaxableUsd = Math.max(0, rawTaxableUsd - taxableDiscount);
   }
 
-  // Delivery fee is considered a taxable transportation service under Venezuelan VAT
-  if (deliveryFeeUsd > 0) {
+  // Delivery fee is considered a taxable transportation service under Venezuelan VAT when billed by the store
+  const isDeliveryFacturado = deliveryBillingMode !== "THIRD_PARTY";
+  if (deliveryFeeUsd > 0 && isDeliveryFacturado) {
     adjustedTaxableUsd += deliveryFeeUsd;
   }
 
@@ -147,6 +214,7 @@ export function calculateSeniatFiscalBreakdown(
     subtotalTaxableVes,
     discountUsd: Number(discountUsd.toFixed(2)),
     deliveryFeeUsd: Number(deliveryFeeUsd.toFixed(2)),
+    deliveryBillingMode,
     ivaRatePercentage,
     ivaAmountUsd,
     ivaAmountVes,

@@ -1863,7 +1863,12 @@ export class MarketOSRepository {
       subtotalExemptUsd = Math.max(0, rawExemptUsd - discountUsd * exemptRatio);
       subtotalTaxableUsd = Math.max(0, rawTaxableUsd - discountUsd * (1 - exemptRatio));
     }
-    if (deliveryFeeUsd > 0) {
+    const tenantSettings = await this.getTenantSettings(input.tenantId);
+    const isDeliveryFacturado =
+      tenantSettings.operational_settings?.delivery_billing_mode !== "THIRD_PARTY" &&
+      tenantSettings.billing_settings?.delivery_billing_mode !== "THIRD_PARTY";
+
+    if (deliveryFeeUsd > 0 && isDeliveryFacturado) {
       subtotalTaxableUsd += deliveryFeeUsd;
     }
     subtotalExemptUsd = Number(subtotalExemptUsd.toFixed(2));

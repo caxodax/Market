@@ -53,6 +53,8 @@ export interface PaymentAccountSettings {
   };
 }
 
+export type DeliveryBillingMode = "INVOICE_ITEM" | "THIRD_PARTY";
+
 export interface StoreOperationalSettings {
   is_open?: boolean;
   closed_message?: string;
@@ -63,6 +65,7 @@ export interface StoreOperationalSettings {
   estimated_delivery_time?: string;
   custom_whatsapp_message?: string;
   show_ticket_qr?: boolean;
+  delivery_billing_mode?: DeliveryBillingMode; // "INVOICE_ITEM" (default, facturado en la cuenta) | "THIRD_PARTY" (externo / contra-entrega)
 }
 
 export type FiscalBillingMode = "TICKET_ONLY" | "DIGITAL_INVOICE" | "MANUAL_INVOICE";
@@ -88,6 +91,7 @@ export interface TenantBillingSettings {
   apply_igtf?: boolean; // Default false (Aplica 3% si es divisa)
   default_iva_rate?: number; // Default 16.0
   fiscal_provider?: FiscalProvider; // Default "THE_FACTORY_HKA"
+  delivery_billing_mode?: DeliveryBillingMode;
   emitter_fiscal_data?: FiscalEmitterData;
   fiscal_machine_serial?: string; // Serial de máquina fiscal de mostrador (ej. "Z4A1234567")
   next_invoice_number?: number; // Próximo número correlativo de factura

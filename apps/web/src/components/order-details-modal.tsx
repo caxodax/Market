@@ -128,6 +128,11 @@ export function OrderDetailsModal({
 
   if (!isOpen || !order) return null;
 
+  const isDeliveryFacturado =
+    Boolean(order.delivery_fee_usd && order.delivery_fee_usd > 0) &&
+    settings.operational_settings?.delivery_billing_mode !== "THIRD_PARTY" &&
+    settings.billing_settings?.delivery_billing_mode !== "THIRD_PARTY";
+
   const handleRegisterPhysicalInvoice = async () => {
     if (!physicalInvoiceInput.trim()) return;
     setIsRegisteringFiscal(true);
@@ -496,6 +501,41 @@ export function OrderDetailsModal({
                   </div>
                 </div>
               ))}
+
+              {/* Delivery service row when billed directly by the store */}
+              {isDeliveryFacturado && order.delivery_fee_usd && order.delivery_fee_usd > 0 && (
+                <div className="p-3 sm:px-4 flex items-center justify-between gap-3 text-xs bg-primary/5 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="w-6 h-6 rounded-lg bg-primary/10 text-primary font-black text-xs flex items-center justify-center shrink-0">
+                      1x
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="font-bold text-foreground truncate">
+                          Servicio de Entrega / Flete
+                        </p>
+                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                          (G 16%)
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Servicio de transporte a domicilio facturado por la tienda
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <span className="font-black text-foreground">
+                      {formatCurrency(order.delivery_fee_usd, "USD")}
+                    </span>
+                    {isVenezuelaActive && (
+                      <span className="block text-[10px] text-muted-foreground font-mono">
+                        Bs. {(order.delivery_fee_usd * order.exchange_rate_applied).toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -625,9 +665,20 @@ export function OrderDetailsModal({
               ) : null}
 
               {order.delivery_fee_usd && order.delivery_fee_usd > 0 ? (
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Tarifa Delivery:</span>
-                  <span>{formatCurrency(order.delivery_fee_usd, "USD")}</span>
+                <div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>
+                      {isDeliveryFacturado
+                        ? "Tarifa Delivery (Servicio Gravado 16%):"
+                        : "Tarifa Delivery (Cobro a Repartidor):"}
+                    </span>
+                    <span>{formatCurrency(order.delivery_fee_usd, "USD")}</span>
+                  </div>
+                  {!isDeliveryFacturado && (
+                    <span className="block text-[10px] text-muted-foreground text-right italic pt-0.5">
+                      * Pagadero al transportista independiente (no entra en base imponible de la tienda)
+                    </span>
+                  )}
                 </div>
               ) : null}
 

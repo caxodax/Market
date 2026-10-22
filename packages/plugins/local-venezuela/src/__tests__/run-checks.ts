@@ -77,6 +77,7 @@ assert.strictEqual(sanitizeSafeUrl("/media/proof.png"), "/media/proof.png", "Val
 // 8. SENIAT Fiscal Calculations & Providencia 00071 Compliance
 import {
   calculateSeniatFiscalBreakdown,
+  getFiscalLineItems,
   formatSeniatControlNumber,
   formatSeniatInvoiceNumber,
   validateSeniatRif,
@@ -84,13 +85,14 @@ import {
 } from "../fiscal/seniat.ts";
 import { generateSeniatSalesBookCsv } from "../fiscal/salesBook.ts";
 
-// Test 8.1: Mixed Cart (Exempt items + Taxable items + Delivery + IGTF 3%)
+// Test 8.1: Mixed Cart with Centralized Delivery (INVOICE_ITEM: Taxable transport included)
 const fiscalRes = calculateSeniatFiscalBreakdown({
   items: [
     { name: "Harina PAN", quantity: 2, unitPriceUsd: 1.20, isTaxExempt: true },
     { name: "Refresco", quantity: 1, unitPriceUsd: 2.00, isTaxExempt: false },
   ],
   deliveryFeeUsd: 2.50, // Taxable transport
+  deliveryBillingMode: "INVOICE_ITEM",
   applyIgtf: true,
   paymentMethod: "CASH_USD",
   exchangeRate: 45,
@@ -103,7 +105,42 @@ assert.strictEqual(fiscalRes.igtfAmountUsd, 0.23, "3% IGTF on 7.62 is 0.23 USD")
 assert.strictEqual(fiscalRes.totalUsd, 7.85, "Total USD should be 7.85");
 assert.strictEqual(fiscalRes.totalVes, 353.25, "Total VES should be 7.85 * 45 = 353.25 Bs.");
 
-// Test 8.2: SENIAT Control & Invoice Numbering Formats
+// Test 8.2: Mixed Cart with Third-Party / Freelance Delivery (THIRD_PARTY: Excluded from store VAT)
+const fiscalThirdParty = calculateSeniatFiscalBreakdown({
+  items: [
+    { name: "Harina PAN", quantity: 2, unitPriceUsd: 1.20, isTaxExempt: true },
+    { name: "Refresco", quantity: 1, unitPriceUsd: 2.00, isTaxExempt: false },
+  ],
+  deliveryFeeUsd: 2.50,
+  deliveryBillingMode: "THIRD_PARTY",
+  applyIgtf: false,
+  paymentMethod: "PAGO_MOVIL",
+  exchangeRate: 45,
+});
+
+assert.strictEqual(fiscalThirdParty.subtotalTaxableUsd, 2.00, "Taxable subtotal excludes third-party delivery");
+assert.strictEqual(fiscalThirdParty.ivaAmountUsd, 0.32, "16% IVA only on 2.00 product is 0.32 USD");
+
+// Test 8.3: getFiscalLineItems appends delivery as service line when INVOICE_ITEM
+const lineItems = getFiscalLineItems(
+  [{ product_name: "Harina PAN", quantity: 2, unit_price_usd: 1.20, is_tax_exempt: true }],
+  3.00,
+  "INVOICE_ITEM"
+);
+assert.strictEqual(lineItems.length, 2, "Should have 2 lines (1 product + 1 delivery service)");
+assert.strictEqual(lineItems[1].isDeliveryService, true);
+assert.strictEqual(lineItems[1].unitPriceUsd, 3.00);
+assert.strictEqual(lineItems[1].taxRateTag, "(G 16%)");
+
+// Test 8.4: getFiscalLineItems excludes delivery from table when THIRD_PARTY
+const thirdPartyLines = getFiscalLineItems(
+  [{ product_name: "Harina PAN", quantity: 2, unit_price_usd: 1.20, is_tax_exempt: true }],
+  3.00,
+  "THIRD_PARTY"
+);
+assert.strictEqual(thirdPartyLines.length, 1, "Should only have product line");
+
+// Test 8.5: SENIAT Control & Invoice Numbering Formats
 assert.strictEqual(formatSeniatControlNumber(1), "00-00000001", "Control number 1 must be 00-00000001");
 assert.strictEqual(formatSeniatControlNumber(1045, "01-"), "01-00001045", "Control number with custom prefix");
 assert.strictEqual(formatSeniatInvoiceNumber(1001), "FACT-00001001", "Invoice number must be FACT-00001001");

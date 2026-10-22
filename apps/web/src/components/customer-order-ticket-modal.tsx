@@ -273,6 +273,15 @@ export function CustomerOrderTicketModal({
   // QR Code visibility flag from operational settings (defaults to true)
   const showQr = settings.operational_settings?.show_ticket_qr !== false;
 
+  // Delivery billing mode: "INVOICE_ITEM" (default, in store invoice) vs "THIRD_PARTY"
+  const deliveryBillingMode =
+    settings.operational_settings?.delivery_billing_mode ||
+    settings.billing_settings?.delivery_billing_mode ||
+    "INVOICE_ITEM";
+  const isDeliveryFacturado =
+    Boolean(order.delivery_fee_usd && order.delivery_fee_usd > 0) &&
+    deliveryBillingMode !== "THIRD_PARTY";
+
   // Smart tracking URL: when scanned by smartphone camera, opens live order tracker
   const trackingUrl =
     typeof window !== "undefined"
@@ -435,7 +444,10 @@ export function CustomerOrderTicketModal({
                           {item.quantity}x
                         </td>
                         <td className="py-1 font-medium pr-2">
-                          {item.product_name}
+                          <span>{item.product_name}</span>
+                          <span className="ml-1 text-[9px] font-mono font-bold text-slate-500">
+                            {item.is_tax_exempt ? "(E)" : "(G 16%)"}
+                          </span>
                         </td>
                         <td className="py-1 text-right font-mono text-slate-600">
                           ${item.unit_price_usd.toFixed(2)}
@@ -450,6 +462,30 @@ export function CustomerOrderTicketModal({
                         )}
                       </tr>
                     ))}
+
+                    {/* Delivery service row when billed directly by the store */}
+                    {isDeliveryFacturado && order.delivery_fee_usd && order.delivery_fee_usd > 0 && (
+                      <tr className="text-slate-900 bg-slate-50/70 font-semibold border-t border-slate-300">
+                        <td className="py-1 text-center font-bold font-mono">1x</td>
+                        <td className="py-1 font-medium pr-2">
+                          <span>Servicio de Entrega / Flete</span>
+                          <span className="ml-1 text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-200 text-slate-800">
+                            (G 16%)
+                          </span>
+                        </td>
+                        <td className="py-1 text-right font-mono text-slate-600">
+                          ${order.delivery_fee_usd.toFixed(2)}
+                        </td>
+                        <td className="py-1 text-right font-mono font-bold">
+                          ${order.delivery_fee_usd.toFixed(2)}
+                        </td>
+                        {isVenezuelaActive && (
+                          <td className="py-1 text-right font-mono text-slate-700">
+                            Bs. {(order.delivery_fee_usd * order.exchange_rate_applied).toFixed(2)}
+                          </td>
+                        )}
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -499,9 +535,20 @@ export function CustomerOrderTicketModal({
                   ) : null}
 
                   {order.delivery_fee_usd && order.delivery_fee_usd > 0 ? (
-                    <div className="flex justify-between text-slate-600">
-                      <span>Tarifa Delivery:</span>
-                      <span>+${order.delivery_fee_usd.toFixed(2)}</span>
+                    <div>
+                      <div className="flex justify-between text-slate-600">
+                        <span>
+                          {isDeliveryFacturado
+                            ? "Tarifa Delivery (Gravado 16%):"
+                            : "Tarifa Delivery (Cobro a Repartidor):"}
+                        </span>
+                        <span>+${order.delivery_fee_usd.toFixed(2)}</span>
+                      </div>
+                      {!isDeliveryFacturado && (
+                        <p className="text-[9px] text-slate-500 italic pt-0.5">
+                          * Servicio prestado por transportista independiente, no gravado por la tienda.
+                        </p>
+                      )}
                     </div>
                   ) : null}
 
@@ -1010,9 +1057,14 @@ export function CustomerOrderTicketModal({
                         {item.quantity}x
                       </span>
                       <div className="min-w-0">
-                        <p className="font-bold text-foreground truncate">
-                          {item.product_name}
-                        </p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-bold text-foreground truncate">
+                            {item.product_name}
+                          </p>
+                          <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
+                            {item.is_tax_exempt ? "(E)" : "(G 16%)"}
+                          </span>
+                        </div>
                         <p className="text-[11px] text-muted-foreground font-mono">
                           {formatCurrency(item.unit_price_usd, "USD")} c/u
                         </p>
@@ -1031,6 +1083,41 @@ export function CustomerOrderTicketModal({
                     </div>
                   </div>
                 ))}
+
+                {/* Delivery service row when billed directly by the store */}
+                {isDeliveryFacturado && order.delivery_fee_usd && order.delivery_fee_usd > 0 && (
+                  <div className="p-3 sm:px-4 flex items-center justify-between gap-3 text-xs bg-primary/5 hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-6 h-6 rounded-lg bg-primary/10 text-primary font-black text-xs flex items-center justify-center shrink-0">
+                        1x
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-bold text-foreground truncate">
+                            Servicio de Entrega / Flete
+                          </p>
+                          <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                            (G 16%)
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Servicio de transporte a domicilio facturado por la tienda
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="font-black text-foreground">
+                        {formatCurrency(order.delivery_fee_usd, "USD")}
+                      </span>
+                      {isVenezuelaActive && (
+                        <span className="block text-[10px] text-muted-foreground font-mono">
+                          Bs. {(order.delivery_fee_usd * order.exchange_rate_applied).toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1094,9 +1181,20 @@ export function CustomerOrderTicketModal({
                 ) : null}
 
                 {order.delivery_fee_usd && order.delivery_fee_usd > 0 ? (
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Tarifa Delivery:</span>
-                    <span>{formatCurrency(order.delivery_fee_usd, "USD")}</span>
+                  <div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>
+                        {isDeliveryFacturado
+                          ? "Tarifa Delivery (Servicio Gravado 16%):"
+                          : "Tarifa Delivery (Cobro a Repartidor):"}
+                      </span>
+                      <span>{formatCurrency(order.delivery_fee_usd, "USD")}</span>
+                    </div>
+                    {!isDeliveryFacturado && (
+                      <span className="block text-[10px] text-muted-foreground text-right italic pt-0.5">
+                        * Pagadero al transportista independiente (no entra en base imponible de la tienda)
+                      </span>
+                    )}
                   </div>
                 ) : null}
 

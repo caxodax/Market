@@ -11,6 +11,7 @@ import {
   FiscalTaxPayerType,
   FiscalProvider,
   TenantModuleId,
+  DeliveryBillingMode,
 } from "@marketos/types";
 import { updateTenantSettingsAction, uploadStoreLogoAction } from "../app/admin/actions";
 import { compressImage } from "@marketos/utils";
@@ -224,7 +225,27 @@ export function StoreSettingsTab({
   const [logoUrl, setLogoUrl] = useState<string | null>(settings.logo_url || null);
   const [isProcessingLogo, setIsProcessingLogo] = useState(false);
 
-  // Form State: Operations
+  // Form State: Operations & SENIAT Fiscal Compliance
+  const defaultBilling: TenantBillingSettings = settings.billing_settings || {
+    fiscal_billing_enabled: false,
+    billing_mode: "TICKET_ONLY",
+    tax_payer_type: "ORDINARY",
+    apply_igtf: false,
+    default_iva_rate: 16.0,
+    fiscal_provider: "THE_FACTORY_HKA",
+    emitter_fiscal_data: {
+      rif: "",
+      business_name: settings.business_name || "",
+      fiscal_address: settings.address || "",
+      phone: settings.phone || "",
+    },
+    provider_credentials: {
+      api_key: "",
+      token: "",
+      environment: "SANDBOX",
+    },
+  };
+
   const defaultOps: StoreOperationalSettings = settings.operational_settings || {
     is_open: true,
     closed_message: "Actualmente nos encontramos fuera de horario de atención comercial. Tomaremos tu pedido a primera hora.",
@@ -247,27 +268,9 @@ export function StoreSettingsTab({
   const [estimatedDeliveryTime, setEstimatedDeliveryTime] = useState(defaultOps.estimated_delivery_time || "30 a 60 minutos");
   const [customWhatsappMessage, setCustomWhatsappMessage] = useState(defaultOps.custom_whatsapp_message || "");
   const [showTicketQr, setShowTicketQr] = useState(defaultOps.show_ticket_qr ?? true);
-
-  // Form State: SENIAT Fiscal Compliance & Facturación Digital (Providencia 00071)
-  const defaultBilling: TenantBillingSettings = settings.billing_settings || {
-    fiscal_billing_enabled: false,
-    billing_mode: "TICKET_ONLY",
-    tax_payer_type: "ORDINARY",
-    apply_igtf: false,
-    default_iva_rate: 16.0,
-    fiscal_provider: "THE_FACTORY_HKA",
-    emitter_fiscal_data: {
-      rif: "",
-      business_name: settings.business_name || "",
-      fiscal_address: settings.address || "",
-      phone: settings.phone || "",
-    },
-    provider_credentials: {
-      api_key: "",
-      token: "",
-      environment: "SANDBOX",
-    },
-  };
+  const [deliveryBillingMode, setDeliveryBillingMode] = useState<DeliveryBillingMode>(
+    defaultOps.delivery_billing_mode || defaultBilling.delivery_billing_mode || "INVOICE_ITEM"
+  );
 
   const [fiscalBillingEnabled, setFiscalBillingEnabled] = useState(defaultBilling.fiscal_billing_enabled ?? false);
   const [billingMode, setBillingMode] = useState<FiscalBillingMode>(defaultBilling.billing_mode || "TICKET_ONLY");
@@ -393,6 +396,7 @@ export function StoreSettingsTab({
       estimated_delivery_time: estimatedDeliveryTime.trim(),
       custom_whatsapp_message: customWhatsappMessage.trim(),
       show_ticket_qr: showTicketQr,
+      delivery_billing_mode: deliveryBillingMode,
     };
 
     const updatedBillingSettings: TenantBillingSettings = {
@@ -402,6 +406,7 @@ export function StoreSettingsTab({
       apply_igtf: applyIgtf,
       default_iva_rate: Number(defaultIvaRate) || 16.0,
       fiscal_provider: fiscalProvider,
+      delivery_billing_mode: deliveryBillingMode,
       emitter_fiscal_data: {
         rif: emitterRif.trim(),
         business_name: emitterBusinessName.trim(),
@@ -1620,9 +1625,10 @@ export function StoreSettingsTab({
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Announcement Banner Card */}
-            <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
+          {/* Announcement Banner Card */}
+          <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
@@ -1732,6 +1738,95 @@ export function StoreSettingsTab({
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+
+          {/* Modalidad de Facturación del Delivery (Normativa SENIAT) */}
+          <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Truck className="w-4 h-4 text-primary" />
+                <h3 className="font-bold text-sm text-foreground">
+                  Modalidad de Facturación del Servicio de Delivery
+                </h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                  SENIAT Providencia 00071
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                En Venezuela, si recibes el pago del flete en la misma cuenta bancaria de la tienda, el SENIAT exige incluirlo como un ítem de servicio gravado al 16% de IVA en la misma factura. Si el cliente le paga al motorizado o a un tercero externo, se excluye de la factura de la tienda.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              {/* Option A: INVOICE_ITEM */}
+              <div
+                onClick={() => setDeliveryBillingMode("INVOICE_ITEM")}
+                className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                  deliveryBillingMode === "INVOICE_ITEM"
+                    ? "border-primary bg-primary/5 shadow-xs"
+                    : "border-border hover:border-muted-foreground/30 bg-background"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                        deliveryBillingMode === "INVOICE_ITEM"
+                          ? "border-primary bg-primary"
+                          : "border-muted-foreground/40"
+                      }`}
+                    >
+                      {deliveryBillingMode === "INVOICE_ITEM" && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                      )}
+                    </div>
+                    <span className="font-bold text-xs text-foreground">
+                      Facturar en la misma cuenta
+                    </span>
+                  </div>
+                  <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 shrink-0">
+                    Recomendado
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+                  El delivery se desglosa como renglón: <strong className="text-foreground">"Servicio de Entrega / Flete (G 16%)"</strong> en el ticket o factura. La base imponible y el IVA coinciden exactamente con el dinero cobrado.
+                </p>
+              </div>
+
+              {/* Option B: THIRD_PARTY */}
+              <div
+                onClick={() => setDeliveryBillingMode("THIRD_PARTY")}
+                className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                  deliveryBillingMode === "THIRD_PARTY"
+                    ? "border-primary bg-primary/5 shadow-xs"
+                    : "border-border hover:border-muted-foreground/30 bg-background"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                        deliveryBillingMode === "THIRD_PARTY"
+                          ? "border-primary bg-primary"
+                          : "border-muted-foreground/40"
+                      }`}
+                    >
+                      {deliveryBillingMode === "THIRD_PARTY" && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                      )}
+                    </div>
+                    <span className="font-bold text-xs text-foreground">
+                      Tercerizado / Contra-entrega
+                    </span>
+                  </div>
+                  <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border shrink-0">
+                    Externo
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+                  El flete es cobrado directamente por el transportista independiente o mensajería (Zoom, MRW, Ridery). La tienda no computa IVA por el envío.
+                </p>
               </div>
             </div>
           </div>
