@@ -240,6 +240,9 @@ export function StoreSettingsTab({
   const [schedule, setSchedule] = useState(defaultOps.schedule || "");
   const [minOrderUsd, setMinOrderUsd] = useState(defaultOps.min_order_usd || 0);
   const [announcementBanner, setAnnouncementBanner] = useState(defaultOps.announcement_banner || "");
+  const [showAnnouncementBanner, setShowAnnouncementBanner] = useState(
+    defaultOps.show_announcement_banner ?? Boolean(defaultOps.announcement_banner?.trim())
+  );
   const [estimatedDeliveryTime, setEstimatedDeliveryTime] = useState(defaultOps.estimated_delivery_time || "30 a 60 minutos");
   const [customWhatsappMessage, setCustomWhatsappMessage] = useState(defaultOps.custom_whatsapp_message || "");
   const [showTicketQr, setShowTicketQr] = useState(defaultOps.show_ticket_qr ?? true);
@@ -385,6 +388,7 @@ export function StoreSettingsTab({
       schedule: schedule.trim(),
       min_order_usd: Number(minOrderUsd) || 0,
       announcement_banner: announcementBanner.trim(),
+      show_announcement_banner: showAnnouncementBanner,
       estimated_delivery_time: estimatedDeliveryTime.trim(),
       custom_whatsapp_message: customWhatsappMessage.trim(),
       show_ticket_qr: showTicketQr,
@@ -1616,20 +1620,64 @@ export function StoreSettingsTab({
               </div>
             </div>
 
-            <div>
-              <label className="font-semibold text-muted-foreground block mb-1.5 text-xs">
-                Banner de Anuncio / Promoción Superior en la Tienda (Opcional)
-              </label>
-              <input
-                type="text"
-                value={announcementBanner}
-                onChange={(e) => setAnnouncementBanner(e.target.value)}
-                placeholder="¡Envíos gratis en Barquisimeto en compras mayores a $30! 🛵🎉"
-                className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">
-                Aparece destacado en la parte superior del catálogo para todos los clientes que visiten la tienda.
-              </p>
+            {/* Announcement Banner Card */}
+            <div className="p-4 rounded-xl border border-border bg-muted/20 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="font-bold text-xs text-foreground block">
+                    Banner de Anuncio Superior (Barra Promocional Roja)
+                  </label>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Activa o desactiva con un clic el cintillo superior de la tienda para promociones o avisos de delivery.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAnnouncementBanner(!showAnnouncementBanner)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    showAnnouncementBanner ? "bg-emerald-600" : "bg-muted-foreground/30"
+                  }`}
+                  aria-label="Activar o desactivar banner de anuncio"
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      showAnnouncementBanner ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {showAnnouncementBanner && (
+                <div className="space-y-2 pt-1 animate-in fade-in duration-150">
+                  <input
+                    type="text"
+                    value={announcementBanner}
+                    onChange={(e) => setAnnouncementBanner(e.target.value)}
+                    placeholder="Ej. ¡Envíos gratis en Barquisimeto en compras mayores a $30! 🛵🎉"
+                    className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground font-medium">
+                      Vista previa de cómo se ve en la tienda:
+                    </span>
+                    {announcementBanner && (
+                      <button
+                        type="button"
+                        onClick={() => setAnnouncementBanner("")}
+                        className="text-xs text-rose-500 hover:underline font-semibold cursor-pointer"
+                      >
+                        Limpiar texto
+                      </button>
+                    )}
+                  </div>
+                  {announcementBanner && (
+                    <div className="bg-primary text-primary-foreground text-xs py-1.5 px-3 rounded-lg text-center font-bold shadow-xs truncate">
+                      {announcementBanner}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

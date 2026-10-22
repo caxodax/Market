@@ -59,6 +59,7 @@ export interface StoreOperationalSettings {
   schedule?: string;
   min_order_usd?: number;
   announcement_banner?: string;
+  show_announcement_banner?: boolean;
   estimated_delivery_time?: string;
   custom_whatsapp_message?: string;
   show_ticket_qr?: boolean;

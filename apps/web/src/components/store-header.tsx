@@ -50,11 +50,12 @@ export function StoreHeader({
   return (
     <header className="sticky top-0 z-30 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
       {/* Announcement Banner */}
-      {settings.operational_settings?.announcement_banner && (
-        <div className="bg-primary text-primary-foreground text-[11px] sm:text-xs py-1.5 px-3 sm:px-4 text-center font-bold tracking-tight shadow-xs truncate">
-          {settings.operational_settings.announcement_banner}
-        </div>
-      )}
+      {settings.operational_settings?.show_announcement_banner !== false &&
+        Boolean(settings.operational_settings?.announcement_banner?.trim()) && (
+          <div className="bg-primary text-primary-foreground text-[11px] sm:text-xs py-1.5 px-3 sm:px-4 text-center font-bold tracking-tight shadow-xs truncate">
+            {settings.operational_settings?.announcement_banner}
+          </div>
+        )}
 
       {/* Store Closed Warning */}
       {settings.operational_settings?.is_open === false && (
