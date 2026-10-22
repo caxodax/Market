@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Order,
   OrderStatus,
@@ -62,6 +63,11 @@ export function CustomerOrderTicketModal({
   const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
   const [copiedOrder, setCopiedOrder] = useState(false);
   const [copiedCi, setCopiedCi] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Live order state with automatic background refresh
   const [order, setOrder] = useState<Order | null>(initialOrder);
@@ -280,306 +286,311 @@ export function CustomerOrderTicketModal({
   return (
     <>
       {/* ============================================================== */}
-      {/* 1. DEDICATED PRINTABLE TICKET (Rendered ONLY when printing)     */}
+      {/* 1. DEDICATED PRINTABLE TICKET (Portalled directly to body)      */}
       {/* ============================================================== */}
-      <div id="printable-order-ticket" className="print-only-ticket">
-        {/* Header with Store Logo & Metadata */}
-        <div className="flex items-start justify-between border-b-2 border-slate-900 pb-4 mb-4">
-          <div className="flex items-center gap-3">
-            {settings.logo_url ? (
-              <img
-                src={settings.logo_url}
-                alt={isFiscal ? emitterBusinessName : settings.business_name}
-                className="h-16 w-auto max-w-[140px] object-contain"
-              />
-            ) : (
-              <div className="w-14 h-14 rounded-xl bg-slate-900 text-white font-black flex items-center justify-center text-xl">
-                SM
-              </div>
-            )}
-            <div>
-              <h1 className="text-xl font-black tracking-tight text-slate-950 uppercase leading-none">
-                {isFiscal ? emitterBusinessName : settings.business_name}
-              </h1>
-              {isFiscal && (
-                <p className="text-xs font-mono font-black text-slate-900 mt-1">
-                  RIF: {emitterRif}
-                </p>
-              )}
-              <p className="text-xs text-slate-600 mt-0.5">
-                {settings.category || "Comercio Digital"} {settings.address ? `• ${settings.address}` : ""}
-              </p>
-              <p className="text-[11px] text-slate-500">
-                {(isFiscal ? emitterAddress : settings.address) && `${isFiscal ? emitterAddress : settings.address} • `}
-                {(isFiscal ? emitterPhone : settings.phone) && `Tlf: ${isFiscal ? emitterPhone : settings.phone}`}
-              </p>
-            </div>
-          </div>
-
-          <div className="text-right">
-            <span
-              className={`inline-block text-white text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider ${
-                isFiscal
-                  ? "bg-emerald-700"
-                  : order.physical_invoice_number
-                  ? "bg-blue-700"
-                  : "bg-slate-900"
-              }`}
-            >
-              {isFiscal
-                ? "FACTURA FISCAL DIGITAL"
-                : order.physical_invoice_number
-                ? `FACTURA FÍSICA N° ${order.physical_invoice_number}`
-                : "COMPROBANTE DE COMPRA"}
-            </span>
-            <div className="mt-1 font-mono font-black text-base text-slate-950">
-              {isFiscal ? invoiceNumber : `#${order.order_number}`}
-            </div>
-            {isFiscal && (
-              <div className="text-[10px] font-mono font-black text-slate-700">
-                N° Control: {controlNumber}
-              </div>
-            )}
-            {!isFiscal && order.physical_machine_serial && (
-              <div className="text-[10px] font-mono font-black text-slate-700">
-                MF: {order.physical_machine_serial}
-              </div>
-            )}
-            <div className="text-[10px] text-slate-600 font-medium">
-              {formattedDate}
-            </div>
-          </div>
-        </div>
-
-        {/* Providencia 00071 Mandatory Non-Fiscal Warning Banner */}
-        {!isFiscal && (
-          <div className="mb-3 py-1.5 px-3 rounded border border-slate-400 bg-slate-100 text-center">
-            <p className="text-[10px] font-black uppercase tracking-wider text-slate-900">
-              {order.physical_invoice_number
-                ? `FACTURA FISCAL EMITIDA EN CAJA N° ${order.physical_invoice_number} ${order.physical_machine_serial ? `• SERIAL: ${order.physical_machine_serial}` : ""}`
-                : (billingSettings?.non_fiscal_warning_legend || "DOCUMENTO NO FISCAL - EXIJA SU FACTURA FISCAL EN CAJA")}
-            </p>
-          </div>
-        )}
-
-        {/* Customer & Delivery Information Block */}
-        <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border border-slate-300 bg-slate-50/70 text-xs mb-4">
-          <div>
-            <span className="text-[10px] font-bold uppercase text-slate-500 block">
-              Datos del Cliente
-            </span>
-            <p className="font-extrabold text-slate-900 text-sm mt-0.5">
-              {order.customer_name || "Cliente General"}
-            </p>
-            <p className="text-slate-700 font-mono text-[11px] mt-0.5">
-              <strong>C.I. / RIF:</strong> {order.customer_id_number || "No registrada"}
-            </p>
-            {order.customer_phone && (
-              <p className="text-slate-700 text-[11px]">
-                <strong>Teléfono:</strong> {order.customer_phone}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <span className="text-[10px] font-bold uppercase text-slate-500 block">
-              Modalidad de Despacho
-            </span>
-            <p className="font-extrabold text-slate-900 text-sm mt-0.5">
-              {isPickup ? "🏬 Retiro en Tienda / Sede" : "🛵 Envío a Domicilio (Delivery)"}
-            </p>
-            <p className="text-slate-700 text-[11px] mt-0.5 leading-snug">
-              {isPickup ? (
-                <>
-                  <strong>Sede:</strong> {order.store_name || store?.name || "Sucursal Principal"}
-                  {store?.address && <span className="block text-slate-500 text-[10px]">{store.address}</span>}
-                </>
-              ) : (
-                <>
-                  <strong>Dirección:</strong> {displayDeliveryAddress || "Indicada por el cliente"}
-                  {deliveryMapsUrl && (
-                    <span className="block mt-0.5 text-slate-500 text-[10px]">
-                      📍 Pin Satelital GPS: {deliveryMapsUrl}
-                    </span>
+      {isMounted && typeof document !== "undefined"
+        ? createPortal(
+            <div id="printable-order-ticket" className="print-only-ticket">
+              {/* Header with Store Logo & Metadata */}
+              <div className="flex items-start justify-between border-b-2 border-slate-900 pb-3 mb-3">
+                <div className="flex items-center gap-2.5">
+                  {settings.logo_url ? (
+                    <img
+                      src={settings.logo_url}
+                      alt={isFiscal ? emitterBusinessName : settings.business_name}
+                      className="h-12 w-auto max-w-[120px] object-contain"
+                    />
+                  ) : (
+                    <div className="w-11 h-11 rounded-lg bg-slate-900 text-white font-black flex items-center justify-center text-lg">
+                      SM
+                    </div>
                   )}
-                </>
-              )}
-            </p>
-          </div>
-        </div>
-
-        {/* Itemized Purchased Products Table */}
-        <div className="mb-4">
-          <table className="w-full text-xs border-collapse">
-            <thead>
-              <tr className="border-b-2 border-slate-900 text-slate-700 text-[10px] uppercase font-black">
-                <th className="py-1.5 text-center w-12">Cant.</th>
-                <th className="py-1.5 text-left">Producto / Descripción</th>
-                <th className="py-1.5 text-right w-24">P. Unit ($)</th>
-                <th className="py-1.5 text-right w-24">Total ($)</th>
-                {isVenezuelaActive && <th className="py-1.5 text-right w-28">Total (Bs.)</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {items.map((item, idx) => (
-                <tr key={item.id || idx} className="text-slate-900">
-                  <td className="py-1.5 text-center font-bold font-mono">
-                    {item.quantity}x
-                  </td>
-                  <td className="py-1.5 font-medium pr-2">
-                    {item.product_name}
-                  </td>
-                  <td className="py-1.5 text-right font-mono text-slate-600">
-                    ${item.unit_price_usd.toFixed(2)}
-                  </td>
-                  <td className="py-1.5 text-right font-mono font-bold">
-                    ${item.total_price_usd.toFixed(2)}
-                  </td>
-                  {isVenezuelaActive && (
-                    <td className="py-1.5 text-right font-mono text-slate-700">
-                      Bs. {(item.total_price_usd * order.exchange_rate_applied).toFixed(2)}
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Financial Breakdown & Payment Info */}
-        <div className="grid grid-cols-2 gap-4 border-t-2 border-slate-900 pt-3 text-xs mb-4">
-          {/* Payment Method Details */}
-          <div className="space-y-1 text-slate-700">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
-              Detalles del Pago
-            </span>
-            <p>
-              <strong>Método:</strong> {order.payment_method || "Pago Móvil / Transferencia"}
-            </p>
-            {order.payment_reference && (
-              <p>
-                <strong>Referencia:</strong>{" "}
-                <span className="font-mono font-bold text-slate-900">
-                  {order.payment_reference}
-                </span>
-              </p>
-            )}
-            <p>
-              <strong>Estado del Pago:</strong>{" "}
-              <span className="font-bold text-slate-900">
-                {order.payment_status === "APPROVED"
-                  ? "Aprobado / Conciliado"
-                  : order.payment_status === "REJECTED"
-                  ? "Rechazado"
-                  : "Por Conciliar"}
-              </span>
-            </p>
-            {isVenezuelaActive && (
-              <p className="text-[10px] text-slate-500 pt-1">
-                Tasa Oficial BCV: Bs. {order.exchange_rate_applied.toFixed(2)}
-              </p>
-            )}
-          </div>
-
-          {/* Totals Calculation */}
-          <div className="space-y-1 text-right">
-            {order.discount_usd && order.discount_usd > 0 ? (
-              <div className="flex justify-between text-slate-600">
-                <span>Descuento Cupón:</span>
-                <span>-${order.discount_usd.toFixed(2)}</span>
-              </div>
-            ) : null}
-
-            {order.delivery_fee_usd && order.delivery_fee_usd > 0 ? (
-              <div className="flex justify-between text-slate-600">
-                <span>Tarifa Delivery:</span>
-                <span>+${order.delivery_fee_usd.toFixed(2)}</span>
-              </div>
-            ) : null}
-
-            {isFiscal ? (
-              <div className="pt-1.5 pb-1 space-y-0.5 border-t border-slate-300 text-[11px] text-slate-700">
-                <div className="flex justify-between">
-                  <span>Subtotal Exento / Exonerado:</span>
-                  <span className="font-mono">${subtotalExemptUsd.toFixed(2)} | Bs. {exemptVes.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Base Imponible Gravable (16%):</span>
-                  <span className="font-mono">${subtotalTaxableUsd.toFixed(2)} | Bs. {taxableVes.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between font-semibold text-slate-900">
-                  <span>IVA Liquidado (16%):</span>
-                  <span className="font-mono font-bold">${ivaAmountUsd.toFixed(2)} | Bs. {ivaAmountVes.toFixed(2)}</span>
-                </div>
-                {igtfAmountUsd > 0 && (
-                  <div className="flex justify-between font-bold text-amber-900 bg-amber-50 px-1 py-0.5 rounded">
-                    <span>IGTF (3% Divisas):</span>
-                    <span className="font-mono">${igtfAmountUsd.toFixed(2)} | Bs. {igtfAmountVes.toFixed(2)}</span>
+                  <div>
+                    <h1 className="text-lg font-black tracking-tight text-slate-950 uppercase leading-none">
+                      {isFiscal ? emitterBusinessName : settings.business_name}
+                    </h1>
+                    {isFiscal && (
+                      <p className="text-[11px] font-mono font-black text-slate-900 mt-0.5">
+                        RIF: {emitterRif}
+                      </p>
+                    )}
+                    <p className="text-[11px] text-slate-600 mt-0.5">
+                      {settings.category || "Comercio Digital"} {settings.address ? `• ${settings.address}` : ""}
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      {(isFiscal ? emitterAddress : settings.address) && `${isFiscal ? emitterAddress : settings.address} • `}
+                      {(isFiscal ? emitterPhone : settings.phone) && `Tlf: ${isFiscal ? emitterPhone : settings.phone}`}
+                    </p>
                   </div>
-                )}
+                </div>
+
+                <div className="text-right">
+                  <span
+                    className={`inline-block text-white text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider ${
+                      isFiscal
+                        ? "bg-emerald-700"
+                        : order.physical_invoice_number
+                        ? "bg-blue-700"
+                        : "bg-slate-900"
+                    }`}
+                  >
+                    {isFiscal
+                      ? "FACTURA FISCAL DIGITAL"
+                      : order.physical_invoice_number
+                      ? `FACTURA FÍSICA N° ${order.physical_invoice_number}`
+                      : "COMPROBANTE DE COMPRA"}
+                  </span>
+                  <div className="mt-1 font-mono font-black text-base text-slate-950">
+                    {isFiscal ? invoiceNumber : `#${order.order_number}`}
+                  </div>
+                  {isFiscal && (
+                    <div className="text-[10px] font-mono font-black text-slate-700">
+                      N° Control: {controlNumber}
+                    </div>
+                  )}
+                  {!isFiscal && order.physical_machine_serial && (
+                    <div className="text-[10px] font-mono font-black text-slate-700">
+                      MF: {order.physical_machine_serial}
+                    </div>
+                  )}
+                  <div className="text-[10px] text-slate-600 font-medium">
+                    {formattedDate}
+                  </div>
+                </div>
               </div>
-            ) : null}
 
-            <div className="flex justify-between items-baseline pt-1 border-t border-slate-300">
-              <span className="font-black text-sm text-slate-900">
-                {isFiscal ? "TOTAL FACTURA USD:" : "TOTAL USD:"}
-              </span>
-              <span className="font-mono font-black text-lg text-slate-950">
-                ${order.total_usd.toFixed(2)}
-              </span>
-            </div>
-
-            {isVenezuelaActive && (
-              <div className="flex justify-between items-baseline font-mono">
-                <span className="text-slate-600 font-bold text-xs">
-                  {isFiscal ? "TOTAL FACTURA BOLÍVARES:" : "TOTAL BOLÍVARES:"}
-                </span>
-                <span className="font-bold text-base text-slate-950">
-                  Bs. {order.total_ves.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* QR Code and Footer (Only shown if showQr is enabled) */}
-        {showQr && (
-          <div className="flex items-center justify-between border-t border-dashed border-slate-300 pt-3 mb-2">
-            <div className="space-y-0.5 text-slate-600 text-[11px] max-w-[70%]">
-              <p className="font-bold text-slate-900 flex items-center gap-1">
-                <QrCode className="w-3.5 h-3.5" />
-                <span>{isFiscal ? "Validación Fiscal Digital SENIAT" : "Rastreo Digital en Tiempo Real"}</span>
-              </p>
-              <p className="text-[10px] text-slate-500 leading-snug">
-                {isFiscal
-                  ? "Escanea este código con tu teléfono para verificar la autenticidad y validez fiscal de este documento ante la plataforma fiscal autorizada."
-                  : "Escanea este código con la cámara de tu smartphone para consultar el estado del pedido, ruta de despacho y confirmación en tiempo real."}
-              </p>
-              {isFiscal && (
-                <p className="text-[9px] font-mono text-slate-600 pt-0.5">
-                  <strong>CUV:</strong> {cuv}
-                </p>
+              {/* Providencia 00071 Mandatory Non-Fiscal Warning Banner */}
+              {!isFiscal && (
+                <div className="mb-2.5 py-1 px-2.5 rounded border border-slate-400 bg-slate-100 text-center">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-900">
+                    {order.physical_invoice_number
+                      ? `FACTURA FISCAL EMITIDA EN CAJA N° ${order.physical_invoice_number} ${order.physical_machine_serial ? `• SERIAL: ${order.physical_machine_serial}` : ""}`
+                      : (billingSettings?.non_fiscal_warning_legend || "DOCUMENTO NO FISCAL - EXIJA SU FACTURA FISCAL EN CAJA")}
+                  </p>
+                </div>
               )}
-            </div>
-            <div className="w-20 h-20 bg-white p-1 border border-slate-300 rounded shrink-0 flex items-center justify-center">
-              <img
-                src={qrImageUrl}
-                alt={`QR ${isFiscal ? invoiceNumber : order.order_number}`}
-                className="w-full h-full object-contain"
-              />
-            </div>
-          </div>
-        )}
 
-        {/* Closing Legal / Thank-you note */}
-        <div className="text-center text-[10px] text-slate-500 pt-2 border-t border-slate-200">
-          {isFiscal
-            ? `Factura digital emitida conforme a la Providencia Administrativa SNAT/2011/00071 y normativas de Facturación Digital para Comercio Electrónico. Proveedor: ${billingSettings?.fiscal_provider || "The Factory HKA"} • Control: ${controlNumber}`
-            : order.physical_invoice_number
-            ? `Pedido amparado por Factura Fiscal Física N° ${order.physical_invoice_number} emitida en mostrador. ¡Gracias por su compra en ${settings.business_name}!`
-            : `DOCUMENTO NO FISCAL (Providencia SNAT/2011/00071) • Comprobante interno de preventa y despacho. ¡Gracias por su compra en ${settings.business_name}!`}
-        </div>
-      </div>
+              {/* Customer & Delivery Information Block */}
+              <div className="grid grid-cols-2 gap-3 p-2.5 rounded-lg border border-slate-300 bg-slate-50/70 text-xs mb-3">
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-slate-500 block">
+                    Datos del Cliente
+                  </span>
+                  <p className="font-extrabold text-slate-900 text-sm mt-0.5">
+                    {order.customer_name || "Cliente General"}
+                  </p>
+                  <p className="text-slate-700 font-mono text-[11px] mt-0.5">
+                    <strong>C.I. / RIF:</strong> {order.customer_id_number || "No registrada"}
+                  </p>
+                  {order.customer_phone && (
+                    <p className="text-slate-700 text-[11px]">
+                      <strong>Teléfono:</strong> {order.customer_phone}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-slate-500 block">
+                    Modalidad de Despacho
+                  </span>
+                  <p className="font-extrabold text-slate-900 text-sm mt-0.5">
+                    {isPickup ? "🏬 Retiro en Tienda / Sede" : "🛵 Envío a Domicilio (Delivery)"}
+                  </p>
+                  <p className="text-slate-700 text-[11px] mt-0.5 leading-snug">
+                    {isPickup ? (
+                      <>
+                        <strong>Sede:</strong> {order.store_name || store?.name || "Sucursal Principal"}
+                        {store?.address && <span className="block text-slate-500 text-[10px]">{store.address}</span>}
+                      </>
+                    ) : (
+                      <>
+                        <strong>Dirección:</strong> {displayDeliveryAddress || "Indicada por el cliente"}
+                        {deliveryMapsUrl && (
+                          <span className="block mt-0.5 text-slate-500 text-[10px]">
+                            📍 Pin Satelital GPS: {deliveryMapsUrl}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* Itemized Purchased Products Table */}
+              <div className="mb-3">
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-slate-900 text-slate-700 text-[10px] uppercase font-black">
+                      <th className="py-1 text-center w-12">Cant.</th>
+                      <th className="py-1 text-left">Producto / Descripción</th>
+                      <th className="py-1 text-right w-24">P. Unit ($)</th>
+                      <th className="py-1 text-right w-24">Total ($)</th>
+                      {isVenezuelaActive && <th className="py-1 text-right w-28">Total (Bs.)</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {items.map((item, idx) => (
+                      <tr key={item.id || idx} className="text-slate-900">
+                        <td className="py-1 text-center font-bold font-mono">
+                          {item.quantity}x
+                        </td>
+                        <td className="py-1 font-medium pr-2">
+                          {item.product_name}
+                        </td>
+                        <td className="py-1 text-right font-mono text-slate-600">
+                          ${item.unit_price_usd.toFixed(2)}
+                        </td>
+                        <td className="py-1 text-right font-mono font-bold">
+                          ${item.total_price_usd.toFixed(2)}
+                        </td>
+                        {isVenezuelaActive && (
+                          <td className="py-1 text-right font-mono text-slate-700">
+                            Bs. {(item.total_price_usd * order.exchange_rate_applied).toFixed(2)}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Financial Breakdown & Payment Info */}
+              <div className="grid grid-cols-2 gap-3 border-t-2 border-slate-900 pt-2.5 text-xs mb-3">
+                {/* Payment Method Details */}
+                <div className="space-y-1 text-slate-700">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                    Detalles del Pago
+                  </span>
+                  <p>
+                    <strong>Método:</strong> {order.payment_method || "Pago Móvil / Transferencia"}
+                  </p>
+                  {order.payment_reference && (
+                    <p>
+                      <strong>Referencia:</strong>{" "}
+                      <span className="font-mono font-bold text-slate-900">
+                        {order.payment_reference}
+                      </span>
+                    </p>
+                  )}
+                  <p>
+                    <strong>Estado del Pago:</strong>{" "}
+                    <span className="font-bold text-slate-900">
+                      {order.payment_status === "APPROVED"
+                        ? "Aprobado / Conciliado"
+                        : order.payment_status === "REJECTED"
+                        ? "Rechazado"
+                        : "Por Conciliar"}
+                    </span>
+                  </p>
+                  {isVenezuelaActive && (
+                    <p className="text-[10px] text-slate-500 pt-0.5">
+                      Tasa Oficial BCV: Bs. {order.exchange_rate_applied.toFixed(2)}
+                    </p>
+                  )}
+                </div>
+
+                {/* Totals Calculation */}
+                <div className="space-y-1 text-right">
+                  {order.discount_usd && order.discount_usd > 0 ? (
+                    <div className="flex justify-between text-slate-600">
+                      <span>Descuento Cupón:</span>
+                      <span>-${order.discount_usd.toFixed(2)}</span>
+                    </div>
+                  ) : null}
+
+                  {order.delivery_fee_usd && order.delivery_fee_usd > 0 ? (
+                    <div className="flex justify-between text-slate-600">
+                      <span>Tarifa Delivery:</span>
+                      <span>+${order.delivery_fee_usd.toFixed(2)}</span>
+                    </div>
+                  ) : null}
+
+                  {isFiscal ? (
+                    <div className="pt-1 pb-1 space-y-0.5 border-t border-slate-300 text-[11px] text-slate-700">
+                      <div className="flex justify-between">
+                        <span>Subtotal Exento / Exonerado:</span>
+                        <span className="font-mono">${subtotalExemptUsd.toFixed(2)} | Bs. {exemptVes.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Base Imponible Gravable (16%):</span>
+                        <span className="font-mono">${subtotalTaxableUsd.toFixed(2)} | Bs. {taxableVes.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold text-slate-900">
+                        <span>IVA Liquidado (16%):</span>
+                        <span className="font-mono font-bold">${ivaAmountUsd.toFixed(2)} | Bs. {ivaAmountVes.toFixed(2)}</span>
+                      </div>
+                      {igtfAmountUsd > 0 && (
+                        <div className="flex justify-between font-bold text-amber-900 bg-amber-50 px-1 py-0.5 rounded">
+                          <span>IGTF (3% Divisas):</span>
+                          <span className="font-mono">${igtfAmountUsd.toFixed(2)} | Bs. {igtfAmountVes.toFixed(2)}</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+
+                  <div className="flex justify-between items-baseline pt-1 border-t border-slate-300">
+                    <span className="font-black text-sm text-slate-900">
+                      {isFiscal ? "TOTAL FACTURA USD:" : "TOTAL USD:"}
+                    </span>
+                    <span className="font-mono font-black text-base sm:text-lg text-slate-950">
+                      ${order.total_usd.toFixed(2)}
+                    </span>
+                  </div>
+
+                  {isVenezuelaActive && (
+                    <div className="flex justify-between items-baseline font-mono">
+                      <span className="text-slate-600 font-bold text-xs">
+                        {isFiscal ? "TOTAL FACTURA BOLÍVARES:" : "TOTAL BOLÍVARES:"}
+                      </span>
+                      <span className="font-bold text-sm sm:text-base text-slate-950">
+                        Bs. {order.total_ves.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* QR Code and Footer (Only shown if showQr is enabled) */}
+              {showQr && (
+                <div className="flex items-center justify-between border-t border-dashed border-slate-300 pt-2.5 mb-1.5">
+                  <div className="space-y-0.5 text-slate-600 text-[11px] max-w-[70%]">
+                    <p className="font-bold text-slate-900 flex items-center gap-1">
+                      <QrCode className="w-3.5 h-3.5" />
+                      <span>{isFiscal ? "Validación Fiscal Digital SENIAT" : "Rastreo Digital en Tiempo Real"}</span>
+                    </p>
+                    <p className="text-[10px] text-slate-500 leading-snug">
+                      {isFiscal
+                        ? "Escanea este código con tu teléfono para verificar la autenticidad y validez fiscal de este documento ante la plataforma fiscal autorizada."
+                        : "Escanea este código con la cámara de tu smartphone para consultar el estado del pedido, ruta de despacho y confirmación en tiempo real."}
+                    </p>
+                    {isFiscal && (
+                      <p className="text-[9px] font-mono text-slate-600 pt-0.5">
+                        <strong>CUV:</strong> {cuv}
+                      </p>
+                    )}
+                  </div>
+                  <div className="w-16 h-16 bg-white p-1 border border-slate-300 rounded shrink-0 flex items-center justify-center">
+                    <img
+                      src={qrImageUrl}
+                      alt={`QR ${isFiscal ? invoiceNumber : order.order_number}`}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Closing Legal / Thank-you note */}
+              <div className="text-center text-[9px] sm:text-[10px] text-slate-500 pt-1.5 border-t border-slate-200">
+                {isFiscal
+                  ? `Factura digital emitida conforme a la Providencia Administrativa SNAT/2011/00071 y normativas de Facturación Digital para Comercio Electrónico. Proveedor: ${billingSettings?.fiscal_provider || "The Factory HKA"} • Control: ${controlNumber}`
+                  : order.physical_invoice_number
+                  ? `Pedido amparado por Factura Fiscal Física N° ${order.physical_invoice_number} emitida en mostrador. ¡Gracias por su compra en ${settings.business_name}!`
+                  : `DOCUMENTO NO FISCAL (Providencia SNAT/2011/00071) • Comprobante interno de preventa y despacho. ¡Gracias por su compra en ${settings.business_name}!`}
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
 
       {/* ============================================================== */}
       {/* 2. ON-SCREEN INTERACTIVE MODAL (Hidden during window.print)     */}
@@ -1187,7 +1198,8 @@ export function CustomerOrderTicketModal({
       {/* ============================================================== */}
       <style jsx global>{`
         @media screen {
-          .print-only-ticket {
+          .print-only-ticket,
+          #printable-order-ticket {
             display: none !important;
           }
         }
@@ -1200,13 +1212,18 @@ export function CustomerOrderTicketModal({
             padding: 0 !important;
             width: 100% !important;
             height: auto !important;
+            min-height: 0 !important;
             overflow: visible !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
 
-          /* 2. Hide everything by default */
-          body * {
+          /* 2. Completely isolate printable ticket: remove ALL other body siblings from print flow */
+          body > *:not(#printable-order-ticket) {
+            display: none !important;
+            height: 0 !important;
+            max-height: 0 !important;
+            overflow: hidden !important;
             visibility: hidden !important;
           }
 
@@ -1222,21 +1239,19 @@ export function CustomerOrderTicketModal({
             visibility: hidden !important;
           }
 
-          /* 4. Display ONLY the dedicated printable ticket container */
-          .print-only-ticket,
-          .print-only-ticket * {
-            visibility: visible !important;
-          }
-
+          /* 4. Display ONLY the dedicated printable ticket container in normal document flow */
+          #printable-order-ticket,
           .print-only-ticket {
             display: block !important;
-            position: absolute !important;
+            visibility: visible !important;
+            position: relative !important;
             top: 0 !important;
             left: 0 !important;
+            margin: 0 auto !important;
+            padding: 4mm 6mm !important;
             width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 !important;
-            padding: 12mm 14mm !important;
+            max-width: 190mm !important;
+            box-sizing: border-box !important;
             background: #ffffff !important;
             color: #0f172a !important;
             box-shadow: none !important;
@@ -1244,11 +1259,30 @@ export function CustomerOrderTicketModal({
             z-index: 99999999 !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+            page-break-before: avoid !important;
+            break-before: avoid !important;
           }
 
+          #printable-order-ticket * {
+            visibility: visible !important;
+          }
+
+          /* Prevent unwanted breaks inside tables, rows and images */
+          #printable-order-ticket tr,
+          #printable-order-ticket td,
+          #printable-order-ticket th,
+          #printable-order-ticket img,
+          #printable-order-ticket table {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+
+          /* Auto page sizing with neat margins for single-page fit across A4 and Letter */
           @page {
-            size: A4 portrait;
-            margin: 8mm 10mm;
+            size: auto;
+            margin: 6mm 8mm;
           }
         }
       `}</style>
