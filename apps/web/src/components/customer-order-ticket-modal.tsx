@@ -534,21 +534,15 @@ export function CustomerOrderTicketModal({
                     </div>
                   ) : null}
 
-                  {order.delivery_fee_usd && order.delivery_fee_usd > 0 ? (
+                  {!isDeliveryFacturado && order.delivery_fee_usd && order.delivery_fee_usd > 0 ? (
                     <div>
                       <div className="flex justify-between text-slate-600">
-                        <span>
-                          {isDeliveryFacturado
-                            ? "Tarifa Delivery (Gravado 16%):"
-                            : "Tarifa Delivery (Cobro a Repartidor):"}
-                        </span>
+                        <span>Tarifa Delivery (Cobro a Repartidor):</span>
                         <span>+${order.delivery_fee_usd.toFixed(2)}</span>
                       </div>
-                      {!isDeliveryFacturado && (
-                        <p className="text-[9px] text-slate-500 italic pt-0.5">
-                          * Servicio prestado por transportista independiente, no gravado por la tienda.
-                        </p>
-                      )}
+                      <p className="text-[9px] text-slate-500 italic pt-0.5">
+                        * Servicio prestado por transportista independiente, no gravado por la tienda.
+                      </p>
                     </div>
                   ) : null}
 
@@ -1180,21 +1174,15 @@ export function CustomerOrderTicketModal({
                   </div>
                 ) : null}
 
-                {order.delivery_fee_usd && order.delivery_fee_usd > 0 ? (
+                {!isDeliveryFacturado && order.delivery_fee_usd && order.delivery_fee_usd > 0 ? (
                   <div>
                     <div className="flex justify-between text-muted-foreground">
-                      <span>
-                        {isDeliveryFacturado
-                          ? "Tarifa Delivery (Servicio Gravado 16%):"
-                          : "Tarifa Delivery (Cobro a Repartidor):"}
-                      </span>
+                      <span>Tarifa Delivery (Cobro a Repartidor):</span>
                       <span>{formatCurrency(order.delivery_fee_usd, "USD")}</span>
                     </div>
-                    {!isDeliveryFacturado && (
-                      <span className="block text-[10px] text-muted-foreground text-right italic pt-0.5">
-                        * Pagadero al transportista independiente (no entra en base imponible de la tienda)
-                      </span>
-                    )}
+                    <span className="block text-[10px] text-muted-foreground text-right italic pt-0.5">
+                      * Pagadero al transportista independiente (no entra en base imponible de la tienda)
+                    </span>
                   </div>
                 ) : null}
 
