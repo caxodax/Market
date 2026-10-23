@@ -7,6 +7,7 @@ export * from "./ports";
 export * from "./food-service";
 export * from "./mto-cpq";
 export * from "./barcode-retail";
+export * from "./pos";
 
 import type { SelectedModifier } from "./food-service";
 

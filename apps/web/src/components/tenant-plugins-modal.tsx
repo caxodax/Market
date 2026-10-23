@@ -31,6 +31,7 @@ import {
   Sliders,
   LayoutTemplate,
   Eye,
+  Monitor,
 } from "lucide-react";
 import { PluginDetailModal } from "./plugin-detail-modal";
 
@@ -252,6 +253,28 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
     targetAudience:
       "Comercios que buscan destacar visualmente con vitrinas modernas: sliders promocionales, stories estilo Instagram, reseñas con estrellas y contadores flash.",
     themeColor: "purple",
+  },
+  {
+    id: "pos_registers",
+    name: "Multi-Caja & Turnos POS",
+    badge: "v1.0.0 • Punto de Venta & Arqueo",
+    category: "Operaciones & Logística",
+    categoryShort: "Multi-Caja POS",
+    description:
+      "Gestiona múltiples cajas físicas con cajeros autenticados por PIN, apertura y cierre de turno con arqueo (Cierre Z), registro inmutable en base de datos y ticket térmico 80mm imprimible.",
+    icon: <Monitor className="w-5 h-5 text-emerald-500" />,
+    features: [
+      "Múltiples terminales físicas + Caja Virtual/Web separada",
+      "Login con PIN numérico de 4 a 6 dígitos por cajero",
+      "Apertura de turno con fondo inicial y control de efectivo",
+      "Cierre X (corte parcial) y Cierre Z (arqueo definitivo e inmutable)",
+      "Ticket de arqueo térmico de 80mm con firma de cajero",
+      "Entradas y salidas manuales de caja con justificación",
+      "Validación de stock atómica para prevenir ventas concurrentes",
+    ],
+    targetAudience:
+      "Supermercados, abastos, farmacias y comercios retail con uno o más cajeros físicos y ventas online simultáneas.",
+    themeColor: "emerald",
   },
 ];
 

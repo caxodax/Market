@@ -13,7 +13,8 @@ export type TenantModuleId =
   | "promotions_coupons"    // Marketing: Cupones de descuento, 2x1, combos
   | "delivery_fleet"        // Logística: Repartidores propios, asignación de rutas
   | "mto_cpq"               // Fabricación & CPQ: Make-to-Order, dimensiones, costeo y cotizaciones
-  | "storefront_pro";       // Vitrina Pro: Banners, sliders, reels, testimonios y maquetador visual
+  | "storefront_pro"        // Vitrina Pro: Banners, sliders, reels, testimonios y maquetador visual
+  | "pos_registers";        // POS: Multi-Caja, Turnos, Arqueo (Cierre X/Z), PIN por cajero
 
 export type PluginCategory =
   | "location"              // Localización por país

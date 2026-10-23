@@ -294,6 +294,7 @@ export async function uploadStoreLogoAction(formData: FormData) {
 
 export async function createProductAction(input: CreateProductInput) {
   try {
+    await assertAuthorizedTenantAdmin(input.tenantId);
     const actor = await getAuditActor();
     const product = await MarketOSRepository.createProduct({
       ...input,
@@ -334,6 +335,7 @@ export async function createProductAction(input: CreateProductInput) {
 
 export async function updateProductAction(input: UpdateProductInput) {
   try {
+    await assertAuthorizedTenantAdmin(input.tenantId);
     const actor = await getAuditActor();
     const product = await MarketOSRepository.updateProduct({
       ...input,
@@ -342,6 +344,12 @@ export async function updateProductAction(input: UpdateProductInput) {
       actorEmail: actor.email,
       actorRole: actor.role,
     });
+    if (!product) {
+      return {
+        success: false,
+        error: "No se encontró el producto para actualizar.",
+      };
+    }
     invalidateProductsCache(input.tenantId);
     revalidatePath("/admin");
     revalidatePath("/");
@@ -357,8 +365,15 @@ export async function updateProductAction(input: UpdateProductInput) {
 
 export async function deleteProductAction(tenantId: string, productId: string) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     const actor = await getAuditActor();
     const ok = await MarketOSRepository.deleteProduct(tenantId, productId, actor);
+    if (!ok) {
+      return {
+        success: false,
+        error: "No se encontró el producto para eliminar.",
+      };
+    }
     invalidateProductsCache(tenantId);
     revalidatePath("/admin");
     revalidatePath("/");

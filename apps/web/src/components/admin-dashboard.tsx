@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   TenantSettings,
   Product,
@@ -3310,8 +3311,14 @@ export function AdminDashboard({
                           >
                             Ir a Taller MTO →
                           </button>
+                        ) : plugin.id === "pos_registers" ? (
+                          <Link
+                            href="/admin/pos"
+                            className="text-xs font-bold text-emerald-600 hover:underline cursor-pointer"
+                          >
+                            Ir a Cajas POS →
+                          </Link>
                         ) : (
-
                           <span className="text-[10px] text-emerald-600 font-medium">
                             Habilitado
                           </span>
@@ -3374,6 +3381,7 @@ export function AdminDashboard({
 
       {/* Product Creation & Editing Modal with WebP Compression */}
       <ProductModal
+        key={editingProduct ? editingProduct.id : "new-product"}
         tenantId={settings.tenant_id}
         categories={categories}
         product={editingProduct}
@@ -3462,6 +3470,7 @@ export function AdminDashboard({
             else if (pluginId === "food_service") setActiveTab("RAW_MATERIALS");
             else if (pluginId === "storefront_pro") setActiveTab("STOREFRONT_STUDIO");
             else if (pluginId === "mto_cpq") setActiveTab("MTO_CPQ");
+            else if (pluginId === "pos_registers") window.location.href = "/admin/pos";
             else setActiveTab("PLUGINS");
 
           }}

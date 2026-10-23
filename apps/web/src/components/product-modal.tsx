@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Product, Category } from "@marketos/types";
 import { compressImage, formatFileSize, CompressionResult } from "@marketos/utils";
 import {
@@ -76,6 +76,24 @@ export function ProductModal({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setName(product?.name || "");
+      setCategoryId(product?.category_id || categories[0]?.id || "");
+      setPriceUsd(product ? product.price_usd.toString() : "");
+      setStock(product ? product.stock.toString() : "20");
+      setSku(product?.sku || "");
+      setBarcode(product?.barcode || "");
+      setDescription(product?.description || "");
+      setIsActive(product ? product.is_active : true);
+      setIsTaxExempt(product ? Boolean(product.is_tax_exempt) : false);
+      setImageUrl(product?.image_url || "");
+      setSelectedFile(null);
+      setCompressionMetrics(null);
+      setErrorMsg(null);
+    }
+  }, [product, isOpen, categories]);
 
   if (!isOpen) return null;
 
@@ -212,10 +230,10 @@ export function ProductModal({
         if (onDeleted) onDeleted(product.id);
         onClose();
       } else {
-        setErrorMsg("Error al eliminar producto");
+        setErrorMsg(res.error || "Error al eliminar producto");
       }
     } catch (err) {
-      setErrorMsg("Error al eliminar producto");
+      setErrorMsg(err instanceof Error ? err.message : "Error al eliminar producto");
     } finally {
       setDeleting(false);
     }

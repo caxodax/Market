@@ -5469,8 +5469,12 @@ export class MarketOSRepository {
 
     const supabase = getSupabase();
     const slug = `${input.name.toLowerCase().trim().replace(/[^a-z0-9]/g, "-")}-${Date.now().toString().slice(-4)}`;
+    
+    // Resolve store ID for inventory
+    const tenantStores = supabase ? await this.getStores(input.tenantId, true) : [];
     const storeId =
       input.storeId ||
+      tenantStores[0]?.id ||
       state.stores.find((s) => s.tenant_id === input.tenantId)?.id ||
       "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d";
     const initialStock = input.initialStock !== undefined ? input.initialStock : 20;
@@ -5495,49 +5499,60 @@ export class MarketOSRepository {
 
     if (supabase) {
       try {
+        const insertPayload: Record<string, unknown> = {
+          tenant_id: input.tenantId,
+          category_id: input.categoryId,
+          name: input.name,
+          slug,
+          description: input.description || null,
+          sku: input.sku || null,
+          barcode: input.barcode || null,
+          image_url: input.imageUrl || null,
+          price_usd: input.priceUsd,
+          is_active: true,
+        };
+
         const { data: prodData, error } = await supabase
           .from("products")
-          .insert({
-            tenant_id: input.tenantId,
-            category_id: input.categoryId,
-            name: input.name,
-            slug,
-            description: input.description || null,
-            sku: input.sku || null,
-            barcode: input.barcode || null,
-            image_url: input.imageUrl || null,
-            price_usd: input.priceUsd,
-            is_active: true,
-            is_tax_exempt: Boolean(input.isTaxExempt),
-          })
+          .insert(insertPayload)
           .select("id")
           .single();
 
-        if (!error && prodData) {
+        if (error) {
+          console.error("[Supabase] Create product error:", error);
+          throw new Error(error.message || "Error al insertar producto en Supabase");
+        }
+
+        if (prodData) {
           createdProduct.id = prodData.id;
 
           // Insert store inventory
-          await supabase.from("inventory").insert({
-            tenant_id: input.tenantId,
-            store_id: storeId,
-            product_id: prodData.id,
-            quantity: initialStock,
-            min_quantity: 5,
-          });
+          if (storeId) {
+            await supabase.from("inventory").insert({
+              tenant_id: input.tenantId,
+              store_id: storeId,
+              product_id: prodData.id,
+              quantity: initialStock,
+              min_quantity: 5,
+            });
 
-          // Insert inventory movement
-          await supabase.from("inventory_movements").insert({
-            tenant_id: input.tenantId,
-            store_id: storeId,
-            product_id: prodData.id,
-            quantity_change: initialStock,
-            previous_quantity: 0,
-            new_quantity: initialStock,
-            reason: "RESTOCK",
-          });
+            // Insert inventory movement
+            await supabase.from("inventory_movements").insert({
+              tenant_id: input.tenantId,
+              store_id: storeId,
+              product_id: prodData.id,
+              quantity_change: initialStock,
+              previous_quantity: 0,
+              new_quantity: initialStock,
+              reason: "RESTOCK",
+            });
+          }
         }
       } catch (e) {
-        console.warn("[Supabase] Create product fallback to state:", e);
+        console.error("[Supabase] Create product error:", e);
+        if (supabase) {
+          throw e;
+        }
       }
     }
 
@@ -5570,10 +5585,16 @@ export class MarketOSRepository {
     input: UpdateProductInput
   ): Promise<(Product & { stock: number }) | null> {
     const supabase = getSupabase();
+    const tenantStores = supabase ? await this.getStores(input.tenantId, true) : [];
     const storeId =
       input.storeId ||
+      tenantStores[0]?.id ||
       state.stores.find((s) => s.tenant_id === input.tenantId)?.id ||
       "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d";
+
+    let updatedFromDb: (Product & { stock: number }) | null = null;
+    let oldPriceUsd: number | undefined = undefined;
+    let oldStock: number | undefined = undefined;
 
     if (supabase) {
       try {
@@ -5588,15 +5609,36 @@ export class MarketOSRepository {
         if (input.barcode !== undefined) updatePayload.barcode = input.barcode;
         if (input.imageUrl !== undefined) updatePayload.image_url = input.imageUrl;
         if (input.isActive !== undefined) updatePayload.is_active = input.isActive;
-        if (input.isTaxExempt !== undefined) updatePayload.is_tax_exempt = input.isTaxExempt;
 
-        await supabase
+        // Fetch current product to compare old values for audit
+        const { data: currentProd } = await supabase
+          .from("products")
+          .select("*, inventory(quantity)")
+          .eq("id", input.productId)
+          .eq("tenant_id", input.tenantId)
+          .maybeSingle();
+
+        if (currentProd) {
+          oldPriceUsd = Number(currentProd.price_usd);
+          oldStock = Array.isArray(currentProd.inventory)
+            ? currentProd.inventory.reduce((sum: number, inv: any) => sum + (inv.quantity || 0), 0)
+            : 20;
+        }
+
+        const { data: updatedData, error: updateErr } = await supabase
           .from("products")
           .update(updatePayload)
           .eq("id", input.productId)
-          .eq("tenant_id", input.tenantId);
+          .eq("tenant_id", input.tenantId)
+          .select("*, inventory(quantity)")
+          .maybeSingle();
 
-        if (input.stock !== undefined) {
+        if (updateErr) {
+          console.error("[Supabase] Update product error:", updateErr);
+          throw new Error(updateErr.message || "Error al actualizar producto en Supabase");
+        }
+
+        if (input.stock !== undefined && storeId) {
           const { data: inv } = await supabase
             .from("inventory")
             .select("id, quantity")
@@ -5645,8 +5687,35 @@ export class MarketOSRepository {
             });
           }
         }
+
+        if (updatedData) {
+          const totalStock = input.stock !== undefined
+            ? input.stock
+            : Array.isArray(updatedData.inventory)
+            ? updatedData.inventory.reduce((sum: number, inv: any) => sum + (inv.quantity || 0), 0)
+            : (oldStock ?? 20);
+
+          updatedFromDb = {
+            id: updatedData.id,
+            tenant_id: updatedData.tenant_id,
+            category_id: updatedData.category_id,
+            name: updatedData.name,
+            slug: updatedData.slug,
+            description: updatedData.description,
+            sku: updatedData.sku,
+            barcode: updatedData.barcode,
+            image_url: updatedData.image_url,
+            price_usd: Number(updatedData.price_usd),
+            is_active: updatedData.is_active,
+            is_tax_exempt: Boolean(input.isTaxExempt),
+            stock: totalStock,
+            created_at: updatedData.created_at,
+            updated_at: updatedData.updated_at,
+          };
+        }
       } catch (e) {
-        console.warn("[Supabase] Update product error:", e);
+        console.error("[Supabase] Update product error:", e);
+        if (supabase) throw e;
       }
     }
 
@@ -5655,6 +5724,9 @@ export class MarketOSRepository {
     );
     if (prod) {
       const oldData = { ...prod };
+      if (oldPriceUsd === undefined) oldPriceUsd = oldData.price_usd;
+      if (oldStock === undefined) oldStock = oldData.stock;
+
       if (input.name !== undefined) prod.name = input.name;
       if (input.categoryId !== undefined) prod.category_id = input.categoryId;
       if (input.description !== undefined) prod.description = input.description;
@@ -5666,41 +5738,35 @@ export class MarketOSRepository {
       if (input.isTaxExempt !== undefined) prod.is_tax_exempt = input.isTaxExempt;
       if (input.stock !== undefined) prod.stock = input.stock;
       prod.updated_at = new Date().toISOString();
+    }
 
-      // Check if price changed -> record surgical PRICE_CHANGED audit event
-      if (
-        input.priceUsd !== undefined &&
-        oldData.price_usd !== undefined &&
-        Number(input.priceUsd) !== Number(oldData.price_usd)
-      ) {
-        const oP = Number(oldData.price_usd);
-        const nP = Number(input.priceUsd);
-        const diff = Number((nP - oP).toFixed(2));
-        const pct = oP > 0 ? Number(((diff / oP) * 100).toFixed(1)) : 0;
+    const finalProduct = updatedFromDb || prod;
+    if (!finalProduct) {
+      return null;
+    }
 
-        await MarketOSRepository.recordAuditLog({
-          tenantId: input.tenantId,
-          actorId: input.actorId,
-          actorName: input.actorName,
-          actorEmail: input.actorEmail,
-          actorRole: input.actorRole,
-          action: "PRICE_CHANGED",
-          entity: "products",
-          entityId: input.productId,
-          oldData: {
-            price_usd: oP,
-            price_formatted: `$${oP.toFixed(2)}`,
-            name: prod.name,
-          },
-          newData: {
-            price_usd: nP,
-            price_formatted: `$${nP.toFixed(2)}`,
-            diff_usd: diff,
-            percentage_change: pct,
-            name: prod.name,
-          },
-        });
+    // Sync in-memory state if finalProduct came from DB
+    if (updatedFromDb) {
+      const existingIdx = state.products.findIndex(
+        (p) => p.id === input.productId && p.tenant_id === input.tenantId
+      );
+      if (existingIdx >= 0) {
+        state.products[existingIdx] = { ...state.products[existingIdx], ...updatedFromDb };
+      } else {
+        state.products.unshift(updatedFromDb);
       }
+    }
+
+    // Check if price changed -> record surgical PRICE_CHANGED audit event
+    if (
+      input.priceUsd !== undefined &&
+      oldPriceUsd !== undefined &&
+      Number(input.priceUsd) !== Number(oldPriceUsd)
+    ) {
+      const oP = Number(oldPriceUsd);
+      const nP = Number(input.priceUsd);
+      const diff = Number((nP - oP).toFixed(2));
+      const pct = oP > 0 ? Number(((diff / oP) * 100).toFixed(1)) : 0;
 
       await MarketOSRepository.recordAuditLog({
         tenantId: input.tenantId,
@@ -5708,17 +5774,38 @@ export class MarketOSRepository {
         actorName: input.actorName,
         actorEmail: input.actorEmail,
         actorRole: input.actorRole,
-        action: "PRODUCT_UPDATED",
+        action: "PRICE_CHANGED",
         entity: "products",
         entityId: input.productId,
-        oldData: { price_usd: oldData.price_usd, stock: oldData.stock },
-        newData: { price_usd: prod.price_usd, stock: prod.stock, name: prod.name },
+        oldData: {
+          price_usd: oP,
+          price_formatted: `$${oP.toFixed(2)}`,
+          name: finalProduct.name,
+        },
+        newData: {
+          price_usd: nP,
+          price_formatted: `$${nP.toFixed(2)}`,
+          diff_usd: diff,
+          percentage_change: pct,
+          name: finalProduct.name,
+        },
       });
-
-      return prod;
     }
 
-    return null;
+    await MarketOSRepository.recordAuditLog({
+      tenantId: input.tenantId,
+      actorId: input.actorId,
+      actorName: input.actorName,
+      actorEmail: input.actorEmail,
+      actorRole: input.actorRole,
+      action: "PRODUCT_UPDATED",
+      entity: "products",
+      entityId: input.productId,
+      oldData: { price_usd: oldPriceUsd, stock: oldStock },
+      newData: { price_usd: finalProduct.price_usd, stock: finalProduct.stock, name: finalProduct.name },
+    });
+
+    return finalProduct;
   }
 
   /**
@@ -5730,15 +5817,29 @@ export class MarketOSRepository {
     actor?: AuditActor | null
   ): Promise<boolean> {
     const supabase = getSupabase();
+    let deletedSuccessfully = false;
+    let deletedProductName = "Producto";
+
     if (supabase) {
       try {
-        await supabase
+        const { data, error } = await supabase
           .from("products")
           .update({ is_active: false, updated_at: new Date().toISOString() })
           .eq("id", productId)
-          .eq("tenant_id", tenantId);
+          .eq("tenant_id", tenantId)
+          .select("name")
+          .maybeSingle();
+
+        if (!error && data) {
+          deletedSuccessfully = true;
+          deletedProductName = data.name;
+        } else if (error) {
+          console.error("[Supabase] Delete product error:", error);
+          throw new Error(error.message || "Error al eliminar producto en Supabase");
+        }
       } catch (e) {
-        console.warn("[Supabase] Delete product error:", e);
+        console.error("[Supabase] Delete product error:", e);
+        if (supabase) throw e;
       }
     }
 
@@ -5748,7 +5849,11 @@ export class MarketOSRepository {
     if (prod) {
       prod.is_active = false;
       prod.updated_at = new Date().toISOString();
+      deletedSuccessfully = true;
+      deletedProductName = prod.name;
+    }
 
+    if (deletedSuccessfully) {
       await MarketOSRepository.recordAuditLog({
         tenantId,
         actorId: actor?.id,
@@ -5758,10 +5863,11 @@ export class MarketOSRepository {
         action: "PRODUCT_DELETED",
         entity: "products",
         entityId: productId,
-        newData: { is_active: false, name: prod.name },
+        newData: { is_active: false, name: deletedProductName },
       });
       return true;
     }
+
     return false;
   }
 
