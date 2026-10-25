@@ -1,9 +1,100 @@
-import type { CurrencyCode, BcvApiResponse } from "@marketos/types";
+import type {
+  CurrencyCode,
+  BcvApiResponse,
+  StoreCurrencySettings,
+  StoreRateMode,
+} from "@marketos/types";
 
 export * from "./storage.ts";
 export * from "./whatsapp.ts";
 export * from "./image-compressor.ts";
 export * from "./dates.ts";
+
+export interface EffectiveExchangeRateResult {
+  effectiveRate: number;
+  baseCurrency: "USD" | "EUR";
+  rateMode: StoreRateMode;
+  usdRate: number;
+  eurRate: number;
+  averageRate: number;
+  label: string;
+}
+
+/**
+ * Calculate the effective exchange rate taking into account store base currency (USD or EUR)
+ * and active conversion regime (BCV_BASE, BCV_AVERAGE, BCV_CROSS, CUSTOM).
+ */
+export function calculateEffectiveExchangeRate(
+  rate: { value: number; eur_value?: number; usdt_value?: number } | number,
+  currencySettings?: StoreCurrencySettings | null
+): EffectiveExchangeRateResult {
+  const rawRateObj = typeof rate === "number" ? { value: rate } : rate;
+  const usdRate = rawRateObj?.value && rawRateObj.value > 0 ? rawRateObj.value : 875.65;
+  const eurRate =
+    rawRateObj?.eur_value && rawRateObj.eur_value > 0
+      ? rawRateObj.eur_value
+      : Number((usdRate * 1.085).toFixed(4));
+  const averageRate = Number(((usdRate + eurRate) / 2).toFixed(4));
+
+  const baseCurrency: "USD" | "EUR" =
+    currencySettings?.base_currency === "EUR" ? "EUR" : "USD";
+  const rateMode: StoreRateMode = currencySettings?.rate_mode || "BCV_BASE";
+
+  let effectiveRate = usdRate;
+  let label = "Tasa Oficial BCV USD";
+
+  if (
+    rateMode === "CUSTOM" &&
+    currencySettings?.custom_rate_value &&
+    currencySettings.custom_rate_value > 0
+  ) {
+    effectiveRate = currencySettings.custom_rate_value;
+    label = "Tasa Especial Personalizada";
+  } else if (rateMode === "BCV_AVERAGE") {
+    effectiveRate = averageRate;
+    label = "Tasa Promedio (USD + EUR) / 2";
+  } else if (rateMode === "BCV_CROSS") {
+    if (baseCurrency === "EUR") {
+      effectiveRate = usdRate;
+      label = "Tasa Cruzada (Referencia USD)";
+    } else {
+      effectiveRate = eurRate;
+      label = "Tasa Cruzada (Referencia EUR)";
+    }
+  } else {
+    // BCV_BASE
+    if (baseCurrency === "EUR") {
+      effectiveRate = eurRate;
+      label = "Tasa Oficial BCV EUR";
+    } else {
+      effectiveRate = usdRate;
+      label = "Tasa Oficial BCV USD";
+    }
+  }
+
+  return {
+    effectiveRate: Number(effectiveRate.toFixed(4)),
+    baseCurrency,
+    rateMode,
+    usdRate,
+    eurRate,
+    averageRate,
+    label,
+  };
+}
+
+/**
+ * Convert base price to VES using the effective exchange rate
+ */
+export function convertPriceToVes(
+  price: number,
+  rate: { value: number; eur_value?: number; usdt_value?: number } | number,
+  currencySettings?: StoreCurrencySettings | null
+): number {
+  if (price <= 0) return 0;
+  const { effectiveRate } = calculateEffectiveExchangeRate(rate, currencySettings);
+  return Number((price * effectiveRate).toFixed(2));
+}
 
 let memoryBcvCache: {
   data: {

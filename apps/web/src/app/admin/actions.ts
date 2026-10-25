@@ -348,6 +348,93 @@ export async function createProductAction(input: CreateProductInput) {
   }
 }
 
+export interface BulkProductImportItem {
+  name: string;
+  categoryName?: string;
+  priceUsd: number;
+  stock: number;
+  sku?: string;
+  barcode?: string;
+  description?: string;
+}
+
+export async function bulkImportProductsAction(
+  tenantId: string,
+  items: BulkProductImportItem[]
+) {
+  try {
+    await assertAuthorizedTenantAdmin(tenantId);
+
+    if (!items || items.length === 0) {
+      return { success: false, error: "No se proporcionaron productos para importar." };
+    }
+
+    // 1. Verify plan quota
+    const limits = await MarketOSRepository.getTenantPlanLimits(tenantId);
+    const currentCount = limits.usage.productsCount;
+    const maxProducts = limits.plan.max_products;
+
+    if (currentCount + items.length > maxProducts) {
+      return {
+        success: false,
+        quotaExceeded: true,
+        error: `No puedes importar ${items.length} productos porque sobrepasarías el límite de tu plan (${currentCount}/${maxProducts}). Espacios disponibles: ${Math.max(0, maxProducts - currentCount)}.`,
+      };
+    }
+
+    const categories = await MarketOSRepository.getCategories(tenantId);
+    const actor = await getAuditActor();
+
+    let importedCount = 0;
+    const errors: string[] = [];
+
+    for (const item of items) {
+      try {
+        let matchedCat = categories.find(
+          (c) => c.name.trim().toLowerCase() === (item.categoryName || "").trim().toLowerCase()
+        );
+        const categoryId = matchedCat?.id || categories[0]?.id || "cat-1";
+
+        await MarketOSRepository.createProduct({
+          tenantId,
+          name: item.name.trim(),
+          description: item.description?.trim() || undefined,
+          priceUsd: item.priceUsd,
+          categoryId,
+          initialStock: item.stock,
+          sku: item.sku?.trim() || undefined,
+          barcode: item.barcode?.trim() || undefined,
+          actorId: actor.id,
+          actorName: actor.name,
+          actorEmail: actor.email,
+          actorRole: actor.role,
+        });
+        importedCount++;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Error al registrar";
+        errors.push(`${item.name}: ${msg}`);
+      }
+    }
+
+    invalidateProductsCache(tenantId);
+    revalidatePath("/admin");
+    revalidatePath("/");
+
+    return {
+      success: true,
+      importedCount,
+      totalRequested: items.length,
+      errors: errors.length > 0 ? errors : undefined,
+    };
+  } catch (error) {
+    console.error("Error bulk importing products:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al importar productos masivamente.",
+    };
+  }
+}
+
 export async function updateProductAction(input: UpdateProductInput) {
   try {
     await assertAuthorizedTenantAdmin(input.tenantId);

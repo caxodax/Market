@@ -253,7 +253,7 @@ export function ProductModal({
                 {isEditing ? "Editar Producto" : "Nuevo Producto"}
               </h3>
               <p className="text-[11px] text-muted-foreground">
-                Catálogo digital en Cloudflare R2 y Supabase
+                Información, precios, categoría y disponibilidad en catálogo
               </p>
             </div>
           </div>

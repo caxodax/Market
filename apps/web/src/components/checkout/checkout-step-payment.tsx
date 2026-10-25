@@ -121,6 +121,7 @@ export function CheckoutStepPayment({
   onFileChange,
 }: CheckoutStepPaymentProps) {
   const activePaymentMethod = paymentMethod;
+  const baseCurrency = settings.currency_settings?.base_currency || "USD";
 
   return (
     <div className="space-y-4 animate-in fade-in duration-200">
@@ -154,14 +155,14 @@ export function CheckoutStepPayment({
         <div className="flex justify-between text-muted-foreground pt-1">
           <span>Subtotal productos:</span>
           <span className="font-semibold text-foreground">
-            {formatCurrency(subtotalUsd, "USD")}
+            {formatCurrency(subtotalUsd, baseCurrency)}
           </span>
         </div>
 
         {appliedCoupon && (
           <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
             <span>Cupón ({appliedCoupon.code}):</span>
-            <span>-{formatCurrency(discountUsd, "USD")}</span>
+            <span>-{formatCurrency(discountUsd, baseCurrency)}</span>
           </div>
         )}
 
@@ -171,7 +172,7 @@ export function CheckoutStepPayment({
             <span className="font-semibold text-foreground">
               {deliveryFeeUsd === 0
                 ? "GRATIS"
-                : formatCurrency(deliveryFeeUsd, "USD")}
+                : formatCurrency(deliveryFeeUsd, baseCurrency)}
             </span>
           </div>
         )}
@@ -180,7 +181,7 @@ export function CheckoutStepPayment({
           <span className="text-foreground text-sm">Total a Pagar:</span>
           <div className="text-right">
             <span className="text-primary font-bold text-lg">
-              {formatCurrency(totalUsd, "USD")}
+              {formatCurrency(totalUsd, baseCurrency)}
             </span>
             {isVenezuelaActive && (
               <span className="block text-xs font-semibold text-muted-foreground font-mono">
@@ -514,7 +515,7 @@ export function CheckoutStepPayment({
             <div className="pt-2 border-t border-border flex items-center justify-between font-bold text-foreground">
               <span className="text-xs">Total exacto de la orden:</span>
               <span className="font-mono text-primary font-black text-sm">
-                {formatCurrency(totalUsd, "USD")}
+                {formatCurrency(totalUsd, baseCurrency)}
               </span>
             </div>
 

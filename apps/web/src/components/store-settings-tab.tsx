@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   TenantSettings,
   PaymentMethodType,
@@ -12,9 +12,16 @@ import {
   FiscalProvider,
   TenantModuleId,
   DeliveryBillingMode,
+  StoreRateMode,
+  StoreCurrencySettings,
+  ExchangeRate,
 } from "@marketos/types";
 import { updateTenantSettingsAction, uploadStoreLogoAction } from "../app/admin/actions";
-import { compressImage } from "@marketos/utils";
+import {
+  compressImage,
+  formatCurrency,
+  calculateEffectiveExchangeRate,
+} from "@marketos/utils";
 import { VENEZUELAN_BANK_NAMES, SeniatFiscalSettings } from "@marketos/plugin-local-venezuela";
 import {
   Store,
@@ -52,6 +59,10 @@ import {
   ShieldCheck,
   FileText,
   Megaphone,
+  Coins,
+  Calculator,
+  ArrowRightLeft,
+  CheckCircle2,
 } from "lucide-react";
 
 interface StoreSettingsTabProps {
@@ -59,6 +70,7 @@ interface StoreSettingsTabProps {
   onUpdateSuccess?: (updated: TenantSettings) => void;
   activeModuleIds?: TenantModuleId[];
   isSuperAdmin?: boolean;
+  exchangeRate?: ExchangeRate;
 }
 
 const AVAILABLE_PAYMENT_METHODS: {
@@ -130,11 +142,40 @@ export function StoreSettingsTab({
   onUpdateSuccess,
   activeModuleIds = [],
   isSuperAdmin = false,
+  exchangeRate,
 }: StoreSettingsTabProps) {
   const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
-  const [activeSubTab, setActiveSubTab] = useState<"GENERAL" | "DOMAINS" | "PAYMENTS" | "BRANDING" | "OPERATIONS" | "FISCAL">("GENERAL");
+  const [activeSubTab, setActiveSubTab] = useState<
+    "GENERAL" | "CURRENCY" | "DOMAINS" | "PAYMENTS" | "BRANDING" | "OPERATIONS" | "FISCAL"
+  >("GENERAL");
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Form State: Currency & BCV Conversion Regime
+  const [baseCurrency, setBaseCurrency] = useState<"USD" | "EUR">(
+    settings.currency_settings?.base_currency ||
+      (settings.default_currency === "EUR" ? "EUR" : "USD")
+  );
+  const [rateMode, setRateMode] = useState<StoreRateMode>(
+    settings.currency_settings?.rate_mode || "BCV_BASE"
+  );
+  const [customRateValue, setCustomRateValue] = useState<string>(
+    settings.currency_settings?.custom_rate_value
+      ? String(settings.currency_settings.custom_rate_value)
+      : ""
+  );
+  const [testSimulatorAmount, setTestSimulatorAmount] = useState<string>("10.00");
+
+  const liveRateInfo = useMemo(() => {
+    return calculateEffectiveExchangeRate(
+      exchangeRate || { value: 875.65, eur_value: 980.61 },
+      {
+        base_currency: baseCurrency,
+        rate_mode: rateMode,
+        custom_rate_value: customRateValue ? Number(customRateValue) : undefined,
+      }
+    );
+  }, [exchangeRate, baseCurrency, rateMode, customRateValue]);
 
   // Form State: General & Custom Domain
   const [customDomain, setCustomDomain] = useState(settings.custom_domain || "");
@@ -442,6 +483,12 @@ export function StoreSettingsTab({
       font_family: fontFamily,
       logo_url: logoUrl,
       custom_domain: customDomain.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "") || null,
+      default_currency: baseCurrency,
+      currency_settings: {
+        base_currency: baseCurrency,
+        rate_mode: rateMode,
+        custom_rate_value: customRateValue ? Number(customRateValue) : undefined,
+      },
       payment_settings: updatedPaymentSettings,
       operational_settings: updatedOperationalSettings,
       billing_settings: updatedBillingSettings,
@@ -527,7 +574,7 @@ export function StoreSettingsTab({
       )}
 
       {/* Sub Navigation Tabs */}
-      <div className={`grid grid-cols-2 sm:grid-cols-3 ${isVenezuelaActive ? "lg:grid-cols-6" : "lg:grid-cols-5"} gap-2 border-b border-border pb-3`}>
+      <div className={`grid grid-cols-2 sm:grid-cols-3 ${isVenezuelaActive ? "lg:grid-cols-7" : "lg:grid-cols-5"} gap-2 border-b border-border pb-3`}>
         <button
           type="button"
           onClick={() => setActiveSubTab("GENERAL")}
@@ -540,6 +587,30 @@ export function StoreSettingsTab({
           <Building2 className="w-4 h-4" />
           <span>Dirección & Negocio</span>
         </button>
+
+        {isVenezuelaActive && (
+          <button
+            type="button"
+            onClick={() => setActiveSubTab("CURRENCY")}
+            className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              activeSubTab === "CURRENCY"
+                ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted"
+            }`}
+          >
+            <Banknote className="w-4 h-4" />
+            <span>Moneda & BCV</span>
+            <span
+              className={`text-[9px] px-1.5 py-0.5 rounded-full font-black ${
+                activeSubTab === "CURRENCY"
+                  ? "bg-primary-foreground/20 text-primary-foreground"
+                  : "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+              }`}
+            >
+              {baseCurrency}
+            </span>
+          </button>
+        )}
 
         <button
           type="button"
@@ -770,6 +841,464 @@ export function StoreSettingsTab({
                   placeholder="@shopmarket"
                   className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
                 />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUBTAB: CURRENCY & BCV CONVERSION REGIME (Plugin local_venezuela) */}
+      {isVenezuelaActive && activeSubTab === "CURRENCY" && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Header Banner */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-card border border-border shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shadow-xs shrink-0">
+                  <Banknote className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-base text-foreground tracking-tight">
+                      Moneda Base & Régimen de Conversión BCV
+                    </h3>
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                      Modo: {liveRateInfo.label}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Define la divisa en la que cotizas tu catálogo ($ USD o € EUR) y cómo se calcula el valor equivalente en Bolívares (Bs.) al cotizar y liquidar pedidos.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 bg-muted/60 p-2.5 rounded-xl border border-border self-start sm:self-auto">
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                    Tasa Efectiva Activa
+                  </span>
+                  <span className="text-sm font-mono font-black text-foreground block">
+                    1 {baseCurrency} = Bs. {liveRateInfo.effectiveRate.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 1. SELECCIÓN DE MONEDA BASE */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-card border border-border shadow-xs space-y-4">
+            <div>
+              <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
+                <Coins className="w-4 h-4 text-primary" />
+                <span>1. Moneda Base del Catálogo Comercial</span>
+              </h4>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Los precios de tus productos en el inventario y catálogo público se registrarán y exhibirán en esta divisa.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {/* Option USD */}
+              <button
+                type="button"
+                onClick={() => setBaseCurrency("USD")}
+                className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative flex flex-col justify-between gap-3 ${
+                  baseCurrency === "USD"
+                    ? "bg-primary/5 border-primary ring-2 ring-primary/20 shadow-xs"
+                    : "bg-background border-border hover:border-border/80 hover:bg-muted/30"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl" role="img" aria-label="USD">🇺🇸</span>
+                    <div>
+                      <span className="text-sm font-black text-foreground block">
+                        Dólar Estadounidense (USD)
+                      </span>
+                      <span className="text-[11px] text-muted-foreground block">
+                        Símbolo oficial: $
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
+                      baseCurrency === "USD"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-muted-foreground/30 bg-background"
+                    }`}
+                  >
+                    {baseCurrency === "USD" && <Check className="w-3 h-3 stroke-[3]" />}
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  Tus productos se publican con precios en dólares (ej. <strong>$ 15.00</strong>). Recomendado para la gran mayoría de comercios y minimarkets.
+                </p>
+
+                <div className="pt-2 border-t border-border/60 flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">Tasa oficial BCV USD:</span>
+                  <strong className="font-mono text-foreground">Bs. {liveRateInfo.usdRate.toFixed(2)}</strong>
+                </div>
+              </button>
+
+              {/* Option EUR */}
+              <button
+                type="button"
+                onClick={() => setBaseCurrency("EUR")}
+                className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative flex flex-col justify-between gap-3 ${
+                  baseCurrency === "EUR"
+                    ? "bg-primary/5 border-primary ring-2 ring-primary/20 shadow-xs"
+                    : "bg-background border-border hover:border-border/80 hover:bg-muted/30"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl" role="img" aria-label="EUR">🇪🇺</span>
+                    <div>
+                      <span className="text-sm font-black text-foreground block">
+                        Euro Europeo (EUR)
+                      </span>
+                      <span className="text-[11px] text-muted-foreground block">
+                        Símbolo oficial: €
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
+                      baseCurrency === "EUR"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-muted-foreground/30 bg-background"
+                    }`}
+                  >
+                    {baseCurrency === "EUR" && <Check className="w-3 h-3 stroke-[3]" />}
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  Tus productos se publican con precios en euros (ej. <strong>€ 15.00</strong>). Ideal para bodegones, farmacias e importadoras de insumos europeos.
+                </p>
+
+                <div className="pt-2 border-t border-border/60 flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">Tasa oficial BCV EUR:</span>
+                  <strong className="font-mono text-foreground">Bs. {liveRateInfo.eurRate.toFixed(2)}</strong>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* 2. RÉGIMEN DE CONVERSIÓN A BOLÍVARES (4 MODOS) */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-card border border-border shadow-xs space-y-4">
+            <div>
+              <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
+                <Calculator className="w-4 h-4 text-primary" />
+                <span>2. Régimen de Tasa para Conversión a Bolívares (Bs.)</span>
+              </h4>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Elige la modalidad para multiplicar el precio base de tus productos al generar montos en moneda nacional (Bs.).
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              {/* Mode 1: BCV Directo de la Moneda Base */}
+              <button
+                type="button"
+                onClick={() => setRateMode("BCV_BASE")}
+                className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                  rateMode === "BCV_BASE"
+                    ? "bg-primary/5 border-primary ring-2 ring-primary/20 shadow-xs"
+                    : "bg-background border-border hover:border-border/80 hover:bg-muted/30"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-black text-foreground block">
+                        Oficial BCV Directo ({baseCurrency})
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        Tasa legal exacta de tu moneda base
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                      rateMode === "BCV_BASE"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-muted-foreground/30 bg-background"
+                    }`}
+                  >
+                    {rateMode === "BCV_BASE" && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Aplica estrictamente la tasa BCV oficial del día para {baseCurrency === "EUR" ? "Euros" : "Dólares"}.
+                </p>
+
+                <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground font-medium">Tasa aplicada:</span>
+                  <span className="font-mono font-bold text-foreground">
+                    Bs. {(baseCurrency === "EUR" ? liveRateInfo.eurRate : liveRateInfo.usdRate).toFixed(2)}
+                  </span>
+                </div>
+              </button>
+
+              {/* Mode 2: Tasa Promedio (USD + EUR) / 2 */}
+              <button
+                type="button"
+                onClick={() => setRateMode("BCV_AVERAGE")}
+                className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                  rateMode === "BCV_AVERAGE"
+                    ? "bg-primary/5 border-primary ring-2 ring-primary/20 shadow-xs"
+                    : "bg-background border-border hover:border-border/80 hover:bg-muted/30"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-teal-500/10 text-teal-600">
+                      <Calculator className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-black text-foreground block">
+                        Tasa Promedio (USD + EUR) / 2
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        Punto medio ponderado oficial
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                      rateMode === "BCV_AVERAGE"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-muted-foreground/30 bg-background"
+                    }`}
+                  >
+                    {rateMode === "BCV_AVERAGE" && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Suma ambas tasas oficiales ({liveRateInfo.usdRate.toFixed(2)} + {liveRateInfo.eurRate.toFixed(2)}) y divide entre 2.
+                </p>
+
+                <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground font-medium">Promedio calculado:</span>
+                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                    Bs. {liveRateInfo.averageRate.toFixed(2)}
+                  </span>
+                </div>
+              </button>
+
+              {/* Mode 3: Tasa Cruzada Inversa */}
+              <button
+                type="button"
+                onClick={() => setRateMode("BCV_CROSS")}
+                className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                  rateMode === "BCV_CROSS"
+                    ? "bg-primary/5 border-primary ring-2 ring-primary/20 shadow-xs"
+                    : "bg-background border-border hover:border-border/80 hover:bg-muted/30"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600">
+                      <ArrowRightLeft className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-black text-foreground block">
+                        Tasa Cruzada ({baseCurrency === "EUR" ? "Referencia USD" : "Referencia EUR"})
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        Cotiza en {baseCurrency} pero liquida con {baseCurrency === "EUR" ? "USD" : "EUR"}
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                      rateMode === "BCV_CROSS"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-muted-foreground/30 bg-background"
+                    }`}
+                  >
+                    {rateMode === "BCV_CROSS" && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  {baseCurrency === "EUR"
+                    ? "Precios fijados en Euros pero convertidos a Bolívares usando la tasa BCV del Dólar."
+                    : "Precios fijados en Dólares pero convertidos a Bolívares usando la tasa BCV del Euro."}
+                </p>
+
+                <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground font-medium">Tasa cruzada:</span>
+                  <span className="font-mono font-bold text-foreground">
+                    Bs. {(baseCurrency === "EUR" ? liveRateInfo.usdRate : liveRateInfo.eurRate).toFixed(2)}
+                  </span>
+                </div>
+              </button>
+
+              {/* Mode 4: Tasa Especial Personalizada */}
+              <button
+                type="button"
+                onClick={() => setRateMode("CUSTOM")}
+                className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                  rateMode === "CUSTOM"
+                    ? "bg-primary/5 border-primary ring-2 ring-primary/20 shadow-xs"
+                    : "bg-background border-border hover:border-border/80 hover:bg-muted/30"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600">
+                      <Coins className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-black text-foreground block">
+                        Tasa Especial Personalizada
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        Valor manual o spread acordado
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                      rateMode === "CUSTOM"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-muted-foreground/30 bg-background"
+                    }`}
+                  >
+                    {rateMode === "CUSTOM" && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Ingresa una tasa fija manual en Bolívares según tus políticas internas o costes de reposición.
+                </p>
+
+                <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground font-medium">Valor configurado:</span>
+                  <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                    {customRateValue ? `Bs. ${Number(customRateValue).toFixed(2)}` : "Sin definir"}
+                  </span>
+                </div>
+              </button>
+            </div>
+
+            {/* Input extra si el modo es CUSTOM */}
+            {rateMode === "CUSTOM" && (
+              <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-3 animate-in fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <label className="text-xs font-bold text-foreground">
+                    Ingresa el valor de la Tasa Especial (Bs. por cada 1 {baseCurrency}):
+                  </label>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setCustomRateValue(String(liveRateInfo.usdRate))}
+                      className="px-2 py-1 text-[10px] font-bold rounded-lg border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                    >
+                      Copiar BCV USD ({liveRateInfo.usdRate.toFixed(2)})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCustomRateValue(String(liveRateInfo.eurRate))}
+                      className="px-2 py-1 text-[10px] font-bold rounded-lg border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                    >
+                      Copiar BCV EUR ({liveRateInfo.eurRate.toFixed(2)})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCustomRateValue(String(liveRateInfo.averageRate))}
+                      className="px-2 py-1 text-[10px] font-bold rounded-lg border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                    >
+                      Copiar Promedio ({liveRateInfo.averageRate.toFixed(2)})
+                    </button>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono font-bold text-xs text-muted-foreground">
+                    Bs.
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    inputMode="decimal"
+                    value={customRateValue}
+                    onChange={(e) => setCustomRateValue(e.target.value)}
+                    placeholder={String(liveRateInfo.averageRate.toFixed(2))}
+                    className="w-full h-11 pl-10 pr-4 rounded-xl border border-input bg-background font-mono text-sm font-bold text-foreground focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 3. SIMULADOR DE PRECIOS Y LIQUIDACIÓN EN VIVO */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-card border border-border shadow-xs space-y-4">
+            <div>
+              <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                <span>3. Simulador de Precios en Tienda (Previsualización en Vivo)</span>
+              </h4>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Prueba cómo verán tus clientes los precios en el catálogo público y el monto exacto a pagar en Bolívares.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">
+                  Monto de prueba en {baseCurrency}:
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono font-bold text-xs text-muted-foreground">
+                    {baseCurrency === "EUR" ? "€" : "$"}
+                  </span>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    inputMode="decimal"
+                    value={testSimulatorAmount}
+                    onChange={(e) => setTestSimulatorAmount(e.target.value)}
+                    className="w-full h-11 pl-8 pr-4 rounded-xl border border-input bg-background font-mono text-sm font-bold text-foreground focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-muted/40 border border-border flex flex-col justify-between">
+                <span className="text-[11px] font-bold uppercase text-muted-foreground block">
+                  Precio visible en catálogo
+                </span>
+                <span className="text-xl font-mono font-black text-primary">
+                  {formatCurrency(Number(testSimulatorAmount) || 0, baseCurrency)}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  Moneda base: {baseCurrency}
+                </span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col justify-between">
+                <span className="text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-400 block">
+                  Equivalente en Bolívares (VES)
+                </span>
+                <span className="text-xl font-mono font-black text-emerald-600 dark:text-emerald-400">
+                  Bs. {Number(((Number(testSimulatorAmount) || 0) * liveRateInfo.effectiveRate).toFixed(2)).toLocaleString("es-VE", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  Liquidado a: Bs. {liveRateInfo.effectiveRate.toFixed(2)} por 1 {baseCurrency}
+                </span>
               </div>
             </div>
           </div>

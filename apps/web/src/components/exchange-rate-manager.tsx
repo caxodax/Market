@@ -327,83 +327,115 @@ export function ExchangeRateManager({
         )}
 
         {/* 3 Metric Cards: USD, EUR, USDT */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Card USD BCV */}
-          <div className="bg-muted/40 rounded-2xl p-4 sm:p-5 border border-border shadow-2xs">
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-xs font-black uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-                <span>🇺🇸</span> Dólar Oficial (BCV)
-              </span>
-              <span className="text-[10px] font-mono font-bold bg-background px-2 py-0.5 rounded-lg border border-border text-foreground">
-                {currentRate.source.toUpperCase()}
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-mono font-black text-foreground tracking-tight">
-                {currentRate.value.toFixed(2)}
-              </span>
-              <span className="text-xs font-bold text-muted-foreground font-mono">
-                Bs. / USD
-              </span>
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1 font-medium">
-              <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              <span>Fecha Valor: <strong className="text-foreground">{formatFecha(rateDate)}</strong></span>
-            </p>
-          </div>
+        {/* 4 Metric Cards: USD, EUR, AVERAGE (USD+EUR)/2, USDT */}
+        {(() => {
+          const effectiveEur = currentRate.eur_value || Number((currentRate.value * 1.085).toFixed(4));
+          const averageBcv = Number(((currentRate.value + effectiveEur) / 2).toFixed(2));
 
-          {/* Card EUR BCV */}
-          <div className="bg-muted/40 rounded-2xl p-4 sm:p-5 border border-border shadow-2xs">
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-xs font-black uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-                <span>🇪🇺</span> Euro Oficial (BCV)
-              </span>
-              <span className="text-[10px] font-mono font-bold bg-background px-2 py-0.5 rounded-lg border border-border text-foreground">
-                BCV OFICIAL
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-mono font-black text-foreground tracking-tight">
-                {currentRate.eur_value
-                  ? currentRate.eur_value.toFixed(2)
-                  : "980.61"}
-              </span>
-              <span className="text-xs font-bold text-muted-foreground font-mono">
-                Bs. / EUR
-              </span>
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1 font-medium">
-              <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              <span>Fecha Valor: <strong className="text-foreground">{formatFecha(rateDate)}</strong></span>
-            </p>
-          </div>
+          return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Card USD BCV */}
+              <div className="bg-muted/40 rounded-2xl p-4 sm:p-5 border border-border shadow-2xs">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs font-black uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+                    <span>🇺🇸</span> Dólar Oficial (BCV)
+                  </span>
+                  <span className="text-[10px] font-mono font-bold bg-background px-2 py-0.5 rounded-lg border border-border text-foreground">
+                    {currentRate.source.toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-mono font-black text-foreground tracking-tight">
+                    {currentRate.value.toFixed(2)}
+                  </span>
+                  <span className="text-xs font-bold text-muted-foreground font-mono">
+                    Bs. / USD
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1 font-medium">
+                  <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <span>Fecha Valor: <strong className="text-foreground">{formatFecha(rateDate)}</strong></span>
+                </p>
+              </div>
 
-          {/* Card USDT Binance */}
-          <div className="bg-muted/40 rounded-2xl p-4 sm:p-5 border border-border shadow-2xs">
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-xs font-black uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-                <span>🟢</span> USDT Promedio (P2P)
-              </span>
-              <span className="text-[10px] font-mono font-bold bg-background px-2 py-0.5 rounded-lg border border-border text-emerald-600 dark:text-emerald-400">
-                BINANCE P2P
-              </span>
+              {/* Card EUR BCV */}
+              <div className="bg-muted/40 rounded-2xl p-4 sm:p-5 border border-border shadow-2xs">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs font-black uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+                    <span>🇪🇺</span> Euro Oficial (BCV)
+                  </span>
+                  <span className="text-[10px] font-mono font-bold bg-background px-2 py-0.5 rounded-lg border border-border text-foreground">
+                    BCV OFICIAL
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-mono font-black text-foreground tracking-tight">
+                    {currentRate.eur_value
+                      ? currentRate.eur_value.toFixed(2)
+                      : effectiveEur.toFixed(2)}
+                  </span>
+                  <span className="text-xs font-bold text-muted-foreground font-mono">
+                    Bs. / EUR
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1 font-medium">
+                  <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <span>Fecha Valor: <strong className="text-foreground">{formatFecha(rateDate)}</strong></span>
+                </p>
+              </div>
+
+              {/* Card Promedio (USD + EUR) / 2 */}
+              <div className="bg-muted/40 rounded-2xl p-4 sm:p-5 border border-border shadow-2xs">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs font-black uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+                    <span>➗</span> Promedio (USD+EUR)/2
+                  </span>
+                  <span className="text-[10px] font-mono font-bold bg-background px-2 py-0.5 rounded-lg border border-teal-500/30 text-teal-600 dark:text-teal-400">
+                    PUNTO MEDIO
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-mono font-black text-teal-600 dark:text-teal-400 tracking-tight">
+                    {averageBcv.toFixed(2)}
+                  </span>
+                  <span className="text-xs font-bold text-muted-foreground font-mono">
+                    Bs. / Promedio
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1 font-medium">
+                  <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <span>Suma y división en tiempo real</span>
+                </p>
+              </div>
+
+              {/* Card USDT Binance */}
+              <div className="bg-muted/40 rounded-2xl p-4 sm:p-5 border border-border shadow-2xs">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs font-black uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+                    <span>🟢</span> USDT Promedio (P2P)
+                  </span>
+                  <span className="text-[10px] font-mono font-bold bg-background px-2 py-0.5 rounded-lg border border-border text-emerald-600 dark:text-emerald-400">
+                    BINANCE P2P
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-mono font-black text-foreground tracking-tight">
+                    {currentRate.usdt_value
+                      ? currentRate.usdt_value.toFixed(2)
+                      : "1016.78"}
+                  </span>
+                  <span className="text-xs font-bold text-muted-foreground font-mono">
+                    Bs. / USDT
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1 font-medium">
+                  <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <span>Mercado Cripto Referencial</span>
+                </p>
+              </div>
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-mono font-black text-foreground tracking-tight">
-                {currentRate.usdt_value
-                  ? currentRate.usdt_value.toFixed(2)
-                  : "1016.78"}
-              </span>
-              <span className="text-xs font-bold text-muted-foreground font-mono">
-                Bs. / USDT
-              </span>
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1 font-medium">
-              <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              <span>Mercado Cripto Referencial</span>
-            </p>
-          </div>
-        </div>
+          );
+        })()}
 
         {/* Automation Info & Manual Toggle */}
         <div className="mt-5 pt-4 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-muted-foreground">

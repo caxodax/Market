@@ -134,6 +134,15 @@ export interface TenantSettings {
   billing_settings?: TenantBillingSettings;
   custom_domain?: string | null;
   storefront_config?: import("./storefront-pro").StorefrontConfig;
+  currency_settings?: StoreCurrencySettings;
+}
+
+export type StoreRateMode = "BCV_BASE" | "BCV_AVERAGE" | "BCV_CROSS" | "CUSTOM";
+
+export interface StoreCurrencySettings {
+  base_currency: "USD" | "EUR";
+  rate_mode: StoreRateMode;
+  custom_rate_value?: number;
 }
 
 export interface Store {

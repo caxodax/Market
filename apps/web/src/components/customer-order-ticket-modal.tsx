@@ -61,6 +61,7 @@ export function CustomerOrderTicketModal({
   activeModuleIds = [],
 }: CustomerOrderTicketModalProps) {
   const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
+  const baseCurrency = settings.currency_settings?.base_currency || "USD";
   const [copiedOrder, setCopiedOrder] = useState(false);
   const [copiedCi, setCopiedCi] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -1060,14 +1061,14 @@ export function CustomerOrderTicketModal({
                           </span>
                         </div>
                         <p className="text-[11px] text-muted-foreground font-mono">
-                          {formatCurrency(item.unit_price_usd, "USD")} c/u
+                          {formatCurrency(item.unit_price_usd, baseCurrency)} c/u
                         </p>
                       </div>
                     </div>
 
                     <div className="text-right shrink-0">
                       <span className="font-black text-foreground">
-                        {formatCurrency(item.total_price_usd, "USD")}
+                        {formatCurrency(item.total_price_usd, baseCurrency)}
                       </span>
                       {isVenezuelaActive && (
                         <span className="block text-[10px] text-muted-foreground font-mono">
@@ -1102,7 +1103,7 @@ export function CustomerOrderTicketModal({
 
                     <div className="text-right shrink-0">
                       <span className="font-black text-foreground">
-                        {formatCurrency(order.delivery_fee_usd, "USD")}
+                        {formatCurrency(order.delivery_fee_usd, baseCurrency)}
                       </span>
                       {isVenezuelaActive && (
                         <span className="block text-[10px] text-muted-foreground font-mono">
@@ -1170,7 +1171,7 @@ export function CustomerOrderTicketModal({
                 {order.discount_usd && order.discount_usd > 0 ? (
                   <div className="flex justify-between text-emerald-600 font-semibold">
                     <span>Descuento Cupón:</span>
-                    <span>-{formatCurrency(order.discount_usd, "USD")}</span>
+                    <span>-{formatCurrency(order.discount_usd, baseCurrency)}</span>
                   </div>
                 ) : null}
 
@@ -1178,7 +1179,7 @@ export function CustomerOrderTicketModal({
                   <div>
                     <div className="flex justify-between text-muted-foreground">
                       <span>Tarifa Delivery (Cobro a Repartidor):</span>
-                      <span>{formatCurrency(order.delivery_fee_usd, "USD")}</span>
+                      <span>{formatCurrency(order.delivery_fee_usd, baseCurrency)}</span>
                     </div>
                     <span className="block text-[10px] text-muted-foreground text-right italic pt-0.5">
                       * Pagadero al transportista independiente (no entra en base imponible de la tienda)
@@ -1192,27 +1193,27 @@ export function CustomerOrderTicketModal({
                       <div className="flex justify-between">
                         <span>Subtotal Exento (IVA 0%):</span>
                         <span className="font-mono text-foreground font-semibold">
-                          {formatCurrency(subtotalExemptUsd, "USD")}
+                          {formatCurrency(subtotalExemptUsd, baseCurrency)}
                         </span>
                       </div>
                     )}
                     <div className="flex justify-between">
                       <span>Base Gravable (16%):</span>
                       <span className="font-mono text-foreground font-semibold">
-                        {formatCurrency(subtotalTaxableUsd, "USD")}
+                        {formatCurrency(subtotalTaxableUsd, baseCurrency)}
                       </span>
                     </div>
                     <div className="flex justify-between font-semibold text-foreground">
                       <span>IVA Liquidado (16%):</span>
                       <span className="font-mono text-primary font-bold">
-                        {formatCurrency(ivaAmountUsd, "USD")} (Bs. {ivaAmountVes.toFixed(2)})
+                        {formatCurrency(ivaAmountUsd, baseCurrency)} (Bs. {ivaAmountVes.toFixed(2)})
                       </span>
                     </div>
                     {igtfAmountUsd > 0 && (
                       <div className="flex justify-between font-bold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-md">
                         <span>IGTF (3% Divisas):</span>
                         <span className="font-mono">
-                          {formatCurrency(igtfAmountUsd, "USD")} (Bs. {igtfAmountVes.toFixed(2)})
+                          {formatCurrency(igtfAmountUsd, baseCurrency)} (Bs. {igtfAmountVes.toFixed(2)})
                         </span>
                       </div>
                     )}
@@ -1221,10 +1222,10 @@ export function CustomerOrderTicketModal({
 
                 <div className="border-t border-border pt-1.5 mt-1 flex justify-between items-baseline">
                   <span className="font-black text-sm text-foreground">
-                    {isFiscal ? "Total Factura USD:" : "Total USD:"}
+                    {isFiscal ? `Total Factura ${baseCurrency}:` : `Total ${baseCurrency}:`}
                   </span>
                   <span className="font-black text-base text-primary">
-                    {formatCurrency(order.total_usd, "USD")}
+                    {formatCurrency(order.total_usd, baseCurrency)}
                   </span>
                 </div>
 

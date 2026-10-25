@@ -11,9 +11,13 @@ import {
   DeliveryZone,
   ProductModifierGroup,
   TenantModuleId,
+  SelectedModifier,
 } from "@marketos/types";
-import { ModifierModal } from "@marketos/plugin-food-service";
-import { formatCurrency, convertUsdToVes } from "@marketos/utils";
+import {
+  formatCurrency,
+  convertUsdToVes,
+  calculateEffectiveExchangeRate,
+} from "@marketos/utils";
 import { useCart } from "../context/cart-context";
 import { ProductCard } from "./product-card";
 import { CartDrawer } from "./cart-drawer";
@@ -23,6 +27,7 @@ import { OrderTrackerModal } from "./order-tracker-modal";
 import { CustomerOrderTicketModal } from "./customer-order-ticket-modal";
 import { useFavorites } from "../context/favorites-context";
 import { StorefrontProRenderer, createDefaultStorefrontConfig } from "@marketos/plugin-storefront-pro";
+import { ModifierModal } from "@marketos/plugin-food-service";
 import {
   Search,
   SlidersHorizontal,
@@ -72,7 +77,12 @@ export function CatalogView({
 }: CatalogViewProps) {
   const { totalItems, totalUsd, setIsOpen, addItem } = useCart();
   const { favorites, favoritesCount } = useFavorites();
-  const totalVes = convertUsdToVes(totalUsd, exchangeRate.value);
+
+  const effectiveRateInfo = useMemo(() => {
+    return calculateEffectiveExchangeRate(exchangeRate, settings.currency_settings);
+  }, [exchangeRate, settings.currency_settings]);
+
+  const totalVes = Number((totalUsd * effectiveRateInfo.effectiveRate).toFixed(2));
 
   // Food Service Plugin: Modifier Customizer Modal State
   const [customizingProduct, setCustomizingProduct] = useState<Product | null>(null);
@@ -679,7 +689,8 @@ export function CatalogView({
                     <ProductCard
                       key={product.id}
                       product={product}
-                      exchangeRate={exchangeRate.value}
+                      exchangeRate={effectiveRateInfo.effectiveRate}
+                      baseCurrency={effectiveRateInfo.baseCurrency}
                       showVesPrice={isVenezuelaActive}
                       hasModifiers={hasModifiers}
                       onOpenModifiers={(prod) => setCustomizingProduct(prod)}
@@ -795,7 +806,7 @@ export function CatalogView({
                   {totalItems} {totalItems === 1 ? "producto" : "productos"} en carrito
                 </p>
                 <p className="text-[10px] font-bold text-white/90">
-                  {formatCurrency(totalUsd, "USD")}
+                  {formatCurrency(totalUsd, effectiveRateInfo.baseCurrency)}
                   {isVenezuelaActive && (
                     <>
                       {" "}• Bs.{" "}
@@ -819,7 +830,8 @@ export function CatalogView({
 
       {/* Persistent Cart Drawer */}
       <CartDrawer
-        exchangeRate={exchangeRate.value}
+        exchangeRate={effectiveRateInfo.effectiveRate}
+        baseCurrency={effectiveRateInfo.baseCurrency}
         showVesPrice={isVenezuelaActive}
         onProceedToCheckout={() => setIsCheckoutOpen(true)}
       />
@@ -831,7 +843,7 @@ export function CatalogView({
         settings={settings}
         stores={stores}
         deliveryZones={deliveryZones}
-        exchangeRate={exchangeRate.value}
+        exchangeRate={effectiveRateInfo.effectiveRate}
         activeModuleIds={activeModuleIds}
         onOrderCompleted={(order) => setCompletedOrder(order)}
       />
@@ -876,8 +888,8 @@ export function CatalogView({
           onClose={() => setCustomizingProduct(null)}
           product={customizingProduct}
           modifierGroups={getProductModifierGroups(customizingProduct)}
-          exchangeRate={exchangeRate.value}
-          onConfirmAddToCart={(prod, qty, selectedModifiers, unitPrice) => {
+          exchangeRate={effectiveRateInfo.effectiveRate}
+          onConfirmAddToCart={(prod: Product, qty: number, selectedModifiers: SelectedModifier[], unitPrice: number) => {
             addItem(prod, qty, true, selectedModifiers, unitPrice);
             setCustomizingProduct(null);
           }}

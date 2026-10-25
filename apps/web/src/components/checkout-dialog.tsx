@@ -758,6 +758,7 @@ export function CheckoutDialog({
               isVenezuelaActive={isVenezuelaActive}
               subtotalUsd={subtotalUsd}
               exchangeRate={exchangeRate}
+              baseCurrency={settings.currency_settings?.base_currency || "USD"}
             />
           ) : (
             <CheckoutStepPayment

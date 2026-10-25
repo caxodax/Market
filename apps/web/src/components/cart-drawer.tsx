@@ -7,12 +7,14 @@ import { X, Trash2, Plus, Minus, ArrowRight, ShoppingBag } from "lucide-react";
 
 interface CartDrawerProps {
   exchangeRate: number;
+  baseCurrency?: "USD" | "EUR";
   showVesPrice?: boolean;
   onProceedToCheckout: () => void;
 }
 
 export function CartDrawer({
   exchangeRate,
+  baseCurrency = "USD",
   showVesPrice = false,
   onProceedToCheckout,
 }: CartDrawerProps) {
@@ -125,7 +127,7 @@ export function CartDrawer({
                               className="text-[9px] px-1.5 py-0.5 rounded-md bg-secondary text-secondary-foreground font-medium"
                             >
                               {mod.option_name}
-                              {mod.price_usd > 0 && ` (+$${mod.price_usd.toFixed(2)})`}
+                              {mod.price_usd > 0 && ` (+${formatCurrency(mod.price_usd, baseCurrency)})`}
                             </span>
                           ))}
                         </div>
@@ -133,7 +135,7 @@ export function CartDrawer({
 
                       <div className="mt-1 flex items-baseline gap-1.5">
                         <span className="text-sm font-bold text-primary">
-                          {formatCurrency(lineTotalUsd, "USD")}
+                          {formatCurrency(lineTotalUsd, baseCurrency)}
                         </span>
                         {showVesPrice && (
                           <span className="text-[11px] text-muted-foreground">
@@ -201,10 +203,10 @@ export function CartDrawer({
               <div className="space-y-1.5">
                 <div className="flex justify-between items-baseline text-sm">
                   <span className="text-muted-foreground font-medium">
-                    Total en Dólares:
+                    {baseCurrency === "EUR" ? "Total en Euros:" : "Total en Dólares:"}
                   </span>
                   <span className="text-lg font-black text-foreground">
-                    {formatCurrency(totalUsd, "USD")}
+                    {formatCurrency(totalUsd, baseCurrency)}
                   </span>
                 </div>
                 {showVesPrice && (

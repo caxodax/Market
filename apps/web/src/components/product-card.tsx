@@ -10,6 +10,7 @@ import { Plus, Minus, ShoppingCart, Heart, Sparkles } from "lucide-react";
 interface ProductCardProps {
   product: Product & { stock: number };
   exchangeRate: number;
+  baseCurrency?: "USD" | "EUR";
   hasModifiers?: boolean;
   showVesPrice?: boolean;
   onOpenModifiers?: (product: Product) => void;
@@ -18,6 +19,7 @@ interface ProductCardProps {
 export function ProductCard({
   product,
   exchangeRate,
+  baseCurrency = "USD",
   hasModifiers = false,
   showVesPrice = false,
   onOpenModifiers,
@@ -121,10 +123,10 @@ export function ProductCard({
         <div className="mt-auto pt-3 flex flex-col">
           <div className="flex items-baseline gap-1.5">
             <span className="text-base sm:text-lg font-black text-primary tracking-tight">
-              {formatCurrency(product.price_usd, "USD")}
+              {formatCurrency(product.price_usd, baseCurrency)}
             </span>
             <span className="text-[11px] text-muted-foreground font-semibold">
-              USD
+              {baseCurrency}
             </span>
           </div>
 

@@ -262,6 +262,19 @@ export class MarketOSRepository {
             ...INITIAL_SETTINGS.billing_settings,
             ...(data.billing_settings || data.operational_settings?.billing_settings || {}),
           },
+          currency_settings: {
+            base_currency:
+              data.currency_settings?.base_currency ||
+              data.operational_settings?.currency_settings?.base_currency ||
+              (data.default_currency === "EUR" ? "EUR" : "USD"),
+            rate_mode:
+              data.currency_settings?.rate_mode ||
+              data.operational_settings?.currency_settings?.rate_mode ||
+              "BCV_BASE",
+            custom_rate_value:
+              data.currency_settings?.custom_rate_value ||
+              data.operational_settings?.currency_settings?.custom_rate_value,
+          },
         };
       }
     }
@@ -299,12 +312,21 @@ export class MarketOSRepository {
       billing_settings: updates.billing_settings
         ? { ...current.billing_settings, ...updates.billing_settings }
         : current.billing_settings,
+      currency_settings: updates.currency_settings
+        ? { ...current.currency_settings, ...updates.currency_settings }
+        : current.currency_settings,
     };
 
-    // Embed billing_settings inside operational_settings JSONB so it persists reliably
+    // Keep default_currency in sync with base_currency if updated
+    if (updated.currency_settings?.base_currency) {
+      updated.default_currency = updated.currency_settings.base_currency;
+    }
+
+    // Embed billing_settings & currency_settings inside operational_settings JSONB so it persists reliably
     const operationalPayload = {
       ...(updated.operational_settings || {}),
       ...(updated.billing_settings ? { billing_settings: updated.billing_settings } : {}),
+      ...(updated.currency_settings ? { currency_settings: updated.currency_settings } : {}),
     };
 
     const supabase = getSupabase();

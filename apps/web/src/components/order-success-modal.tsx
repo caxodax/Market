@@ -24,6 +24,7 @@ export function OrderSuccessModal({
   activeModuleIds = [],
 }: OrderSuccessModalProps) {
   const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
+  const baseCurrency = settings.currency_settings?.base_currency || "USD";
   if (!order) return null;
 
   // Formatted WhatsApp order link
@@ -75,9 +76,9 @@ export function OrderSuccessModal({
         {/* Order Details box */}
         <div className="p-4 rounded-xl bg-muted/40 border border-border text-xs space-y-2 text-left">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Monto Total USD:</span>
+            <span className="text-muted-foreground">Monto Total ({baseCurrency}):</span>
             <span className="font-bold text-foreground">
-              {formatCurrency(order.total_usd, "USD")}
+              {formatCurrency(order.total_usd, baseCurrency)}
             </span>
           </div>
           {isVenezuelaActive && (
@@ -91,7 +92,7 @@ export function OrderSuccessModal({
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Tasa aplicada:</span>
                 <span className="font-mono text-muted-foreground">
-                  Bs. {order.exchange_rate_applied.toFixed(2)}/USD
+                  Bs. {order.exchange_rate_applied.toFixed(2)}/{baseCurrency}
                 </span>
               </div>
             </>
@@ -113,7 +114,7 @@ export function OrderSuccessModal({
                     <span className="text-foreground truncate">{item.product_name}</span>
                   </div>
                   <span className="font-semibold text-foreground shrink-0">
-                    {formatCurrency(item.total_price_usd, "USD")}
+                    {formatCurrency(item.total_price_usd, baseCurrency)}
                   </span>
                 </div>
               ))}

@@ -456,6 +456,16 @@ flowchart TD
     P6["Prioridad 6: Resiliencia de UI/UX y Poda Arquitectónica"] --> P6_1["P6.1: Crear error.tsx y not-found.tsx nativos en apps/web/src/app/"]
     P6 --> P6_2["P6.2: Re-validar cupones de descuento estrictamente en el servidor"]
     P6 --> P6_3["P6.3: Modularizar repositorios de base de datos eliminando mock en memoria"]
+
+    P7["Prioridad 7: Optimización Integral de Inventario y Carga Masiva Excel"] --> P7_1["P7.1: Conmutador de Vistas (Cards / Lista) y Poda de Copy R2"]
+    P7 --> P7_2["P7.2: Buscador en tiempo real y Paginación Adaptativa (10, 25, 50)"]
+    P7 --> P7_3["P7.3: Descarga de Plantilla Oficial Excel (.xlsx) con exceljs"]
+    P7 --> P7_4["P7.4: Importador Masivo de Productos (.xlsx) con Validación y Control de Cupo"]
+
+    P8["Prioridad 8: Régimen Multi-Divisa (USD/EUR), Tasa Promedio y Tasa Especial BCV"] --> P8_1["P8.1: Tipos de Dominio y Motor Matemático Multi-Divisa (USD/EUR/VES)"]
+    P8 --> P8_2["P8.2: Pestaña Moneda & BCV en Ajustes de Comercio con Simulador en Vivo"]
+    P8 --> P8_3["P8.3: Monitor de Tasas con Card de Promedio BCV ((USD+EUR)/2)"]
+    P8 --> P8_4["P8.4: Formato Integral de Precios en Catálogo, Inventario, Carrito y Checkout"]
 ```
 
 | ID | Tarea Específica | Archivo Objetivo | Dimensión | Estado |
@@ -467,6 +477,14 @@ flowchart TD
 | **P6.1** | Error Boundaries nativos con diseño accesible (`error.tsx` y `not-found.tsx`) | [`apps/web/src/app/error.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/app/error.tsx), [`apps/web/src/app/not-found.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/app/not-found.tsx) | UI/UX & Resiliencia | **Completada ✅** |
 | **P6.2** | Validación estricta de cupón en `createOrderAction` en servidor | [`apps/web/src/app/actions.ts`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/app/actions.ts) | Funcionalidad | **Completada ✅** |
 | **P6.3** | Desacoplamiento de `services.ts` en repositorios modulares especializados | [`packages/database/src/repositories/`](file:///home/lmontes/Documentos/Telegram/Market/packages/database/src/repositories/) | Ponytail Ultra & ECC | **Completada ✅** |
+| **P7.1** | Conmutador de vistas (Cards/Lista) y eliminación de copy de Cloudflare R2 | [`apps/web/src/components/inventory-tab.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/inventory-tab.tsx) | UI/UX & Ponytail | **Completada ✅** |
+| **P7.2** | Buscador en tiempo real multi-campo y paginación ergonómica móvil/desktop | [`apps/web/src/components/inventory-tab.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/inventory-tab.tsx) | UI/UX Pro Max | **Completada ✅** |
+| **P7.3** | Descarga de plantilla Excel (`.xlsx`) estructurada y validada | [`apps/web/src/lib/productExcel.ts`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/lib/productExcel.ts) | Funcionalidad & ECC | **Completada ✅** |
+| **P7.4** | Modal e importador masivo de productos con control de límites SaaS | [`apps/web/src/app/admin/actions.ts`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/app/admin/actions.ts) | Funcionalidad & ECC | **Completada ✅** |
+| **P8.1** | Tipos y motor de cálculo de régimen de tasa (`effectiveRate`, EUR/USD/VES) | [`packages/types/src/index.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/types/src/index.ts), [`packages/utils/src/index.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/utils/src/index.ts) | Arquitectura & ECC | **Completada ✅** |
+| **P8.2** | Selector de divisa base y 4 regímenes con simulador en Ajustes de Comercio | [`apps/web/src/components/store-settings-tab.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/store-settings-tab.tsx) | UI/UX Pro Max | **Completada ✅** |
+| **P8.3** | Tarjeta de Promedio BCV `(USD+EUR)/2` en Monitor de Tasas | [`apps/web/src/components/exchange-rate-manager.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/exchange-rate-manager.tsx) | Funcionalidad | **Completada ✅** |
+| **P8.4** | Sincronización de divisa base en catálogo, inventario, carrito y checkout | [`apps/web/src/components/`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/) | Impeccable & UX | **Completada ✅** |
 
 ---
 
@@ -552,6 +570,137 @@ flowchart TD
 ### 4. Verificación de Compilación y Suites de Pruebas
 * **Pruebas Automatizadas:** 9/9 suites ejecutadas y aprobadas (100% de éxito en `@marketos/database`, plugins de despacho, fiscal SENIAT, retail código de barras, MTO CPQ y promociones).
 * **Compilación de Producción:** Next.js 16.3.8 Turbopack completado con código 0 y 0 errores de TypeScript (`pnpm build`).
+
+---
+
+## 17. Detalle de Ejecución de la Prioridad 7 (Completada ✅)
+
+### 1. Auditoría del Ciclo de Vida de Inventario y Conciliación de Pedidos
+* **Objetivo:** Verificar rigurosamente el CRUD de inventario, el descuento en ventas y la reposición automática en cancelaciones.
+* **Resultados de la Auditoría en Código:**
+  - **Deducción de Stock en Pedido (`createOrder`):** Ubicado en [`packages/database/src/services.ts#L1491-L1505`](file:///home/lmontes/Documentos/Telegram/Market/packages/database/src/services.ts#L1491-L1505). Por cada línea de producto del pedido, se descuenta de la tabla `inventory` y se registra en `inventory_movements` con `reason: "SALE"` (y en memoria sincronizada).
+  - **Reposición de Stock en Cancelación (`updateOrderStatus(CANCELLED)`):** Ubicado en [`packages/database/src/services.ts#L2343-L2361`](file:///home/lmontes/Documentos/Telegram/Market/packages/database/src/services.ts#L2343-L2361). Al pasar cualquier orden al estado `CANCELLED`, se reingresan las unidades al stock de cada producto con `reason: "CANCELLATION"`.
+  - **Acciones CRUD y Ajuste Manual:** Verificadas en [`apps/web/src/app/admin/actions.ts`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/app/admin/actions.ts) (`createProductAction`, `updateProductAction`, `deleteProductAction`, `adjustStockAction`) con bitácora de auditoría y guardianes multi-tenant.
+
+### 2. Modernización del Componente de Inventario ([`apps/web/src/components/inventory-tab.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/inventory-tab.tsx))
+* **Desacoplamiento Arquitectónico (Ponytail Ultra):** Se extrajo el bloque monolítico de inventario de `admin-dashboard.tsx` (~250 líneas) y se reemplazó por un componente independiente cargado dinámicamente vía `next/dynamic`.
+* **Conmutador de Vista (Tarjetas vs Lista Compacta):**
+  - Botones de selección rápida con iconos intuitivos (`LayoutGrid` vs `List`).
+  - **Vista Lista (Tabular/Compacta):** Ideal para catálogos con alta densidad de ítems, mostrando miniatura, nombre, categoría, SKU, código de barras, precio USD/Bs, estado activo/inactivo, controles de stock inmediato (-1/+1) y botón de edición.
+  - **Vista Tarjetas:** Tarjetas visuales amplias ideales para inspección visual y pantallas táctiles.
+* **Buscador en Tiempo Real Multi-campo:**
+  - Filtrado instantáneo sin recargas buscando simultáneamente en: `name`, `sku`, `barcode` y nombre de `category`.
+  - Chip con contador de coincidencias y botón de limpieza rápida con un solo toque (`X`).
+  - Filtro adicional por Categoría con conteo de productos por categoría.
+* **Paginación Ergonómica Móvil y Desktop:**
+  - Selector de elementos por página: 10, 25 y 50 productos.
+  - Indicador numérico de rango actual ("Mostrando X - Y de Z productos").
+  - Botones táctiles "Anterior" y "Siguiente" con targets ergonómicos de altura mínima $\ge 44\text{ px}$ conformes a los estándares WCAG AA y UI/UX Pro Max.
+* **Erradicación de Copy Técnico y Publicitario:**
+  - Se eliminó la frase técnica redundante: `"Subida directa a Cloudflare R2 con compresión WebP sin pérdida visual."`.
+  - Se sustituyó por texto funcional centrado en el usuario comerciante: `"Gestión de catálogo, existencias, precios y sincronización de inventario."`.
+  - Se reemplazó el copy en `product-modal.tsx` de `"Catálogo digital en Cloudflare R2 y Supabase"` a `"Información, precios, categoría y disponibilidad en catálogo"`.
+
+### 3. Descarga de Plantilla Oficial Excel ([`apps/web/src/lib/productExcel.ts`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/lib/productExcel.ts))
+* **Generación sin Nuevas Dependencias:** Reutiliza la librería instalada `exceljs` (^4.4.0).
+* **Estructura de la Plantilla (`Plantilla_Productos_MarketOS.xlsx`):**
+  - Hoja 1 ("Productos"):
+    - Encabezados con estilo profesional en verde esmeralda, tipografía negrita y texto centrado.
+    - Columnas estructuradas: `Nombre del Producto *`, `Categoría`, `Precio USD *`, `Stock Inicial *`, `SKU`, `Código de Barras`, `Descripción`.
+    - Formato numérico explícito: Precio USD en `$#,##0.00` y Stock Inicial en número entero `0`.
+    - Filas de ejemplo pre-llenadas con categorías reales del comercio activo.
+  - Hoja 2 ("Categorías Disponibles"):
+    - Lista de las categorías registradas en el comercio con sus IDs de referencia y notas de orientación.
+
+### 4. Modal e Importador Masivo con Control de Cupos ([`apps/web/src/components/product-import-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/product-import-modal.tsx) y [`apps/web/src/app/admin/actions.ts`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/app/admin/actions.ts))
+* **Modal de Carga Masiva (UI/UX Pro Max):**
+  - Zona de arrastre y soltado (drag-and-drop) con detección de archivos `.xlsx` y `.xls`.
+  - Validación previa inmediata en el cliente antes de enviar al servidor:
+    - Previsualización tabular de las primeras filas válidas.
+    - Detección visual de filas inválidas indicando el número exacto de fila y el motivo del fallo (p. ej. precio no numérico o nombre vacío).
+    - Desglose con alerta preventiva si la cantidad de productos a importar excede el cupo disponible del plan contratado.
+* **Server Action Segura (`bulkImportProductsAction`):**
+  - Valida obligatoriamente `assertAuthorizedTenantAdmin(tenantId)` impidiendo importaciones no autorizadas.
+  - Comprueba la cuota máxima del plan de suscripción (`max_products`), abortando de forma segura con mensaje de advertencia si la tienda sobrepasaría su límite.
+  - Asocia automáticamente la categoría por nombre insensible a mayúsculas/minúsculas.
+  - Registra cada creación a través de `MarketOSRepository.createProduct` con actor de auditoría inmutable (`actorId`, `actorName`, `actorEmail`, `actorRole`).
+  - Invalida la caché del catálogo y revalida los paths `/admin` y `/` para actualización inmediata.
+
+### 5. Verificación de Compilación y Suite de Pruebas
+* **Suites de Pruebas:** 9 de 9 suites aprobadas al 100% (`pnpm test` -> 0 fallos).
+* **Compilación de Producción:** Next.js 16.3.8 Turbopack completado con éxito (`pnpm build` -> exit code 0).
+* **Control de Versiones:** Cambios preservados localmente sin push al repositorio, en estricto cumplimiento de la instrucción del usuario.
+
+---
+
+## 18. Detalle de Ejecución de la Prioridad 8 (Completada ✅)
+
+### 1. Requerimiento y Arquitectura de Dominio Multi-Divisa (Ponytail Ultra & ECC)
+* **Objetivo del Usuario:**
+  - En **Ajustes de Comercio** (`store-settings-tab.tsx`), al activar el plugin **locación Venezuela** (`local_venezuela`), permitir seleccionar la **Moneda Base del Comercio** (`USD` o `EUR`).
+  - Mostrar la conversión en tiempo real a Bolívares (Bs.) según la moneda seleccionada (ej. si el comercio fija `EUR`, los precios se muestran en Euros `€` y se calculan a Bs. usando la tasa oficial o el régimen configurado).
+  - Permitir seleccionar y configurar una **Tasa Promedio / Especial** (Opción A: Catálogo con selector de divisa base y 4 regímenes: `BCV_BASE`, Promedio `BCV_AVERAGE = (USD + EUR) / 2`, Tasa Cruzada `BCV_CROSS = EUR / USD` y Tasa Especial Personalizada `CUSTOM`).
+
+### 2. Capa de Modelado y Tipos de Dominio ([`packages/types/src/index.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/types/src/index.ts))
+* **Nuevos Tipos Creados:**
+  - `StoreRateMode = "BCV_BASE" | "BCV_AVERAGE" | "BCV_CROSS" | "CUSTOM"`
+  - `StoreCurrencySettings`:
+    ```typescript
+    export interface StoreCurrencySettings {
+      base_currency: "USD" | "EUR";
+      rate_mode: StoreRateMode;
+      custom_rate_value?: number;
+    }
+    ```
+  - Integrado en `TenantSettings` (`currency_settings?: StoreCurrencySettings;`).
+
+### 3. Motor Matemático de Tasas y Formato ([`packages/utils/src/index.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/utils/src/index.ts))
+* **Función `calculateEffectiveExchangeRate(rate, currencySettings)`:**
+  - Extrae de manera resiliente las cotizaciones del objeto `ExchangeRate` (`rate.value` para USD y `rate.eur_value` para EUR, con fallbacks de contingencia).
+  - Calcula el promedio ponderado oficial: $\text{Tasa Promedio} = \frac{\text{USD} + \text{EUR}}{2}$.
+  - Resuelve la tasa efectiva en Bs. por unidad de la divisa base según el régimen seleccionado:
+    1. `BCV_BASE`: Tasa pura del BCV para la divisa base elegida (`USD` $\to$ `rate.value`, `EUR` $\to$ `rate.eur_value`).
+    2. `BCV_AVERAGE`: Tasa promedio $\frac{\text{USD} + \text{EUR}}{2}$.
+    3. `BCV_CROSS`: Tasa cruzada EUR/USD $\approx \frac{\text{EUR}}{\text{USD}}$.
+    4. `CUSTOM`: Tasa especial personalizada introducida manualmente por el comerciante.
+  - Retorna `{ effectiveRate, baseCurrency, rateMode, usdRate, eurRate, averageRate, label }`.
+* **Función `convertPriceToVes(price, rate, currencySettings)`:**
+  - Convierte cualquier monto de la divisa base a Bolívares de forma unificada y redondeada a 2 decimales.
+* **Función `formatCurrency(amount, currency)`:**
+  - Soporta formateo nativo para `EUR` (`15,00 €`) y `USD` (`$15.00`) usando `Intl.NumberFormat` sin dependencias externas.
+
+### 4. Persistencia en Base de Datos ([`packages/database/src/services.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/database/src/services.ts))
+* **Compatibilidad Multi-Tenant sin Migraciones (Ponytail Ultra):**
+  - Se persiste `currency_settings` dentro de la columna JSONB `operational_settings` en Supabase PostgreSQL.
+  - Sincroniza simultáneamente el campo `default_currency` con `base_currency`.
+  - Mapeo bidireccional y actualización atómica en memoria y Postgres garantizando cero pérdida de configuración en reinicios.
+
+### 5. Pestaña "Moneda & BCV" en Ajustes de Comercio ([`apps/web/src/components/store-settings-tab.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/store-settings-tab.tsx))
+* **Experiencia de Usuario (UI/UX Pro Max & Impeccable):**
+  - Sub-pestaña interactiva **"Moneda & BCV"** (icono `Coins`) visible cuando el plugin `local_venezuela` está activo.
+  - **Selector de Divisa Base:** Selector tipo tarjeta con selección única entre Dólares Estadounidenses (`USD $`) y Euros (`EUR €`), con badge distintivo de divisa primaria.
+  - **Selector de Régimen de Tasa (4 Opciones):**
+    1. *Tasa Oficial BCV*: Cotización oficial directa de la moneda base.
+    2. *Promedio BCV (USD + EUR / 2)*: Mitiga la volatilidad cambiaria promediando ambas cotizaciones.
+    3. *Tasa Cruzada EUR/USD*: Relación cambiaria entre divisas.
+    4. *Tasa Especial / Personalizada*: Permite al comerciante definir una tasa fija manual, con botones rápidos de 1 toque para copiar la tasa USD, EUR o el Promedio.
+  - **Simulador de Precios en Vivo:** Input numérico para probar cualquier importe y verificar instantáneamente el precio formateado en la tienda, el régimen aplicado y su conversión exacta en Bolívares (`Bs.`).
+
+### 6. Monitor de Tasas Administrativo ([`apps/web/src/components/exchange-rate-manager.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/exchange-rate-manager.tsx))
+* Se agregó la 4ta tarjeta de métrica financiera: **"Promedio BCV (USD + EUR) / 2"** mostrando en vivo el valor de la tasa promedio junto a las tarjetas existentes de USD, EUR y USDT.
+
+### 7. Propagación Integral de Precios en Catálogo, Inventario, Carrito y Checkout
+* **Tarjetas de Producto ([`product-card.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/product-card.tsx)):** Formatea el precio unitario con la divisa base configurada (`$` o `€`) y actualiza el badge dinámicamente.
+* **Vista de Catálogo ([`catalog-view.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/catalog-view.tsx)):** Calcula `effectiveRateInfo` y propaga la tasa efectiva y la moneda base a las tarjetas, al drawer del carrito, a los modales y al floating cart bar.
+* **Inventario ([`inventory-tab.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/inventory-tab.tsx)):** Encabezado dinámico `Precio (USD)` o `Precio (EUR)` tanto en vista lista tabular como en vista tarjetas (grid), con cálculo del equivalente en Bs. basado en `effectiveRate`.
+* **Carrito de Compras ([`cart-drawer.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/cart-drawer.tsx)):** Etiquetas adaptativas ("Total en Euros:" / "Total en Dólares:") y formato exacto en items y totales.
+* **Checkout y Entrega ([`checkout-step-delivery.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/checkout/checkout-step-delivery.tsx) y [`checkout-step-payment.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/checkout/checkout-step-payment.tsx)):** Subtotal, cupones, delivery, total a pagar y desglose de efectivo adaptados a la divisa base y a su equivalente en Bolívares.
+* **Modal de Éxito y Ticket ([`order-success-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/order-success-modal.tsx) y [`customer-order-ticket-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/customer-order-ticket-modal.tsx)):** Desglose fiscal y comercial con indicación de tasa aplicada `Bs. X.XX/EUR` o `Bs. X.XX/USD`.
+
+### 8. Verificación de Compilación y Suite de Pruebas
+* **Suites de Pruebas:** 9 de 9 suites aprobadas al 100% (`pnpm test` -> 0 fallos).
+* **Compilación de Producción:** Next.js 16.3.8 Turbopack completado con éxito (`pnpm build` -> exit code 0).
+* **Control de Versiones y Sincronización Remota:** Cambios de Prioridad 7 (Inventario Moderno & Carga Masiva Excel) y Prioridad 8 (Multi-Divisa USD/EUR, Tasa Promedio y Tasa Especial BCV) consolidados, confirmados (commit) y sincronizados exitosamente con el repositorio remoto GitHub (`origin/main`).
 
 
 

@@ -105,6 +105,10 @@ const MtoCpqAdminPanel = dynamic(
   () => import("@marketos/plugin-mto-cpq").then((m) => m.MtoCpqAdminPanel),
   { loading: TabLoading }
 );
+const InventoryTab = dynamic(
+  () => import("./inventory-tab").then((m) => m.InventoryTab),
+  { loading: TabLoading }
+);
 const ProductModal = dynamic(
   () => import("./product-modal").then((m) => m.ProductModal)
 );
@@ -2404,250 +2408,30 @@ export function AdminDashboard({
         )}
 
         {/* TAB 3: INVENTORY */}
-        {activeTab === "INVENTORY" && (() => {
-          const maxProducts = planLimitsState?.plan.max_products || 60;
-          const currentProductsCount = products.length;
-          const isAtCapacity = currentProductsCount >= maxProducts;
-          const productUsagePct = Math.min(100, Math.round((currentProductsCount / maxProducts) * 100));
-
-          return (
-            <div className="space-y-4 animate-in fade-in">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card p-4 rounded-2xl border border-border">
-                <div>
-                  <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-                    <Boxes className="w-4 h-4 text-primary" />
-                    Catálogo & Control de Inventario
-                  </h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Subida directa a Cloudflare R2 con compresión WebP sin pérdida visual.
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => {
-                    if (isAtCapacity) {
-                      triggerUpgradeModal("products");
-                      return;
-                    }
-                    setEditingProduct(null);
-                    setIsProductModalOpen(true);
-                  }}
-                  className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold shadow-sm cursor-pointer transition-all shrink-0 ${
-                    isAtCapacity
-                      ? "bg-rose-600 hover:bg-rose-500 text-white ring-2 ring-rose-500/30"
-                      : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white"
-                  }`}
-                  title={isAtCapacity ? "Cupo máximo alcanzado. Clic para actualizar plan" : "Registrar nuevo producto"}
-                >
-                  {isAtCapacity ? (
-                    <>
-                      <Zap className="w-4 h-4" />
-                      <span>Límite Alcanzado (Mejorar Plan)</span>
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4" />
-                      <span>+ Nuevo Producto</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* SaaS Catalog Quota Indicator Card */}
-              <div
-                className={`p-4 rounded-2xl border transition-all ${
-                  isAtCapacity
-                    ? "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
-                    : productUsagePct >= 80
-                    ? "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400"
-                    : "bg-card border-border text-foreground"
-                }`}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        isAtCapacity
-                          ? "bg-rose-500/20 text-rose-500"
-                          : productUsagePct >= 80
-                          ? "bg-amber-500/20 text-amber-500"
-                          : "bg-primary/10 text-primary"
-                      }`}
-                    >
-                      <Boxes className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-extrabold text-sm text-foreground">
-                          Capacidad de Catálogo ({currentProductsCount} / {maxProducts} productos)
-                        </span>
-                        <span
-                          className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                            isAtCapacity
-                              ? "bg-rose-500 text-white"
-                              : productUsagePct >= 80
-                              ? "bg-amber-500 text-white"
-                              : "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
-                          }`}
-                        >
-                          {isAtCapacity
-                            ? "Límite Alcanzado (100%)"
-                            : productUsagePct >= 80
-                            ? `${productUsagePct}% En Uso (Cerca del Límite)`
-                            : `${productUsagePct}% En Uso`}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Plan actual: <strong className="text-foreground">{planLimitsState?.plan.name || "Starter"}</strong>.
-                        {isAtCapacity
-                          ? " Has alcanzado el cupo máximo de tu plan. No podrás agregar más artículos hasta actualizar a un plan superior."
-                          : ` Te quedan ${maxProducts - currentProductsCount} espacios para nuevos productos en tu catálogo.`}
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => triggerUpgradeModal("products")}
-                    className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                      isAtCapacity
-                        ? "bg-rose-600 hover:bg-rose-500 text-white shadow-sm hover:scale-105 active:scale-95"
-                        : "bg-muted hover:bg-muted/80 text-foreground border border-border"
-                    }`}
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>{isAtCapacity ? "Actualizar Plan Ahora" : "Ver Opciones de Upgrade"}</span>
-                  </button>
-                </div>
-
-                {/* Progress bar */}
-                <div className="mt-3 w-full h-2 rounded-full bg-muted overflow-hidden border border-border/50">
-                  <div
-                    className={`h-full transition-all duration-500 rounded-full ${
-                      isAtCapacity
-                        ? "bg-rose-500"
-                        : productUsagePct >= 80
-                        ? "bg-amber-500"
-                        : "bg-gradient-to-r from-emerald-500 to-teal-500"
-                    }`}
-                    style={{ width: `${productUsagePct}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-3">
-              {products.map((prod) => {
-                const categoryName =
-                  categories.find((c) => c.id === prod.category_id)?.name ||
-                  "General";
-                const priceVes = prod.price_usd * rate.value;
-
-                return (
-                  <div
-                    key={prod.id}
-                    className="p-3.5 rounded-2xl border border-border bg-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all hover:border-border/80"
-                  >
-                    <div className="flex items-center gap-3">
-                      {prod.image_url ? (
-                        <img
-                          src={prod.image_url}
-                          alt={prod.name}
-                          className="w-14 h-14 object-cover rounded-xl border border-border shrink-0 bg-muted"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-14 h-14 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground shrink-0">
-                          <ImageIcon className="w-6 h-6 opacity-40" />
-                        </div>
-                      )}
-
-                      <div className="space-y-0.5 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-xs font-bold text-foreground">
-                            {prod.name}
-                          </h3>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-semibold">
-                            {categoryName}
-                          </span>
-                          {!prod.is_active && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-500 font-semibold">
-                              Inactivo
-                            </span>
-                          )}
-                        </div>
-
-                        <p className="text-[11px] text-muted-foreground flex items-center gap-2">
-                          <span>SKU: <strong className="text-foreground/80">{prod.sku || "N/A"}</strong></span>
-                          {prod.barcode && (
-                            <span>• Barra: <strong className="text-foreground/80">{prod.barcode}</strong></span>
-                          )}
-                        </p>
-
-                        <p className="text-xs font-mono font-bold text-primary">
-                          {formatCurrency(prod.price_usd, "USD")}
-                          {activeModuleIds.includes("local_venezuela") && (
-                            <span className="text-[11px] text-muted-foreground font-normal">
-                              {" "}(Bs. {priceVes.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-border">
-                      {/* Edit Button */}
-                      <button
-                        onClick={() => {
-                          setEditingProduct(prod);
-                          setIsProductModalOpen(true);
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-muted/40 hover:bg-muted text-xs font-semibold text-foreground transition-all cursor-pointer"
-                        title="Editar detalles y fotos del producto"
-                      >
-                        <Pencil className="w-3.5 h-3.5 text-primary" />
-                        <span>Editar</span>
-                      </button>
-
-                      {/* Stock controls */}
-                      <div className="flex items-center gap-1.5 bg-muted/40 p-1 rounded-xl border border-border">
-                        <button
-                          onClick={() => handleStockChange(prod.id, -1)}
-                          className="w-7 h-7 rounded-lg border border-border bg-card flex items-center justify-center hover:bg-muted text-foreground transition-all cursor-pointer"
-                          title="Restar 1 unidad"
-                        >
-                          <Minus className="w-3.5 h-3.5" />
-                        </button>
-
-                        <div className="w-12 text-center">
-                          <span
-                            className={`font-mono font-black text-xs block ${
-                              prod.stock <= 5
-                                ? "text-amber-500"
-                                : "text-foreground"
-                            }`}
-                          >
-                            {prod.stock}
-                          </span>
-                          <span className="text-[9px] text-muted-foreground block -mt-0.5">
-                            unid.
-                          </span>
-                        </div>
-
-                        <button
-                          onClick={() => handleStockChange(prod.id, 1)}
-                          className="w-7 h-7 rounded-lg border border-border bg-card flex items-center justify-center hover:bg-muted text-foreground transition-all cursor-pointer"
-                          title="Sumar 1 unidad"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ); })()}
+        {activeTab === "INVENTORY" && (
+          <InventoryTab
+            tenantId={settings.tenant_id}
+            products={products}
+            categories={categories}
+            rate={rate}
+            currencySettings={settingsState.currency_settings}
+            activeModuleIds={activeModuleIds}
+            planLimitsState={planLimitsState}
+            onStockChange={handleStockChange}
+            onEditProduct={(prod) => {
+              setEditingProduct(prod);
+              setIsProductModalOpen(true);
+            }}
+            onNewProduct={() => {
+              setEditingProduct(null);
+              setIsProductModalOpen(true);
+            }}
+            onTriggerUpgrade={(type) => triggerUpgradeModal(type)}
+            onProductsImported={() => {
+              window.location.reload();
+            }}
+          />
+        )}
 
         {/* PLUGIN FOOD SERVICE: RAW MATERIALS */}
         {activeTab === "RAW_MATERIALS" && (
@@ -3229,6 +3013,7 @@ export function AdminDashboard({
           <StoreSettingsTab
             settings={settingsState}
             activeModuleIds={activeModuleIds}
+            exchangeRate={rate}
             onUpdateSuccess={(updated) => setSettingsState(updated)}
             isSuperAdmin={currentUser?.role === "PLATFORM_SUPER_ADMIN" || Boolean(currentUser?.impersonation)}
           />

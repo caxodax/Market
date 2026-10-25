@@ -43,6 +43,7 @@ export interface CheckoutStepDeliveryProps {
   isVenezuelaActive: boolean;
   subtotalUsd: number;
   exchangeRate: number;
+  baseCurrency?: "USD" | "EUR";
 }
 
 export function CheckoutStepDelivery({
@@ -73,6 +74,7 @@ export function CheckoutStepDelivery({
   isVenezuelaActive,
   subtotalUsd,
   exchangeRate,
+  baseCurrency = "USD",
 }: CheckoutStepDeliveryProps) {
   return (
     <div className="space-y-4 animate-in fade-in duration-200">
@@ -348,7 +350,7 @@ export function CheckoutStepDelivery({
         <span className="text-muted-foreground font-medium">Subtotal de compra:</span>
         <div className="text-right">
           <span className="font-black text-sm text-foreground">
-            {formatCurrency(subtotalUsd, "USD")}
+            {formatCurrency(subtotalUsd, baseCurrency)}
           </span>
           {isVenezuelaActive && (
             <span className="block text-[10px] font-semibold text-muted-foreground">
