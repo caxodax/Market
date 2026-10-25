@@ -702,5 +702,73 @@ flowchart TD
 * **Compilación de Producción:** Next.js 16.3.8 Turbopack completado con éxito (`pnpm build` -> exit code 0).
 * **Control de Versiones y Sincronización Remota:** Cambios de Prioridad 7 (Inventario Moderno & Carga Masiva Excel) y Prioridad 8 (Multi-Divisa USD/EUR, Tasa Promedio y Tasa Especial BCV) consolidados, confirmados (commit) y sincronizados exitosamente con el repositorio remoto GitHub (`origin/main`).
 
+---
+
+## 19. Detalle de Ejecución de la Prioridad 9 (Completada ✅)
+
+### 1. Requerimiento, Análisis y Decisión Arquitectónica (Brainstorming & ECC)
+* **Objetivo del Usuario:**
+  - Crear un plugin integral de **Facturación** que incluya: **Facturas**, **Notas de Débito**, **Notas de Crédito**.
+  - Resolver si **Órdenes de Entrega** y **Guías de Despacho** forman parte de este plugin o de uno separado.
+  - Asegurar la **independencia de país**: MarketOS debe funcionar tanto en Venezuela como en Chile (o globalmente) sin reingeniería.
+  - Diseñar el mapa para el módulo de compras (Comprobantes de Retención de IVA/ISLR en Venezuela vs. Registro de Compras y Ventas RCV / Factura de Compra DTE 46 en Chile).
+* **Decisiones Arquitectónicas Adoptadas:**
+  1. **Separación de Flujos (OUTBOUND vs INBOUND):**
+     - **Facturación & Despacho (`OUTBOUND`):** Ventas, emisión hacia clientes y traslados de mercancía vendida $\to$ Unificado en `@marketos/plugin-invoicing`.
+     - **Compras & Retenciones (`INBOUND`):** Adquisiciones a proveedores y emisión de comprobantes de retención por Sujetos Pasivos Especiales $\to$ Planificado como `@marketos/plugin-purchasing-retentions` para no sobrecargar el POS ni las ventas.
+  2. **Unificación de Guías de Despacho:**
+     - En Chile, la **Guía de Despacho** es un Documento Tributario Electrónico legal (**DTE 52**) normado por el SII que ampara el traslado de bienes antes o junto con la factura. En Venezuela está normada por la Providencia 00071 del SENIAT. Unificarlas en el plugin de facturación ofrece paridad legal en ambos países.
+  3. **Arquitectura Hexagonal con Puerto Fiscal Desacoplado (`FiscalAdapterPort`):**
+     - Cero lógica fiscal acoplada a Venezuela en el núcleo.
+     - Puerto en [`packages/types/src/ports.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/types/src/ports.ts) implementado por:
+       - `VenezuelaFiscalAdapter`: IVA 16%, IGTF 3%, validación de RIF, leyendas Providencia 00071, prefijos `FACT-`, `NC-`, `ND-`, `GD-`, `OE-`.
+       - `ChileFiscalAdapter`: IVA 19%, validación de RUT (Módulo 11), folios DTE SII (33, 61, 56, 52), formato de moneda CLP sin decimales.
+       - `GlobalFiscalAdapter`: Facturación comercial estándar multimoneda internacional.
+
+### 2. Paquete Creado: `@marketos/plugin-invoicing`
+* **Manifiesto:** [`packages/plugins/invoicing/src/manifest.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/invoicing/src/manifest.ts) (`id: "invoicing"`, `country_code: "GLOBAL"`, `icon_name: "ReceiptText"`).
+* **Adaptadores Fiscales:** [`packages/plugins/invoicing/src/adapters/fiscal-adapter.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/invoicing/src/adapters/fiscal-adapter.ts)
+  - `validateChileanRut(rut)`: Implementación con algoritmo Módulo 11 (ponderadores 2..7 y residuo con dígito verificador `0..9`, `K`).
+  - `validateVenezuelanRif(rif)`: Validador con regex oficial SENIAT para personas naturales y jurídicas (`[JVEGP]\d{8,9}`).
+  - Selector automático `resolveFiscalAdapter(countryCode, activeModuleIds)` que prioriza los módulos activos del inquilino.
+* **Servicio de Emisión:** [`packages/plugins/invoicing/src/services/invoicing-service.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/invoicing/src/services/invoicing-service.ts)
+  - `prepareFiscalDocument`:
+    - Valida que Notas de Crédito y Débito exijan obligatoriamente el número de factura afectada.
+    - Valida que el monto de una Nota de Crédito no exceda el total de la factura original.
+    - Genera correlativos automáticos, número de control SENIAT/SII y payload QR CUV para verificación fiscal.
+* **Componentes de Interfaz de Usuario (UI/UX Pro Max & Impeccable):**
+  - [`invoicing-manager-admin.tsx`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/invoicing/src/components/invoicing-manager-admin.tsx): Panel administrativo con métricas (Total Facturado, Notas de Crédito, Guías de Despacho, Comprobantes Totales), filtros por tipo de documento, buscador instantáneo y tabla de documentos.
+  - [`issue-document-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/invoicing/src/components/issue-document-modal.tsx): Modal unificado para emitir Facturas, NC, ND, Órdenes de Entrega y Guías de Despacho. Incluye selector de factura afectada, interruptor para reponer stock al inventario y campos de transporte (chofer, cédula/RUT, placa y modelo del vehículo) con selección en 1 toque desde la flota de repartidores.
+  - [`printable-document-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/invoicing/src/components/printable-document-modal.tsx): Visor e impresor dual con estilos `@media print`:
+    - **Ticket Térmico (80mm):** Para impresoras térmicas de punto de venta.
+    - **Hoja Completa (Carta / A4):** Para facturas fiscales corporativas y guías de despacho de carretera con QR de autenticidad.
+
+### 3. Persistencia y Reposición de Inventario (`@marketos/database`)
+* **Repositorio Creado:** [`packages/database/src/repositories/invoicing.repository.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/database/src/repositories/invoicing.repository.ts)
+  - Métodos: `getFiscalDocuments`, `getFiscalDocumentById`, `getFiscalDocumentByNumber`, `countFiscalDocuments`, `saveFiscalDocument`.
+  - **Reposición Automática de Inventario:** Cuando se emite una Nota de Crédito con `return_items_to_inventory: true`, el repositorio incrementa inmediatamente las existencias del producto en la tabla `inventory` e inserta el movimiento en `inventory_movements` con `reason: "CREDIT_NOTE_RETURN"`.
+  - Registro de auditoría multi-tenant en `audit_logs` con `action: "FISCAL_DOCUMENT_ISSUED"`.
+* **Exportación y Sincronización:** Re-exportado en [`packages/database/src/index.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/database/src/index.ts) y con soporte en el runtime en memoria de [`mock-data.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/database/src/mock-data.ts).
+
+### 4. Integración en la Aplicación Web (`apps/web`)
+* **Server Actions Seguras:** [`apps/web/src/app/admin/invoicing-actions.ts`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/app/admin/invoicing-actions.ts)
+  - `getFiscalDocumentsAction(tenantId, filterType)`: Con guardián `assertAuthorizedTenantAdmin`.
+  - `getAvailableInvoicesAction(tenantId)`: Lista facturas emitidas para asociar notas de crédito o débito.
+  - `issueFiscalDocumentAction(tenantId, input)`: Prepara, calcula impuestos desacoplados por adaptador, persiste y revalida la ruta `/admin`.
+* **Carga en Servidor:** [`apps/web/src/app/admin/page.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/app/admin/page.tsx)
+  - Carga concurrente en `Promise.all` con `InvoicingRepository.getFiscalDocuments(targetTenantId)` y paso como `initialFiscalDocuments`.
+* **Consola Administrativa:** [`apps/web/src/components/admin-dashboard.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/admin-dashboard.tsx)
+  - Añadida la pestaña condicional **"Facturación & Guías"** bajo la categoría de Finanzas cuando el módulo `invoicing` está activo.
+  - En la lista de pedidos (**Órdenes**), se integró el botón directo **"Facturar / Guía"** para emitir cualquier documento pre-cargando los datos del cliente, dirección, ítems y montos con 1 solo clic.
+* **Catálogo de Plugins:** [`apps/web/src/components/tenant-plugins-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/tenant-plugins-modal.tsx)
+  - Registrados los plugins `invoicing` y `local_chile` para que los administradores de tienda puedan activarlos o desactivarlos de forma autónoma.
+
+### 5. Verificación Rigurosa y Calidad de Código
+* **Pruebas de Unidad Propias:** 11 de 11 pruebas aprobadas en [`packages/plugins/invoicing/src/__tests__/run-checks.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/invoicing/src/__tests__/run-checks.ts) evaluando RUT Módulo 11, RIF SENIAT, cálculo de IVA e IGTF, secuencias DTE y SENIAT, y límites de Notas de Crédito.
+* **Pruebas Monorepo:** 10 de 10 suites de prueba aprobadas al 100% (`pnpm test` -> 0 fallos).
+* **Verificación de Tipos:** 14 de 14 proyectos en `pnpm check-types` aprobados sin un solo error de TypeScript.
+* **Compilación de Producción:** Next.js 16.3.8 Turbopack completado con éxito (`pnpm build` -> exit code 0).
+
+
 
 

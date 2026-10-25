@@ -37,6 +37,7 @@ export * from "./client.ts";
 export * from "./server.ts";
 export * from "./circuit-breaker.ts";
 export * from "./services.ts";
+export * from "./repositories/index.ts";
 export * from "./mock-data.ts";
 export * from "@marketos/types";
 

@@ -32,6 +32,7 @@ import {
   LayoutTemplate,
   Eye,
   Monitor,
+  ReceiptText,
 } from "lucide-react";
 import { PluginDetailModal } from "./plugin-detail-modal";
 
@@ -275,6 +276,44 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
     targetAudience:
       "Supermercados, abastos, farmacias y comercios retail con uno o más cajeros físicos y ventas online simultáneas.",
     themeColor: "emerald",
+  },
+  {
+    id: "invoicing",
+    name: "Facturación, Notas & Guías de Despacho",
+    badge: "v1.0.0 • Motor Fiscal Universal",
+    category: "Finanzas Locales",
+    categoryShort: "Facturación & Guías",
+    description:
+      "Sistema universal de emisión de Facturas, Notas de Crédito con reposición automática de inventario, Notas de Débito, Órdenes de Entrega y Guías de Despacho de mercancías con chofer y placas.",
+    icon: <ReceiptText className="w-5 h-5 text-blue-500" />,
+    features: [
+      "Facturas Comerciales y Fiscales con numeración correlativa y número de control",
+      "Notas de Crédito con reposición opcional de inventario e historial auditado",
+      "Guías de Despacho y Órdenes de Entrega con datos del transportista y vehículo",
+      "Impresión dual: Ticket Térmico POS 80mm y Hoja Completa Carta/A4 con QR CUV",
+    ],
+    targetAudience:
+      "Comercios que requieren emitir facturas legales, notas de crédito/débito vinculadas a facturas, o guías de despacho y control de mercancía en tránsito.",
+    themeColor: "blue",
+  },
+  {
+    id: "local_chile",
+    name: "Localización Oficial Chile (SII)",
+    badge: "v1.0.0 • DTE & RUT",
+    category: "Finanzas Locales",
+    categoryShort: "Chile / SII",
+    description:
+      "Localización para Chile con validación de RUT por Algoritmo Módulo 11, IVA 19%, y mapeo de folios DTE (33, 61, 56, 52).",
+    icon: <Landmark className="w-5 h-5 text-purple-500" />,
+    features: [
+      "Validador nativo de RUT chileno con dígito verificador Módulo 11",
+      "IVA 19% estándar de acuerdo a la normativa del SII",
+      "Mapeo de folios DTE 33 (Factura), DTE 61 (NC) y DTE 52 (Guía de Despacho)",
+      "Moneda CLP con formato chileno sin decimales",
+    ],
+    targetAudience:
+      "Comercios operando en Chile con exigencias de tributación SII y RUT.",
+    themeColor: "purple",
   },
 ];
 

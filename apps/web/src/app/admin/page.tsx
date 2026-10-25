@@ -1,6 +1,6 @@
 import React from "react";
 import { redirect } from "next/navigation";
-import { MarketOSRepository } from "@marketos/database";
+import { MarketOSRepository, InvoicingRepository } from "@marketos/database";
 import { AdminDashboard } from "../../components/admin-dashboard";
 import { SuspendedAdminScreen } from "../../components/suspended-admin-screen";
 import { getCurrentUser } from "../login/actions";
@@ -94,6 +94,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     activeModuleIds,
     rawMaterials,
     existingRecipes,
+    fiscalDocuments,
   ] = await Promise.all([
     MarketOSRepository.getTenantSettings(targetTenantId),
     MarketOSRepository.getProducts(targetTenantId),
@@ -114,6 +115,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     MarketOSRepository.getTenantActiveModuleIds(targetTenantId),
     MarketOSRepository.getRawMaterials(targetTenantId),
     MarketOSRepository.getProductRecipes(targetTenantId),
+    InvoicingRepository.getFiscalDocuments(targetTenantId),
   ]);
 
   return (
@@ -156,6 +158,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         activeModuleIds={activeModuleIds}
         initialRawMaterials={rawMaterials}
         initialRecipes={existingRecipes}
+        initialFiscalDocuments={fiscalDocuments}
       />
     </div>
   );

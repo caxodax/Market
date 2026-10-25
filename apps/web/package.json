@@ -15,6 +15,7 @@
     "@marketos/plugin-barcode-retail": "workspace:*",
     "@marketos/plugin-delivery-fleet": "workspace:*",
     "@marketos/plugin-food-service": "workspace:*",
+    "@marketos/plugin-invoicing": "workspace:*",
     "@marketos/plugin-local-venezuela": "workspace:*",
     "@marketos/plugin-mto-cpq": "workspace:*",
     "@marketos/plugin-promotions-coupons": "workspace:*",

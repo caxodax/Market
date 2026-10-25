@@ -25,6 +25,8 @@ import {
   TenantModuleId,
   RawMaterial,
   ProductRecipe,
+  FiscalDocument,
+  CreateFiscalDocumentInput,
 } from "@marketos/types";
 
 import {
@@ -47,6 +49,7 @@ import {
   saveProductRecipeAction,
   updateTenantSettingsAction,
 } from "../app/admin/actions";
+import { issueFiscalDocumentAction } from "../app/admin/invoicing-actions";
 import dynamic from "next/dynamic";
 import { stopImpersonationAction } from "../app/platform/actions";
 import { logoutUserAction } from "../app/login/actions";
@@ -104,6 +107,13 @@ const RecipeManagerAdmin = dynamic(
 const MtoCpqAdminPanel = dynamic(
   () => import("@marketos/plugin-mto-cpq").then((m) => m.MtoCpqAdminPanel),
   { loading: TabLoading }
+);
+const InvoicingManagerAdmin = dynamic(
+  () => import("@marketos/plugin-invoicing").then((m) => m.InvoicingManagerAdmin),
+  { loading: TabLoading }
+);
+const IssueDocumentModal = dynamic(
+  () => import("@marketos/plugin-invoicing").then((m) => m.IssueDocumentModal)
 );
 const InventoryTab = dynamic(
   () => import("./inventory-tab").then((m) => m.InventoryTab),
@@ -188,6 +198,7 @@ import {
   ChefHat,
   Puzzle,
   ScanBarcode,
+  ReceiptText,
 } from "lucide-react";
 
 interface AdminDashboardProps {
@@ -212,6 +223,7 @@ interface AdminDashboardProps {
   activeModuleIds?: TenantModuleId[];
   initialRawMaterials?: RawMaterial[];
   initialRecipes?: ProductRecipe[];
+  initialFiscalDocuments?: FiscalDocument[];
 }
 
 interface AdminToast {
@@ -255,6 +267,7 @@ export function AdminDashboard({
   activeModuleIds = [],
   initialRawMaterials = [],
   initialRecipes = [],
+  initialFiscalDocuments = [],
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<
     | "PAYMENTS"
@@ -274,6 +287,7 @@ export function AdminDashboard({
     | "PLUGINS"
     | "STOREFRONT_STUDIO"
     | "MTO_CPQ"
+    | "INVOICING"
   >("PAYMENTS");
 
   const [settingsState, setSettingsState] = useState(settings);
@@ -285,6 +299,9 @@ export function AdminDashboard({
   const [rate, setRate] = useState(initialRate);
   const [auditLogs, setAuditLogs] = useState(initialAuditLogs);
   const [staff, setStaff] = useState<UserProfile[]>(initialStaffMembers);
+  const [fiscalDocuments, setFiscalDocuments] = useState<FiscalDocument[]>(initialFiscalDocuments);
+  const [invoicingOrderTarget, setInvoicingOrderTarget] = useState<Order | null>(null);
+  const [isQuickInvoiceModalOpen, setIsQuickInvoiceModalOpen] = useState(false);
 
   // Ponytail Ultra: Auto-refresh admin data (orders, rate, payments) on tab focus and every 45s
   useAutoRefresh(45000);
@@ -952,7 +969,8 @@ export function AdminDashboard({
       | "RECIPES"
       | "PLUGINS"
       | "STOREFRONT_STUDIO"
-      | "MTO_CPQ";
+      | "MTO_CPQ"
+      | "INVOICING";
 
     category: ModuleCategory;
     label: string;
@@ -1148,6 +1166,20 @@ export function AdminDashboard({
           },
         ]
       : []),
+    ...(activeModuleIds.includes("invoicing")
+      ? [
+          {
+            id: "INVOICING" as const,
+            category: "FINANCE" as const,
+            label: `Facturación & Guías (${fiscalDocuments.length})`,
+            shortLabel: "Facturación",
+            description: "Facturas, Notas de Crédito, Débito y Guías de Despacho",
+            icon: <ReceiptText className="w-4 h-4 shrink-0" />,
+            badge: fiscalDocuments.length > 0 ? `${fiscalDocuments.length}` : null,
+            badgeClassName: "bg-blue-500/10 text-blue-600 border border-blue-500/20 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+          },
+        ]
+      : []),
 
     // 4. Administración
     {
@@ -1228,6 +1260,7 @@ export function AdminDashboard({
     // 3. Finanzas
     REPORTS: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER"],
     RATES: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_CASHIER"],
+    INVOICING: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_CASHIER"],
 
     // 4. Administración & Gobierno (Exclusivo Dueño / Super Admin / Gerente)
     STORES: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER"],
@@ -2339,6 +2372,22 @@ export function AdminDashboard({
                             <span>Ver Detalle</span>
                           </button>
 
+                          {/* Facturar / Guía Button (Plugin Invoicing) */}
+                          {activeModuleIds.includes("invoicing") && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setInvoicingOrderTarget(order);
+                                setIsQuickInvoiceModalOpen(true);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 text-xs font-bold border border-blue-500/20 transition-colors cursor-pointer"
+                              title="Emitir Factura o Guía de Despacho para este pedido"
+                            >
+                              <ReceiptText className="w-3.5 h-3.5" />
+                              <span>Facturar / Guía</span>
+                            </button>
+                          )}
+
                           <a
                             href={generateOrderStatusNotificationWhatsAppLink({
                               customerName: order.customer_name || "Cliente",
@@ -2535,6 +2584,43 @@ export function AdminDashboard({
               initialRate={rate}
               initialHistory={ratesHistory}
               onRateUpdated={(newRate) => setRate(newRate)}
+            />
+          </div>
+        )}
+
+        {/* TAB: FACTURACIÓN & GUÍAS DE DESPACHO */}
+        {activeTab === "INVOICING" && (
+          <div className="animate-in fade-in">
+            <InvoicingManagerAdmin
+              tenantId={settingsState.tenant_id}
+              settings={settingsState}
+              activeModuleIds={activeModuleIds}
+              initialDocuments={fiscalDocuments}
+              orders={orders}
+              availableDrivers={drivers.map((d) => ({
+                id: d.id,
+                name: d.name,
+                phone: d.phone,
+                vehicle_plate: d.plate_number || undefined,
+              }))}
+              onIssueDocument={async (input) => {
+                const res = await issueFiscalDocumentAction(settingsState.tenant_id, input);
+                if (res.success && res.document) {
+                  setFiscalDocuments((prev) => [res.document!, ...prev]);
+                  showToast({
+                    type: "success",
+                    title: "Documento Emitido",
+                    message: `Se emitió con éxito ${res.document.document_number}`,
+                  });
+                } else {
+                  showToast({
+                    type: "error",
+                    title: "Error de Emisión",
+                    message: res.error || "No se pudo emitir el documento",
+                  });
+                }
+                return res;
+              }}
             />
           </div>
         )}
@@ -3267,6 +3353,45 @@ export function AdminDashboard({
           setSelectedOrderForModal(updated);
         }}
       />
+
+      {/* Quick Issue Commercial Document Modal from Order */}
+      {isQuickInvoiceModalOpen && (
+        <IssueDocumentModal
+          isOpen={isQuickInvoiceModalOpen}
+          onClose={() => {
+            setIsQuickInvoiceModalOpen(false);
+            setInvoicingOrderTarget(null);
+          }}
+          settings={settingsState}
+          activeModuleIds={activeModuleIds}
+          initialOrder={invoicingOrderTarget}
+          availableDrivers={drivers.map((d) => ({
+            id: d.id,
+            name: d.name,
+            phone: d.phone,
+            vehicle_plate: d.plate_number || undefined,
+          }))}
+          existingInvoices={fiscalDocuments.filter((d) => d.document_type === "INVOICE")}
+          onDocumentCreated={async (input: CreateFiscalDocumentInput) => {
+            const res = await issueFiscalDocumentAction(settingsState.tenant_id, input);
+            if (res.success && res.document) {
+              setFiscalDocuments((prev) => [res.document!, ...prev]);
+              showToast({
+                type: "success",
+                title: "Documento Emitido",
+                message: `Se emitió con éxito ${res.document.document_number}`,
+              });
+            } else {
+              showToast({
+                type: "error",
+                title: "Error de Emisión",
+                message: res.error || "No se pudo emitir el documento",
+              });
+            }
+            return res;
+          }}
+        />
+      )}
 
       {/* Tenant Plugins Modal for Super Admin & Support Impersonation */}
       <TenantPluginsModal

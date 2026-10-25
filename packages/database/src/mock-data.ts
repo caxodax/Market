@@ -25,6 +25,7 @@ import type {
   ProductRecipe,
   ProductModifierGroup,
   PlatformSettings,
+  FiscalDocument,
 } from "@marketos/types";
 
 export const INITIAL_TENANT: Tenant = {
@@ -1366,6 +1367,14 @@ export const INITIAL_TENANT_MODULES: TenantModule[] = [
     installed_at: new Date(nowMs - 90 * oneDay).toISOString(),
     updated_at: new Date(nowMs - 90 * oneDay).toISOString(),
   },
+  {
+    id: "mod-sm-inv",
+    tenant_id: "shop-market-ca",
+    module_id: "invoicing",
+    is_active: true,
+    installed_at: new Date(nowMs - 90 * oneDay).toISOString(),
+    updated_at: new Date(nowMs - 90 * oneDay).toISOString(),
+  },
   // Pulldog (Gastronomía / Perros Calientes & Comida Rápida)
   {
     id: "mod-pd-food",
@@ -1856,6 +1865,7 @@ export const state = {
   rawMaterials: INITIAL_RAW_MATERIALS,
   recipes: INITIAL_RECIPES,
   modifierGroups: INITIAL_MODIFIER_GROUPS,
+  fiscalDocuments: [] as FiscalDocument[],
   platformSettings: {
     id: "default",
     platform_name: "MarketOS",

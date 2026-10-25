@@ -14,7 +14,9 @@ export type TenantModuleId =
   | "delivery_fleet"        // Logística: Repartidores propios, asignación de rutas
   | "mto_cpq"               // Fabricación & CPQ: Make-to-Order, dimensiones, costeo y cotizaciones
   | "storefront_pro"        // Vitrina Pro: Banners, sliders, reels, testimonios y maquetador visual
-  | "pos_registers";        // POS: Multi-Caja, Turnos, Arqueo (Cierre X/Z), PIN por cajero
+  | "pos_registers"         // POS: Multi-Caja, Turnos, Arqueo (Cierre X/Z), PIN por cajero
+  | "invoicing"             // Facturación: Facturas, Notas de Crédito, Notas de Débito, Guías de Despacho
+  | "local_chile";          // Localización Chile: RUT, IVA 19%, SII, DTE, Boletas Electrónicas
 
 export type PluginCategory =
   | "location"              // Localización por país

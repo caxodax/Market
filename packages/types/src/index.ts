@@ -9,6 +9,7 @@ export * from "./mto-cpq.ts";
 export * from "./barcode-retail.ts";
 export * from "./pos.ts";
 export * from "./storefront-pro.ts";
+export * from "./invoicing.ts";
 
 import type { SelectedModifier } from "./food-service.ts";
 
@@ -157,7 +158,7 @@ export interface Store {
   updated_at: string;
 }
 
-export type CurrencyCode = "USD" | "VES" | "COP" | "EUR";
+export type CurrencyCode = "USD" | "VES" | "COP" | "EUR" | "CLP";
 
 export interface ExchangeRate {
   id: string;

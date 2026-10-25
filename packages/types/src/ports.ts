@@ -106,3 +106,41 @@ export interface NotificationPort {
   readonly channelId: string;
   sendNotification(payload: NotificationPayload): Promise<NotificationResult>;
 }
+
+// ─── 5. FISCAL & INVOICING ADAPTER PORT ──────────────────────────────────────
+export interface FiscalCalculationInput {
+  items: Array<{
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    isExempt?: boolean;
+    taxRatePercent?: number;
+  }>;
+  currency: string;
+  applyIgtf?: boolean;
+  exchangeRate?: number;
+}
+
+export interface FiscalCalculationBreakdown {
+  subtotalGross: number;
+  subtotalExempt: number;
+  subtotalTaxable: number;
+  ivaRatePercent: number;
+  ivaAmount: number;
+  igtfRatePercent?: number;
+  igtfAmount?: number;
+  total: number;
+  totalVes?: number;
+}
+
+export interface FiscalAdapterPort {
+  readonly countryCode: "VE" | "CL" | "GLOBAL" | string;
+  readonly countryName: string;
+  readonly taxIdLabel: string;
+  readonly defaultIvaRate: number;
+
+  validateTaxId(taxId: string): boolean;
+  calculateTaxes(input: FiscalCalculationInput): FiscalCalculationBreakdown;
+  formatDocumentNumber(type: string, sequence: number, prefix?: string): string;
+  getLegalLegend(type: string): string;
+}

@@ -131,6 +131,14 @@ export function formatCurrency(
     }).format(amount);
   }
 
+  if (currency === "CLP") {
+    return new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency: "CLP",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  }
+
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: currency,
