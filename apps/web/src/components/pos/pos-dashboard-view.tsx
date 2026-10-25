@@ -448,10 +448,12 @@ export function POSDashboardView({
                 <Input
                   id="pin-input"
                   type="password"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   maxLength={6}
                   value={newPin}
                   onChange={(e) => {
-                    setNewPin(e.target.value);
+                    setNewPin(e.target.value.replace(/\D/g, ""));
                     setPinError("");
                   }}
                   placeholder="••••"

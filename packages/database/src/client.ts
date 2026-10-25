@@ -1,5 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
-import { DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY } from "./server";
+import { DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY } from "./server.ts";
 
 /**
  * Creates a Supabase client for Client Components in the browser

@@ -9,7 +9,8 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "node --experimental-strip-types src/__tests__/order-persistence.test.ts"
   },
   "dependencies": {
     "@marketos/types": "workspace:*",

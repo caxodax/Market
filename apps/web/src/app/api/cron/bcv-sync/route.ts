@@ -19,12 +19,19 @@ export async function GET(request: Request) {
     const isVercelCron = request.headers.get("x-vercel-cron") === "1";
     const isSupabasePgNet = userAgent.includes("Supabase-pg_net");
 
-    // Verify secret if CRON_SECRET is set in environment (allow Vercel Cron and Supabase pg_net)
-    if (cronSecret && !isVercelCron && !isSupabasePgNet) {
-      const isBearerValid = authHeader === `Bearer ${cronSecret}`;
-      const isParamValid = secretParam === cronSecret || secretParam === "marketos-bcv-secret";
-      if (!isBearerValid && !isParamValid) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // AgentShield: Verify authorization (Vercel Cron, Supabase pg_net, or Bearer/secret token)
+    if (!isVercelCron && !isSupabasePgNet) {
+      if (cronSecret) {
+        const isBearerValid = authHeader === `Bearer ${cronSecret}`;
+        const isParamValid = secretParam === cronSecret;
+        if (!isBearerValid && !isParamValid) {
+          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+      } else if (process.env.NODE_ENV === "production") {
+        return NextResponse.json(
+          { error: "Cron execution disabled: CRON_SECRET is not configured in production" },
+          { status: 403 }
+        );
       }
     }
 

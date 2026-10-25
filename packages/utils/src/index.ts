@@ -1,9 +1,9 @@
-import { CurrencyCode, BcvApiResponse } from "@marketos/types";
+import type { CurrencyCode, BcvApiResponse } from "@marketos/types";
 
-export * from "./storage";
-export * from "./whatsapp";
-export * from "./image-compressor";
-export * from "./dates";
+export * from "./storage.ts";
+export * from "./whatsapp.ts";
+export * from "./image-compressor.ts";
+export * from "./dates.ts";
 
 let memoryBcvCache: {
   data: {

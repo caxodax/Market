@@ -40,8 +40,11 @@ export function ProductCard({
           <img
             src={product.image_url}
             alt={product.name}
-            className="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
+            width={400}
+            height={400}
             loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
             onError={(e) => {
               e.currentTarget.onerror = null;
               e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z'/%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M16 10a4 4 0 0 1-8 0'/%3E%3C/svg%3E";
@@ -79,9 +82,12 @@ export function ProductCard({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (typeof window !== "undefined" && "vibrate" in navigator) {
+              try { navigator.vibrate(10); } catch {}
+            }
             toggleFavorite(product.id);
           }}
-          className={`absolute top-2.5 right-2.5 z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer backdrop-blur-md shadow-2xs active:scale-90 ${
+          className={`absolute top-2.5 right-2.5 z-10 w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all cursor-pointer backdrop-blur-md shadow-2xs active:scale-90 touch-manipulation ${
             favorited
               ? "bg-rose-500/15 border border-rose-500/30 text-rose-500 shadow-sm"
               : "bg-background/80 hover:bg-background border border-border/60 text-muted-foreground hover:text-rose-500 hover:scale-105"
@@ -136,11 +142,16 @@ export function ProductCard({
         {/* Interactive Action Button / Inline Stepper */}
         <div className="mt-3 pt-1">
           {quantityInCart > 0 ? (
-            <div className="flex items-center justify-between h-10 px-1.5 rounded-xl bg-primary/10 border border-primary/30 text-primary shadow-2xs">
+            <div className="flex items-center justify-between min-h-[44px] h-11 px-1.5 rounded-xl bg-primary/10 border border-primary/30 text-primary shadow-2xs">
               <button
                 type="button"
-                onClick={() => updateQuantity(product.id, quantityInCart - 1)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary hover:text-primary-foreground transition-colors active:scale-95 cursor-pointer"
+                onClick={() => {
+                  if (typeof window !== "undefined" && "vibrate" in navigator) {
+                    try { navigator.vibrate(10); } catch {}
+                  }
+                  updateQuantity(product.id, quantityInCart - 1);
+                }}
+                className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary hover:text-primary-foreground transition-colors active:scale-95 cursor-pointer touch-manipulation"
                 aria-label="Disminuir cantidad"
               >
                 <Minus className="w-4 h-4 stroke-[2.5]" />
@@ -159,13 +170,16 @@ export function ProductCard({
                 type="button"
                 disabled={quantityInCart >= product.stock}
                 onClick={() => {
+                  if (typeof window !== "undefined" && "vibrate" in navigator) {
+                    try { navigator.vibrate(12); } catch {}
+                  }
                   if (hasModifiers && onOpenModifiers) {
                     onOpenModifiers(product);
                   } else {
                     addItem(product, 1, false);
                   }
                 }}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary hover:text-primary-foreground transition-colors active:scale-95 disabled:opacity-40 cursor-pointer"
+                className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary hover:text-primary-foreground transition-colors active:scale-95 disabled:opacity-40 cursor-pointer touch-manipulation"
                 aria-label="Aumentar cantidad"
               >
                 <Plus className="w-4 h-4 stroke-[2.5]" />
@@ -174,6 +188,9 @@ export function ProductCard({
           ) : (
             <button
               onClick={() => {
+                if (typeof window !== "undefined" && "vibrate" in navigator) {
+                  try { navigator.vibrate(15); } catch {}
+                }
                 if (hasModifiers && onOpenModifiers) {
                   onOpenModifiers(product);
                 } else {
@@ -181,7 +198,7 @@ export function ProductCard({
                 }
               }}
               disabled={isOutOfStock}
-              className={`w-full h-10 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer ${
+              className={`w-full min-h-[44px] h-11 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer touch-manipulation ${
                 isOutOfStock
                   ? "bg-muted text-muted-foreground cursor-not-allowed"
                   : hasModifiers

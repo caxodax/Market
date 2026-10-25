@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { createServerComponentClient } from "@marketos/database";
+import { assertAuthorizedTenantAdmin } from "./actions";
 import type {
   CashRegister,
   CashRegisterSession,
@@ -120,15 +121,32 @@ export async function setRegisterPin(
   if (!/^\d{4,6}$/.test(newPin)) {
     return { success: false, error: "El PIN debe ser 4-6 dígitos numéricos" };
   }
-  const supabase = await getSupabase();
-  const pin_hash = await hashPin(newPin);
-  const { error } = await supabase
-    .from("cash_registers")
-    .update({ pin_hash })
-    .eq("id", registerId);
+  try {
+    const supabase = await getSupabase();
+    const { data: reg, error: regError } = await supabase
+      .from("cash_registers")
+      .select("tenant_id")
+      .eq("id", registerId)
+      .single();
 
-  if (error) return { success: false, error: error.message };
-  return { success: true };
+    if (regError || !reg) {
+      return { success: false, error: "Caja no encontrada" };
+    }
+
+    await assertAuthorizedTenantAdmin(reg.tenant_id);
+
+    const pin_hash = await hashPin(newPin);
+    const { error } = await supabase
+      .from("cash_registers")
+      .update({ pin_hash })
+      .eq("id", registerId);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Error al configurar PIN";
+    return { success: false, error: message };
+  }
 }
 
 // ── Obtener cajas activas del tenant ─────────────────────────────────────────
@@ -136,6 +154,7 @@ export async function getCashRegisters(
   tenantId: string,
   storeId: string
 ): Promise<CashRegister[]> {
+  await assertAuthorizedTenantAdmin(tenantId);
   const supabase = await getSupabase();
 
   const { data, error } = await supabase
@@ -172,15 +191,21 @@ export async function createCashRegister(
   description?: string,
   isVirtual = false
 ): Promise<POSActionResult<CashRegister>> {
-  const supabase = await getSupabase();
-  const { data, error } = await supabase
-    .from("cash_registers")
-    .insert({ tenant_id: tenantId, store_id: storeId, name, description, is_virtual: isVirtual })
-    .select()
-    .single();
+  try {
+    await assertAuthorizedTenantAdmin(tenantId);
+    const supabase = await getSupabase();
+    const { data, error } = await supabase
+      .from("cash_registers")
+      .insert({ tenant_id: tenantId, store_id: storeId, name, description, is_virtual: isVirtual })
+      .select()
+      .single();
 
-  if (error) return { success: false, error: error.message };
-  return { success: true, data: data as CashRegister };
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data as CashRegister };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Error al crear caja";
+    return { success: false, error: message };
+  }
 }
 
 // ── Abrir turno ──────────────────────────────────────────────────────────────
@@ -188,34 +213,40 @@ export async function openShift(
   tenantId: string,
   payload: OpenShiftPayload
 ): Promise<POSActionResult<CashRegisterSession>> {
-  const supabase = await getSupabase();
+  try {
+    await assertAuthorizedTenantAdmin(tenantId);
+    const supabase = await getSupabase();
 
-  // Verificar que no haya turno abierto
-  const { data: existing } = await supabase
-    .from("cash_register_sessions")
-    .select("id")
-    .eq("register_id", payload.register_id)
-    .is("closed_at", null)
-    .maybeSingle();
+    // Verificar que no haya turno abierto
+    const { data: existing } = await supabase
+      .from("cash_register_sessions")
+      .select("id")
+      .eq("register_id", payload.register_id)
+      .is("closed_at", null)
+      .maybeSingle();
 
-  if (existing) {
-    return { success: false, error: "La caja ya tiene un turno abierto" };
+    if (existing) {
+      return { success: false, error: "La caja ya tiene un turno abierto" };
+    }
+
+    const { data, error } = await supabase
+      .from("cash_register_sessions")
+      .insert({
+        register_id: payload.register_id,
+        tenant_id: tenantId,
+        cashier_user_id: payload.cashier_user_id,
+        cashier_name: payload.cashier_name,
+        opening_balance: payload.opening_balance,
+      })
+      .select()
+      .single();
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: data as CashRegisterSession };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Error al abrir turno";
+    return { success: false, error: message };
   }
-
-  const { data, error } = await supabase
-    .from("cash_register_sessions")
-    .insert({
-      register_id: payload.register_id,
-      tenant_id: tenantId,
-      cashier_user_id: payload.cashier_user_id,
-      cashier_name: payload.cashier_name,
-      opening_balance: payload.opening_balance,
-    })
-    .select()
-    .single();
-
-  if (error) return { success: false, error: error.message };
-  return { success: true, data: data as CashRegisterSession };
 }
 
 // ── Obtener resumen del turno (para Cierre X y Cierre Z) ─────────────────────
@@ -231,6 +262,10 @@ export async function getShiftSummary(
     .single();
 
   if (error || !session) return null;
+
+  if (session.tenant_id) {
+    await assertAuthorizedTenantAdmin(session.tenant_id);
+  }
 
   const { data: movements } = await supabase
     .from("cash_movements")
@@ -269,41 +304,50 @@ export async function getShiftSummary(
 export async function closeShift(
   payload: CloseShiftPayload
 ): Promise<POSActionResult<{ expected_balance: number; difference: number }>> {
-  const supabase = await getSupabase();
+  try {
+    const supabase = await getSupabase();
 
-  const { data: session } = await supabase
-    .from("cash_register_sessions")
-    .select("opening_balance, total_sales_usd, total_cash_in, total_cash_out")
-    .eq("id", payload.session_id)
-    .is("closed_at", null) // solo si aún está abierto
-    .single();
+    const { data: session } = await supabase
+      .from("cash_register_sessions")
+      .select("tenant_id, opening_balance, total_sales_usd, total_cash_in, total_cash_out")
+      .eq("id", payload.session_id)
+      .is("closed_at", null) // solo si aún está abierto
+      .single();
 
-  if (!session) {
-    return { success: false, error: "Turno no encontrado o ya cerrado" };
+    if (!session) {
+      return { success: false, error: "Turno no encontrado o ya cerrado" };
+    }
+
+    if (session.tenant_id) {
+      await assertAuthorizedTenantAdmin(session.tenant_id);
+    }
+
+    const expected =
+      Number(session.opening_balance) +
+      Number(session.total_sales_usd) +
+      Number(session.total_cash_in) -
+      Number(session.total_cash_out);
+
+    const difference = Number(payload.closing_balance) - expected;
+
+    const { error } = await supabase
+      .from("cash_register_sessions")
+      .update({
+        closed_at: new Date().toISOString(),
+        closing_balance: payload.closing_balance,
+        expected_balance: expected,
+        difference,
+        close_type: payload.close_type,
+        notes: payload.notes ?? null,
+      })
+      .eq("id", payload.session_id);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: { expected_balance: expected, difference } };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Error al cerrar turno";
+    return { success: false, error: message };
   }
-
-  const expected =
-    Number(session.opening_balance) +
-    Number(session.total_sales_usd) +
-    Number(session.total_cash_in) -
-    Number(session.total_cash_out);
-
-  const difference = Number(payload.closing_balance) - expected;
-
-  const { error } = await supabase
-    .from("cash_register_sessions")
-    .update({
-      closed_at: new Date().toISOString(),
-      closing_balance: payload.closing_balance,
-      expected_balance: expected,
-      difference,
-      close_type: payload.close_type,
-      notes: payload.notes ?? null,
-    })
-    .eq("id", payload.session_id);
-
-  if (error) return { success: false, error: error.message };
-  return { success: true, data: { expected_balance: expected, difference } };
 }
 
 // ── Registrar movimiento de caja (entrada/salida manual) ─────────────────────
@@ -315,27 +359,33 @@ export async function addCashMovement(
     return { success: false, error: "El monto debe ser mayor a 0" };
   }
 
-  const supabase = await getSupabase();
+  try {
+    await assertAuthorizedTenantAdmin(tenantId);
+    const supabase = await getSupabase();
 
-  // 1. Insertar movimiento
-  const { error: movError } = await supabase
-    .from("cash_movements")
-    .insert({ ...payload, tenant_id: tenantId });
+    // 1. Insertar movimiento
+    const { error: movError } = await supabase
+      .from("cash_movements")
+      .insert({ ...payload, tenant_id: tenantId });
 
-  if (movError) return { success: false, error: movError.message };
+    if (movError) return { success: false, error: movError.message };
 
-  // 2. Actualizar totales en la sesión vía función PG atómica
-  const field =
-    payload.type === "IN" ? "total_cash_in" : "total_cash_out";
+    // 2. Actualizar totales en la sesión vía función PG atómica
+    const field =
+      payload.type === "IN" ? "total_cash_in" : "total_cash_out";
 
-  const { error: rpcError } = await supabase.rpc("increment_session_amount", {
-    p_session_id: payload.session_id,
-    p_field: field,
-    p_amount: payload.amount_usd,
-  });
+    const { error: rpcError } = await supabase.rpc("increment_session_amount", {
+      p_session_id: payload.session_id,
+      p_field: field,
+      p_amount: payload.amount_usd,
+    });
 
-  if (rpcError) return { success: false, error: rpcError.message };
-  return { success: true };
+    if (rpcError) return { success: false, error: rpcError.message };
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Error al registrar movimiento";
+    return { success: false, error: message };
+  }
 }
 
 // ── Historial de sesiones de una caja ────────────────────────────────────────
@@ -344,6 +394,16 @@ export async function getRegisterSessions(
   limit = 10
 ): Promise<CashRegisterSession[]> {
   const supabase = await getSupabase();
+
+  const { data: reg } = await supabase
+    .from("cash_registers")
+    .select("tenant_id")
+    .eq("id", registerId)
+    .single();
+
+  if (reg?.tenant_id) {
+    await assertAuthorizedTenantAdmin(reg.tenant_id);
+  }
 
   const { data, error } = await supabase
     .from("cash_register_sessions")
@@ -360,12 +420,27 @@ export async function getRegisterSessions(
 export async function markTicketPrinted(
   sessionId: string
 ): Promise<POSActionResult> {
-  const supabase = await getSupabase();
-  const { error } = await supabase
-    .from("cash_register_sessions")
-    .update({ ticket_printed: true })
-    .eq("id", sessionId);
+  try {
+    const supabase = await getSupabase();
+    const { data: session } = await supabase
+      .from("cash_register_sessions")
+      .select("tenant_id")
+      .eq("id", sessionId)
+      .single();
 
-  if (error) return { success: false, error: error.message };
-  return { success: true };
+    if (session?.tenant_id) {
+      await assertAuthorizedTenantAdmin(session.tenant_id);
+    }
+
+    const { error } = await supabase
+      .from("cash_register_sessions")
+      .update({ ticket_printed: true })
+      .eq("id", sessionId);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Error al marcar ticket";
+    return { success: false, error: message };
+  }
 }

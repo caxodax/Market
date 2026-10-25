@@ -3,7 +3,7 @@
  * Pure abstract interfaces that decouple Core business logic from external Adapters/Plugins.
  */
 
-import { CurrencyCode, Order, OrderItem } from "./index";
+import type { CurrencyCode, Order, OrderItem } from "./index.ts";
 
 // ─── 1. PAYMENT PORT ────────────────────────────────────────────────────────
 export interface PaymentProcessInput {

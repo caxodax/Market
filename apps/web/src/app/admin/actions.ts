@@ -53,21 +53,18 @@ async function getAuditActor(): Promise<AuditActor> {
   };
 }
 
-async function assertAuthorizedTenantAdmin(tenantId: string) {
+export async function assertAuthorizedTenantAdmin(tenantId: string) {
   const user = await getCurrentUser();
-  if (user) {
-    if (user.role === "PLATFORM_SUPER_ADMIN" || user.impersonation) {
-      return user;
-    }
-    if (user.tenant_id && user.tenant_id !== tenantId) {
-      throw new Error("Acceso denegado: No tiene permisos sobre este comercio.");
-    }
-    return user;
-  }
-  if (process.env.NODE_ENV === "production") {
+  if (!user) {
     throw new Error("No autenticado. Inicie sesión para continuar.");
   }
-  return null;
+  if (user.role === "PLATFORM_SUPER_ADMIN" || user.impersonation) {
+    return user;
+  }
+  if (user.tenant_id && user.tenant_id !== tenantId) {
+    throw new Error("Acceso denegado: No tiene permisos sobre este comercio.");
+  }
+  return user;
 }
 
 export async function reviewPaymentAction(
@@ -77,6 +74,7 @@ export async function reviewPaymentAction(
   rejectionReason?: string
 ) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     const actor = await getAuditActor();
     const updated = await MarketOSRepository.reviewPayment(
       tenantId,
@@ -126,6 +124,7 @@ export async function adjustStockAction(
   storeId?: string
 ) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     const actor = await getAuditActor();
     const newStock = await MarketOSRepository.adjustStock(
       tenantId,
@@ -151,6 +150,7 @@ export async function adjustStockAction(
  */
 export async function syncBcvRateAction(tenantId: string) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     const updatedRate = await MarketOSRepository.syncBcvRateFromApi(tenantId);
     invalidateExchangeRateCache(tenantId);
     revalidatePath("/admin");
@@ -176,6 +176,7 @@ export async function updateOrderStatusAction(
   cancellationReason?: string
 ) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     const actor = await getAuditActor();
     let order = await MarketOSRepository.updateOrderStatus(
       tenantId,
@@ -230,7 +231,14 @@ export async function updateOrderStatusAction(
 export async function uploadProductImageAction(formData: FormData) {
   try {
     const file = formData.get("file") as File | null;
-    const tenantId = (formData.get("tenantId") as string) || "shop-market-ca";
+    const formTenantId = (formData.get("tenantId") as string) || null;
+    const user = await getCurrentUser();
+    const tenantId = formTenantId || user?.tenant_id;
+
+    if (!tenantId) {
+      return { success: false, error: "Identificador de comercio requerido" };
+    }
+    await assertAuthorizedTenantAdmin(tenantId);
 
     if (!file || file.size === 0) {
       return { success: false, error: "No se seleccionó ninguna imagen" };
@@ -264,7 +272,14 @@ export async function uploadProductImageAction(formData: FormData) {
 export async function uploadStoreLogoAction(formData: FormData) {
   try {
     const file = formData.get("file") as File | null;
-    const tenantId = (formData.get("tenantId") as string) || "shop-market-ca";
+    const formTenantId = (formData.get("tenantId") as string)?.trim();
+    const user = await getCurrentUser();
+    const tenantId = formTenantId || user?.tenant_id;
+
+    if (!tenantId) {
+      return { success: false, error: "Identificador de comercio requerido para subir el logotipo" };
+    }
+    await assertAuthorizedTenantAdmin(tenantId);
 
     if (!file || file.size === 0) {
       return { success: false, error: "No se seleccionó ninguna imagen de logo" };
@@ -500,6 +515,7 @@ export async function saveManualRateAction(
   }
 ) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     const actor = await getAuditActor();
     const updatedRate = await MarketOSRepository.saveManualExchangeRate(
       tenantId,
@@ -531,6 +547,7 @@ export async function saveManualRateAction(
  */
 export async function getAuditLogsAction(tenantId: string, limit = 100) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     const logs = await MarketOSRepository.getAuditLogs(tenantId, limit);
     return { success: true, logs };
   } catch (error) {
@@ -551,8 +568,7 @@ export async function updateTenantSettingsAction(
   updates: Partial<TenantSettings>
 ) {
   try {
-    const { getCurrentUser } = await import("../login/actions");
-    const user = await getCurrentUser();
+    const user = await assertAuthorizedTenantAdmin(tenantId);
     const isSuperAdmin =
       user?.role === "PLATFORM_SUPER_ADMIN" || Boolean(user?.impersonation);
 
@@ -580,6 +596,7 @@ export async function updateTenantSettingsAction(
  */
 export async function createCouponAction(input: CreateCouponInput) {
   try {
+    await assertAuthorizedTenantAdmin(input.tenantId);
     const coupon = await MarketOSRepository.createCoupon(input);
     revalidatePath("/admin");
     revalidatePath("/");
@@ -609,6 +626,7 @@ export async function toggleCouponAction(
   isActive: boolean
 ) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     const updated = await MarketOSRepository.toggleCoupon(tenantId, couponId, isActive);
     revalidatePath("/admin");
     revalidatePath("/");
@@ -627,6 +645,7 @@ export async function toggleCouponAction(
  */
 export async function deleteCouponAction(tenantId: string, couponId: string) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     await MarketOSRepository.deleteCoupon(tenantId, couponId);
     revalidatePath("/admin");
     revalidatePath("/");
@@ -645,6 +664,7 @@ export async function deleteCouponAction(tenantId: string, couponId: string) {
  */
 export async function updateCouponAction(input: UpdateCouponInput) {
   try {
+    await assertAuthorizedTenantAdmin(input.tenantId);
     const updated = await MarketOSRepository.updateCoupon(input);
     revalidatePath("/admin");
     revalidatePath("/");
@@ -663,6 +683,7 @@ export async function updateCouponAction(input: UpdateCouponInput) {
  */
 export async function getLatestOrdersAction(tenantId: string) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     const orders = await MarketOSRepository.getTenantOrders(tenantId);
     return { success: true, orders };
   } catch (error) {
@@ -676,6 +697,7 @@ export async function getLatestOrdersAction(tenantId: string) {
  */
 export async function getLatestPaymentsAction(tenantId: string) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     const payments = await MarketOSRepository.getTenantPayments(tenantId);
     return { success: true, payments };
   } catch (error) {
@@ -692,6 +714,7 @@ export async function getSalesAnalyticsAction(
   dateRange: "today" | "week" | "month" | "all" = "all"
 ) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     const report = await MarketOSRepository.getSalesAnalytics(tenantId, { dateRange });
     return { success: true, report };
   } catch (error) {
@@ -712,6 +735,7 @@ export async function createStoreAction(input: {
   isActive?: boolean;
 }) {
   try {
+    await assertAuthorizedTenantAdmin(input.tenantId);
     const store = await MarketOSRepository.createStore(input);
     revalidatePath("/admin");
     revalidatePath("/platform");
@@ -747,16 +771,26 @@ export async function createStoreAction(input: {
  */
 export async function updateStoreAction(
   storeId: string,
-  updates: Partial<Store>
+  updates: Partial<Store>,
+  tenantId?: string
 ) {
   try {
+    const user = await getCurrentUser();
+    const effectiveTenantId = tenantId || updates.tenant_id || user?.tenant_id;
+    if (!effectiveTenantId) {
+      throw new Error("Identificador de comercio requerido para actualizar la sucursal.");
+    }
+    await assertAuthorizedTenantAdmin(effectiveTenantId);
     const store = await MarketOSRepository.updateStore(storeId, updates);
     revalidatePath("/admin");
     revalidatePath("/platform");
     return { success: true, store };
   } catch (error) {
     console.error("Error updating store:", error);
-    return { success: false, error: "No se pudo actualizar la sucursal" };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "No se pudo actualizar la sucursal",
+    };
   }
 }
 
@@ -768,6 +802,7 @@ export async function updateTenantCustomDomainAction(
   rawDomain: string | null
 ) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     let cleanDomain: string | null = null;
     if (rawDomain && rawDomain.trim()) {
       cleanDomain = rawDomain
@@ -802,6 +837,7 @@ export async function updateTenantCustomDomainAction(
  */
 export async function createDeliveryZoneAction(input: CreateDeliveryZoneInput) {
   try {
+    await assertAuthorizedTenantAdmin(input.tenantId);
     const zone = await MarketOSRepository.createDeliveryZone(input);
     invalidateDeliveryZonesCache(input.tenantId);
     revalidatePath("/admin");
@@ -821,6 +857,7 @@ export async function createDeliveryZoneAction(input: CreateDeliveryZoneInput) {
  */
 export async function updateDeliveryZoneAction(input: UpdateDeliveryZoneInput) {
   try {
+    await assertAuthorizedTenantAdmin(input.tenantId);
     const zone = await MarketOSRepository.updateDeliveryZone(input);
     invalidateDeliveryZonesCache(input.tenantId);
     revalidatePath("/admin");
@@ -844,6 +881,7 @@ export async function toggleDeliveryZoneStatusAction(
   isActive: boolean
 ) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     const success = await MarketOSRepository.toggleDeliveryZoneStatus(
       tenantId,
       zoneId,
@@ -867,6 +905,7 @@ export async function toggleDeliveryZoneStatusAction(
  */
 export async function createDriverAction(input: CreateDriverInput) {
   try {
+    await assertAuthorizedTenantAdmin(input.tenantId);
     const driver = await MarketOSRepository.createDriver(input);
     revalidatePath("/admin");
     return { success: true, driver };
@@ -891,6 +930,7 @@ export async function createDriverAction(input: CreateDriverInput) {
  */
 export async function updateDriverAction(input: UpdateDriverInput) {
   try {
+    await assertAuthorizedTenantAdmin(input.tenantId);
     const driver = await MarketOSRepository.updateDriver(input);
     revalidatePath("/admin");
     return { success: !!driver, driver };
@@ -912,6 +952,7 @@ export async function toggleDriverStatusAction(
   isActive: boolean
 ) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     const success = await MarketOSRepository.toggleDriverStatus(
       tenantId,
       driverId,
@@ -933,6 +974,7 @@ export async function toggleDriverStatusAction(
  */
 export async function getTenantPlanLimitsAction(tenantId: string) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     const limits = await MarketOSRepository.getTenantPlanLimits(tenantId);
     return { success: true, limits };
   } catch (error) {
@@ -949,6 +991,7 @@ export async function getTenantPlanLimitsAction(tenantId: string) {
  */
 export async function getRawMaterialsAction(tenantId: string) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     const rawMaterials = await MarketOSRepository.getRawMaterials(tenantId);
     return { success: true, rawMaterials };
   } catch (error) {
@@ -995,6 +1038,7 @@ export async function deleteRawMaterialAction(tenantId: string, id: string) {
 
 export async function getProductRecipesAction(tenantId: string) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     const recipes = await MarketOSRepository.getProductRecipes(tenantId);
     return { success: true, recipes };
   } catch (error) {

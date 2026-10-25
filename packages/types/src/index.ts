@@ -2,14 +2,15 @@
  * MarketOS Core Multi-Tenant Domain Types
  */
 
-export * from "./modules";
-export * from "./ports";
-export * from "./food-service";
-export * from "./mto-cpq";
-export * from "./barcode-retail";
-export * from "./pos";
+export * from "./modules.ts";
+export * from "./ports.ts";
+export * from "./food-service.ts";
+export * from "./mto-cpq.ts";
+export * from "./barcode-retail.ts";
+export * from "./pos.ts";
+export * from "./storefront-pro.ts";
 
-import type { SelectedModifier } from "./food-service";
+import type { SelectedModifier } from "./food-service.ts";
 
 export type TenantStatus = "active" | "inactive" | "suspended" | "trial";
 
@@ -1121,6 +1122,4 @@ export interface PlatformSettings {
 export type UpdatePlatformSettingsInput = Partial<
   Omit<PlatformSettings, "id" | "created_at" | "updated_at">
 >;
-
-export * from "./storefront-pro";
 

@@ -41,7 +41,25 @@ export async function loginUserAction(email: string, password?: string) {
   const cleanEmail = email.toLowerCase().trim();
 
   try {
+    const isDemoAllowed =
+      process.env.NODE_ENV !== "production" ||
+      process.env.ALLOW_DEMO_LOGIN === "true";
+
+    if (!isDemoAllowed && !password) {
+      return {
+        success: false,
+        error: "La contraseña es requerida.",
+      };
+    }
+
     const supabase = await getSupabaseServerClient();
+    if (!isDemoAllowed && !supabase) {
+      return {
+        success: false,
+        error: "Servicio de autenticación no disponible.",
+      };
+    }
+
     let authUserId: string | null = null;
 
     // 1. Try Supabase Auth password sign-in if password provided
@@ -52,9 +70,24 @@ export async function loginUserAction(email: string, password?: string) {
           password,
         });
 
-      if (!authError && authData.user) {
+      if (authError) {
+        console.warn(`[MarketOS Auth] Invalid password attempt for ${cleanEmail}: ${authError.message}`);
+        return {
+          success: false,
+          error: "Credenciales inválidas o contraseña incorrecta.",
+        };
+      }
+
+      if (authData.user) {
         authUserId = authData.user.id;
       }
+    }
+
+    if (!isDemoAllowed && !authUserId) {
+      return {
+        success: false,
+        error: "Autenticación fallida o credenciales inválidas.",
+      };
     }
 
     // 2. Fetch User Profile
@@ -66,8 +99,8 @@ export async function loginUserAction(email: string, password?: string) {
       profile = await MarketOSRepository.getUserProfile(cleanEmail);
     }
 
-    // 3. Fallback defaults for demo accounts
-    if (!profile) {
+    // 3. Fallback defaults for demo accounts (STRICTLY non-production or explicit demo flag)
+    if (!profile && isDemoAllowed) {
       if (
         cleanEmail === "superadmin@marketos.com" ||
         cleanEmail === "admin@marketos.platform"

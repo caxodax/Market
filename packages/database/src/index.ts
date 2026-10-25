@@ -2,8 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import {
   DEFAULT_SUPABASE_URL,
   DEFAULT_SUPABASE_ANON_KEY,
-  DEFAULT_SUPABASE_SERVICE_ROLE_KEY,
-} from "./server";
+} from "./server.ts";
 
 /**
  * Creates an authenticated Supabase client for Server/Browser
@@ -21,8 +20,11 @@ export function createSupabaseClient(
  */
 export function createSupabaseAdminClient(
   supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL,
-  supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || DEFAULT_SUPABASE_SERVICE_ROLE_KEY
+  supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 ) {
+  if (!supabaseServiceRoleKey) {
+    throw new Error("[MarketOS Database] SUPABASE_SERVICE_ROLE_KEY is required for admin client.");
+  }
   return createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: {
       autoRefreshToken: false,
@@ -31,10 +33,10 @@ export function createSupabaseAdminClient(
   });
 }
 
-export * from "./client";
-export * from "./server";
-export * from "./circuit-breaker";
-export * from "./services";
-export * from "./mock-data";
+export * from "./client.ts";
+export * from "./server.ts";
+export * from "./circuit-breaker.ts";
+export * from "./services.ts";
+export * from "./mock-data.ts";
 export * from "@marketos/types";
 

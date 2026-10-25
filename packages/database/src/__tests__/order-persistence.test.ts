@@ -1,12 +1,15 @@
 import assert from "node:assert";
-import { MarketOSRepository } from "../services";
+import { MarketOSRepository } from "../services.ts";
 
 async function runChecks() {
-  console.log("🧪 [ECC & Ponytail Check] Running database persistence tests...");
+  console.log("🧪 [ECC & Ponytail Check] Running database persistence & multi-tenant isolation tests...");
 
-  // 1. Check createOrder
-  const input = {
-    tenantId: "shop-market-ca",
+  const tenantA = "shop-market-ca";
+  const tenantB = "ferreteria-el-sol-ve";
+
+  // 1. Check createOrder for Tenant A
+  const inputA = {
+    tenantId: tenantA,
     storeId: "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
     customerName: "Luis Arturo Montes",
     customerPhone: "04128505629",
@@ -27,40 +30,94 @@ async function runChecks() {
     notes: "Método: CASH_USD | Retiro en Tienda",
   };
 
-  const order = await MarketOSRepository.createOrder(input);
+  const orderA = await MarketOSRepository.createOrder(inputA);
 
-  assert.ok(order.id, "Order should have an ID");
-  assert.match(order.order_number, /^ORD-\d+/, "Order number should match standard format");
-  assert.strictEqual(order.customer_name, "Luis Arturo Montes");
-  assert.strictEqual(order.customer_id_number, "V-21276890");
-  assert.strictEqual(order.delivery_fee_usd, 2.0);
-  assert.ok(order.notes?.includes("Paga con: $20.00"), "Notes should include cash tendered info");
-  assert.ok(order.notes?.includes("Vuelto: $10.00"), "Notes should include change required info");
+  assert.ok(orderA.id, "Order should have an ID");
+  assert.match(orderA.order_number, /^ORD-\d+/, "Order number should match standard format");
+  assert.strictEqual(orderA.customer_name, "Luis Arturo Montes");
+  assert.strictEqual(orderA.customer_id_number, "V-21276890");
+  assert.strictEqual(orderA.delivery_fee_usd, 2.0);
+  assert.ok(orderA.notes?.includes("Paga con: $20.00"), "Notes should include cash tendered info");
+  assert.ok(orderA.notes?.includes("Vuelto: $10.00"), "Notes should include change required info");
   console.log("  ✔ createOrder formats cash and change into notes and persists state");
 
-  // 2. Check getTenantOrders
-  const orders = await MarketOSRepository.getTenantOrders("shop-market-ca");
-  assert.ok(Array.isArray(orders), "Orders should be an array");
-  assert.ok(orders.length > 0, "Should have retrieved tenant orders");
+  // 2. Check getTenantOrders for Tenant A
+  const ordersA = await MarketOSRepository.getTenantOrders(tenantA);
+  assert.ok(Array.isArray(ordersA), "Orders should be an array");
+  assert.ok(ordersA.length > 0, "Should have retrieved tenant orders");
 
-  const ord = orders.find((o) => o.order_number === "ORD-151169");
-  assert.ok(ord, "Should find restored order ORD-151169");
-  assert.strictEqual(ord.order_number, "ORD-151169");
-  assert.strictEqual(ord.status, "PAYMENT_PENDING");
-  console.log("  ✔ getTenantOrders extracts cash and change info and finds ORD-151169");
+  const ordFound = ordersA.find((o) => o.id === orderA.id);
+  assert.ok(ordFound, `Should find created order ${orderA.id}`);
+  assert.strictEqual(ordFound.customer_phone, "04128505629");
+  console.log(`  ✔ getTenantOrders finds created order ${orderA.order_number}`);
 
-  // 3. Check getTenantPayments
-  const payments = await MarketOSRepository.getTenantPayments("shop-market-ca");
-  assert.ok(Array.isArray(payments), "Payments should be an array");
-  assert.ok(payments.length > 0, "Should have retrieved tenant payments");
+  // 3. Submit payment proof for Tenant A
+  await MarketOSRepository.submitPaymentProof({
+    tenantId: tenantA,
+    orderId: orderA.id,
+    method: "PAGO_MOVIL",
+    bankName: "Banesco",
+    referenceNumber: "151169",
+    amount: 4.5,
+    currency: "VES",
+  });
 
-  const p = payments.find((pay) => pay.reference_number === "151169");
-  assert.ok(p, "Should find restored payment proof for ORD-151169");
-  assert.strictEqual(p.method, "PAGO_MOVIL");
-  assert.strictEqual(p.status, "PENDING");
-  console.log("  ✔ getTenantPayments retrieves payments for shop-market-ca");
+  const paymentsA = await MarketOSRepository.getTenantPayments(tenantA);
+  assert.ok(Array.isArray(paymentsA), "Payments should be an array");
+  const pA = paymentsA.find((pay) => pay.order_id === orderA.id);
+  assert.ok(pA, "Should find submitted payment proof for Tenant A");
+  assert.strictEqual(pA.method, "PAGO_MOVIL");
+  assert.strictEqual(pA.status, "PENDING");
+  console.log("  ✔ submitPaymentProof & getTenantPayments retrieves payment for Tenant A");
 
-  console.log("✅ All database persistence tests passed successfully!");
+  // =========================================================================
+  // 4. MULTI-TENANT ISOLATION TESTS (ECC AgentShield Standards)
+  // =========================================================================
+  console.log("🔒 [AgentShield] Verifying zero cross-tenant data leakage...");
+
+  // Tenant B queries orders
+  const ordersB = await MarketOSRepository.getTenantOrders(tenantB);
+  const leakedOrder = ordersB.find((o) => o.id === orderA.id || o.tenant_id === tenantA);
+  assert.strictEqual(leakedOrder, undefined, "CRITICAL: Tenant B must NEVER see Tenant A orders!");
+  console.log("  ✔ Orders Isolation: Tenant B cannot access Tenant A orders");
+
+  // Tenant B queries payments
+  const paymentsB = await MarketOSRepository.getTenantPayments(tenantB);
+  const leakedPayment = paymentsB.find((p) => p.order_id === orderA.id || p.tenant_id === tenantA);
+  assert.strictEqual(leakedPayment, undefined, "CRITICAL: Tenant B must NEVER see Tenant A payments!");
+  console.log("  ✔ Payments Isolation: Tenant B cannot access Tenant A payment proofs");
+
+  // Tenant B queries products
+  const productsB = await MarketOSRepository.getProducts(tenantB);
+  const leakedProduct = productsB.find((p) => p.tenant_id === tenantA);
+  assert.strictEqual(leakedProduct, undefined, "CRITICAL: Tenant B must NEVER see Tenant A products!");
+  console.log("  ✔ Catalog Isolation: Tenant B cannot access Tenant A products");
+
+  // =========================================================================
+  // 5. PLUGIN VISIBILITY & ISOLATION TESTS (Phase 4)
+  // =========================================================================
+  console.log("🧩 [Plugins] Verifying plugin activation and visibility isolation...");
+
+  // Set plugin status for Tenant A: enable delivery_fleet, disable pos_registers
+  await MarketOSRepository.setTenantModuleStatus(tenantA, "delivery_fleet", true);
+  await MarketOSRepository.setTenantModuleStatus(tenantA, "pos_registers", false);
+
+  const activeA = await MarketOSRepository.getTenantActiveModuleIds(tenantA);
+  assert.ok(activeA.includes("delivery_fleet"), "Tenant A should have delivery_fleet active");
+  assert.strictEqual(activeA.includes("pos_registers"), false, "Tenant A should have pos_registers inactive");
+
+  // Check that Tenant A module settings do not dictate Tenant B module settings
+  const isDeliveryActiveB = await MarketOSRepository.isModuleActiveForTenant(tenantB, "delivery_fleet");
+  // Toggle for Tenant B
+  await MarketOSRepository.setTenantModuleStatus(tenantB, "delivery_fleet", false);
+  const isDeliveryActiveBAfter = await MarketOSRepository.isModuleActiveForTenant(tenantB, "delivery_fleet");
+  const isDeliveryActiveAAfter = await MarketOSRepository.isModuleActiveForTenant(tenantA, "delivery_fleet");
+
+  assert.strictEqual(isDeliveryActiveBAfter, false, "Tenant B delivery_fleet was disabled");
+  assert.strictEqual(isDeliveryActiveAAfter, true, "Tenant A delivery_fleet remains enabled (independent state)");
+  console.log("  ✔ Plugin Isolation: Toggling modules in Tenant B leaves Tenant A unaffected");
+
+  console.log("✅ All persistence, isolation, and plugin tests passed successfully!");
 }
 
 runChecks().catch((err) => {

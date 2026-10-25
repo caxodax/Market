@@ -26,8 +26,6 @@ import {
   RawMaterial,
   ProductRecipe,
 } from "@marketos/types";
-import { RawMaterialsAdmin, RecipeManagerAdmin } from "@marketos/plugin-food-service";
-import { MtoCpqAdminPanel } from "@marketos/plugin-mto-cpq";
 
 import {
   formatCurrency,
@@ -49,23 +47,82 @@ import {
   saveProductRecipeAction,
   updateTenantSettingsAction,
 } from "../app/admin/actions";
-import { AdminStorefrontStudio } from "@marketos/plugin-storefront-pro";
+import dynamic from "next/dynamic";
 import { stopImpersonationAction } from "../app/platform/actions";
 import { logoutUserAction } from "../app/login/actions";
-import { ProductModal } from "./product-modal";
-import { StaffModal, ROLE_LABELS } from "./staff-modal";
-import { ExchangeRateManager } from "./exchange-rate-manager";
-import { StoreSettingsTab } from "./store-settings-tab";
-import { CouponManager } from "./coupon-manager";
-import { PushNotificationsManager } from "./push-notifications-manager";
-import { OrderDetailsModal } from "./order-details-modal";
-import { SalesReportsTab } from "./sales-reports-tab";
-import { DeliveryManager } from "./delivery-manager";
-import { AuditTrailViewer } from "./audit-trail-viewer";
-import { PlanUpgradeModal } from "./plan-upgrade-modal";
-import { TenantPluginsModal, AVAILABLE_PLUGINS, PluginMetadata } from "./tenant-plugins-modal";
-import { PluginDetailModal } from "./plugin-detail-modal";
+import { ROLE_LABELS } from "./staff-modal";
+import { AVAILABLE_PLUGINS, type PluginMetadata } from "./tenant-plugins-modal";
 import { useAutoRefresh } from "../lib/use-auto-refresh";
+
+const TabLoading = () => (
+  <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
+    <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin mb-2" />
+    <span className="text-xs">Cargando sección...</span>
+  </div>
+);
+
+const SalesReportsTab = dynamic(
+  () => import("./sales-reports-tab").then((m) => m.SalesReportsTab),
+  { loading: TabLoading }
+);
+const StoreSettingsTab = dynamic(
+  () => import("./store-settings-tab").then((m) => m.StoreSettingsTab),
+  { loading: TabLoading }
+);
+const ExchangeRateManager = dynamic(
+  () => import("./exchange-rate-manager").then((m) => m.ExchangeRateManager),
+  { loading: TabLoading }
+);
+const CouponManager = dynamic(
+  () => import("./coupon-manager").then((m) => m.CouponManager),
+  { loading: TabLoading }
+);
+const PushNotificationsManager = dynamic(
+  () => import("./push-notifications-manager").then((m) => m.PushNotificationsManager),
+  { loading: TabLoading }
+);
+const DeliveryManager = dynamic(
+  () => import("./delivery-manager").then((m) => m.DeliveryManager),
+  { loading: TabLoading }
+);
+const AuditTrailViewer = dynamic(
+  () => import("./audit-trail-viewer").then((m) => m.AuditTrailViewer),
+  { loading: TabLoading }
+);
+const AdminStorefrontStudio = dynamic(
+  () => import("@marketos/plugin-storefront-pro").then((m) => m.AdminStorefrontStudio),
+  { loading: TabLoading }
+);
+const RawMaterialsAdmin = dynamic(
+  () => import("@marketos/plugin-food-service").then((m) => m.RawMaterialsAdmin),
+  { loading: TabLoading }
+);
+const RecipeManagerAdmin = dynamic(
+  () => import("@marketos/plugin-food-service").then((m) => m.RecipeManagerAdmin),
+  { loading: TabLoading }
+);
+const MtoCpqAdminPanel = dynamic(
+  () => import("@marketos/plugin-mto-cpq").then((m) => m.MtoCpqAdminPanel),
+  { loading: TabLoading }
+);
+const ProductModal = dynamic(
+  () => import("./product-modal").then((m) => m.ProductModal)
+);
+const StaffModal = dynamic(
+  () => import("./staff-modal").then((m) => m.StaffModal)
+);
+const OrderDetailsModal = dynamic(
+  () => import("./order-details-modal").then((m) => m.OrderDetailsModal)
+);
+const TenantPluginsModal = dynamic(
+  () => import("./tenant-plugins-modal").then((m) => m.TenantPluginsModal)
+);
+const PlanUpgradeModal = dynamic(
+  () => import("./plan-upgrade-modal").then((m) => m.PlanUpgradeModal)
+);
+const PluginDetailModal = dynamic(
+  () => import("./plugin-detail-modal").then((m) => m.PluginDetailModal)
+);
 import {
   PackageCheck,
   Boxes,

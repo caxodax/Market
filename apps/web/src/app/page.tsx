@@ -1,6 +1,7 @@
 import React from "react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { notFound } from "next/navigation";
 import {
   getCachedTenant,
   getCachedTenantSettings,
@@ -51,7 +52,14 @@ export async function generateMetadata({
   const tenantSlugOrId = await resolveTenantIdentifier(params?.tenant);
 
   const tenant = await getCachedTenant(tenantSlugOrId);
-  const activeTenantId = tenant?.id || "shop-market-ca";
+  if (!tenant) {
+    return {
+      title: "Comercio no encontrado | MarketOS",
+      description: "El comercio solicitado no existe o no se encuentra activo.",
+    };
+  }
+
+  const activeTenantId = tenant.id;
   const settings = await getCachedTenantSettings(activeTenantId);
 
   const title = `${settings.business_name} | Catálogo & Delivery`;
@@ -89,10 +97,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const tenantSlugOrId = await resolveTenantIdentifier(params?.tenant);
 
   const tenant = await getCachedTenant(tenantSlugOrId);
-  const activeTenantId = tenant?.id || "shop-market-ca";
+  if (!tenant) {
+    notFound();
+  }
+
+  const activeTenantId = tenant.id;
 
   // BLOQUEO INMEDIATO: Si la tienda ha sido suspendida por el Super Admin o está inactiva
-  if (tenant && (tenant.status === "suspended" || tenant.status === "inactive")) {
+  if (tenant.status === "suspended" || tenant.status === "inactive") {
     const settings = await getCachedTenantSettings(activeTenantId);
     return <SuspendedStorePage settings={settings} tenant={tenant} />;
   }

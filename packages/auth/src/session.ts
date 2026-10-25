@@ -39,15 +39,6 @@ export function signSessionPayload(payload: unknown): string {
 export function verifySessionPayload<T = unknown>(token: string | null | undefined): T | null {
   if (!token || typeof token !== "string") return null;
 
-  // Graceful support for legacy unsigned JSON during rolling migration
-  if (token.startsWith("{") && token.endsWith("}")) {
-    try {
-      return JSON.parse(token) as T;
-    } catch {
-      return null;
-    }
-  }
-
   const parts = token.split(".");
   if (parts.length !== 2) return null;
 

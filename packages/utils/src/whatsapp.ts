@@ -1,4 +1,4 @@
-import { Order, OrderItem } from "@marketos/types";
+import type { Order, OrderItem } from "@marketos/types";
 
 export interface WhatsAppOrderInput {
   tenantPhone: string;

@@ -111,6 +111,10 @@ export function StoreHeader({
             <img
               src={settings.logo_url}
               alt={settings.business_name}
+              width={40}
+              height={40}
+              loading="eager"
+              decoding="sync"
               onError={() => setLogoError(true)}
               className="h-9 w-9 sm:h-10 sm:w-10 object-contain rounded-xl bg-card border border-border p-0.5 shadow-xs shrink-0"
             />

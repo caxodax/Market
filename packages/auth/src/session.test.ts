@@ -63,10 +63,9 @@ describe("Cryptographic Session Auth (HMAC-SHA256)", () => {
     assert.equal(verifySessionPayload(null as any), null);
   });
 
-  it("supports legacy JSON tokens during rolling migration", () => {
-    const legacyJson = JSON.stringify(samplePayload);
-    const result = verifySessionPayload<typeof samplePayload>(legacyJson);
-    assert.ok(result !== null);
-    assert.equal(result?.id, samplePayload.id);
+  it("strictly rejects unsigned or forged JSON tokens", () => {
+    const unsignedJson = JSON.stringify(samplePayload);
+    const result = verifySessionPayload<typeof samplePayload>(unsignedJson);
+    assert.equal(result, null, "Unsigned JSON payloads must be rejected");
   });
 });

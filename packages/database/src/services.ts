@@ -1,4 +1,4 @@
-import {
+import type {
   Tenant,
   TenantSettings,
   Store,
@@ -78,11 +78,13 @@ import {
   CpqQuote,
   CpqQuoteItem,
   CpqOrderMilestone,
+} from "@marketos/types";
+import {
   convertUnitQuantity,
   extractGpsCoordinates,
 } from "@marketos/types";
 
-import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data";
+import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "./mock-data.ts";
 import {
   fetchBcvRate,
   convertUsdToVes,
@@ -93,8 +95,14 @@ import {
   sanitizeSafeUrl,
   formatMediaUrl,
 } from "@marketos/utils";
-import { createServerComponentClient } from "./server";
-import { isSupabaseOffline } from "./circuit-breaker";
+import { createServerComponentClient } from "./server.ts";
+import { isSupabaseOffline } from "./circuit-breaker.ts";
+import {
+  CouponRepository,
+  DeliveryRepository,
+  AuditRepository,
+  ExchangeRateRepository,
+} from "./repositories/index.ts";
 
 function isUuid(value: unknown): boolean {
   if (typeof value !== "string") return false;
@@ -209,7 +217,7 @@ export class MarketOSRepository {
         t.slug.toLowerCase() === cleanSearch ||
         (t.custom_domain && t.custom_domain.toLowerCase() === cleanSearch)
     );
-    return tenant || INITIAL_TENANT;
+    return tenant || null;
   }
 
   /**
@@ -259,7 +267,13 @@ export class MarketOSRepository {
     }
 
     const settings = state.settings.find((s) => s.tenant_id === tenantId);
-    return settings || INITIAL_SETTINGS;
+    if (settings) return settings;
+
+    return {
+      ...INITIAL_SETTINGS,
+      tenant_id: tenantId,
+      business_name: tenantId,
+    };
   }
 
   /**
@@ -599,91 +613,9 @@ export class MarketOSRepository {
 
   /**
    * Get Exchange Rate for Tenant - Reads strictly from Database / Local Seed
-   * Pure database read (0 network latency, 0 external API calls on user requests)
    */
   static async getExchangeRate(tenantId: string): Promise<ExchangeRate> {
-    const supabase = getSupabase();
-    if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from("exchange_rates")
-          .select("*")
-          .eq("tenant_id", tenantId)
-          .maybeSingle();
-
-        if (!error && data) {
-          const rate: ExchangeRate = {
-            id: data.id,
-            tenant_id: data.tenant_id,
-            currency: data.currency,
-            value: Number(data.value),
-            eur_value: data.eur_value ? Number(data.eur_value) : undefined,
-            usdt_value: data.usdt_value ? Number(data.usdt_value) : undefined,
-            source: data.source,
-            updated_at: data.updated_at,
-          };
-
-          // If eur_value or usdt_value are missing (since exchange_rates table only stores USD value),
-          // hydrate them seamlessly from the latest record in exchange_rate_history
-          if (!rate.eur_value || !rate.usdt_value) {
-            try {
-              const { data: hist } = await supabase
-                .from("exchange_rate_history")
-                .select("rate_eur, usdt_promedio")
-                .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
-                .order("date_rate", { ascending: false })
-                .limit(1)
-                .maybeSingle();
-
-              if (hist) {
-                if (hist.rate_eur && !rate.eur_value) rate.eur_value = Number(hist.rate_eur);
-                if (hist.usdt_promedio && !rate.usdt_value) rate.usdt_value = Number(hist.usdt_promedio);
-              }
-            } catch {
-              // Non-blocking fallback
-            }
-          }
-
-          return rate;
-        }
-
-        // Fallback: read directly from latest database history (0 external API calls)
-        const { data: latestHist } = await supabase
-          .from("exchange_rate_history")
-          .select("*")
-          .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
-          .order("date_rate", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (latestHist) {
-          return {
-            id: latestHist.id,
-            tenant_id: tenantId,
-            currency: "VES",
-            value: Number(latestHist.rate),
-            eur_value: latestHist.rate_eur ? Number(latestHist.rate_eur) : undefined,
-            usdt_value: latestHist.usdt_promedio ? Number(latestHist.usdt_promedio) : undefined,
-            source: latestHist.source,
-            updated_at: latestHist.created_at || new Date().toISOString(),
-          };
-        }
-      } catch (err) {
-        console.warn("[MarketOS] Exchange rate fetch error, using resilient fallback:", err);
-      }
-    }
-
-    const fallback = state.rates.find((r) => r.tenant_id === tenantId) || {
-      id: "rate-fallback",
-      tenant_id: tenantId,
-      currency: "VES",
-      value: 875.6505,
-      eur_value: 980.6147,
-      usdt_value: 1016.785,
-      source: "alcambio.app",
-      updated_at: new Date().toISOString(),
-    };
-    return fallback;
+    return ExchangeRateRepository.getExchangeRate(tenantId);
   }
 
   /**
@@ -693,183 +625,14 @@ export class MarketOSRepository {
     tenantId?: string,
     limit: number = 30
   ): Promise<RateHistoryItem[]> {
-    const supabase = getSupabase();
-    if (supabase) {
-      try {
-        let query = supabase
-          .from("exchange_rate_history")
-          .select("*")
-          .order("date_rate", { ascending: false })
-          .limit(limit);
-
-        if (tenantId) {
-          query = query.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
-        }
-
-        const { data, error } = await query;
-        if (!error && data && data.length > 0) {
-          return data.map((item: any) => ({
-            id: item.id,
-            tenant_id: item.tenant_id,
-            date_rate: item.date_rate,
-            currency: item.currency || "USD",
-            rate: Number(item.rate),
-            rate_eur: item.rate_eur ? Number(item.rate_eur) : undefined,
-            usdt_promedio: item.usdt_promedio ? Number(item.usdt_promedio) : undefined,
-            source: item.source,
-            created_at: item.created_at,
-          }));
-        }
-      } catch (err) {
-        console.warn("[MarketOS] Error fetching exchange rate history from Supabase:", err);
-      }
-    }
-
-    // Fallback to in-memory history state
-    let history = [...state.rateHistory];
-    if (tenantId) {
-      history = history.filter((h) => !h.tenant_id || h.tenant_id === tenantId);
-    }
-    history.sort((a, b) => b.date_rate.localeCompare(a.date_rate));
-    return history.slice(0, limit);
+    return ExchangeRateRepository.getExchangeRateHistory(tenantId, limit);
   }
 
   /**
    * Synchronize Official BCV Rate from API into Supabase Database
-   * Executed via scheduled cron (e.g. daily at 7:00 AM) or manual Admin trigger
    */
   static async syncBcvRateFromApi(tenantId: string): Promise<ExchangeRate> {
-    let bcv: {
-      usdRate: number;
-      eurRate?: number;
-      usdtRate?: number;
-      source: string;
-      timestamp: string;
-    };
-
-    try {
-      bcv = await fetchBcvRate();
-    } catch {
-      bcv = {
-        usdRate: 875.6505,
-        eurRate: 980.6147,
-        usdtRate: 1016.785,
-        source: "alcambio.app",
-        timestamp: new Date().toISOString(),
-      };
-    }
-
-    const todayDateStr = bcv.timestamp.split("T")[0];
-    const supabase = getSupabase();
-
-    if (supabase) {
-      try {
-        // 1. Update active rate in exchange_rates
-        const { data: existing } = await supabase
-          .from("exchange_rates")
-          .select("id")
-          .eq("tenant_id", tenantId)
-          .maybeSingle();
-
-        // exchange_rates table strictly has (id, tenant_id, currency, value, source, updated_at)
-        const ratePayload = {
-          value: bcv.usdRate,
-          source: bcv.source,
-          updated_at: bcv.timestamp,
-        };
-
-        if (existing) {
-          const { error: updateErr } = await supabase
-            .from("exchange_rates")
-            .update(ratePayload)
-            .eq("id", existing.id);
-          if (updateErr) {
-            console.error("[MarketOS] Error updating exchange_rates:", updateErr);
-          }
-        } else {
-          const { error: insertErr } = await supabase.from("exchange_rates").insert({
-            tenant_id: tenantId,
-            currency: "VES",
-            ...ratePayload,
-          });
-          if (insertErr) {
-            console.error("[MarketOS] Error inserting exchange_rates:", insertErr);
-          }
-        }
-
-        // 2. Upsert into exchange_rate_history
-        await supabase.from("exchange_rate_history").upsert(
-          {
-            tenant_id: tenantId,
-            date_rate: todayDateStr,
-            currency: "USD",
-            rate: bcv.usdRate,
-            rate_eur: bcv.eurRate,
-            usdt_promedio: bcv.usdtRate,
-            source: bcv.source,
-            created_at: bcv.timestamp,
-          },
-          { onConflict: "tenant_id,date_rate,currency" }
-        );
-
-        await MarketOSRepository.recordAuditLog({
-          tenantId,
-          action: "BCV_RATE_SYNCED",
-          entity: "exchange_rates",
-          entityId: tenantId,
-          newData: {
-            value: bcv.usdRate,
-            eurRate: bcv.eurRate,
-            usdtRate: bcv.usdtRate,
-            timestamp: bcv.timestamp,
-          },
-        });
-      } catch (e) {
-        console.warn("[MarketOS] Error updating exchange rate in Supabase:", e);
-      }
-    }
-
-    const updatedRate: ExchangeRate = {
-      id: `rate-${tenantId}`,
-      tenant_id: tenantId,
-      currency: "VES",
-      value: bcv.usdRate,
-      eur_value: bcv.eurRate,
-      usdt_value: bcv.usdtRate,
-      source: bcv.source,
-      updated_at: bcv.timestamp,
-    };
-
-    // Update in-memory state
-    const existingIdx = state.rates.findIndex((r) => r.tenant_id === tenantId);
-    if (existingIdx >= 0) {
-      state.rates[existingIdx] = updatedRate;
-    } else {
-      state.rates.push(updatedRate);
-    }
-
-    // Update in-memory history
-    const existingHistIdx = state.rateHistory.findIndex(
-      (h) => h.tenant_id === tenantId && h.date_rate === todayDateStr
-    );
-    const historyItem: RateHistoryItem = {
-      id: `hist-${Date.now()}`,
-      tenant_id: tenantId,
-      date_rate: todayDateStr,
-      currency: "USD",
-      rate: bcv.usdRate,
-      rate_eur: bcv.eurRate,
-      usdt_promedio: bcv.usdtRate,
-      source: bcv.source,
-      created_at: bcv.timestamp,
-    };
-    if (existingHistIdx >= 0) {
-      state.rateHistory[existingHistIdx] = historyItem;
-    } else {
-      state.rateHistory.unshift(historyItem);
-    }
-
-    return updatedRate;
+    return ExchangeRateRepository.syncBcvRateFromApi(tenantId);
   }
 
   /**
@@ -886,121 +649,7 @@ export class MarketOSRepository {
     },
     actor?: AuditActor | null
   ): Promise<ExchangeRate> {
-    const source = data.source || "MANUAL";
-    const nowIso = new Date().toISOString();
-    const supabase = getSupabase();
-
-    if (supabase) {
-      try {
-        // 1. Update active rate in exchange_rates
-        const { data: existing } = await supabase
-          .from("exchange_rates")
-          .select("id")
-          .eq("tenant_id", tenantId)
-          .maybeSingle();
-
-        // exchange_rates table strictly has (id, tenant_id, currency, value, source, updated_at)
-        const ratePayload = {
-          value: data.usd_rate,
-          source,
-          updated_at: nowIso,
-        };
-
-        if (existing) {
-          const { error: updateErr } = await supabase
-            .from("exchange_rates")
-            .update(ratePayload)
-            .eq("id", existing.id);
-          if (updateErr) {
-            console.error("[MarketOS] Error updating manual exchange_rates:", updateErr);
-          }
-        } else {
-          const { error: insertErr } = await supabase.from("exchange_rates").insert({
-            tenant_id: tenantId,
-            currency: "VES",
-            ...ratePayload,
-          });
-          if (insertErr) {
-            console.error("[MarketOS] Error inserting manual exchange_rates:", insertErr);
-          }
-        }
-
-        // 2. Upsert in exchange_rate_history
-        await supabase.from("exchange_rate_history").upsert(
-          {
-            tenant_id: tenantId,
-            date_rate: data.date_rate,
-            currency: "USD",
-            rate: data.usd_rate,
-            rate_eur: data.eur_rate,
-            usdt_promedio: data.usdt_rate,
-            source,
-            created_at: nowIso,
-          },
-          { onConflict: "tenant_id,date_rate,currency" }
-        );
-
-        await MarketOSRepository.recordAuditLog({
-          tenantId,
-          actorId: actor?.id,
-          actorName: actor?.name,
-          actorEmail: actor?.email,
-          actorRole: actor?.role,
-          action: "MANUAL_RATE_SAVED",
-          entity: "exchange_rates",
-          entityId: tenantId,
-          newData: {
-            usd: data.usd_rate,
-            eur: data.eur_rate,
-            usdt: data.usdt_rate,
-            date: data.date_rate,
-          },
-        });
-      } catch (e) {
-        console.warn("[MarketOS] Error saving manual rate to Supabase:", e);
-      }
-    }
-
-    const updatedRate: ExchangeRate = {
-      id: `rate-${tenantId}`,
-      tenant_id: tenantId,
-      currency: "VES",
-      value: data.usd_rate,
-      eur_value: data.eur_rate,
-      usdt_value: data.usdt_rate,
-      source,
-      updated_at: nowIso,
-    };
-
-    const existingIdx = state.rates.findIndex((r) => r.tenant_id === tenantId);
-    if (existingIdx >= 0) {
-      state.rates[existingIdx] = updatedRate;
-    } else {
-      state.rates.push(updatedRate);
-    }
-
-    // Add to history
-    const existingHistIdx = state.rateHistory.findIndex(
-      (h) => h.tenant_id === tenantId && h.date_rate === data.date_rate
-    );
-    const historyItem: RateHistoryItem = {
-      id: `hist-${Date.now()}`,
-      tenant_id: tenantId,
-      date_rate: data.date_rate,
-      currency: "USD",
-      rate: data.usd_rate,
-      rate_eur: data.eur_rate,
-      usdt_promedio: data.usdt_rate,
-      source,
-      created_at: nowIso,
-    };
-    if (existingHistIdx >= 0) {
-      state.rateHistory[existingHistIdx] = historyItem;
-    } else {
-      state.rateHistory.unshift(historyItem);
-    }
-
-    return updatedRate;
+    return ExchangeRateRepository.saveManualExchangeRate(tenantId, data, actor);
   }
 
   /**
@@ -1010,27 +659,7 @@ export class MarketOSRepository {
     tenantId: string,
     includeInactive = false
   ): Promise<DeliveryZone[]> {
-    const supabase = getSupabase();
-    if (supabase) {
-      let query = supabase
-        .from("delivery_zones")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .order("sort_order", { ascending: true });
-
-      if (!includeInactive) {
-        query = query.eq("is_active", true);
-      }
-
-      const { data, error } = await query;
-      if (!error && data && data.length > 0) {
-        return data as DeliveryZone[];
-      }
-    }
-
-    return state.deliveryZones
-      .filter((z) => z.tenant_id === tenantId && (includeInactive || z.is_active))
-      .sort((a, b) => a.sort_order - b.sort_order);
+    return DeliveryRepository.getDeliveryZones(tenantId, includeInactive);
   }
 
   /**
@@ -1039,55 +668,7 @@ export class MarketOSRepository {
   static async createDeliveryZone(
     input: CreateDeliveryZoneInput
   ): Promise<DeliveryZone> {
-    const supabase = getSupabase();
-    const id = generateUuid();
-    const now = new Date().toISOString();
-    const sortOrder =
-      input.sortOrder !== undefined
-        ? input.sortOrder
-        : state.deliveryZones.filter((z) => z.tenant_id === input.tenantId).length + 1;
-
-    const newZone: DeliveryZone = {
-      id,
-      tenant_id: input.tenantId,
-      name: input.name.trim(),
-      price_usd: Math.max(0, Number(input.priceUsd)),
-      estimated_time: input.estimatedTime?.trim() || "30-45 min",
-      coverage_description: input.coverageDescription?.trim() || null,
-      is_active: input.isActive !== undefined ? input.isActive : true,
-      sort_order: sortOrder,
-      created_at: now,
-      updated_at: now,
-    };
-
-    if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from("delivery_zones")
-          .insert({
-            id: newZone.id,
-            tenant_id: newZone.tenant_id,
-            name: newZone.name,
-            price_usd: newZone.price_usd,
-            estimated_time: newZone.estimated_time,
-            coverage_description: newZone.coverage_description,
-            is_active: newZone.is_active,
-            sort_order: newZone.sort_order,
-          })
-          .select("*")
-          .single();
-
-        if (!error && data) {
-          state.deliveryZones.push(data as DeliveryZone);
-          return data as DeliveryZone;
-        }
-      } catch (e) {
-        console.warn("[Supabase] createDeliveryZone fallback:", e);
-      }
-    }
-
-    state.deliveryZones.push(newZone);
-    return newZone;
+    return DeliveryRepository.createDeliveryZone(input);
   }
 
   /**
@@ -1096,55 +677,7 @@ export class MarketOSRepository {
   static async updateDeliveryZone(
     input: UpdateDeliveryZoneInput
   ): Promise<DeliveryZone | null> {
-    const supabase = getSupabase();
-    const now = new Date().toISOString();
-
-    const updates: any = { updated_at: now };
-    if (input.name !== undefined) updates.name = input.name.trim();
-    if (input.priceUsd !== undefined) updates.price_usd = Math.max(0, Number(input.priceUsd));
-    if (input.estimatedTime !== undefined) updates.estimated_time = input.estimatedTime.trim();
-    if (input.coverageDescription !== undefined)
-      updates.coverage_description = input.coverageDescription ? input.coverageDescription.trim() : null;
-    if (input.isActive !== undefined) updates.is_active = input.isActive;
-    if (input.sortOrder !== undefined) updates.sort_order = input.sortOrder;
-
-    if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from("delivery_zones")
-          .update(updates)
-          .eq("id", input.zoneId)
-          .eq("tenant_id", input.tenantId)
-          .select("*")
-          .single();
-
-        if (!error && data) {
-          const idx = state.deliveryZones.findIndex((z) => z.id === input.zoneId);
-          if (idx !== -1) {
-            state.deliveryZones[idx] = data as DeliveryZone;
-          }
-          return data as DeliveryZone;
-        }
-      } catch (e) {
-        console.warn("[Supabase] updateDeliveryZone fallback:", e);
-      }
-    }
-
-    const idx = state.deliveryZones.findIndex(
-      (z) => z.id === input.zoneId && z.tenant_id === input.tenantId
-    );
-    if (idx !== -1) {
-      const existing = state.deliveryZones[idx];
-      const updated: DeliveryZone = {
-        ...existing,
-        ...updates,
-        updated_at: now,
-      };
-      state.deliveryZones[idx] = updated;
-      return updated;
-    }
-
-    return null;
+    return DeliveryRepository.updateDeliveryZone(input);
   }
 
   /**
@@ -1155,35 +688,7 @@ export class MarketOSRepository {
     zoneId: string,
     isActive: boolean
   ): Promise<boolean> {
-    const supabase = getSupabase();
-    const now = new Date().toISOString();
-
-    if (supabase) {
-      try {
-        const { error } = await supabase
-          .from("delivery_zones")
-          .update({ is_active: isActive, updated_at: now })
-          .eq("id", zoneId)
-          .eq("tenant_id", tenantId);
-
-        if (!error) {
-          const zone = state.deliveryZones.find((z) => z.id === zoneId);
-          if (zone) zone.is_active = isActive;
-          return true;
-        }
-      } catch (e) {
-        console.warn("[Supabase] toggleDeliveryZoneStatus fallback:", e);
-      }
-    }
-
-    const zone = state.deliveryZones.find(
-      (z) => z.id === zoneId && z.tenant_id === tenantId
-    );
-    if (zone) {
-      zone.is_active = isActive;
-      return true;
-    }
-    return false;
+    return DeliveryRepository.toggleDeliveryZoneStatus(tenantId, zoneId, isActive);
   }
 
   /**
@@ -1200,159 +705,19 @@ export class MarketOSRepository {
     discountUsd: number;
     message?: string;
   }> {
-    const code = rawCode.trim().toUpperCase();
-    let coupon: Coupon | undefined;
-
-    const supabase = getSupabase();
-    if (supabase) {
-      const { data } = await supabase
-        .from("coupons")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .ilike("code", code)
-        .eq("is_active", true)
-        .maybeSingle();
-
-      if (data) {
-        coupon = data as Coupon;
-      }
-    }
-
-    if (!coupon) {
-      coupon = state.coupons.find(
-        (c) =>
-          c.tenant_id === tenantId &&
-          c.code.toUpperCase() === code &&
-          c.is_active
-      );
-    }
-
-    if (!coupon) {
-      return { valid: false, discountUsd: 0, message: "Cupón no encontrado o inválido" };
-    }
-
-    if (orderAmountUsd < coupon.min_order_amount_usd) {
-      return {
-        valid: false,
-        coupon,
-        discountUsd: 0,
-        message: `Monto mínimo de compra para este cupón: $${coupon.min_order_amount_usd.toFixed(2)}`,
-      };
-    }
-
-    if (coupon.usage_limit && coupon.usage_count >= coupon.usage_limit) {
-      return {
-        valid: false,
-        coupon,
-        discountUsd: 0,
-        message: "Este cupón ha alcanzado su límite de usos",
-      };
-    }
-
-    if (coupon.usage_limit_per_customer && customerPhone) {
-      const cleanPhone = customerPhone.replace(/\D/g, "");
-      let customerUsageCount = 0;
-
-      if (supabase && cleanPhone.length >= 7) {
-        try {
-          const { count } = await supabase
-            .from("orders")
-            .select("id", { count: "exact", head: true })
-            .eq("tenant_id", tenantId)
-            .eq("coupon_id", coupon.id)
-            .neq("status", "CANCELLED")
-            .ilike("customer_phone", `%${cleanPhone.slice(-7)}%`);
-          customerUsageCount = count || 0;
-        } catch (e) {
-          console.warn("[MarketOS] Could not count customer coupon orders in Supabase:", e);
-        }
-      }
-
-      if (!customerUsageCount) {
-        customerUsageCount = state.orders.filter(
-          (o) =>
-            o.tenant_id === tenantId &&
-            o.coupon_id === coupon?.id &&
-            o.status !== "CANCELLED" &&
-            (o.customer_phone?.replace(/\D/g, "").slice(-7) === cleanPhone.slice(-7) ||
-              o.customer_phone === customerPhone)
-        ).length;
-      }
-
-      if (customerUsageCount >= coupon.usage_limit_per_customer) {
-        return {
-          valid: false,
-          coupon,
-          discountUsd: 0,
-          message: `Has alcanzado el límite de ${coupon.usage_limit_per_customer} uso(s) permitido(s) para este cupón`,
-        };
-      }
-    }
-
-    if (coupon.starts_at) {
-      const starts = new Date(coupon.starts_at).getTime();
-      if (!isNaN(starts) && Date.now() < starts) {
-        return {
-          valid: false,
-          coupon,
-          discountUsd: 0,
-          message: `Este cupón aún no está activo. Estará disponible a partir del ${new Date(coupon.starts_at).toLocaleDateString("es-VE")}`,
-        };
-      }
-    }
-
-    if (coupon.expires_at) {
-      const expiry = new Date(coupon.expires_at).getTime();
-      if (!isNaN(expiry) && Date.now() > expiry) {
-        return {
-          valid: false,
-          coupon,
-          discountUsd: 0,
-          message: "Este cupón ha vencido",
-        };
-      }
-    }
-
-    let discount = 0;
-    if (coupon.discount_type === "FIXED_USD") {
-      discount = Math.min(orderAmountUsd, coupon.discount_value);
-    } else if (coupon.discount_type === "PERCENTAGE") {
-      discount = (orderAmountUsd * coupon.discount_value) / 100;
-      if (coupon.max_discount_usd && discount > coupon.max_discount_usd) {
-        discount = coupon.max_discount_usd;
-      }
-    }
-
-    discount = Number(discount.toFixed(2));
-
-    return {
-      valid: true,
-      coupon,
-      discountUsd: discount,
-      message: `¡Cupón aplicado con éxito! -$${discount.toFixed(2)}`,
-    };
+    return CouponRepository.validateCoupon(
+      tenantId,
+      rawCode,
+      orderAmountUsd,
+      customerPhone
+    );
   }
 
   /**
    * Get all coupons for Tenant
    */
   static async getCoupons(tenantId: string): Promise<Coupon[]> {
-    const supabase = getSupabase();
-    if (supabase) {
-      const { data, error } = await supabase
-        .from("coupons")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .order("created_at", { ascending: false });
-
-      if (!error && data) {
-        return data as Coupon[];
-      }
-    }
-
-    return state.coupons
-      .filter((c) => c.tenant_id === tenantId)
-      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+    return CouponRepository.getCoupons(tenantId);
   }
 
   /**
@@ -1501,43 +866,14 @@ export class MarketOSRepository {
     couponId: string,
     isActive: boolean
   ): Promise<Coupon | null> {
-    const supabase = getSupabase();
-    if (supabase) {
-      await supabase
-        .from("coupons")
-        .update({ is_active: isActive })
-        .eq("id", couponId)
-        .eq("tenant_id", tenantId);
-    }
-
-    const c = state.coupons.find((cp) => cp.id === couponId && cp.tenant_id === tenantId);
-    if (c) {
-      c.is_active = isActive;
-      return c;
-    }
-    return null;
+    return CouponRepository.toggleCoupon(tenantId, couponId, isActive);
   }
 
   /**
    * Delete Coupon
    */
   static async deleteCoupon(tenantId: string, couponId: string): Promise<boolean> {
-    const supabase = getSupabase();
-    if (supabase) {
-      await supabase
-        .from("coupons")
-        .delete()
-        .eq("id", couponId)
-        .eq("tenant_id", tenantId);
-    }
-
-    const idx = state.coupons.findIndex(
-      (cp) => cp.id === couponId && cp.tenant_id === tenantId
-    );
-    if (idx !== -1) {
-      state.coupons.splice(idx, 1);
-    }
-    return true;
+    return CouponRepository.deleteCoupon(tenantId, couponId);
   }
 
   /**
@@ -1547,26 +883,7 @@ export class MarketOSRepository {
     tenantId: string,
     includeInactive = false
   ): Promise<Driver[]> {
-    const supabase = getSupabase();
-    if (supabase) {
-      let query = supabase
-        .from("drivers")
-        .select("*")
-        .eq("tenant_id", tenantId);
-
-      if (!includeInactive) {
-        query = query.eq("is_active", true);
-      }
-
-      const { data, error } = await query;
-      if (!error && data && data.length > 0) {
-        return data as Driver[];
-      }
-    }
-
-    return state.drivers.filter(
-      (d) => d.tenant_id === tenantId && (includeInactive || d.is_active)
-    );
+    return DeliveryRepository.getDrivers(tenantId, includeInactive);
   }
 
   /**
@@ -1632,55 +949,7 @@ export class MarketOSRepository {
    * Update driver details
    */
   static async updateDriver(input: UpdateDriverInput): Promise<Driver | null> {
-    const supabase = getSupabase();
-    const now = new Date().toISOString();
-
-    const updates: any = { updated_at: now };
-    if (input.name !== undefined) updates.name = input.name.trim();
-    if (input.phone !== undefined) updates.phone = input.phone.trim();
-    if (input.vehicleType !== undefined) updates.vehicle_type = input.vehicleType;
-    if (input.plateNumber !== undefined)
-      updates.plate_number = input.plateNumber ? input.plateNumber.trim() : null;
-    if (input.storeId !== undefined) updates.store_id = input.storeId;
-    if (input.isActive !== undefined) updates.is_active = input.isActive;
-
-    if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from("drivers")
-          .update(updates)
-          .eq("id", input.driverId)
-          .eq("tenant_id", input.tenantId)
-          .select("*")
-          .single();
-
-        if (!error && data) {
-          const idx = state.drivers.findIndex((d) => d.id === input.driverId);
-          if (idx !== -1) {
-            state.drivers[idx] = data as Driver;
-          }
-          return data as Driver;
-        }
-      } catch (e) {
-        console.warn("[Supabase] updateDriver fallback:", e);
-      }
-    }
-
-    const idx = state.drivers.findIndex(
-      (d) => d.id === input.driverId && d.tenant_id === input.tenantId
-    );
-    if (idx !== -1) {
-      const existing = state.drivers[idx];
-      const updated: Driver = {
-        ...existing,
-        ...updates,
-        updated_at: now,
-      };
-      state.drivers[idx] = updated;
-      return updated;
-    }
-
-    return null;
+    return DeliveryRepository.updateDriver(input);
   }
 
   /**
@@ -1691,35 +960,7 @@ export class MarketOSRepository {
     driverId: string,
     isActive: boolean
   ): Promise<boolean> {
-    const supabase = getSupabase();
-    const now = new Date().toISOString();
-
-    if (supabase) {
-      try {
-        const { error } = await supabase
-          .from("drivers")
-          .update({ is_active: isActive, updated_at: now })
-          .eq("id", driverId)
-          .eq("tenant_id", tenantId);
-
-        if (!error) {
-          const driver = state.drivers.find((d) => d.id === driverId);
-          if (driver) driver.is_active = isActive;
-          return true;
-        }
-      } catch (e) {
-        console.warn("[Supabase] toggleDriverStatus fallback:", e);
-      }
-    }
-
-    const driver = state.drivers.find(
-      (d) => d.id === driverId && d.tenant_id === tenantId
-    );
-    if (driver) {
-      driver.is_active = isActive;
-      return true;
-    }
-    return false;
+    return DeliveryRepository.toggleDriverStatus(tenantId, driverId, isActive);
   }
 
   /**
@@ -1801,7 +1042,7 @@ export class MarketOSRepository {
       0
     );
 
-    // 3. Validate and apply coupon discount if present
+    // 3. AgentShield: Validate and strictly calculate coupon discount on server
     let discountUsd = 0;
     let couponId: string | null = null;
     if (input.couponCode) {
@@ -1811,12 +1052,16 @@ export class MarketOSRepository {
         subtotalUsd,
         input.customerPhone
       );
-      if (couponRes.valid) {
-        discountUsd = couponRes.discountUsd;
-        couponId = couponRes.coupon?.id || null;
+      if (!couponRes.valid) {
+        throw new Error(
+          `Cupón de descuento no válido: ${couponRes.message || "El cupón ha expirado o no cumple los requisitos."}`
+        );
       }
-    } else if (input.discountUsd) {
-      discountUsd = input.discountUsd;
+      discountUsd = couponRes.discountUsd;
+      couponId = couponRes.coupon?.id || null;
+    } else {
+      // Reject arbitrary client-supplied discounts to prevent price tampering
+      discountUsd = 0;
     }
 
     // 4. Validate delivery fee against database delivery_zones
@@ -2779,7 +2024,7 @@ export class MarketOSRepository {
         .or(`tenant_id.eq.${actualTenantId},tenant_id.eq.${tenantId}`)
         .order("created_at", { ascending: false });
 
-      if (!error && data) {
+      if (!error && data && data.length > 0) {
         return data as PaymentProof[];
       }
     }
@@ -3541,303 +2786,21 @@ export class MarketOSRepository {
    * Record Audit Log in Supabase & memory state
    */
   static async recordAuditLog(input: RecordAuditLogInput): Promise<AuditLog> {
-    const tenantName =
-      input.tenantName ||
-      state.tenants.find((t) => t.id === input.tenantId)?.name ||
-      (input.tenantId === "platform" ? "Plataforma Central" : undefined);
-
-    const actorDetails = {
-      id: input.actorId || null,
-      name: input.actorName || "Admin Operativo",
-      email: input.actorEmail || null,
-      role: input.actorRole || "OPERATOR",
-    };
-
-    const enrichedNewData: Record<string, unknown> = {
-      ...(input.newData || {}),
-      _actor: actorDetails,
-      ...(tenantName ? { _tenant_name: tenantName } : {}),
-    };
-
-    const auditLog: AuditLog = {
-      id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      tenant_id: input.tenantId,
-      tenant_name: tenantName || null,
-      actor_id: input.actorId || null,
-      actor_name: input.actorName || "Admin Operativo",
-      actor_email: input.actorEmail || null,
-      actor_role: input.actorRole || "OPERATOR",
-      action: input.action,
-      entity: input.entity,
-      entity_id: input.entityId,
-      old_data: input.oldData || null,
-      new_data: enrichedNewData,
-      created_at: new Date().toISOString(),
-    };
-
-    const supabase = getSupabase();
-    if (supabase) {
-      try {
-        const actorUuid = input.actorId && isUuid(input.actorId) ? input.actorId : null;
-        const insertPayload: Record<string, unknown> = {
-          tenant_id: auditLog.tenant_id,
-          action: auditLog.action,
-          entity: auditLog.entity,
-          entity_id: auditLog.entity_id,
-          old_data: auditLog.old_data,
-          new_data: enrichedNewData,
-          actor_id: actorUuid,
-        };
-        if (input.actorName) insertPayload.actor_name = input.actorName;
-        if (input.actorEmail) insertPayload.actor_email = input.actorEmail;
-        if (input.actorRole) insertPayload.actor_role = input.actorRole;
-        if (tenantName) insertPayload.tenant_name = tenantName;
-
-        const { error: insertErr } = await supabase.from("audit_logs").insert(insertPayload);
-        if (insertErr) {
-          // Fallback to base columns if schema hasn't reloaded
-          await supabase.from("audit_logs").insert({
-            tenant_id: auditLog.tenant_id,
-            action: auditLog.action,
-            entity: auditLog.entity,
-            entity_id: auditLog.entity_id,
-            old_data: auditLog.old_data,
-            new_data: enrichedNewData,
-            actor_id: actorUuid,
-          });
-        }
-      } catch (e) {
-        console.warn("[MarketOS] Error recording audit log in Supabase:", e);
-      }
-    }
-
-    state.auditLogs.unshift(auditLog);
-    return auditLog;
+    return AuditRepository.recordAuditLog(input);
   }
 
   /**
    * Get Audit Logs for Tenant Admin
    */
   static async getAuditLogs(tenantId: string, limit = 50): Promise<AuditLog[]> {
-    return MarketOSRepository.getGlobalAuditLogs({ tenantId, limit });
+    return AuditRepository.getAuditLogs(tenantId, limit);
   }
 
   /**
    * Get Global Audit Logs across all tenants (Super Admin) or with filters
    */
   static async getGlobalAuditLogs(filters?: AuditLogFilters): Promise<AuditLog[]> {
-    const limit = filters?.limit || 100;
-    const supabase = getSupabase();
-
-    const tenantMap = new Map<string, string>();
-    state.tenants.forEach((t) => tenantMap.set(t.id, t.name));
-
-    if (supabase) {
-      try {
-        let query = supabase
-          .from("audit_logs")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(limit);
-
-        if (filters?.tenantId && filters.tenantId !== "ALL") {
-          query = query.eq("tenant_id", filters.tenantId);
-        }
-        if (filters?.action && filters.action !== "ALL") {
-          query = query.eq("action", filters.action);
-        }
-        if (filters?.actorId) {
-          query = query.eq("actor_id", filters.actorId);
-        }
-        if (filters?.startDate) {
-          query = query.gte("created_at", filters.startDate);
-        }
-        if (filters?.endDate) {
-          query = query.lte("created_at", filters.endDate);
-        }
-
-        const { data, error } = await query;
-
-        // Also fetch physical stock movements from inventory_movements
-        let invData: any[] = [];
-        try {
-          let invQuery = supabase
-            .from("inventory_movements")
-            .select("*, products(name)")
-            .order("created_at", { ascending: false })
-            .limit(limit);
-
-          if (filters?.tenantId && filters.tenantId !== "ALL") {
-            invQuery = invQuery.eq("tenant_id", filters.tenantId);
-          }
-          if (filters?.startDate) {
-            invQuery = invQuery.gte("created_at", filters.startDate);
-          }
-          if (filters?.endDate) {
-            invQuery = invQuery.lte("created_at", filters.endDate);
-          }
-
-          const { data: idata, error: ierr } = await invQuery;
-          if (!ierr && idata) {
-            invData = idata;
-          }
-        } catch (invErr) {
-          console.warn("[MarketOS] inventory_movements fetch warning:", invErr);
-        }
-
-        const mappedInv: AuditLog[] = invData.map((im: any) => {
-          const prodName =
-            im.products?.name ||
-            state.products.find((p) => p.id === im.product_id)?.name ||
-            "Producto";
-          const reasonLabel =
-            im.reason === "SALE"
-              ? "VENTA"
-              : im.reason === "CANCELLATION"
-              ? "CANCELACIÓN"
-              : im.reason === "RESTOCK"
-              ? "REABASTECIMIENTO"
-              : im.reason || "AJUSTE";
-
-          return {
-            id: `inv-${im.id}`,
-            tenant_id: im.tenant_id,
-            tenant_name: tenantMap.get(im.tenant_id) || "Tienda",
-            actor_id: im.created_by || null,
-            actor_name: im.reason === "SALE" ? "Venta en Línea" : "Sistema de Inventario",
-            actor_email: null,
-            actor_role: "SYSTEM",
-            action: "STOCK_ADJUSTED",
-            entity: "inventory",
-            entity_id: im.product_id,
-            old_data: {
-              product_id: im.product_id,
-              name: prodName,
-              stock_quantity: im.previous_quantity,
-            },
-            new_data: {
-              product_id: im.product_id,
-              name: prodName,
-              delta: im.quantity_change,
-              quantity: im.new_quantity,
-              reason: reasonLabel,
-              note:
-                im.reason === "SALE"
-                  ? "Deducción automática por venta de comercio"
-                  : im.reason === "CANCELLATION"
-                  ? "Reintegro por orden cancelada"
-                  : undefined,
-            },
-            created_at: im.created_at,
-          };
-        });
-
-        const mappedAudit: AuditLog[] = (!error && data)
-          ? data.map((d: any) => {
-              const actorFromMeta =
-                (d.new_data && typeof d.new_data === "object" && d.new_data._actor) || {};
-              const tName =
-                d.tenant_name ||
-                (d.new_data && d.new_data._tenant_name) ||
-                tenantMap.get(d.tenant_id) ||
-                (d.tenant_id === "platform" ? "Plataforma Central" : "Tienda");
-
-              return {
-                id: d.id,
-                tenant_id: d.tenant_id,
-                tenant_name: tName,
-                actor_id: d.actor_id || actorFromMeta.id || null,
-                actor_name: d.actor_name || actorFromMeta.name || "Admin Operativo",
-                actor_email: d.actor_email || actorFromMeta.email || null,
-                actor_role: d.actor_role || actorFromMeta.role || null,
-                action: d.action,
-                entity: d.entity,
-                entity_id: d.entity_id,
-                old_data: d.old_data,
-                new_data: d.new_data,
-                created_at: d.created_at,
-              };
-            })
-          : [];
-
-        // Deduplicate: if an entry for the exact movement exists in audit_logs, don't duplicate
-        const existingAuditKeys = new Set(
-          mappedAudit
-            .filter((a) => a.action === "STOCK_ADJUSTED")
-            .map((a) => `${a.entity_id}_${a.new_data?.delta}_${a.created_at?.slice(0, 16)}`)
-        );
-        const filteredInv = mappedInv.filter(
-          (im) => !existingAuditKeys.has(`${im.entity_id}_${im.new_data?.delta}_${im.created_at?.slice(0, 16)}`)
-        );
-
-        let combined = [...mappedAudit, ...filteredInv].sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-
-        if (filters?.action && filters.action !== "ALL") {
-          combined = combined.filter((l) => l.action === filters.action);
-        }
-
-        if (filters?.search && filters.search.trim()) {
-          const term = filters.search.trim().toLowerCase();
-          combined = combined.filter(
-            (l) =>
-              (l.actor_name && l.actor_name.toLowerCase().includes(term)) ||
-              (l.actor_email && l.actor_email.toLowerCase().includes(term)) ||
-              (l.action && l.action.toLowerCase().includes(term)) ||
-              (l.entity_id && l.entity_id.toLowerCase().includes(term)) ||
-              (l.tenant_name && l.tenant_name.toLowerCase().includes(term)) ||
-              JSON.stringify(l.new_data || {}).toLowerCase().includes(term)
-          );
-        }
-
-        if (combined.length > 0) {
-          return combined.slice(0, limit);
-        }
-      } catch (e) {
-        console.warn("[MarketOS] Error fetching global audit logs from Supabase:", e);
-      }
-    }
-
-    // Fallback to in-memory state
-    let results = [...state.auditLogs];
-
-    if (filters?.tenantId && filters.tenantId !== "ALL") {
-      results = results.filter((l) => l.tenant_id === filters.tenantId);
-    }
-    if (filters?.action && filters.action !== "ALL") {
-      results = results.filter((l) => l.action === filters.action);
-    }
-    if (filters?.actorId) {
-      results = results.filter((l) => l.actor_id === filters.actorId);
-    }
-    if (filters?.startDate) {
-      results = results.filter((l) => l.created_at >= filters.startDate!);
-    }
-    if (filters?.endDate) {
-      results = results.filter((l) => l.created_at <= filters.endDate!);
-    }
-    if (filters?.search && filters.search.trim()) {
-      const term = filters.search.trim().toLowerCase();
-      results = results.filter(
-        (l) =>
-          (l.actor_name && l.actor_name.toLowerCase().includes(term)) ||
-          (l.actor_email && l.actor_email.toLowerCase().includes(term)) ||
-          (l.action && l.action.toLowerCase().includes(term)) ||
-          (l.entity_id && l.entity_id.toLowerCase().includes(term)) ||
-          (tenantMap.get(l.tenant_id) &&
-            tenantMap.get(l.tenant_id)!.toLowerCase().includes(term)) ||
-          JSON.stringify(l.new_data || {}).toLowerCase().includes(term)
-      );
-    }
-
-    return results.slice(0, limit).map((l) => ({
-      ...l,
-      tenant_name:
-        l.tenant_name ||
-        tenantMap.get(l.tenant_id) ||
-        (l.tenant_id === "platform" ? "Plataforma Central" : "Tienda"),
-    }));
+    return AuditRepository.getGlobalAuditLogs(filters);
   }
 
   /**
@@ -6395,7 +5358,7 @@ export class MarketOSRepository {
           .select("*")
           .eq("tenant_id", tenantId);
 
-        if (!error && data) {
+        if (!error && data && data.length > 0) {
           return data as TenantModule[];
         }
       } catch (err) {

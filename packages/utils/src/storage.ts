@@ -7,7 +7,7 @@ import {
   type ListObjectsV2CommandOutput,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { slugify } from "./index";
+import { slugify } from "./index.ts";
 import type {
   StorageFolder,
   StorageFolderTelemetry,
@@ -20,11 +20,6 @@ import type {
 export type { StorageFolder };
 
 const DEFAULT_SUPABASE_URL = "https://xiklunkmdpqzlhmrfkql.supabase.co";
-const DEFAULT_SUPABASE_SERVICE_ROLE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhpa2x1bmttZHBxemxobXJma3FsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MTEyNDQ3NywiZXhwIjoyMTA2NzAwNDc3fQ.JfPA42wthygKWPs7KaAR1BJDnMH4t1wydQ_zTSKZjRM";
-const DEFAULT_CLOUDFLARE_ACCOUNT_ID = "e96fb9441d9085bf6ebe215d152ec37d";
-const DEFAULT_R2_ACCESS_KEY_ID = "16fd1412b0cb0d4b071c4544ff0880e4";
-const DEFAULT_R2_SECRET_ACCESS_KEY = "da39b83a69bcd9080f03c4000bbb2f3011dc2816952c479d05a9b9866258ee53";
 export const DEFAULT_R2_BUCKET_NAME = "marketos-media";
 
 /**
@@ -48,13 +43,13 @@ export const DEFAULT_PLAN_STORAGE_LIMITS: Record<SubscriptionPlanTier, number> =
  * Cloudflare R2 Client (S3 Compatible)
  */
 export function getR2Client(): S3Client {
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || DEFAULT_CLOUDFLARE_ACCOUNT_ID;
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID || DEFAULT_R2_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || DEFAULT_R2_SECRET_ACCESS_KEY;
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
 
   if (!accountId || !accessKeyId || !secretAccessKey) {
     throw new Error(
-      "[Cloudflare R2] Missing CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID, or R2_SECRET_ACCESS_KEY"
+      "[Cloudflare R2] Missing CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID, or R2_SECRET_ACCESS_KEY in environment"
     );
   }
 
@@ -146,7 +141,10 @@ export async function uploadToR2(input: UploadFileInput): Promise<UploadResult> 
   let supabaseSuccess = false;
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || DEFAULT_SUPABASE_SERVICE_ROLE_KEY;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceKey) {
+      throw new Error("SUPABASE_SERVICE_ROLE_KEY missing in environment");
+    }
 
     const uploadRes = await fetch(`${supabaseUrl}/storage/v1/object/marketos-media/${key}`, {
       method: "POST",
@@ -528,15 +526,15 @@ export async function scanR2PlatformStorage(
     console.warn("[Cloudflare R2 Telemetry] Live scan failed, generating resilient fallback:", error);
     // Fallback using known seeded objects if R2 call fails
     const mockObjects: Array<{ Key: string; Size: number; LastModified: Date }> = [
-      { Key: "shop-market-ca/products/harina-pan-blanca-1kg.jpg", Size: 524436, LastModified: new Date() },
-      { Key: "shop-market-ca/products/arroz-mary-tradicional-1kg.jpg", Size: 571511, LastModified: new Date() },
-      { Key: "shop-market-ca/products/aceite-vegetal-mazeite-1l.jpg", Size: 458248, LastModified: new Date() },
-      { Key: "shop-market-ca/products/cafe-fama-de-america-250g.jpg", Size: 516622, LastModified: new Date() },
-      { Key: "shop-market-ca/products/queso-paisa-pasteurizado-500g.jpg", Size: 540548, LastModified: new Date() },
-      { Key: "shop-market-ca/products/leche-completa-la-campina-1l.jpg", Size: 516403, LastModified: new Date() },
-      { Key: "shop-market-ca/products/coca-cola-original-1-5l.jpg", Size: 519287, LastModified: new Date() },
-      { Key: "shop-market-ca/products/galletas-oreo-chocolate-108g.jpg", Size: 458492, LastModified: new Date() },
-      { Key: "shop-market-ca/branding/1791903872020-sm.webp", Size: 345120, LastModified: new Date() },
+      { Key: "shop-market-ca/products/harina-pan-blanca-1kg.webp", Size: 38728, LastModified: new Date() },
+      { Key: "shop-market-ca/products/arroz-mary-tradicional-1kg.webp", Size: 45142, LastModified: new Date() },
+      { Key: "shop-market-ca/products/aceite-vegetal-mazeite-1l.webp", Size: 24646, LastModified: new Date() },
+      { Key: "shop-market-ca/products/cafe-fama-de-america-250g.webp", Size: 30784, LastModified: new Date() },
+      { Key: "shop-market-ca/products/queso-paisa-pasteurizado-500g.webp", Size: 30418, LastModified: new Date() },
+      { Key: "shop-market-ca/products/leche-completa-la-campina-1l.webp", Size: 31026, LastModified: new Date() },
+      { Key: "shop-market-ca/products/coca-cola-original-1-5l.webp", Size: 32942, LastModified: new Date() },
+      { Key: "shop-market-ca/products/galletas-oreo-chocolate-108g.webp", Size: 26106, LastModified: new Date() },
+      { Key: "shop-market-ca/branding/1791903872020-sm.webp", Size: 34512, LastModified: new Date() },
     ];
     return calculatePlatformStorageTelemetry(mockObjects, tenants, "cached_fallback");
   }

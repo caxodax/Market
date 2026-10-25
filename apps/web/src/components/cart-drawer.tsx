@@ -100,6 +100,10 @@ export function CartDrawer({
                     <img
                       src={item.product.image_url || ""}
                       alt={item.product.name}
+                      width={64}
+                      height={64}
+                      loading="lazy"
+                      decoding="async"
                       className="w-16 h-16 rounded-lg object-cover bg-muted shrink-0"
                       onError={(e) => {
                         e.currentTarget.onerror = null;

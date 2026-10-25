@@ -10,7 +10,7 @@ import {
   ExchangeRate,
   DeliveryZone,
 } from "@marketos/types";
-import { CartProvider } from "../context/cart-context";
+import { CartProvider, useCart } from "../context/cart-context";
 import { FavoritesProvider } from "../context/favorites-context";
 import { StoreHeader } from "./store-header";
 import { CatalogView } from "./catalog-view";
@@ -60,6 +60,39 @@ function hexToHslString(hex: string): string {
   } catch {
     return "0 72% 51%";
   }
+}
+
+function StorefrontTopMarquee({
+  config,
+  categories,
+  products,
+  selectedStore,
+  exchangeRate,
+  selectedCategoryId,
+  onSelectCategory,
+}: {
+  config: import("@marketos/types").StorefrontConfig;
+  categories: Category[];
+  products: (Product & { stock: number })[];
+  selectedStore: Store;
+  exchangeRate: ExchangeRate;
+  selectedCategoryId: string | null;
+  onSelectCategory: (cat: string | null) => void;
+}) {
+  const { addItem } = useCart();
+  return (
+    <StorefrontProRenderer
+      config={config}
+      position="top"
+      categories={categories}
+      products={products}
+      selectedStore={selectedStore}
+      exchangeRate={exchangeRate}
+      selectedCategoryId={selectedCategoryId}
+      onSelectCategory={onSelectCategory}
+      onAddToCart={addItem}
+    />
+  );
 }
 
 export function StorefrontPage({
@@ -121,17 +154,15 @@ export function StorefrontPage({
         />
         <div className="min-h-screen bg-background text-foreground flex flex-col w-full max-w-full overflow-x-hidden">
           {/* Storefront Pro: Top Marquee if active */}
-          {isStorefrontProActive && (
-            <StorefrontProRenderer
+          {isStorefrontProActive && storefrontConfig && (
+            <StorefrontTopMarquee
               config={storefrontConfig}
-              position="top"
               categories={categories}
               products={products}
               selectedStore={selectedStore}
               exchangeRate={exchangeRate}
               selectedCategoryId={activeCategory}
               onSelectCategory={setActiveCategory}
-              onAddToCart={() => {}}
             />
           )}
 

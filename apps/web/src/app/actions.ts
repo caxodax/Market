@@ -8,6 +8,7 @@ import {
 import type { Order } from "@marketos/types";
 import { revalidatePath } from "next/cache";
 import { invalidateProductsCache } from "@/lib/cached-queries";
+import { assertAuthorizedTenantAdmin } from "./admin/actions";
 
 export type CreateOrderResult =
   | { success: true; order: Order; error?: never }
@@ -210,7 +211,14 @@ export async function validateCouponAction(
 export async function uploadPaymentProofToR2Action(formData: FormData) {
   try {
     const file = formData.get("file") as File | null;
-    const tenantId = (formData.get("tenantId") as string) || "shop-market-ca";
+    const formTenantId = (formData.get("tenantId") as string)?.trim();
+    if (!formTenantId) {
+      return {
+        success: false,
+        error: "Identificador de comercio requerido para registrar el comprobante",
+      };
+    }
+    const tenantId = formTenantId;
 
     if (!file || file.size === 0) {
       return { success: false, error: "No se proporcionó ningún archivo" };
@@ -338,6 +346,7 @@ export async function registerPhysicalFiscalInvoiceAction(
   physicalMachineSerial?: string
 ) {
   try {
+    await assertAuthorizedTenantAdmin(tenantId);
     const order = await MarketOSRepository.registerPhysicalFiscalInvoice(
       tenantId,
       orderId,

@@ -85,6 +85,7 @@ export function OpenShiftModal({
               <Input
                 id="opening-balance"
                 type="number"
+                inputMode="decimal"
                 min="0"
                 step="0.01"
                 value={openingBalance}
@@ -95,6 +96,26 @@ export function OpenShiftModal({
                 className="pl-9 font-semibold text-base"
                 placeholder="0.00"
               />
+            </div>
+            {/* Quick Presets for Cashiers */}
+            <div className="flex gap-1.5 pt-1">
+              {["0.00", "20.00", "50.00", "100.00"].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => {
+                    setOpeningBalance(preset);
+                    setError("");
+                  }}
+                  className={`px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold border transition-all cursor-pointer ${
+                    openingBalance === preset
+                      ? "bg-emerald-600 text-white border-emerald-600"
+                      : "bg-muted/60 hover:bg-muted text-muted-foreground border-border"
+                  }`}
+                >
+                  ${Number(preset).toFixed(0)}
+                </button>
+              ))}
             </div>
             <p className="text-[11px] text-muted-foreground">
               Efectivo disponible en caja para comenzar a dar vuelto.

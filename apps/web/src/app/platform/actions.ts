@@ -16,20 +16,33 @@ import { cookies } from "next/headers";
 import { invalidateTenantCache } from "../../lib/cached-queries";
 import { getCurrentUser } from "../login/actions";
 
+export async function assertPlatformSuperAdmin() {
+  const user = await getCurrentUser();
+  if (!user) {
+    throw new Error("No autenticado. Inicie sesión para continuar.");
+  }
+  if (user.role !== "PLATFORM_SUPER_ADMIN" && !user.impersonation) {
+    throw new Error(
+      "Acceso denegado: Se requieren privilegios de Super Administrador de la plataforma."
+    );
+  }
+  return user;
+}
+
 /**
  * Onboard and automatically provision a new tenant
  */
 export async function onboardTenantAction(input: OnboardTenantInput) {
   try {
+    const currentUser = await assertPlatformSuperAdmin();
     const tenant = await MarketOSRepository.onboardTenant(input);
-    const currentUser = await getCurrentUser();
     await MarketOSRepository.recordAuditLog({
       tenantId: tenant.id,
       tenantName: tenant.name,
-      actorId: currentUser?.id,
-      actorName: currentUser?.full_name,
-      actorEmail: currentUser?.email,
-      actorRole: currentUser?.role,
+      actorId: currentUser.id,
+      actorName: currentUser.full_name,
+      actorEmail: currentUser.email,
+      actorRole: currentUser.role,
       action: "TENANT_ONBOARDED",
       entity: "tenants",
       entityId: tenant.id,
@@ -59,14 +72,14 @@ export async function updateTenantStatusAction(
   status: "active" | "inactive" | "suspended" | "trial"
 ) {
   try {
+    const currentUser = await assertPlatformSuperAdmin();
     const updated = await MarketOSRepository.updateTenantStatus(tenantId, status);
-    const currentUser = await getCurrentUser();
     await MarketOSRepository.recordAuditLog({
       tenantId,
-      actorId: currentUser?.id,
-      actorName: currentUser?.full_name,
-      actorEmail: currentUser?.email,
-      actorRole: currentUser?.role,
+      actorId: currentUser.id,
+      actorName: currentUser.full_name,
+      actorEmail: currentUser.email,
+      actorRole: currentUser.role,
       action: "TENANT_STATUS_CHANGED",
       entity: "tenants",
       entityId: tenantId,
@@ -81,7 +94,10 @@ export async function updateTenantStatusAction(
     return { success: updated };
   } catch (error) {
     console.error("Error updating tenant status:", error);
-    return { success: false, error: "Error al actualizar estado del comercio" };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al actualizar estado del comercio",
+    };
   }
 }
 
@@ -95,19 +111,19 @@ export async function renewTenantSubscriptionAction(
   reference?: string
 ) {
   try {
+    const currentUser = await assertPlatformSuperAdmin();
     const subscription = await MarketOSRepository.renewTenantSubscription(
       tenantId,
       durationDays,
       paymentMethod,
       reference
     );
-    const currentUser = await getCurrentUser();
     await MarketOSRepository.recordAuditLog({
       tenantId,
-      actorId: currentUser?.id,
-      actorName: currentUser?.full_name,
-      actorEmail: currentUser?.email,
-      actorRole: currentUser?.role,
+      actorId: currentUser.id,
+      actorName: currentUser.full_name,
+      actorEmail: currentUser.email,
+      actorRole: currentUser.role,
       action: "SUBSCRIPTION_RENEWED",
       entity: "subscriptions",
       entityId: tenantId,
@@ -136,14 +152,14 @@ export async function changeTenantPlanAction(
   planTier: SubscriptionPlanTier
 ) {
   try {
+    const currentUser = await assertPlatformSuperAdmin();
     const subscription = await MarketOSRepository.changeTenantPlan(tenantId, planTier);
-    const currentUser = await getCurrentUser();
     await MarketOSRepository.recordAuditLog({
       tenantId,
-      actorId: currentUser?.id,
-      actorName: currentUser?.full_name,
-      actorEmail: currentUser?.email,
-      actorRole: currentUser?.role,
+      actorId: currentUser.id,
+      actorName: currentUser.full_name,
+      actorEmail: currentUser.email,
+      actorRole: currentUser.role,
       action: "SUBSCRIPTION_PLAN_CHANGED",
       entity: "subscriptions",
       entityId: tenantId,
@@ -167,6 +183,7 @@ export async function changeTenantPlanAction(
  */
 export async function getGlobalAuditLogsAction(filters?: AuditLogFilters) {
   try {
+    await assertPlatformSuperAdmin();
     const logs = await MarketOSRepository.getGlobalAuditLogs(filters);
     return { success: true, logs };
   } catch (error) {
@@ -184,6 +201,7 @@ export async function getGlobalAuditLogsAction(filters?: AuditLogFilters) {
  */
 export async function createPlatformUserAction(input: import("@marketos/types").CreatePlatformUserInput) {
   try {
+    await assertPlatformSuperAdmin();
     const user = await MarketOSRepository.createPlatformUser(input);
     revalidatePath("/platform");
     return { success: true, user };
@@ -204,6 +222,7 @@ export async function updateUserProfileAction(
   data: Partial<import("@marketos/types").UserProfile>
 ) {
   try {
+    await assertPlatformSuperAdmin();
     const updated = await MarketOSRepository.updateUserProfile(userId, data);
     revalidatePath("/platform");
     return { success: !!updated, user: updated };
@@ -221,6 +240,7 @@ export async function updateUserProfileAction(
  */
 export async function deletePlatformUserAction(userId: string) {
   try {
+    await assertPlatformSuperAdmin();
     const deleted = await MarketOSRepository.deleteUserProfile(userId);
     revalidatePath("/platform");
     return { success: deleted };
@@ -240,6 +260,7 @@ export async function getPlatformBiAnalyticsAction(
   filter: PlatformBiAnalyticsFilter | "today" | "week" | "month" | "all" = "all"
 ) {
   try {
+    await assertPlatformSuperAdmin();
     const analytics = await MarketOSRepository.getPlatformBiAnalytics(filter);
     return { success: true, analytics };
   } catch (error) {

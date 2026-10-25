@@ -82,5 +82,45 @@ export async function GET(
     console.error(`[Media Proxy Backup] Failed for ${key}:`, fallbackErr);
   }
 
+  // 3. Local filesystem fallback (development / offline assets)
+  try {
+    const fs = await import("fs/promises");
+    const path = await import("path");
+    const publicMediaDir = path.resolve(process.cwd(), "public/media");
+    const resolvedFilePath = path.resolve(publicMediaDir, ...pathSegments);
+
+    // Prevent directory traversal attacks
+    if (resolvedFilePath.startsWith(publicMediaDir)) {
+      let targetFile = resolvedFilePath;
+      try {
+        await fs.access(/*turbopackIgnore: true*/ targetFile);
+      } catch {
+        // If jpg/jpeg/png requested, test if lighter webp version is available
+        const webpCandidate = resolvedFilePath.replace(/\.(jpg|jpeg|png)$/i, ".webp");
+        try {
+          await fs.access(/*turbopackIgnore: true*/ webpCandidate);
+          targetFile = webpCandidate;
+        } catch {
+          targetFile = "";
+        }
+      }
+
+      if (targetFile) {
+        const fileBuffer = await fs.readFile(/*turbopackIgnore: true*/ targetFile);
+        const contentType = getContentType(targetFile);
+        return new NextResponse(fileBuffer, {
+          status: 200,
+          headers: {
+            "Content-Type": contentType,
+            "Cache-Control": "public, max-age=86400",
+            Vary: "Accept",
+          },
+        });
+      }
+    }
+  } catch {
+    // Local file does not exist, fall through to 404
+  }
+
   return new NextResponse("Media asset not found", { status: 404 });
 }

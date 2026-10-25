@@ -1,10 +1,8 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { isSupabaseOffline, markSupabaseOffline, resetSupabaseCircuit } from "./circuit-breaker";
+import { isSupabaseOffline, markSupabaseOffline, resetSupabaseCircuit } from "./circuit-breaker.ts";
 
 export const DEFAULT_SUPABASE_URL = "https://xiklunkmdpqzlhmrfkql.supabase.co";
 export const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_TFxsLCzYcvAAXM3yf65CuA_excYmDR7";
-export const DEFAULT_SUPABASE_SERVICE_ROLE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhpa2x1bmttZHBxemxobXJma3FsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MTEyNDQ3NywiZXhwIjoyMTA2NzAwNDc3fQ.JfPA42wthygKWPs7KaAR1BJDnMH4t1wydQ_zTSKZjRM";
 
 /**
  * Creates a Supabase client for Server Components, Server Actions, or Route Handlers
@@ -20,13 +18,12 @@ export function createServerComponentClient(cookieStore?: {
     process.env.SUPABASE_URL ||
     DEFAULT_SUPABASE_URL;
 
-  // For backend repository access without user session, prioritize SERVICE_ROLE_KEY to bypass RLS
+  // For backend repository access without user session, prioritize SERVICE_ROLE_KEY from environment
   const supabaseKey = cookieStore
     ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
       DEFAULT_SUPABASE_ANON_KEY
     : process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      DEFAULT_SUPABASE_SERVICE_ROLE_KEY ||
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
       DEFAULT_SUPABASE_ANON_KEY;
 

@@ -1,4 +1,5 @@
-import { Order, Driver, extractGpsCoordinates } from "@marketos/types";
+import type { Order, Driver } from "@marketos/types";
+import { extractGpsCoordinates } from "@marketos/types";
 
 export interface DriverDispatchPayload {
   order: Order;

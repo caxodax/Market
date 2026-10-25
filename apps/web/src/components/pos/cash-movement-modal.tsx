@@ -120,6 +120,7 @@ export function CashMovementModal({
               <Input
                 id="mov-amount"
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0.01"
                 value={amount}

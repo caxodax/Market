@@ -4,39 +4,28 @@ import React, { useState, useId, useEffect, useRef } from "react";
 import { Store, TenantSettings, Order, DeliveryZone } from "@marketos/types";
 import { useCart } from "../context/cart-context";
 import { formatCurrency, convertUsdToVes, compressImage, formatFileSize } from "@marketos/utils";
-import { PagoMovilCard, validatePagoMovilInput } from "@marketos/plugin-local-venezuela";
+import { validatePagoMovilInput } from "@marketos/plugin-local-venezuela";
 import {
   createOrderWithPaymentAction,
   validateCouponAction,
   uploadPaymentProofToR2Action,
 } from "../app/actions";
 import { savePushSubscriptionAction } from "../app/admin/push-actions";
+import { CheckoutStepDelivery } from "./checkout/checkout-step-delivery";
+import { CheckoutStepPayment } from "./checkout/checkout-step-payment";
 import {
   X,
   CreditCard,
   Truck,
-  Store as StoreIcon,
   CheckCircle2,
   AlertCircle,
-  QrCode,
   Loader2,
-  Tag,
-  Upload,
-  Clock,
-  MapPin,
-  Check,
-  Copy,
   ArrowLeft,
   ChevronRight,
-  User,
-  Phone,
-  FileText,
+  ShieldCheck,
+  QrCode,
   DollarSign,
   Receipt,
-  Info,
-  ShieldCheck,
-  Navigation,
-  ExternalLink,
 } from "lucide-react";
 
 interface CheckoutDialogProps {
@@ -293,6 +282,9 @@ export function CheckoutDialog({
     try {
       navigator.clipboard.writeText(text);
       setCopiedField(fieldId);
+      if (typeof window !== "undefined" && "vibrate" in navigator) {
+        try { navigator.vibrate(15); } catch {}
+      }
       setTimeout(() => setCopiedField(null), 1800);
     } catch (e) {
       console.warn("Could not copy to clipboard", e);
@@ -738,865 +730,81 @@ export function CheckoutDialog({
             className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1 min-h-0 overscroll-contain"
           >
           {step === 1 ? (
-            /* ============================================================== */
-            /* STEP 1: DESTINATARIO Y MODALIDAD DE ENTREGA                   */
-            /* ============================================================== */
-            <div className="space-y-4 animate-in fade-in duration-200">
-              {/* Customer Information Card */}
-              <div className="space-y-3 p-3.5 rounded-2xl bg-muted/20 border border-border">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
-                    <User className="w-3.5 h-3.5 text-primary" />
-                    Datos del Cliente
-                  </label>
-                  <span className="text-[10px] text-muted-foreground font-medium">
-                    Requeridos para tu orden
-                  </span>
-                </div>
-
-                <div className="space-y-2.5">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-foreground/80 mb-1">
-                      Nombre y Apellido *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ej. Carmen Rodríguez"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      className="w-full h-11 px-3.5 rounded-xl border border-input bg-background text-xs font-medium focus:ring-2 focus:ring-primary focus:border-primary transition-all"
-                    />
-                  </div>
-
-                  <div
-                    className={`grid gap-2.5 ${
-                      isVenezuelaActive ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"
-                    }`}
-                  >
-                    {/* Cédula / RIF (Solo si local_venezuela activo) */}
-                    {isVenezuelaActive && (
-                      <div>
-                        <label className="block text-[11px] font-semibold text-foreground/80 mb-1">
-                          Cédula o RIF *
-                        </label>
-                        <div className="flex gap-1.5">
-                          <select
-                            value={ciPrefix}
-                            onChange={(e) =>
-                              setCiPrefix(e.target.value as "V" | "E" | "J" | "G")
-                            }
-                            className="h-11 px-2.5 rounded-xl border border-input bg-background text-xs font-bold text-foreground focus:ring-2 focus:ring-primary shrink-0 cursor-pointer"
-                            title="Prefijo documento"
-                          >
-                            <option value="V">V-</option>
-                            <option value="E">E-</option>
-                            <option value="J">J-</option>
-                            <option value="G">G-</option>
-                          </select>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            required
-                            placeholder="Ej. 12345678"
-                            value={ciNumber}
-                            onChange={(e) =>
-                              setCiNumber(e.target.value.replace(/\D/g, ""))
-                            }
-                            className="w-full h-11 px-3 rounded-xl border border-input bg-background text-xs font-mono font-medium focus:ring-2 focus:ring-primary"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Teléfono / WhatsApp */}
-                    <div>
-                      <label className="block text-[11px] font-semibold text-foreground/80 mb-1">
-                        Teléfono / WhatsApp *
-                      </label>
-                      <div className="relative">
-                        <Phone className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-3.5" />
-                        <input
-                          type="tel"
-                          inputMode="tel"
-                          required
-                          placeholder="Ej. 04121234567"
-                          value={customerPhone}
-                          onChange={(e) => setCustomerPhone(e.target.value)}
-                          className="w-full h-11 pl-9 pr-3 rounded-xl border border-input bg-background text-xs font-mono font-medium focus:ring-2 focus:ring-primary"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Delivery Mode Card */}
-              {isDeliveryActive ? (
-                <div className="space-y-3 p-3.5 rounded-2xl bg-muted/20 border border-border">
-                  <label className="text-xs font-bold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
-                    <Truck className="w-3.5 h-3.5 text-primary" />
-                    Modalidad de Entrega
-                  </label>
-
-                  <div className="grid grid-cols-2 gap-2.5">
-                    {/* Retiro en Tienda Pill */}
-                    <button
-                      type="button"
-                      onClick={() => setDeliveryType("PICKUP")}
-                      className={`min-h-[58px] p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-                        deliveryType === "PICKUP"
-                          ? "border-primary bg-primary/10 text-primary font-bold shadow-xs ring-1 ring-primary/40"
-                          : "border-border bg-background text-muted-foreground hover:bg-muted"
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <StoreIcon className="w-4 h-4" />
-                        <span className="text-xs">Retiro en Tienda</span>
-                      </div>
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                        Sin costo adicional
-                      </span>
-                    </button>
-
-                    {/* Delivery a Domicilio Pill */}
-                    <button
-                      type="button"
-                      onClick={() => setDeliveryType("DELIVERY")}
-                      className={`min-h-[58px] p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-                        deliveryType === "DELIVERY"
-                          ? "border-primary bg-primary/10 text-primary font-bold shadow-xs ring-1 ring-primary/40"
-                          : "border-border bg-background text-muted-foreground hover:bg-muted"
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <Truck className="w-4 h-4" />
-                        <span className="text-xs">Delivery a Domicilio</span>
-                      </div>
-                      <span className="text-[10px] text-muted-foreground">
-                        {deliveryZones.length > 0
-                          ? `Zonas desde $${Math.min(...deliveryZones.map((z) => z.price_usd || 0)).toFixed(2)}`
-                          : "Tarifa estándar"}
-                      </span>
-                    </button>
-                  </div>
-
-                  {/* Pickup Store Info */}
-                  {deliveryType === "PICKUP" && (
-                    <div className="p-3 rounded-xl bg-background border border-border flex items-start gap-2.5 animate-in fade-in">
-                      <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
-                        <StoreIcon className="w-4 h-4" />
-                      </div>
-                      <div className="text-xs">
-                        <span className="font-bold text-foreground block">
-                          {selectedStore.name}
-                        </span>
-                        <span className="text-muted-foreground text-[11px] leading-tight block mt-0.5">
-                          {selectedStore.address || "Tu pedido estará listo para retiro tras la confirmación del pago."}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Delivery Address & Zone Selectors */}
-                  {deliveryType === "DELIVERY" && (
-                    <div className="space-y-3 pt-1 animate-in fade-in">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-foreground/80 mb-1">
-                          Zona de Cobertura *
-                        </label>
-                        <select
-                          value={selectedZoneId}
-                          onChange={(e) => setSelectedZoneId(e.target.value)}
-                          className="w-full h-11 px-3 rounded-xl border border-input bg-background text-xs font-semibold focus:ring-2 focus:ring-primary cursor-pointer"
-                        >
-                          {deliveryZones.map((zone) => (
-                            <option key={zone.id} value={zone.id}>
-                              {zone.name} —{" "}
-                              {zone.price_usd === 0
-                                ? "GRATIS"
-                                : `$${zone.price_usd.toFixed(2)} USD`}{" "}
-                              {zone.estimated_time ? `(${zone.estimated_time})` : ""}
-                            </option>
-                          ))}
-                        </select>
-                        {selectedZone?.coverage_description && (
-                          <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-primary shrink-0" />
-                            <span>{selectedZone.coverage_description}</span>
-                          </p>
-                        )}
-                      </div>
-
-                      {/* 1-Tap Customer Satellite GPS Capture */}
-                      <div className="space-y-1.5 pt-1">
-                        <div className="flex items-center justify-between">
-                          <label className="block text-[11px] font-semibold text-foreground/80">
-                            Ubicación Satelital (GPS)
-                          </label>
-                          {gpsCoords && (
-                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                              ±{gpsCoords.accuracy}m precisión
-                            </span>
-                          )}
-                        </div>
-
-                        {!gpsCoords ? (
-                          <button
-                            type="button"
-                            onClick={handleCaptureGps}
-                            disabled={isLocatingGps}
-                            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary text-xs font-bold transition-all active:scale-[0.99] cursor-pointer"
-                          >
-                            {isLocatingGps ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                                <span>Buscando señal satelital GPS...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Navigation className="w-4 h-4 text-primary" />
-                                <span>📍 Fijar mi Ubicación GPS Actual</span>
-                              </>
-                            )}
-                          </button>
-                        ) : (
-                          <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between gap-2 text-xs">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                                <MapPin className="w-4 h-4" />
-                              </span>
-                              <div className="min-w-0">
-                                <p className="font-bold text-emerald-700 dark:text-emerald-300 text-xs truncate">
-                                  Pin GPS capturado para el motorizado
-                                </p>
-                                <a
-                                  href={`https://www.google.com/maps?q=${gpsCoords.lat},${gpsCoords.lng}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-[11px] text-emerald-600 dark:text-emerald-400 underline font-medium hover:text-emerald-700 flex items-center gap-1"
-                                >
-                                  <span>Ver mi punto en Google Maps</span>
-                                  <ExternalLink className="w-3 h-3" />
-                                </a>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => setGpsCoords(null)}
-                              className="text-xs text-muted-foreground hover:text-rose-500 px-2 py-1 font-semibold rounded-lg hover:bg-rose-500/10 transition-colors cursor-pointer"
-                              title="Descartar coordenada"
-                            >
-                              ✕ Quitar
-                            </button>
-                          </div>
-                        )}
-
-                        {gpsError && (
-                          <p className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5">
-                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                            <span>{gpsError}</span>
-                          </p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-foreground/80 mb-1">
-                          Dirección Exacta *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Urbanización, Avenida/Calle, Edificio o N° de casa"
-                          value={deliveryAddress}
-                          onChange={(e) => setDeliveryAddress(e.target.value)}
-                          className="w-full h-11 px-3.5 rounded-xl border border-input bg-background text-xs font-medium focus:ring-2 focus:ring-primary"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-foreground/80 mb-1">
-                          Punto de Referencia (Opcional)
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Color de reja, negocio cercano o indicaciones al motorizado"
-                          value={deliveryReference}
-                          onChange={(e) => setDeliveryReference(e.target.value)}
-                          className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-xs focus:ring-2 focus:ring-primary"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="p-3.5 rounded-2xl bg-muted/20 border border-border flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                    <StoreIcon className="w-4 h-4" />
-                  </div>
-                  <div className="text-xs">
-                    <span className="font-bold text-foreground block">
-                      Modalidad: Retiro en Tienda
-                    </span>
-                    <span className="text-muted-foreground text-[11px]">
-                      {selectedStore.name}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Subtotal preview banner */}
-              <div className="p-3.5 rounded-xl bg-muted/40 border border-border flex items-center justify-between text-xs">
-                <span className="text-muted-foreground font-medium">Subtotal de compra:</span>
-                <div className="text-right">
-                  <span className="font-black text-sm text-foreground">
-                    {formatCurrency(subtotalUsd, "USD")}
-                  </span>
-                  {isVenezuelaActive && (
-                    <span className="block text-[10px] font-semibold text-muted-foreground">
-                      Bs. {convertUsdToVes(subtotalUsd, exchangeRate).toLocaleString("es-VE", {
-                        minimumFractionDigits: 2,
-                      })}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
+            <CheckoutStepDelivery
+              customerName={customerName}
+              setCustomerName={setCustomerName}
+              customerPhone={customerPhone}
+              setCustomerPhone={setCustomerPhone}
+              ciPrefix={ciPrefix}
+              setCiPrefix={setCiPrefix}
+              ciNumber={ciNumber}
+              setCiNumber={setCiNumber}
+              deliveryType={deliveryType}
+              setDeliveryType={setDeliveryType}
+              selectedZoneId={selectedZoneId}
+              setSelectedZoneId={setSelectedZoneId}
+              deliveryAddress={deliveryAddress}
+              setDeliveryAddress={setDeliveryAddress}
+              deliveryReference={deliveryReference}
+              setDeliveryReference={setDeliveryReference}
+              deliveryZones={deliveryZones}
+              selectedStore={selectedStore}
+              gpsCoords={gpsCoords}
+              setGpsCoords={setGpsCoords}
+              isLocatingGps={isLocatingGps}
+              gpsError={gpsError}
+              onGetGpsCoordinates={handleCaptureGps}
+              isDeliveryActive={isDeliveryActive}
+              isVenezuelaActive={isVenezuelaActive}
+              subtotalUsd={subtotalUsd}
+              exchangeRate={exchangeRate}
+            />
           ) : (
-            /* ============================================================== */
-            /* STEP 2: METODO DE PAGO, CUPONES Y CONFIRMACIÓN                 */
-            /* ============================================================== */
-            <div className="space-y-4 animate-in fade-in duration-200">
-              {/* Back button and recipient pill */}
-              <div className="flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>← Volver a Datos</span>
-                </button>
-                <span className="text-[11px] font-medium text-muted-foreground truncate max-w-[200px]">
-                  {customerName} • {deliveryType === "DELIVERY" ? "Delivery" : "Retiro"}
-                </span>
-              </div>
-
-              {/* Order Financial Breakdown Card */}
-              <div className="p-4 rounded-2xl bg-muted/40 border border-border text-xs space-y-2">
-                <div className="flex items-center justify-between font-bold text-foreground pb-1 border-b border-border/60">
-                  <span className="flex items-center gap-1.5">
-                    <Receipt className="w-3.5 h-3.5 text-primary" />
-                    Resumen del Pedido
-                  </span>
-                  <span className="text-[11px] text-muted-foreground font-normal">
-                    {items.length} {items.length === 1 ? "artículo" : "artículos"}
-                  </span>
-                </div>
-
-                <div className="flex justify-between text-muted-foreground pt-1">
-                  <span>Subtotal productos:</span>
-                  <span className="font-semibold text-foreground">
-                    {formatCurrency(subtotalUsd, "USD")}
-                  </span>
-                </div>
-
-                {appliedCoupon && (
-                  <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
-                    <span>Cupón ({appliedCoupon.code}):</span>
-                    <span>-{formatCurrency(discountUsd, "USD")}</span>
-                  </div>
-                )}
-
-                {isDeliveryActive && deliveryType === "DELIVERY" && (
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Delivery ({selectedZone?.name}):</span>
-                    <span className="font-semibold text-foreground">
-                      {deliveryFeeUsd === 0
-                        ? "GRATIS"
-                        : formatCurrency(deliveryFeeUsd, "USD")}
-                    </span>
-                  </div>
-                )}
-
-                <div className="pt-2 border-t border-border flex justify-between items-baseline font-black">
-                  <span className="text-foreground text-sm">Total a Pagar:</span>
-                  <div className="text-right">
-                    <span className="text-primary font-bold text-lg">
-                      {formatCurrency(totalUsd, "USD")}
-                    </span>
-                    {isVenezuelaActive && (
-                      <span className="block text-xs font-semibold text-muted-foreground font-mono">
-                        Bs.{" "}
-                        {totalVes.toLocaleString("es-VE", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Coupon / Discount Code Section */}
-              {isCouponsActive && (
-                <div className="p-3.5 rounded-2xl bg-muted/20 border border-border space-y-2">
-                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <Tag className="w-3.5 h-3.5 text-primary" />
-                    ¿Tienes un Cupón de Descuento?
-                  </label>
-
-                  {!appliedCoupon ? (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Ej. BIENVENIDO o PROMO10"
-                        value={couponCode}
-                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                        className="flex-1 h-10 px-3 rounded-xl border border-input bg-background text-xs uppercase font-mono tracking-wider focus:ring-2 focus:ring-primary"
-                      />
-                      <button
-                        type="button"
-                        disabled={couponLoading || !couponCode.trim()}
-                        onClick={handleApplyCoupon}
-                        className="px-4 h-10 rounded-xl bg-secondary text-secondary-foreground text-xs font-bold hover:bg-secondary/80 disabled:opacity-50 transition-colors cursor-pointer"
-                      >
-                        {couponLoading ? "Validando..." : "Aplicar"}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs">
-                      <div className="flex items-center gap-1.5 font-bold">
-                        <Check className="w-4 h-4 stroke-[2.5]" />
-                        <span>
-                          {appliedCoupon.code}: -${appliedCoupon.discountUsd.toFixed(2)} USD
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleRemoveCoupon}
-                        className="text-[11px] font-semibold underline hover:text-emerald-700 cursor-pointer"
-                      >
-                        Quitar
-                      </button>
-                    </div>
-                  )}
-
-                  {couponMessage && !appliedCoupon && (
-                    <p
-                      className={`text-[11px] font-medium ${
-                        couponMessage.type === "success"
-                          ? "text-emerald-600"
-                          : "text-destructive"
-                      }`}
-                    >
-                      {couponMessage.text}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Payment Method Selector Grid */}
-              <div className="space-y-2.5">
-                <label className="text-xs font-bold text-foreground uppercase tracking-wider block">
-                  Selecciona tu Método de Pago
-                </label>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  {availablePaymentMethods.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setPaymentMethod(m.id)}
-                      className={`min-h-[50px] p-2.5 rounded-xl border flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                        activePaymentMethod === m.id
-                          ? "border-primary bg-primary/10 text-primary font-bold shadow-xs ring-1 ring-primary/40"
-                          : "border-border bg-background text-foreground hover:bg-muted"
-                      }`}
-                    >
-                      {m.icon}
-                      <span className="text-xs">{m.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Account Details & Instructions with 1-Click Copy */}
-              <div className="p-4 rounded-2xl bg-muted/40 border border-border text-xs space-y-3">
-                <div className="font-bold text-foreground flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <QrCode className="w-4 h-4 text-primary" />
-                    <span>Datos de Pago ({settings.business_name})</span>
-                  </div>
-                  <span className="text-[10px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full">
-                    {activePaymentMethod === "PAGO_MOVIL"
-                      ? `${pmData.bank || "Pago Móvil"}`
-                      : activePaymentMethod === "BANK_TRANSFER"
-                      ? `${btData.bank || "Transferencia"}`
-                      : activePaymentMethod === "ZELLE"
-                      ? "Zelle USD"
-                      : "Efectivo"}
-                  </span>
-                </div>
-
-                {/* Pago Móvil Details */}
-                {activePaymentMethod === "PAGO_MOVIL" && (
-                  <PagoMovilCard
-                    data={pmData}
-                    amountBs={totalVes}
-                    exchangeRate={exchangeRate}
-                  />
-                )}
-
-                {/* Bank Transfer Details */}
-                {activePaymentMethod === "BANK_TRANSFER" && (
-                  <div className="space-y-2 pt-1">
-                    {/* Account Number */}
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border">
-                      <div>
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold block">
-                          N° Cuenta {btData.account_type || "Corriente"} ({btData.bank})
-                        </span>
-                        <span className="font-mono font-bold text-xs text-foreground tracking-wide">
-                          {btData.account_number}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleCopy(
-                            btData.account_number.replace(/\D/g, ""),
-                            "bank_account"
-                          )
-                        }
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                          copiedField === "bank_account"
-                            ? "bg-emerald-600 text-white"
-                            : "bg-muted hover:bg-primary hover:text-primary-foreground text-foreground border border-border"
-                        }`}
-                      >
-                        {copiedField === "bank_account" ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>¡Copiado!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>Copiar</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* RIF */}
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border">
-                      <div>
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold block">
-                          RIF / Titular
-                        </span>
-                        <span className="font-mono font-bold text-xs text-foreground">
-                          {btData.id_doc} ({btData.name || settings.business_name})
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleCopy(
-                            btData.id_doc.replace(/[^A-Za-z0-9]/g, ""),
-                            "bank_rif"
-                          )
-                        }
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                          copiedField === "bank_rif"
-                            ? "bg-emerald-600 text-white"
-                            : "bg-muted hover:bg-primary hover:text-primary-foreground text-foreground border border-border"
-                        }`}
-                      >
-                        {copiedField === "bank_rif" ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>¡Copiado!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>Copiar</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Exact amount in VES */}
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-primary/10 border border-primary/30">
-                      <div>
-                        <span className="text-[10px] text-primary uppercase font-bold block">
-                          Monto a transferir
-                        </span>
-                        <span className="font-mono font-black text-sm text-foreground">
-                          Bs.{" "}
-                          {totalVes.toLocaleString("es-VE", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(totalVes.toFixed(2), "bank_amount")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs ${
-                          copiedField === "bank_amount"
-                            ? "bg-emerald-600 text-white"
-                            : "bg-primary text-primary-foreground hover:bg-primary/90"
-                        }`}
-                      >
-                        {copiedField === "bank_amount" ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>¡Copiado!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>Copiar Monto</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Zelle Details */}
-                {activePaymentMethod === "ZELLE" && (
-                  <div className="space-y-2 pt-1">
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border">
-                      <div>
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold block">
-                          Correo Zelle
-                        </span>
-                        <span className="font-mono font-bold text-xs text-foreground">
-                          {zelleData.email}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(zelleData.email, "zelle_email")}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                          copiedField === "zelle_email"
-                            ? "bg-emerald-600 text-white"
-                            : "bg-muted hover:bg-primary hover:text-primary-foreground text-foreground border border-border"
-                        }`}
-                      >
-                        {copiedField === "zelle_email" ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>¡Copiado!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>Copiar</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-background border border-border">
-                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">
-                        Titular de la Cuenta
-                      </span>
-                      <span className="font-bold text-xs text-foreground">
-                        {zelleData.name || settings.business_name}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-primary/10 border border-primary/30">
-                      <div>
-                        <span className="text-[10px] text-primary uppercase font-bold block">
-                          Monto exacto USD
-                        </span>
-                        <span className="font-mono font-black text-sm text-foreground">
-                          {formatCurrency(totalUsd, "USD")}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(totalUsd.toFixed(2), "zelle_amount")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs ${
-                          copiedField === "zelle_amount"
-                            ? "bg-emerald-600 text-white"
-                            : "bg-primary text-primary-foreground hover:bg-primary/90"
-                        }`}
-                      >
-                        {copiedField === "zelle_amount" ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>¡Copiado!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>Copiar Monto</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Cash Details */}
-                {activePaymentMethod === "CASH_USD" && (
-                  <div className="text-muted-foreground leading-relaxed pt-1 p-3.5 rounded-2xl bg-background border border-border space-y-3">
-                    <div>
-                      <p className="font-semibold text-foreground flex items-center gap-1.5 text-xs">
-                        <Receipt className="w-3.5 h-3.5 text-amber-500" />
-                        Pago en efectivo contra entrega / tienda física:
-                      </p>
-                      <p className="mt-1 text-[11px]">{cashInstructions}</p>
-                    </div>
-
-                    <div className="pt-2 border-t border-border flex items-center justify-between font-bold text-foreground">
-                      <span className="text-xs">Total exacto de la orden:</span>
-                      <span className="font-mono text-primary font-black text-sm">
-                        {formatCurrency(totalUsd, "USD")}
-                      </span>
-                    </div>
-
-                    {/* Cash Tendered & Change calculator */}
-                    <div className="pt-2 border-t border-border space-y-2">
-                      <label className="block text-[11px] font-bold text-foreground">
-                        💵 ¿Con qué denominación o billete pagarás? (Opcional)
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-xs">
-                          $
-                        </span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min={totalUsd}
-                          placeholder={totalUsd.toFixed(2)}
-                          value={cashTenderedInput}
-                          onChange={(e) => setCashTenderedInput(e.target.value)}
-                          className="w-full h-10 pl-7 pr-3 rounded-xl border border-input bg-card text-xs font-mono font-bold focus:ring-2 focus:ring-primary focus:outline-none"
-                        />
-                      </div>
-                      {parseFloat(cashTenderedInput) > totalUsd && (
-                        <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs font-medium flex items-center justify-between animate-fadeIn">
-                          <span className="font-semibold">🔄 Cambio que debe llevar el repartidor:</span>
-                          <span className="font-mono font-black text-sm text-emerald-700 dark:text-emerald-200">
-                            ${(parseFloat(cashTenderedInput) - totalUsd).toFixed(2)} USD
-                          </span>
-                        </div>
-                      )}
-                      {parseFloat(cashTenderedInput) < totalUsd && parseFloat(cashTenderedInput) > 0 && (
-                        <p className="text-[11px] text-destructive font-semibold">
-                          ⚠️ El monto ingresado (${parseFloat(cashTenderedInput).toFixed(2)}) no cubre el total del pedido (${totalUsd.toFixed(2)}).
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Proof fields and R2 file upload (for electronic payments) */}
-              {(paymentMethod === "PAGO_MOVIL" ||
-                paymentMethod === "BANK_TRANSFER" ||
-                paymentMethod === "ZELLE") && (
-                <div className="space-y-3 p-3.5 rounded-2xl bg-muted/20 border border-border">
-                  <label className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-primary" />
-                    Datos del Comprobante
-                  </label>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-foreground/80 mb-1">
-                        Banco Emisor
-                      </label>
-                      <select
-                        value={bankName}
-                        onChange={(e) => setBankName(e.target.value)}
-                        className="w-full h-11 px-3 rounded-xl border border-input bg-background text-xs font-medium focus:ring-2 focus:ring-primary cursor-pointer"
-                      >
-                        <option value="Bancamiga">Bancamiga</option>
-                        <option value="Banesco">Banesco</option>
-                        <option value="Mercantil">Mercantil</option>
-                        <option value="BBVA Provincial">BBVA Provincial</option>
-                        <option value="BDV">Banco de Venezuela</option>
-                        <option value="Bancaribe">Bancaribe</option>
-                        <option value="BNC">BNC</option>
-                        <option value="Otro">Otro Banco</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-foreground/80 mb-1">
-                        N° Referencia *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Últimos 4 a 6 dígitos"
-                        value={referenceNumber}
-                        onChange={(e) => setReferenceNumber(e.target.value)}
-                        className="w-full h-11 px-3 rounded-xl border border-input bg-background text-xs font-mono font-medium focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Cloudflare R2 Proof Screenshot Upload with WebP compression */}
-                  <div className="pt-1">
-                    <label className="text-[11px] font-semibold text-foreground/80 block mb-1">
-                      Adjuntar Captura / Screenshot (Opcional)
-                    </label>
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      <label
-                        htmlFor={fileInputId}
-                        className={`cursor-pointer flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-dashed border-input bg-background hover:bg-muted text-xs font-medium text-foreground transition-all active:scale-[0.98] ${
-                          isCompressingProof ? "opacity-60 pointer-events-none" : ""
-                        }`}
-                      >
-                        {isCompressingProof ? (
-                          <Loader2 className="w-4 h-4 text-primary animate-spin" />
-                        ) : (
-                          <Upload className="w-4 h-4 text-primary" />
-                        )}
-                        <span>
-                          {isCompressingProof
-                            ? "Optimizando imagen..."
-                            : proofFile
-                            ? proofFile.name
-                            : "Subir comprobante"}
-                        </span>
-                      </label>
-                      <input
-                        id={fileInputId}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        disabled={isCompressingProof}
-                        className="sr-only"
-                      />
-
-                      {proofPreview && !isCompressingProof && (
-                        <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                          <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                          <span>
-                            {proofCompressionInfo
-                              ? `WebP (${formatFileSize(
-                                  proofCompressionInfo.compressedSize
-                                )})`
-                              : "Comprobante listo"}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-            </div>
+            <CheckoutStepPayment
+              customerName={customerName}
+              deliveryType={deliveryType}
+              onBack={() => setStep(1)}
+              itemsCount={items.length}
+              subtotalUsd={subtotalUsd}
+              appliedCoupon={appliedCoupon}
+              discountUsd={discountUsd}
+              deliveryFeeUsd={deliveryFeeUsd}
+              selectedZoneName={selectedZone?.name}
+              isDeliveryActive={isDeliveryActive}
+              totalUsd={totalUsd}
+              totalVes={totalVes}
+              isVenezuelaActive={isVenezuelaActive}
+              isCouponsActive={isCouponsActive}
+              couponCode={couponCode}
+              setCouponCode={setCouponCode}
+              couponLoading={couponLoading}
+              couponMessage={couponMessage}
+              onApplyCoupon={handleApplyCoupon}
+              onRemoveCoupon={handleRemoveCoupon}
+              paymentMethod={paymentMethod}
+              setPaymentMethod={setPaymentMethod}
+              availablePaymentMethods={availablePaymentMethods}
+              settings={settings}
+              exchangeRate={exchangeRate}
+              pmData={pmData}
+              btData={btData}
+              zelleData={zelleData}
+              copiedField={copiedField}
+              onCopy={handleCopy}
+              cashInstructions={cashInstructions}
+              cashTenderedInput={cashTenderedInput}
+              setCashTenderedInput={setCashTenderedInput}
+              bankName={bankName}
+              setBankName={setBankName}
+              referenceNumber={referenceNumber}
+              setReferenceNumber={setReferenceNumber}
+              fileInputId={fileInputId}
+              isCompressingProof={isCompressingProof}
+              proofFile={proofFile}
+              proofPreview={proofPreview}
+              proofCompressionInfo={proofCompressionInfo}
+              onFileChange={handleFileChange}
+            />
           )}
           </div>
 
@@ -1605,8 +813,13 @@ export function CheckoutDialog({
             {step === 1 ? (
               <button
                 type="button"
-                onClick={handleProceedToStep2}
-                className="w-full h-12 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 flex items-center justify-center gap-2 transition-transform active:scale-[0.98] shadow-md cursor-pointer"
+                onClick={() => {
+                  if (typeof window !== "undefined" && "vibrate" in navigator) {
+                    try { navigator.vibrate(12); } catch {}
+                  }
+                  handleProceedToStep2();
+                }}
+                className="w-full h-12 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 flex items-center justify-center gap-2 transition-transform active:scale-[0.98] shadow-md cursor-pointer touch-manipulation"
               >
                 <span>Continuar al Pago</span>
                 <ChevronRight className="w-4 h-4" />
@@ -1615,8 +828,13 @@ export function CheckoutDialog({
               <div className="flex gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setStep(1)}
-                  className="w-1/3 h-12 rounded-xl border border-border text-foreground text-xs font-bold hover:bg-muted flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  onClick={() => {
+                    if (typeof window !== "undefined" && "vibrate" in navigator) {
+                      try { navigator.vibrate(10); } catch {}
+                    }
+                    setStep(1);
+                  }}
+                  className="w-1/3 h-12 rounded-xl border border-border text-foreground text-xs font-bold hover:bg-muted flex items-center justify-center gap-1.5 transition-colors cursor-pointer touch-manipulation"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   <span>Atrás</span>
@@ -1625,7 +843,12 @@ export function CheckoutDialog({
                 <button
                   type="submit"
                   disabled={loading || isSubmittingRef.current}
-                  className="w-2/3 h-12 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center gap-2 hover:bg-primary/90 transition-transform active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-md cursor-pointer"
+                  onClick={() => {
+                    if (typeof window !== "undefined" && "vibrate" in navigator) {
+                      try { navigator.vibrate(20); } catch {}
+                    }
+                  }}
+                  className="w-2/3 h-12 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center gap-2 hover:bg-primary/90 transition-transform active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-md cursor-pointer touch-manipulation"
                 >
                   {loading ? (
                     <>
