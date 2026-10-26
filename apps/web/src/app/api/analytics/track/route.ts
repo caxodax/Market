@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServerComponentClient } from "@marketos/database/server";
+import { createSupabaseClient } from "@marketos/database";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     const validDeviceTypes = ["mobile", "desktop", "tablet", "other"];
     const sanitizedDevice = validDeviceTypes.includes(deviceType) ? deviceType : "desktop";
 
-    const supabase = createServerComponentClient();
+    const supabase = createSupabaseClient();
 
     const { error } = await supabase.from("tenant_page_views").insert({
       tenant_id: sanitizedTenantId,

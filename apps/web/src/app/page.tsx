@@ -14,6 +14,7 @@ import {
 import { MarketOSRepository } from "@marketos/database";
 import { StorefrontPage } from "../components/storefront-page";
 import { SuspendedStorePage } from "../components/suspended-store-page";
+import { AnalyticsTracker } from "@marketos/plugin-analytics";
 
 export const dynamic = "force-dynamic";
 
@@ -131,15 +132,18 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   ]);
 
   return (
-    <StorefrontPage
-      settings={settings}
-      categories={categories}
-      products={products}
-      stores={stores}
-      deliveryZones={deliveryZones}
-      exchangeRate={exchangeRate}
-      activeModuleIds={activeModuleIds}
-      modifierGroups={modifierGroups}
-    />
+    <>
+      <AnalyticsTracker tenantId={activeTenantId} />
+      <StorefrontPage
+        settings={settings}
+        categories={categories}
+        products={products}
+        stores={stores}
+        deliveryZones={deliveryZones}
+        exchangeRate={exchangeRate}
+        activeModuleIds={activeModuleIds}
+        modifierGroups={modifierGroups}
+      />
+    </>
   );
 }
