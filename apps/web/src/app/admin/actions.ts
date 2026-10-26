@@ -1,6 +1,6 @@
 "use server";
 
-import { MarketOSRepository } from "@marketos/database";
+import { MarketOSRepository, createServerComponentClient } from "@marketos/database";
 import {
   PaymentStatus,
   CreateProductInput,

@@ -21,6 +21,7 @@
 | `clothing_variants` | Moda, Calzado & Indumentaria | Retail Moda | **Registrado** | Matriz de tallas y colores independientes con stock por SKU. |
 | `local_colombia` | Localización Oficial Colombia | Finanzas | **Registrado** | TRM oficial, cobro en COP, Nequi, Daviplata, PSE y NIT/DIAN. |
 | `local_global` | Localización Global en Dólares | Finanzas | **Registrado** | Operación pura USD, Stripe, tarjetas de crédito internacionales y PayPal. |
+| `analytics` | Analítica, Audiencia & Conversión | Marketing & Ventas | **Completado** | Tráfico web, visitantes únicos, canales (Instagram/WhatsApp/Google), páginas más vistas y conversión. |
 
 ---
 

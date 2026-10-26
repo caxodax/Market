@@ -217,4 +217,54 @@ assert.strictEqual(validCreditNote.return_items_to_inventory, true);
 assert.strictEqual(validCreditNote.document_number, "NC-000002");
 console.log("  ✔ Credit note properly sets return_items_to_inventory flag");
 
-console.log("🎉 All 11 @marketos/plugin-invoicing checks passed successfully!");
+// 12. Sales Book Report compilation and totals
+const { buildSalesBook, exportSalesBookCsv } = await import("../services/sales-book-service.ts");
+const salesBookDocs: FiscalDocument[] = [
+  {
+    ...invoiceDoc,
+    created_at: "2026-10-15T10:00:00Z",
+  },
+  {
+    ...validCreditNote,
+    created_at: "2026-10-18T14:30:00Z",
+    total_amount: 5.48,
+    total_ves: 274,
+  },
+  {
+    // A document from another month to test period filtering
+    ...invoiceDoc,
+    id: "doc_sep_01",
+    document_number: "FACT-000009",
+    created_at: "2026-09-20T10:00:00Z",
+  },
+];
+
+const salesReport = buildSalesBook(salesBookDocs, {
+  period: "2026-10",
+  tenantId: "shop-market-ca",
+  emitter: {
+    name: "Shop Market C.A.",
+    taxId: "J-12345678-0",
+    address: "Av. Principal",
+  },
+  currency: "USD",
+});
+
+assert.strictEqual(salesReport.entries.length, 2, "Should only include the 2 documents from 2026-10");
+assert.strictEqual(salesReport.entries[0].document_number, "FACT-000011");
+assert.strictEqual(salesReport.entries[1].document_number, "NC-000002");
+// In entries: Invoice (11.60) minus partial Credit Note (5.48) = 6.12 net sales
+assert.strictEqual(salesReport.totals.total_sales, 6.12, "Invoice (11.60) minus partial Credit Note (5.48) should net to 6.12");
+assert.strictEqual(salesReport.totals.documents_count, 2);
+console.log("  ✔ buildSalesBook filters by period, computes negative NC rows and nets totals");
+
+// 13. Sales Book CSV Export
+const csvOutput = exportSalesBookCsv(salesReport);
+assert.ok(csvOutput.startsWith("\ufeff"), "CSV must start with UTF-8 BOM for Microsoft Excel");
+assert.ok(csvOutput.includes("LIBRO DE VENTAS FISCAL"), "CSV must contain header title");
+assert.ok(csvOutput.includes("Shop Market C.A."), "CSV must contain emitter name");
+assert.ok(csvOutput.includes(";"), "CSV must use semicolon as column delimiter");
+assert.ok(csvOutput.includes("TOTALES GENERALES"), "CSV must contain summary totals row");
+console.log("  ✔ exportSalesBookCsv generates Excel-compliant UTF-8 BOM semicolon-delimited CSV");
+
+console.log("🎉 All 13 @marketos/plugin-invoicing checks passed successfully!");

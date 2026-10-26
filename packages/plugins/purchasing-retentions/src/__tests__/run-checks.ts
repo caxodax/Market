@@ -214,4 +214,108 @@ console.log("  Testing buildSeniatRetentionTxt...");
   assert.ok(lines[1].includes("J222222222\t002"));
 }
 
+// ─── 6. PURCHASES BOOK TESTS ────────────────────────────────────────────────
+console.log("  Testing buildPurchasesBook & exportPurchasesBookCsv...");
+{
+  const { buildPurchasesBook, exportPurchasesBookCsv } = await import("../services/purchases-book-service.ts");
+  const testInvoices: import("@marketos/types").PurchaseInvoice[] = [
+    {
+      id: "inv-001",
+      tenant_id: "tenant-demo-123",
+      supplier_id: "sup-1",
+      supplier_name: "Distribuidora Polar C.A.",
+      supplier_tax_id: "J-00000001-1",
+      invoice_number: "FAC-9912",
+      control_number: "00-112233",
+      invoice_date: "2026-10-12",
+      received_date: "2026-10-12",
+      status: "REGISTERED",
+      items: [],
+      subtotal_exempt: 100.0,
+      subtotal_taxable: 500.0,
+      iva_rate_percent: 16.0,
+      iva_amount: 80.0,
+      total_amount: 680.0,
+      currency: "USD",
+      retained_vat_amount: 60.0, // 75% of 80.0
+      retention_voucher_id: "vouch-001",
+      created_at: "2026-10-12T10:00:00Z",
+    },
+    {
+      // An invoice from another period
+      id: "inv-002",
+      tenant_id: "tenant-demo-123",
+      supplier_id: "sup-2",
+      supplier_name: "Molinos Nacionales",
+      supplier_tax_id: "J-00000002-2",
+      invoice_number: "FAC-8831",
+      invoice_date: "2026-09-15",
+      received_date: "2026-09-15",
+      status: "REGISTERED",
+      items: [],
+      subtotal_exempt: 0,
+      subtotal_taxable: 200.0,
+      iva_rate_percent: 16.0,
+      iva_amount: 32.0,
+      total_amount: 232.0,
+      currency: "USD",
+      created_at: "2026-09-15T10:00:00Z",
+    },
+  ];
+
+  const testVouchers: import("@marketos/types").RetentionVoucher[] = [
+    {
+      id: "vouch-001",
+      tenant_id: "tenant-demo-123",
+      voucher_type: "VAT",
+      voucher_number: "20261000000001",
+      tax_period: "202610",
+      issue_date: "2026-10-12",
+      agent_business_name: "Inversiones Demo C.A.",
+      agent_tax_id: "J-30987654-1",
+      agent_fiscal_address: "Av. Libertador",
+      supplier_id: "sup-1",
+      supplier_name: "Distribuidora Polar C.A.",
+      supplier_tax_id: "J-00000001-1",
+      purchase_invoice_id: "inv-001",
+      invoice_number: "FAC-9912",
+      invoice_date: "2026-10-12",
+      invoice_total_amount: 680.0,
+      taxable_base_amount: 500.0,
+      exempt_base_amount: 100.0,
+      iva_rate_percent: 16.0,
+      iva_total_amount: 80.0,
+      retention_rate_percent: 75.0,
+      retained_vat_amount: 60.0,
+      currency: "USD",
+      created_at: "2026-10-12T10:00:00Z",
+    },
+  ];
+
+  const report = buildPurchasesBook(testInvoices, {
+    period: "2026-10",
+    tenantId: "tenant-demo-123",
+    buyer: {
+      name: "Inversiones Demo C.A.",
+      taxId: "J-30987654-1",
+    },
+    currency: "USD",
+    vouchers: testVouchers,
+  });
+
+  assert.equal(report.entries.length, 1, "Should filter strictly by 2026-10 period");
+  assert.equal(report.entries[0].invoice_number, "FAC-9912");
+  assert.equal(report.entries[0].retention_voucher_number, "20261000000001");
+  assert.equal(report.totals.total_purchases, 680.0);
+  assert.equal(report.totals.total_vat_credit, 80.0);
+  assert.equal(report.totals.total_retained_vat, 60.0);
+
+  const csv = exportPurchasesBookCsv(report);
+  assert.ok(csv.startsWith("\ufeff"), "Purchases CSV must start with UTF-8 BOM");
+  assert.ok(csv.includes("LIBRO DE COMPRAS FISCAL"), "CSV must contain Purchases header");
+  assert.ok(csv.includes("Distribuidora Polar C.A."));
+  assert.ok(csv.includes("20261000000001"), "CSV must include retention voucher number");
+  assert.ok(csv.includes("TOTALES GENERALES"), "CSV must include totals row");
+}
+
 console.log("✅ All checks passed successfully for @marketos/plugin-purchasing-retentions!");

@@ -168,3 +168,48 @@ export interface SeniatRetentionTxtRow {
   ivaRatePercent: number;         // Alícuota (ej. 16.00)
   fileNumber?: string;            // Número de expediente (opcional, default 0)
 }
+
+/**
+ * Official Purchases Book Entry (Libro de Compras Fiscal)
+ * Compliant with SENIAT Art. 56 / Providencia 00071 & SII Chile RCV / DTE 46.
+ */
+export interface PurchasesBookEntry {
+  operation_number: number;
+  invoice_date: string;                      // YYYY-MM-DD
+  supplier_tax_id: string;                   // RIF en VE / RUT en CL
+  supplier_name: string;
+  document_type: "FACTURA" | "NOTA_CREDITO" | "NOTA_DEBITO" | "DTE-46" | "BOLETA";
+  invoice_number: string;                    // N° de Factura emitida por el proveedor
+  control_number: string;                    // N° de Control fiscal
+  affected_document_number?: string | null;  // Factura afectada si NC/ND
+  total_with_tax: number;                    // Total compra incluyendo impuestos
+  exempt_amount: number;                     // Compras exentas o sin crédito fiscal
+  taxable_base: number;                      // Base imponible
+  tax_rate_percent: number;                  // 16% en VE / 19% en CL
+  tax_amount: number;                        // Crédito fiscal IVA
+  retained_vat_amount: number;               // IVA retenido al proveedor (75% o 100%)
+  retention_voucher_number?: string | null;  // N° de comprobante emitido (14 dígitos)
+  retention_voucher_date?: string | null;
+}
+
+export interface PurchasesBookTotals {
+  total_purchases: number;
+  total_exempt: number;
+  total_taxable_base: number;
+  total_vat_credit: number;
+  total_retained_vat: number;
+  invoices_count: number;
+}
+
+export interface PurchasesBookReport {
+  period: string;                            // "YYYY-MM" (ej. "2026-10")
+  tenant_id: string;
+  buyer_business_name: string;
+  buyer_id_doc: string;                      // RIF / RUT del comercio adquirente
+  buyer_address?: string;
+  currency: "USD" | "EUR" | "CLP" | "VES";
+  generated_at: string;
+  entries: PurchasesBookEntry[];
+  totals: PurchasesBookTotals;
+}
+

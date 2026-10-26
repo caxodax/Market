@@ -32,6 +32,9 @@ importers:
       '@marketos/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@marketos/plugin-analytics':
+        specifier: workspace:*
+        version: link:../../packages/plugins/analytics
       '@marketos/plugin-barcode-retail':
         specifier: workspace:*
         version: link:../../packages/plugins/barcode-retail

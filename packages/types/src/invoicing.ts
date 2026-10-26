@@ -112,3 +112,49 @@ export interface CreateFiscalDocumentInput {
 
   transport_info?: FiscalDocumentTransportInfo;
 }
+
+/**
+ * Official Sales Book Entry (Libro de Ventas Fiscal)
+ * Compliant with SENIAT Art. 56 / Providencia 00071 & SII Chile RCV.
+ */
+export interface SalesBookEntry {
+  operation_number: number;
+  document_date: string;                     // YYYY-MM-DD
+  customer_id_doc: string;                   // RIF en VE / RUT en CL
+  customer_name: string;
+  document_type: FiscalDocumentType;
+  document_number: string;                   // FACT-000001, NC-000001
+  control_number: string;                    // N° de Control SENIAT o Folio DTE
+  affected_document_number?: string | null;  // N° de Factura Afectada (para NC/ND)
+  total_with_tax: number;                    // Total ventas incluyendo impuestos
+  exempt_amount: number;                     // Ventas exentas o no gravadas
+  taxable_base: number;                      // Base imponible general
+  tax_rate_percent: number;                  // 16% en VE / 19% en CL
+  tax_amount: number;                        // Débito fiscal IVA
+  igtf_amount: number;                       // IGTF percibido (3%) en pagos en divisas
+  retained_vat_amount: number;               // IVA retenido por el cliente (si es SPE)
+  retention_voucher_number?: string | null;
+}
+
+export interface SalesBookTotals {
+  total_sales: number;
+  total_exempt: number;
+  total_taxable_base: number;
+  total_vat: number;
+  total_igtf: number;
+  total_retained_vat: number;
+  documents_count: number;
+}
+
+export interface SalesBookReport {
+  period: string;                            // "YYYY-MM" (ej. "2026-10")
+  tenant_id: string;
+  emitter_business_name: string;
+  emitter_id_doc: string;                    // RIF / RUT
+  emitter_address?: string;
+  currency: "USD" | "EUR" | "CLP" | "VES";
+  generated_at: string;
+  entries: SalesBookEntry[];
+  totals: SalesBookTotals;
+}
+
