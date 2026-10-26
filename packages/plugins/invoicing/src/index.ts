@@ -5,3 +5,4 @@ export * from "./services/sales-book-service";
 export * from "./components/invoicing-manager-admin";
 export * from "./components/issue-document-modal";
 export * from "./components/printable-document-modal";
+export * from "./components/sales-book-modal";
