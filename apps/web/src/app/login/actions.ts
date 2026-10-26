@@ -51,7 +51,9 @@ export async function loginUserAction(email: string, password?: string) {
     ];
 
     const isDemoAccount = DEMO_ACCOUNTS.includes(cleanEmail);
-    const isDemoPasswordValid = password === "MarketOS2026*";
+    const isDemoPasswordValid =
+      password === "MarketOS2026*" ||
+      password === "PlatformMaster2026*";
 
     const isDemoAllowed =
       process.env.NODE_ENV !== "production" ||
@@ -223,15 +225,30 @@ export async function loginUserAction(email: string, password?: string) {
       path: "/",
     });
 
-    await MarketOSRepository.recordAuditLog({
-      tenantId: profile.tenant_id || "platform",
-      actorId: profile.id,
-      actorName: profile.full_name,
-      action: "USER_LOGIN",
-      entity: "profiles",
-      entityId: profile.id,
-      newData: { role: profile.role, email: profile.email, redirectTo },
-    });
+    // If super admin, set super_admin cookie as well
+    if (profile.role === "PLATFORM_SUPER_ADMIN") {
+      cookieStore.set("marketos_super_admin_session", signedToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 7,
+        path: "/",
+      });
+    }
+
+    try {
+      await MarketOSRepository.recordAuditLog({
+        tenantId: profile.tenant_id || TENANT_ID,
+        actorId: profile.id,
+        actorName: profile.full_name,
+        action: "USER_LOGIN",
+        entity: "profiles",
+        entityId: profile.id,
+        newData: { role: profile.role, email: profile.email, redirectTo },
+      });
+    } catch (auditErr) {
+      console.warn("[MarketOS Auth] Could not record login audit log:", auditErr);
+    }
 
     return { success: true, profile, redirectTo };
   } catch (error) {
