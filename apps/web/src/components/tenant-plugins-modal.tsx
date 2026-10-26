@@ -34,6 +34,7 @@ import {
   Monitor,
   ReceiptText,
   ShoppingBag,
+  TrendingUp,
 } from "lucide-react";
 import { PluginDetailModal } from "./plugin-detail-modal";
 
@@ -336,6 +337,26 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
       "Comercios calificados como Sujetos Pasivos Especiales (SPE) o que requieren retener IVA a proveedores y generar el archivo TXT para el SENIAT o DTE 46 en Chile.",
     themeColor: "purple",
   },
+  {
+    id: "analytics",
+    name: "Analítica, Audiencia & Conversión",
+    badge: "v1.0.0 • Inteligencia Comercial",
+    category: "Marketing & Ventas",
+    categoryShort: "Analítica",
+    description:
+      "Métricas en tiempo real sobre el tráfico de tu tienda: visitas, visitantes únicos, páginas y productos con mayor interés, canales de captación (WhatsApp, Instagram, Google) y tasa de conversión de pedidos.",
+    icon: <TrendingUp className="w-5 h-5 text-emerald-500" />,
+    features: [
+      "Tráfico en Tiempo Real: Monitoreo continuo de visitas y sesiones únicas",
+      "Atribución de Canales: Detección automática de visitas desde Instagram, WhatsApp, TikTok y Google",
+      "Páginas Más Populares: Identifica qué productos y categorías despiertan mayor interés",
+      "Tasa de Conversión: Cruce automático de visitantes vs pedidos completados",
+      "100% Privado & Sin Cookies: Sin rastreadores invasivos de terceros ni impacto en velocidad",
+    ],
+    targetAudience:
+      "Cualquier dueño de tienda que quiera conocer de dónde vienen sus clientes, qué productos ven más y cuál es la efectividad de sus campañas y enlaces.",
+    themeColor: "emerald",
+  },
 ];
 
 const ITEMS_PER_PAGE = 6;
@@ -441,9 +462,39 @@ export function TenantPluginsModal({
       const res = await setTenantModuleStatusAction(tenant.id, moduleId, nextEnabled);
       if (res.success) {
         const plugin = AVAILABLE_PLUGINS.find((p) => p.id === moduleId);
-        setSuccessMessage(
-          `Módulo "${plugin?.name || moduleId}" ${nextEnabled ? "activado" : "desactivado"} exitosamente.`
-        );
+        const baseMsg = `Módulo "${plugin?.name || moduleId}" ${nextEnabled ? "activado" : "desactivado"} exitosamente.`;
+        const extraMsgs = res.messages && res.messages.length > 0 ? ` ${res.messages.join(" ")}` : "";
+        setSuccessMessage(`${baseMsg}${extraMsgs}`);
+
+        // Sincronizar todos los módulos afectados por la cascada de dependencias
+        if (res.activated || res.deactivated) {
+          const activatedSet = new Set(res.activated || []);
+          const deactivatedSet = new Set(res.deactivated || []);
+
+          setModules((prev) => {
+            const nextList = prev.map((m) => {
+              if (activatedSet.has(m.module_id)) return { ...m, is_active: true };
+              if (deactivatedSet.has(m.module_id)) return { ...m, is_active: false };
+              return m;
+            });
+
+            for (const actId of activatedSet) {
+              if (!nextList.some((m) => m.module_id === actId)) {
+                nextList.push({
+                  id: `mod-${Date.now()}-${actId}`,
+                  tenant_id: tenant.id,
+                  module_id: actId,
+                  is_active: true,
+                  installed_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                });
+              }
+            }
+
+            return nextList;
+          });
+        }
+
         if (onModulesUpdated) onModulesUpdated();
       } else {
         // Revert

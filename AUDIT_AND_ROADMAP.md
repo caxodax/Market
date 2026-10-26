@@ -828,6 +828,77 @@ flowchart TD
 * **Verificación de Tipos Global:** 15 de 15 proyectos en `pnpm check-types` aprobados sin un solo error de TypeScript.
 * **Compilación de Producción:** Next.js 16.3.8 Turbopack completado con éxito (`pnpm build` -> exit code 0).
 
+---
+
+## 21. Plan de Evolución Fiscal & Tesorería (Prioridades 11, 12 y 13)
+
+### 1. Libros Fiscales Oficiales de Ventas y Compras (Prioridad 11)
+* **Objetivo:** Cumplir con la obligación formal mensual del Código Orgánico Tributario / Ley del IVA (Venezuela: Art. 56 y Providencia 00071 / Chile: RCV del SII) permitiendo exportar en Excel (.xlsx) y PDF el Libro de Ventas y Libro de Compras para el contador.
+* **Ubicación Arquitectónica:**
+  - **Libro de Ventas:** En [`@marketos/plugin-invoicing`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/invoicing) (ya que este plugin posee la colección `fiscal_documents` con facturas, notas de débito y crédito).
+  - **Libro de Compras:** En [`@marketos/plugin-purchasing-retentions`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions) (ya que posee `purchase_invoices` y retenciones de IVA/ISLR).
+  - **Columnas y formatos desacoplados:** Los encabezados y cálculos de alícuotas se delegan a `FiscalAdapterPort` y `RetentionAdapterPort`.
+
+### 2. Retenciones de ISLR (Decreto 1.808)
+* **Objetivo:** Permitir a Sujetos Pasivos Especiales retener Impuesto Sobre la Renta a personas naturales y jurídicas prestadoras de servicios según la tabla de conceptos oficiales (1%, 2%, 3%, 5%) y exportar el archivo XML para el SENIAT.
+* **Ubicación Arquitectónica:** Dentro de [`@marketos/plugin-purchasing-retentions`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions).
+
+### 3. Módulo Simple de Cuentas por Cobrar (CxC) y Cuentas por Pagar (CxP) (Prioridad 12)
+* **Objetivo:** Gestión de ventas a crédito a clientes y compras a crédito con proveedores:
+  - Registro de condición de pago (`CASH` vs `CREDIT`), fecha de vencimiento (`due_date`) y días de plazo.
+  - Registro de abonos parciales y liquidación total.
+  - Vista de cobranzas pendientes con saldo por cliente y cuentas por pagar a proveedores.
+* **Ubicación Arquitectónica:**
+  - Los datos de deuda y abonos se vinculan en las entidades existentes `FiscalDocument` (Ventas/CxC) y `PurchaseInvoice` (Compras/CxP).
+  - La interfaz de Tesorería puede operar en un plugin coordinado o como sub-pestañas operativas de los módulos de Facturación y Compras.
+
+### 4. Integración con Imprentas Digitales Autorizadas (PACs: The Factory HKA / Novus) (Prioridad 13)
+* **Objetivo:** Cumplimiento de la Providencia SNAT/00093 (G.O. N° 43.484) antes del 18 de abril de 2027 (muerte definitiva de la Forma Libre física).
+* **Ubicación Arquitectónica:** Implementación de un proveedor digital dentro de `FiscalAdapterPort` que consume los endpoints REST/JSON del PAC.
+
+---
+
+## 22. Sistema de Dependencias, Auto-Activación e Incompatibilidades de Plugins (Completado ✅)
+
+### 1. Dominio y Modelado Tipado ([`packages/types/src/modules.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/types/src/modules.ts))
+* **Tipos de Reglas:** `AUTO_ACTIVATE` (cascada automática), `REQUIRES` (dependencia dura) y `CONFLICTS` (incompatibilidad mutua/territorial).
+* **Entidades:** `PluginDependencyRule`, `ResolveDependenciesOptions`, `ResolveDependenciesResult`.
+* **Reglas por Defecto:**
+  - `rule_inv_purchasing`: `invoicing` -> `purchasing_retentions` (`AUTO_ACTIVATE`). Al encender facturación para ventas, se auto-activa compras y retenciones fiscales para proveedores.
+  - `rule_conflict_ve_cl`: `local_venezuela` <-> `local_chile` (`CONFLICTS`). Localizaciones territoriales mutuamente excluyentes para evitar colisiones de motores fiscales en una misma tienda.
+* **Ajustes de Plataforma:** `plugin_dependency_rules` y `default_tenant_modules` incorporados en `PlatformSettings`.
+
+### 2. Motor de Resolución Algorítmico ([`packages/utils/src/plugin-resolver.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/utils/src/plugin-resolver.ts))
+* **Patrón de Cola BFS:** Resuelve dependencias transitivas multi-salto ($A \rightarrow B \rightarrow C$) sin recursión descontrolada ni ciclos infinitos.
+* **Detección y Apagado de Conflictos:** Si se activa un módulo que entra en conflicto con uno activo, programa su apagado automático sin bloquear al usuario.
+* **Desactivación en Cascada:** Si se desactiva un módulo requerido por otros, programa la desactivación coordinada de los módulos dependientes para evitar estados huérfanos.
+* **Pruebas de Unidad Propias:** [`packages/utils/src/__tests__/plugin-resolver.test.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/utils/src/__tests__/plugin-resolver.test.ts) cubriendo 6 escenarios exhaustivos con 100% de éxito.
+
+### 3. Orquestación Multi-Inquilino Atómica ([`apps/web/src/app/actions.ts`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/app/actions.ts))
+* **`setTenantModuleStatusAction`:**
+  - Lee las reglas dinámicas configuradas por el Super Admin en `PlatformSettings`.
+  - Ejecuta `resolvePluginDependencies` para calcular atómicamente la lista de activaciones y desactivaciones.
+  - Persiste todos los cambios de forma secuencial y atómica en Supabase / memoria.
+  - Registra una bitácora de auditoría detallada (`MODULE_TOGGLED`) con la lista de plugins afectados.
+  - Revalida el catálogo y rutas afectadas de la tienda.
+* **Sincronización en Modal de Tienda ([`apps/web/src/components/tenant-plugins-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/tenant-plugins-modal.tsx)):**
+  - Actualiza el estado reactivo local de todos los módulos encendidos o apagados por efecto cascada sin necesidad de recargar la página.
+
+### 4. Consola de Configuración Super Admin ([`apps/web/src/components/platform-settings-tab.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/platform-settings-tab.tsx))
+* **Plugins por Defecto para Nuevas Tiendas:** Selector visual de 12 plugins para definir qué módulos vienen pre-instalados de fábrica al incorporar nuevos comercios (`onboardTenant`).
+* **Matriz de Dependencias de Plugins:**
+  - Visualización de reglas activas con badges codificados por color (`AUTO_ACTIVATE` en verde, `REQUIRES` en azul, `CONFLICTS` en rojo).
+  - Interruptor para activar/desactivar reglas individuales sin eliminarlas.
+  - Formulario integrado para añadir nuevas reglas personalizadas entre cualquier par de módulos.
+  - Botón para restaurar reglas por defecto de fábrica.
+  - Persistencia global centralizada vía `updatePlatformSettingsAction`.
+
+### 5. Verificación Rigurosa y Calidad de Código
+* **Pruebas Automatizadas:** 13/13 suites de prueba aprobadas al 100% (`pnpm test` -> 0 fallos).
+* **Verificación de Tipos:** 16/16 proyectos aprobados con 0 errores de TypeScript (`pnpm check-types`).
+* **Compilación de Producción:** Next.js 16.3.8 Turbopack completado con éxito (`pnpm build` -> exit code 0).
+
+
 
 
 

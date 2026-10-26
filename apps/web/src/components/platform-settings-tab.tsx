@@ -5,6 +5,10 @@ import {
   PlatformSettings,
   UpdatePlatformSettingsInput,
   UserProfile,
+  PluginDependencyRule,
+  PluginDependencyType,
+  TenantModuleId,
+  DEFAULT_PLUGIN_DEPENDENCY_RULES,
 } from "@marketos/types";
 import { formatMediaUrl } from "@marketos/utils";
 import {
@@ -12,6 +16,7 @@ import {
   uploadPlatformLogoAction,
   updateUserProfileAction,
 } from "../app/platform/actions";
+import { AVAILABLE_PLUGINS } from "./tenant-plugins-modal";
 import {
   Sliders,
   Building2,
@@ -30,6 +35,15 @@ import {
   MessageSquare,
   Globe,
   Info,
+  GitFork,
+  ArrowRight,
+  ShieldAlert,
+  Plus,
+  Zap,
+  Ban,
+  RotateCcw,
+  Boxes,
+  Check,
 } from "lucide-react";
 
 interface PlatformSettingsTabProps {
@@ -61,6 +75,63 @@ export function PlatformSettingsTab({
   const [supportEmail, setSupportEmail] = useState(initialSettings.support_email || "");
   const [currencySymbol, setCurrencySymbol] = useState(initialSettings.currency_symbol || "$");
   const [contactAddress, setContactAddress] = useState(initialSettings.contact_address || "");
+
+  // Plugin Dependency & Default Modules State
+  const [dependencyRules, setDependencyRules] = useState<PluginDependencyRule[]>(
+    initialSettings.plugin_dependency_rules && initialSettings.plugin_dependency_rules.length > 0
+      ? initialSettings.plugin_dependency_rules
+      : DEFAULT_PLUGIN_DEPENDENCY_RULES
+  );
+  const [defaultModules, setDefaultModules] = useState<TenantModuleId[]>(
+    initialSettings.default_tenant_modules && initialSettings.default_tenant_modules.length > 0
+      ? initialSettings.default_tenant_modules
+      : ["local_venezuela", "invoicing", "purchasing_retentions"]
+  );
+
+  // New Rule Form State
+  const [showAddRule, setShowAddRule] = useState(false);
+  const [newSourceModule, setNewSourceModule] = useState<TenantModuleId>("invoicing");
+  const [newTargetModule, setNewTargetModule] = useState<TenantModuleId>("purchasing_retentions");
+  const [newRuleType, setNewRuleType] = useState<PluginDependencyType>("AUTO_ACTIVATE");
+  const [newRuleDesc, setNewRuleDesc] = useState("");
+
+  const handleToggleDefaultModule = (modId: TenantModuleId) => {
+    setDefaultModules((prev) =>
+      prev.includes(modId) ? prev.filter((id) => id !== modId) : [...prev, modId]
+    );
+  };
+
+  const handleToggleRuleStatus = (ruleId: string) => {
+    setDependencyRules((prev) =>
+      prev.map((r) => (r.id === ruleId ? { ...r, is_active: !r.is_active } : r))
+    );
+  };
+
+  const handleDeleteRule = (ruleId: string) => {
+    setDependencyRules((prev) => prev.filter((r) => r.id !== ruleId));
+  };
+
+  const handleAddRule = () => {
+    if (newSourceModule === newTargetModule) {
+      setErrorMessage("El plugin de origen y destino no pueden ser el mismo.");
+      return;
+    }
+    const newRule: PluginDependencyRule = {
+      id: `rule_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      source_module_id: newSourceModule,
+      target_module_id: newTargetModule,
+      type: newRuleType,
+      description: newRuleDesc.trim() || undefined,
+      is_active: true,
+    };
+    setDependencyRules((prev) => [...prev, newRule]);
+    setNewRuleDesc("");
+    setShowAddRule(false);
+  };
+
+  const handleRestoreDefaultRules = () => {
+    setDependencyRules([...DEFAULT_PLUGIN_DEPENDENCY_RULES]);
+  };
 
   // Super Admin Personal Profile State
   const [adminFullName, setAdminFullName] = useState(currentUser.full_name || "");
@@ -142,6 +213,8 @@ export function PlatformSettingsTab({
           support_email: supportEmail.trim() || null,
           currency_symbol: currencySymbol.trim() || "$",
           contact_address: contactAddress.trim() || null,
+          plugin_dependency_rules: dependencyRules,
+          default_tenant_modules: defaultModules,
         };
 
         const res = await updatePlatformSettingsAction(payload);
@@ -489,6 +562,322 @@ export function PlatformSettingsTab({
                   Dirección donde los comercios remitirán dudas y comprobantes bancarios de suscripción.
                 </p>
               </div>
+            </div>
+          </div>
+
+          {/* CARD 3: PLUGINS POR DEFECTO PARA NUEVAS TIENDAS */}
+          <div className="p-6 rounded-3xl border border-border bg-card shadow-xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 shrink-0">
+                  <Boxes className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-foreground">
+                      Plugins por Defecto para Nuevas Tiendas
+                    </h3>
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                      {defaultModules.length} Activos
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Módulos pre-instalados automáticamente al incorporar o registrar un nuevo comercio
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Selecciona qué plugins vendrán encendidos de fábrica en cada nueva tienda. Los administradores de cada comercio podrán luego solicitar la activación o desactivación de módulos adicionales según su plan.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {AVAILABLE_PLUGINS.map((plugin) => {
+                const isSelected = defaultModules.includes(plugin.id);
+                return (
+                  <button
+                    key={plugin.id}
+                    type="button"
+                    onClick={() => handleToggleDefaultModule(plugin.id)}
+                    className={`flex items-start gap-3 p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                      isSelected
+                        ? "bg-primary/5 border-primary/40 shadow-xs ring-1 ring-primary/20"
+                        : "bg-background/60 hover:bg-muted/40 border-border text-muted-foreground"
+                    }`}
+                  >
+                    <div className="shrink-0 mt-0.5 p-2 rounded-xl bg-card border border-border shadow-xs">
+                      {plugin.icon}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span
+                          className={`text-xs font-bold truncate ${
+                            isSelected ? "text-foreground" : "text-muted-foreground"
+                          }`}
+                        >
+                          {plugin.name}
+                        </span>
+                        {isSelected ? (
+                          <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-primary-foreground shrink-0">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                          </div>
+                        ) : (
+                          <div className="w-5 h-5 rounded-full border border-border bg-muted/40 shrink-0" />
+                        )}
+                      </div>
+                      <span className="inline-block text-[10px] font-semibold text-muted-foreground mt-0.5">
+                        {plugin.categoryShort}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* CARD 4: MATRIZ DE DEPENDENCIAS E INCOMPATIBILIDADES */}
+          <div className="p-6 rounded-3xl border border-border bg-card shadow-xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-500 shrink-0">
+                  <GitFork className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-foreground">
+                      Matriz de Dependencias de Plugins
+                    </h3>
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                      {dependencyRules.filter((r) => r.is_active).length} Reglas Activas
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Reglas que gobiernan auto-activación, dependencias y conflictos territoriales entre plugins
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleRestoreDefaultRules}
+                  title="Restaurar reglas de fábrica"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-background hover:bg-muted text-xs font-semibold text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Restaurar Fábrica</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddRule(!showAddRule)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Añadir Regla</span>
+                </button>
+              </div>
+            </div>
+
+            {/* ADD RULE INLINE FORM */}
+            {showAddRule && (
+              <div className="p-4 rounded-2xl bg-muted/30 border border-border space-y-3 animate-in fade-in slide-in-from-top-2">
+                <div className="flex items-center justify-between border-b border-border/60 pb-2">
+                  <span className="text-xs font-black uppercase text-foreground tracking-wide">
+                    Nueva Regla de Dependencia
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddRule(false)}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Origen */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-foreground">
+                      Plugin Origen
+                    </label>
+                    <select
+                      value={newSourceModule}
+                      onChange={(e) => setNewSourceModule(e.target.value as TenantModuleId)}
+                      className="w-full px-3 py-2 rounded-xl border border-input bg-background text-xs font-medium text-foreground focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all cursor-pointer"
+                    >
+                      {AVAILABLE_PLUGINS.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Tipo de Relación */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-foreground">
+                      Tipo de Relación
+                    </label>
+                    <select
+                      value={newRuleType}
+                      onChange={(e) => setNewRuleType(e.target.value as PluginDependencyType)}
+                      className="w-full px-3 py-2 rounded-xl border border-input bg-background text-xs font-bold text-foreground focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all cursor-pointer"
+                    >
+                      <option value="AUTO_ACTIVATE">⚡ Auto-Activar (Cascada)</option>
+                      <option value="REQUIRES">🛡️ Requiere Obligatoriamente</option>
+                      <option value="CONFLICTS">🚫 Conflicto / Incompatible</option>
+                    </select>
+                  </div>
+
+                  {/* Destino */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-foreground">
+                      Plugin Afectado / Requerido
+                    </label>
+                    <select
+                      value={newTargetModule}
+                      onChange={(e) => setNewTargetModule(e.target.value as TenantModuleId)}
+                      className="w-full px-3 py-2 rounded-xl border border-input bg-background text-xs font-medium text-foreground focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all cursor-pointer"
+                    >
+                      {AVAILABLE_PLUGINS.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Descripción */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-foreground">
+                    Descripción / Motivo de la regla (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={newRuleDesc}
+                    onChange={(e) => setNewRuleDesc(e.target.value)}
+                    placeholder="ej. Facturación requiere compras para retenciones de IVA..."
+                    className="w-full px-3 py-2 rounded-xl border border-input bg-background text-xs font-medium text-foreground focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
+                  />
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={handleAddRule}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Guardar Regla</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* RULES LIST */}
+            <div className="space-y-2.5">
+              {dependencyRules.length === 0 ? (
+                <div className="p-8 text-center rounded-2xl border border-dashed border-border text-muted-foreground space-y-3">
+                  <GitFork className="w-8 h-8 mx-auto opacity-40" />
+                  <p className="text-xs">No hay reglas de dependencia configuradas.</p>
+                  <button
+                    type="button"
+                    onClick={handleRestoreDefaultRules}
+                    className="px-3 py-1.5 rounded-xl bg-muted text-xs font-bold text-foreground hover:bg-muted/80"
+                  >
+                    Cargar Reglas de Fábrica
+                  </button>
+                </div>
+              ) : (
+                dependencyRules.map((rule) => {
+                  const source = AVAILABLE_PLUGINS.find((p) => p.id === rule.source_module_id);
+                  const target = AVAILABLE_PLUGINS.find((p) => p.id === rule.target_module_id);
+
+                  return (
+                    <div
+                      key={rule.id}
+                      className={`p-3.5 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+                        rule.is_active
+                          ? "bg-card border-border shadow-xs"
+                          : "bg-muted/20 border-border/60 opacity-60"
+                      }`}
+                    >
+                      <div className="space-y-1.5 min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {/* Source Module */}
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted text-foreground text-xs font-bold">
+                            {source?.icon}
+                            <span className="truncate max-w-[140px] sm:max-w-none">
+                              {source?.name || rule.source_module_id}
+                            </span>
+                          </div>
+
+                          {/* Rule Badge */}
+                          {rule.type === "AUTO_ACTIVATE" && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-black uppercase">
+                              <Zap className="w-3 h-3" />
+                              Auto-Activa
+                            </span>
+                          )}
+                          {rule.type === "REQUIRES" && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 text-[10px] font-black uppercase">
+                              <ShieldAlert className="w-3 h-3" />
+                              Requiere
+                            </span>
+                          )}
+                          {rule.type === "CONFLICTS" && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 text-[10px] font-black uppercase">
+                              <Ban className="w-3 h-3" />
+                              Conflicto Mutuo
+                            </span>
+                          )}
+
+                          <ArrowRight className="w-3.5 h-3.5 text-muted-foreground shrink-0 hidden sm:inline" />
+
+                          {/* Target Module */}
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted text-foreground text-xs font-bold">
+                            {target?.icon}
+                            <span className="truncate max-w-[140px] sm:max-w-none">
+                              {target?.name || rule.target_module_id}
+                            </span>
+                          </div>
+                        </div>
+
+                        {rule.description && (
+                          <p className="text-[11px] text-muted-foreground leading-relaxed pl-1">
+                            {rule.description}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Rule Actions */}
+                      <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleRuleStatus(rule.id)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            rule.is_active
+                              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                              : "bg-muted text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {rule.is_active ? "Regla Activa" : "Desactivada"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRule(rule.id)}
+                          title="Eliminar regla"
+                          className="p-1.5 rounded-xl hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>

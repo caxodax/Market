@@ -305,7 +305,7 @@ export async function getTenantModulesAction(tenantId: string) {
 }
 
 /**
- * Enable or disable a plugin/module for a specific tenant (Super Admin operation)
+ * Enable or disable a plugin/module for a specific tenant with cascade dependency resolution
  */
 export async function setTenantModuleStatusAction(
   tenantId: string,
@@ -321,15 +321,77 @@ export async function setTenantModuleStatusAction(
         error: "No autorizado. Se requieren permisos de Super Administrador.",
       };
     }
-    const success = await MarketOSRepository.setTenantModuleStatus(
-      tenantId,
+
+    const { resolvePluginDependencies } = await import("@marketos/utils");
+    const { DEFAULT_PLUGIN_DEPENDENCY_RULES } = await import("@marketos/types");
+
+    // 1. Obtener módulos activos actuales del inquilino
+    const currentModules = await MarketOSRepository.getTenantModules(tenantId);
+    const activeModuleIds = currentModules
+      .filter((m) => m.is_active)
+      .map((m) => m.module_id);
+
+    // 2. Obtener reglas de dependencias de la plataforma (o por defecto)
+    const platformSettings = await MarketOSRepository.getPlatformSettings();
+    const rules =
+      platformSettings.plugin_dependency_rules && platformSettings.plugin_dependency_rules.length > 0
+        ? platformSettings.plugin_dependency_rules
+        : DEFAULT_PLUGIN_DEPENDENCY_RULES;
+
+    // 3. Resolver dependencias en cascada y conflictos
+    const resolution = resolvePluginDependencies({
       moduleId,
-      isEnabled
-    );
+      targetState: isEnabled,
+      activeModuleIds,
+      rules,
+    });
+
+    // 4. Aplicar activaciones en cascada
+    for (const modId of resolution.toActivate) {
+      await MarketOSRepository.setTenantModuleStatus(tenantId, modId, true);
+    }
+
+    // 5. Aplicar desactivaciones en cascada
+    for (const modId of resolution.toDeactivate) {
+      await MarketOSRepository.setTenantModuleStatus(tenantId, modId, false);
+    }
+
+    // 6. Auditoría inmutable de la operación de plugins
+    try {
+      await MarketOSRepository.recordAuditLog({
+        tenantId,
+        actorId: user.id,
+        actorName: user.full_name || "Super Admin",
+        actorEmail: user.email,
+        actorRole: user.role,
+        action: "TENANT_MODULE_TOGGLED" as any,
+        entity: "tenant_modules",
+        entityId: moduleId,
+        details: isEnabled
+          ? `Plugin ${moduleId} activado. Activados: [${resolution.toActivate.join(", ")}]. Desactivados: [${resolution.toDeactivate.join(", ")}]`
+          : `Plugin ${moduleId} desactivado. Desactivados: [${resolution.toDeactivate.join(", ")}]`,
+        newData: {
+          moduleId,
+          isEnabled,
+          toActivate: resolution.toActivate,
+          toDeactivate: resolution.toDeactivate,
+          messages: resolution.autoActivatedMessages,
+        },
+      });
+    } catch {
+      // Non-blocking audit
+    }
+
     revalidatePath("/platform");
     revalidatePath("/admin");
     revalidatePath("/");
-    return { success: Boolean(success) };
+
+    return {
+      success: true,
+      activated: resolution.toActivate,
+      deactivated: resolution.toDeactivate,
+      messages: resolution.autoActivatedMessages,
+    };
   } catch (error) {
     console.error("Error setting tenant module status:", error);
     return { success: false, error: "Error al actualizar el estado del módulo" };

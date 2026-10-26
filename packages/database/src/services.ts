@@ -4062,14 +4062,48 @@ export class MarketOSRepository {
           sort_order: 1,
         });
 
+        // Initialize default modules from platform settings
+        const platformSettings = await this.getPlatformSettings();
+        const defaultMods = platformSettings.default_tenant_modules || [
+          "local_venezuela",
+          "invoicing",
+          "purchasing_retentions",
+        ];
+
+        const moduleRows = defaultMods.map((modId) => ({
+          tenant_id: tenantId,
+          module_id: modId,
+          is_active: true,
+          installed_at: now,
+          updated_at: now,
+        }));
+        await supabase.from("tenant_modules").insert(moduleRows);
+
         // Fetch official BCV rate for new tenant only if local_venezuela is active
-        const activeMods = await this.getTenantActiveModuleIds(tenantId);
-        if (activeMods.includes("local_venezuela")) {
+        if (defaultMods.includes("local_venezuela")) {
           await this.syncBcvRateFromApi(tenantId);
         }
       } catch (e) {
         console.warn("[Supabase] Onboarding fallback to memory state:", e);
       }
+    }
+
+    // Memory state initialization for default modules
+    const defaultModsInMemory = state.platformSettings.default_tenant_modules || [
+      "local_venezuela",
+      "invoicing",
+      "purchasing_retentions",
+    ];
+    if (!state.tenantModules) state.tenantModules = [];
+    for (const modId of defaultModsInMemory) {
+      state.tenantModules.push({
+        id: `mod-${tenantId}-${modId}`,
+        tenant_id: tenantId,
+        module_id: modId,
+        is_active: true,
+        installed_at: now,
+        updated_at: now,
+      });
     }
 
     state.tenants.push(newTenant);

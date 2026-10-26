@@ -17,7 +17,8 @@ export type TenantModuleId =
   | "pos_registers"         // POS: Multi-Caja, Turnos, Arqueo (Cierre X/Z), PIN por cajero
   | "invoicing"             // Facturación: Facturas, Notas de Crédito, Notas de Débito, Guías de Despacho
   | "local_chile"           // Localización Chile: RUT, IVA 19%, SII, DTE, Boletas Electrónicas
-  | "purchasing_retentions";// Compras & Retenciones: Facturas de compra, Retención IVA/ISLR (SPE) y DTE 46;
+  | "purchasing_retentions" // Compras & Retenciones: Facturas de compra, Retención IVA/ISLR (SPE) y DTE 46
+  | "analytics";            // Analítica & Audiencia: Vistas, visitantes únicos, fuentes y conversión de tienda
 
 export type PluginCategory =
   | "location"              // Localización por país
@@ -44,4 +45,51 @@ export interface PluginManifest {
   country_code?: "VE" | "CO" | "GLOBAL" | string;
   required_ports?: string[];
   icon_name?: string;
+  dependencies?: TenantModuleId[];
+  incompatible_with?: TenantModuleId[];
 }
+
+export type PluginDependencyType = "REQUIRES" | "AUTO_ACTIVATE" | "CONFLICTS";
+
+export interface PluginDependencyRule {
+  id: string;
+  source_module_id: TenantModuleId;
+  target_module_id: TenantModuleId;
+  type: PluginDependencyType;
+  description?: string;
+  is_active: boolean;
+}
+
+export interface ResolveDependenciesOptions {
+  moduleId: TenantModuleId;
+  targetState: boolean; // true = activate, false = deactivate
+  activeModuleIds: TenantModuleId[];
+  rules: PluginDependencyRule[];
+}
+
+export interface ResolveDependenciesResult {
+  allowed: boolean;
+  toActivate: TenantModuleId[];
+  toDeactivate: TenantModuleId[];
+  blockedReason?: string;
+  autoActivatedMessages: string[];
+}
+
+export const DEFAULT_PLUGIN_DEPENDENCY_RULES: PluginDependencyRule[] = [
+  {
+    id: "rule_inv_purchasing",
+    source_module_id: "invoicing",
+    target_module_id: "purchasing_retentions",
+    type: "AUTO_ACTIVATE",
+    description: "Al activar Facturación (Outbound), activar automáticamente Compras y Retenciones (Inbound)",
+    is_active: true,
+  },
+  {
+    id: "rule_conflict_ve_cl",
+    source_module_id: "local_venezuela",
+    target_module_id: "local_chile",
+    type: "CONFLICTS",
+    description: "Incompatibilidad territorial: Localización Venezuela y Localización Chile son mutuamente excluyentes en una misma tienda",
+    is_active: true,
+  },
+];

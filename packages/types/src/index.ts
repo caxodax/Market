@@ -11,6 +11,7 @@ export * from "./pos.ts";
 export * from "./storefront-pro.ts";
 export * from "./invoicing.ts";
 export * from "./purchasing.ts";
+export * from "./analytics.ts";
 
 import type { SelectedModifier } from "./food-service.ts";
 
@@ -1126,6 +1127,8 @@ export interface PlatformSettings {
   support_whatsapp: string | null;
   currency_symbol: string;
   contact_address?: string | null;
+  plugin_dependency_rules?: import("./modules").PluginDependencyRule[];
+  default_tenant_modules?: import("./modules").TenantModuleId[];
   created_at?: string;
   updated_at?: string;
 }

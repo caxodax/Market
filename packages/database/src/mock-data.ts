@@ -30,6 +30,7 @@ import type {
   RetentionVoucher,
   Supplier,
 } from "@marketos/types";
+import { DEFAULT_PLUGIN_DEPENDENCY_RULES } from "@marketos/types";
 
 export const INITIAL_TENANT: Tenant = {
   id: "shop-market-ca",
@@ -1882,6 +1883,8 @@ export const state = {
     support_whatsapp: "+58 412-0000000",
     currency_symbol: "$",
     contact_address: "Torre Empresarial, Piso 10",
+    plugin_dependency_rules: [...DEFAULT_PLUGIN_DEPENDENCY_RULES],
+    default_tenant_modules: ["local_venezuela", "invoicing", "purchasing_retentions"],
     updated_at: new Date().toISOString(),
   } as PlatformSettings,
 };

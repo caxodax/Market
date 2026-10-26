@@ -21,6 +21,7 @@
     "@marketos/plugin-promotions-coupons": "workspace:*",
     "@marketos/plugin-purchasing-retentions": "workspace:*",
     "@marketos/plugin-storefront-pro": "workspace:*",
+    "@marketos/plugin-analytics": "workspace:*",
 
     "@marketos/types": "workspace:*",
     "@marketos/ui": "workspace:*",
