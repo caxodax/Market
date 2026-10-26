@@ -18,6 +18,7 @@ import {
   MoreVertical,
   Download,
 } from "lucide-react";
+import { ThemeToggle } from "./theme-toggle";
 
 interface StoreHeaderProps {
   settings: TenantSettings;
@@ -263,6 +264,9 @@ export function StoreHeader({
               )}
             </button>
           )}
+
+          {/* Dark / Light Mode Switcher */}
+          <ThemeToggle />
 
           {/* Cart Trigger Button (Primary conversion action) */}
           <button

@@ -12,6 +12,8 @@ export * from "./storefront-pro.ts";
 export * from "./invoicing.ts";
 export * from "./purchasing.ts";
 export * from "./analytics.ts";
+export * from "./accounting.ts";
+export * from "./commissions-fintech.ts";
 
 import type { SelectedModifier } from "./food-service.ts";
 

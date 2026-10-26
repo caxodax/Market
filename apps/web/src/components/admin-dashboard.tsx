@@ -123,11 +123,19 @@ const PurchasingManagerAdmin = dynamic(
   () => import("@marketos/plugin-purchasing-retentions").then((m) => m.PurchasingManagerAdmin),
   { loading: TabLoading }
 );
+const AccountingManagerAdmin = dynamic(
+  () => import("@marketos/plugin-accounting").then((m) => m.AccountingManagerAdmin),
+  { loading: TabLoading }
+);
 const IssueDocumentModal = dynamic(
   () => import("@marketos/plugin-invoicing").then((m) => m.IssueDocumentModal)
 );
 const InventoryTab = dynamic(
   () => import("./inventory-tab").then((m) => m.InventoryTab),
+  { loading: TabLoading }
+);
+const StoresTab = dynamic(
+  () => import("./stores-tab").then((m) => m.StoresTab),
   { loading: TabLoading }
 );
 const ProductModal = dynamic(
@@ -211,6 +219,7 @@ import {
   ScanBarcode,
   ReceiptText,
   ShoppingBag,
+  BookOpen,
 } from "lucide-react";
 
 interface AdminDashboardProps {
@@ -307,6 +316,7 @@ export function AdminDashboard({
     | "MTO_CPQ"
     | "INVOICING"
     | "PURCHASING"
+    | "ACCOUNTING"
   >("PAYMENTS");
 
   const [settingsState, setSettingsState] = useState(settings);
@@ -993,7 +1003,8 @@ export function AdminDashboard({
       | "STOREFRONT_STUDIO"
       | "MTO_CPQ"
       | "INVOICING"
-      | "PURCHASING";
+      | "PURCHASING"
+      | "ACCOUNTING";
 
     category: ModuleCategory;
     label: string;
@@ -1217,6 +1228,20 @@ export function AdminDashboard({
           },
         ]
       : []),
+    ...(activeModuleIds.includes("accounting")
+      ? [
+          {
+            id: "ACCOUNTING" as const,
+            category: "FINANCE" as const,
+            label: "Contabilidad & Libros",
+            shortLabel: "Contabilidad",
+            description: "Plan de Cuentas NIIF, Asientos por Partida Doble y Balance",
+            icon: <BookOpen className="w-4 h-4 shrink-0" />,
+            badge: "NIIF",
+            badgeClassName: "bg-indigo-500/10 text-indigo-600 border border-indigo-500/20 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+          },
+        ]
+      : []),
 
     // 4. Administración
     {
@@ -1299,6 +1324,7 @@ export function AdminDashboard({
     RATES: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_CASHIER"],
     INVOICING: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_CASHIER"],
     PURCHASING: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_CASHIER"],
+    ACCOUNTING: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER"],
 
     // 4. Administración & Gobierno (Exclusivo Dueño / Super Admin / Gerente)
     STORES: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER"],
@@ -2702,6 +2728,19 @@ export function AdminDashboard({
           </div>
         )}
 
+        {/* TAB: CONTABILIDAD NIIF & PLAN ÚNICO DE CUENTAS */}
+        {activeTab === "ACCOUNTING" && (
+          <div className="animate-in fade-in">
+            <AccountingManagerAdmin
+              tenantId={settingsState.tenant_id}
+              settings={settingsState}
+              activeModuleIds={activeModuleIds}
+              initialInvoices={fiscalDocuments}
+              initialPurchaseInvoices={purchaseInvoices}
+            />
+          </div>
+        )}
+
         {/* TAB 6: AUDIT LOGS & TRACEABILITY */}
         {activeTab === "AUDIT" && (
           <div className="animate-in fade-in">
@@ -2895,251 +2934,20 @@ export function AdminDashboard({
         )}
 
         {/* TAB: STORES & BRANCH MANAGEMENT */}
-        {activeTab === "STORES" && (() => {
-          const maxStores = planLimitsState?.plan.max_stores || 1;
-          const currentStoresCount = stores.length;
-          const isAtCapacity = currentStoresCount >= maxStores;
-          const storeUsagePct = Math.min(100, Math.round((currentStoresCount / maxStores) * 100));
-
-          return (
-            <div className="space-y-6 animate-in fade-in">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card p-4 rounded-2xl border border-border">
-                <div>
-                  <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-primary" />
-                    Sucursales y Sedes de Despacho ({stores.length})
-                  </h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Gestiona las sedes físicas de este comercio para zonificación de inventario y despacho de pedidos.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isAtCapacity) {
-                      triggerUpgradeModal("stores");
-                      return;
-                    }
-                    setIsStoreModalOpen(true);
-                  }}
-                  className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold shadow-sm cursor-pointer transition-all shrink-0 ${
-                    isAtCapacity
-                      ? "bg-rose-600 hover:bg-rose-500 text-white ring-2 ring-rose-500/30"
-                      : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                  }`}
-                  title={isAtCapacity ? "Cupo máximo alcanzado. Clic para actualizar plan" : "Registrar nueva sucursal"}
-                >
-                  {isAtCapacity ? (
-                    <>
-                      <Zap className="w-4 h-4" />
-                      <span>Límite de Sedes Alcanzado</span>
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4" />
-                      <span>+ Registrar Nueva Sucursal</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* SaaS Store Quota Card */}
-              <div
-                className={`p-4 rounded-2xl border transition-all ${
-                  isAtCapacity
-                    ? "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
-                    : storeUsagePct >= 80
-                    ? "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400"
-                    : "bg-card border-border text-foreground"
-                }`}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        isAtCapacity
-                          ? "bg-rose-500/20 text-rose-500"
-                          : storeUsagePct >= 80
-                          ? "bg-amber-500/20 text-amber-500"
-                          : "bg-primary/10 text-primary"
-                      }`}
-                    >
-                      <Building2 className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-extrabold text-sm text-foreground">
-                          Límite de Sedes Físicas ({currentStoresCount} / {maxStores} sucursales)
-                        </span>
-                        <span
-                          className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                            isAtCapacity
-                              ? "bg-rose-500 text-white"
-                              : storeUsagePct >= 80
-                              ? "bg-amber-500 text-white"
-                              : "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
-                          }`}
-                        >
-                          {isAtCapacity
-                            ? "Límite Alcanzado (100%)"
-                            : storeUsagePct >= 80
-                            ? `${storeUsagePct}% En Uso`
-                            : `${storeUsagePct}% En Uso`}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Plan actual: <strong className="text-foreground">{planLimitsState?.plan.name || "Starter"}</strong>.
-                        {isAtCapacity
-                          ? " Has alcanzado el límite máximo de sucursales permitido por tu suscripción actual. Actualiza a Growth (hasta 3) o Enterprise (hasta 10) para abrir nuevas sedes."
-                          : ` Puedes registrar ${maxStores - currentStoresCount} sucursales adicionales en tu plan.`}
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => triggerUpgradeModal("stores")}
-                    className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                      isAtCapacity
-                        ? "bg-rose-600 hover:bg-rose-500 text-white shadow-sm hover:scale-105 active:scale-95"
-                        : "bg-muted hover:bg-muted/80 text-foreground border border-border"
-                    }`}
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>{isAtCapacity ? "Aumentar Límite de Sedes" : "Ver Planes SaaS"}</span>
-                  </button>
-                </div>
-
-                {/* Progress bar */}
-                <div className="mt-3 w-full h-2 rounded-full bg-muted overflow-hidden border border-border/50">
-                  <div
-                    className={`h-full transition-all duration-500 rounded-full ${
-                      isAtCapacity
-                        ? "bg-rose-500"
-                        : storeUsagePct >= 80
-                        ? "bg-amber-500"
-                        : "bg-gradient-to-r from-emerald-500 to-teal-500"
-                    }`}
-                    style={{ width: `${storeUsagePct}%` }}
-                  />
-                </div>
-              </div>
-
-              {stores.length === 0 ? (
-                <div className="p-12 text-center rounded-2xl border border-dashed border-border bg-card space-y-3">
-                  <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
-                    <Building2 className="w-6 h-6" />
-                  </div>
-                  <h3 className="font-bold text-foreground text-sm">No hay sucursales registradas aún</h3>
-                  <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                    Registra la primera sede física de este comercio (ej: Sede Principal, Sucursal Este, etc.) para asociar inventario y pedidos.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (isAtCapacity) {
-                        triggerUpgradeModal("stores");
-                        return;
-                      }
-                      setIsStoreModalOpen(true);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold shadow-sm hover:bg-primary/90 transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Crear Primera Sucursal</span>
-                  </button>
-                </div>
-              ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {stores.map((st) => {
-                  const branchOrdersCount = orders.filter((o) => o.store_id === st.id).length;
-                  return (
-                    <div
-                      key={st.id}
-                      className="p-4 rounded-2xl bg-card border border-border hover:border-primary/40 transition-all flex flex-col justify-between gap-4 shadow-xs"
-                    >
-                      <div className="space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                              <Building2 className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <h3 className="font-bold text-sm text-foreground leading-tight">
-                                {st.name}
-                              </h3>
-                              {st.code && (
-                                <span className="text-[10px] font-mono text-muted-foreground">
-                                  Cód: {st.code}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                              st.is_active
-                                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                                : "bg-zinc-500/10 text-zinc-500 border-zinc-500/20"
-                            }`}
-                          >
-                            {st.is_active ? "Activa" : "Inactiva"}
-                          </span>
-                        </div>
-
-                        {st.address && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1.5 pt-1">
-                            <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                            <span className="truncate">{st.address}</span>
-                          </p>
-                        )}
-
-                        {st.phone && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                            <Phone className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                            <span>{st.phone}</span>
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="pt-3 border-t border-border flex items-center justify-between gap-2">
-                        <div className="text-[11px] text-muted-foreground">
-                          <strong>{branchOrdersCount}</strong> {branchOrdersCount === 1 ? "pedido" : "pedidos"}
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setStoreFilter(st.id);
-                              setActiveTab("ORDERS");
-                            }}
-                            className="px-2.5 py-1 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-[11px] font-semibold transition-colors cursor-pointer"
-                          >
-                            Ver Pedidos
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleToggleStoreStatus(st)}
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer border ${
-                              st.is_active
-                                ? "border-amber-500/30 text-amber-600 hover:bg-amber-500/10"
-                                : "border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
-                            }`}
-                          >
-                            {st.is_active ? "Desactivar" : "Activar"}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ); })()}
+        {activeTab === "STORES" && (
+          <StoresTab
+            stores={stores}
+            orders={orders}
+            planLimitsState={planLimitsState}
+            onOpenStoreModal={() => setIsStoreModalOpen(true)}
+            onTriggerUpgradeModal={(feature) => triggerUpgradeModal(feature)}
+            onToggleStoreStatus={(st) => handleToggleStoreStatus(st)}
+            onFilterStoreOrders={(storeId) => {
+              setStoreFilter(storeId);
+              setActiveTab("ORDERS");
+            }}
+          />
+        )}
 
         {/* TAB: STOREFRONT STUDIO (VITRINA PRO) */}
         {activeTab === "STOREFRONT_STUDIO" && (

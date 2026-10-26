@@ -22,6 +22,7 @@
     "@marketos/plugin-purchasing-retentions": "workspace:*",
     "@marketos/plugin-storefront-pro": "workspace:*",
     "@marketos/plugin-analytics": "workspace:*",
+    "@marketos/plugin-accounting": "workspace:*",
 
     "@marketos/types": "workspace:*",
     "@marketos/ui": "workspace:*",

@@ -18,7 +18,8 @@ export type TenantModuleId =
   | "invoicing"             // Facturación: Facturas, Notas de Crédito, Notas de Débito, Guías de Despacho
   | "local_chile"           // Localización Chile: RUT, IVA 19%, SII, DTE, Boletas Electrónicas
   | "purchasing_retentions" // Compras & Retenciones: Facturas de compra, Retención IVA/ISLR (SPE) y DTE 46
-  | "analytics";            // Analítica & Audiencia: Vistas, visitantes únicos, fuentes y conversión de tienda
+  | "analytics"             // Analítica & Audiencia: Vistas, visitantes únicos, fuentes y conversión de tienda
+  | "accounting";           // Contabilidad: Catálogo de Cuentas, Asientos Automáticos y Balance de Comprobación
 
 export type PluginCategory =
   | "location"              // Localización por país

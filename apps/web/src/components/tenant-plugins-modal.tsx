@@ -35,6 +35,7 @@ import {
   ReceiptText,
   ShoppingBag,
   TrendingUp,
+  BookOpen,
 } from "lucide-react";
 import { PluginDetailModal } from "./plugin-detail-modal";
 
@@ -336,6 +337,25 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
     targetAudience:
       "Comercios calificados como Sujetos Pasivos Especiales (SPE) o que requieren retener IVA a proveedores y generar el archivo TXT para el SENIAT o DTE 46 en Chile.",
     themeColor: "purple",
+  },
+  {
+    id: "accounting",
+    name: "Contabilidad NIIF & Plan Único de Cuentas (PUC)",
+    badge: "v1.0.0 • Asientos & Balance",
+    category: "Finanzas Locales",
+    categoryShort: "Contabilidad",
+    description:
+      "Plan de cuentas estandarizado de 4 niveles (NIIF), generación automática de asientos por partida doble desde Facturación y Compras, y Balance de Comprobación (Sumas y Saldos).",
+    icon: <BookOpen className="w-5 h-5 text-indigo-500" />,
+    features: [
+      "Catálogo maestro de cuentas NIIF (Activo, Pasivo, Patrimonio, Ingresos, Costos, Gastos)",
+      "Generación automática de asientos contables por partida doble al facturar o comprar",
+      "Balance de Comprobación en tiempo real con validación estricta Débito = Crédito",
+      "Exportación e inspección detallada de Libro Diario con auditoría inmutable",
+    ],
+    targetAudience:
+      "Contadores, administradores y dueños de empresas que necesitan libros contables al día conforme a NIIF.",
+    themeColor: "indigo",
   },
   {
     id: "analytics",

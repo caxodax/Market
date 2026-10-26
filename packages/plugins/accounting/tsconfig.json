@@ -1,0 +1,10 @@
+{
+  "extends": "@marketos/typescript-config/react-library.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["src/__tests__/**/*"]
+}

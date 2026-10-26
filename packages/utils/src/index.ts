@@ -10,6 +10,7 @@ export * from "./whatsapp.ts";
 export * from "./image-compressor.ts";
 export * from "./dates.ts";
 export * from "./plugin-resolver.ts";
+export * from "./fintech.ts";
 
 export interface EffectiveExchangeRateResult {
   effectiveRate: number;

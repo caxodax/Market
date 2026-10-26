@@ -980,6 +980,73 @@ flowchart TD
 * **Verificación de Tipos:** 16/16 proyectos aprobados con 0 errores de TypeScript (`pnpm check-types`).
 * **Compilación de Producción:** Next.js 16.3.8 Turbopack completado con éxito (`pnpm build` -> exit code 0).
 
+---
+
+## 23. Bloque de Expansión Avanzada: Contabilidad NIIF, Fintech/Cashea, Conector WooCommerce y Refactorización Core (Completado ✅)
+
+> **Modo Ejecución:** **Ultra (Ponytail + ECC AgentShield + Impeccable + UI/UX Pro Max)**.
+
+### 1. Opción A: Contabilidad NIIF & Plan Único de Cuentas (`@marketos/plugin-accounting`)
+* **Nuevo Paquete de Workspace:** [`packages/plugins/accounting/`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/accounting)
+* **Tipos de Dominio:** [`packages/types/src/accounting.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/types/src/accounting.ts)
+  - `Account`: Catálogo de cuentas con código, nombre, tipo (`ASSET`, `LIABILITY`, `EQUITY`, `REVENUE`, `COST`, `EXPENSE`), nivel (1 a 4) y naturaleza contable (`DEBIT` vs `CREDIT`).
+  - `JournalEntry` y `JournalEntryLine`: Modelo inmutable de Libro Diario con principio estricto de Partida Doble ($\sum \text{Débito} = \sum \text{Crédito}$).
+  - `TrialBalanceReport` y `TrialBalanceRow`: Balance de Comprobación (Sumas y Saldos) con validación automática de cuadre patrimonial.
+* **Catálogo Maestro de Cuentas:** [`default-accounts.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/accounting/src/constants/default-accounts.ts) estructurado según NIIF para Pymes (Caja, Bancos, CxC, Inventarios, Crédito Fiscal IVA, CxP Proveedores, Débito Fiscal IVA, IGTF por enterar, Retenciones de IVA/ISLR, Capital Social, Ventas, Costo de Ventas, Gastos Operativos).
+* **Motor Contable Automatizado:** [`accounting-service.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/accounting/src/services/accounting-service.ts)
+  - Generación automática de asientos contables por partida doble desde Facturas de Ventas (`generateSalesInvoiceEntry` con desglose de IVA 16% e IGTF 3%).
+  - Generación automática desde Facturas de Compras (`generatePurchaseInvoiceEntry` con retención de IVA e ISLR).
+  - Asientos de liquidación de cobro a clientes (`generateCustomerPaymentEntry`).
+  - Motor de balance de comprobación `buildTrialBalance` con auditoría de diferencias.
+* **Interfaz Administrativa:** [`AccountingManagerAdmin`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/accounting/src/components/accounting-manager-admin.tsx)
+  - Pestaña de Libro Diario con trazabilidad, detalle de líneas por cuenta y modal de asiento manual con validación reactiva de balance.
+  - Pestaña de Balance de Comprobación en vivo con banner de cuadre y exportación CSV.
+  - Pestaña de Plan de Cuentas NIIF con búsqueda y filtrado por nivel y tipo.
+* **Integración en Core:**
+  - Registrado en [`apps/web/src/components/tenant-plugins-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/tenant-plugins-modal.tsx) dentro de Finanzas Locales.
+  - Carga dinámica `next/dynamic` en [`apps/web/src/components/admin-dashboard.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/admin-dashboard.tsx) bajo permisos de dueño/gerente.
+
+### 2. Opción B: Comisiones de Venta & Pasarelas Fintech (Cashea, Biopago BDV, Spidi, WayuPay)
+* **Tipos de Dominio:** [`packages/types/src/commissions-fintech.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/types/src/commissions-fintech.ts)
+  - `SalesAgent`, `CommissionRecord`, `FintechPaymentProvider`, `FintechPaymentLink`.
+* **Utilidades Fintech:** [`packages/utils/src/fintech.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/utils/src/fintech.ts)
+  - `calculateSalesCommission`: Cálculo aritmético preciso de comisiones con redondeo financiero.
+  - `generateFintechPaymentLink`: Generador de enlaces y códigos QR específicos para **Cashea** (BNPL en 3 cuotas), **Biopago BDV** (Banco de Venezuela en VES con tasa oficial BCV), **Spidi Pay** y **WayuPay**.
+  - `buildFintechWhatsAppShareMessage`: Redacción y codificación automática del mensaje para compartir enlace por WhatsApp en 1 clic.
+* **Componente Modal:** [`FintechPaymentModal`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/fintech-payment-modal.tsx)
+  - Selector interactivo de pasarela con badges dinámicos.
+  - Visualización del monto en USD y VES a tasa oficial BCV.
+  - Copia rápida al portapapeles con feedback visual.
+  - Botón directo de compartir enlace por WhatsApp.
+  - Integrado en [`OrderDetailsModal`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/order-details-modal.tsx) para cobro instantáneo en mostrador o delivery.
+
+### 3. Opción C: Conector Webhook WooCommerce con Validación Criptográfica y Auto-Facturación
+* **Endpoint API:** [`apps/web/src/app/api/webhooks/woocommerce/route.ts`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/app/api/webhooks/woocommerce/route.ts)
+* **Seguridad AgentShield (ECC):**
+  - Validación de firma digital HMAC-SHA256 (`x-wc-webhook-signature`) contra secreto de tienda.
+  - Comparación en tiempo constante (`crypto.timingSafeEqual`) para mitigar ataques de temporización.
+  - Aislamiento multi-tenant por resolución estricta de `tenant_id`.
+* **Procesamiento de Órdenes:**
+  - Conversión del payload WooCommerce (`order.created`) a orden canónica de MarketOS.
+  - Normalización de cliente, dirección de despacho, productos y montos.
+  - Persistencia atómica vía `MarketOSRepository.createOrder`.
+* **Auto-Emisión Fiscal:**
+  - Si el comercio tiene activo el plugin `invoicing`, emite automáticamente la factura fiscal legal con numeración correlativa y cálculo de IVA.
+
+### 4. Opción D: Refactorización Core & Modo Oscuro para Storefront
+* **Desacoplamiento de `admin-dashboard.tsx`:**
+  - Extracción completa de la pestaña de sucursales a [`apps/web/src/components/stores-tab.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/stores-tab.tsx).
+  - Carga dinámica `next/dynamic` que reduce el peso del chunk inicial del dashboard administrativo en ~250 líneas.
+* **Modo Oscuro Accesible Storefront:**
+  - [`apps/web/src/components/theme-toggle.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/theme-toggle.tsx): Conmutador ligero de tema (Sol/Luna) con persistencia en `localStorage` y soporte para preferencia de sistema (`prefers-color-scheme`).
+  - Integrado en la cabecera pública de la tienda ([`store-header.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/store-header.tsx)).
+
+### 5. Verificación de Calidad y Pruebas
+* **Suites de Pruebas Unitarias:** 14/14 suites exitosas en el monorepo (`pnpm test` -> 0 fallos).
+* **Verificación de Tipos Estricta:** 17/17 proyectos con 0 errores TypeScript (`pnpm check-types`).
+* **Compilación de Producción:** Next.js 16.3.8 Turbopack completado con éxito (`pnpm build` -> exit code 0).
+
+
 
 
 
