@@ -769,6 +769,66 @@ flowchart TD
 * **Verificación de Tipos:** 14 de 14 proyectos en `pnpm check-types` aprobados sin un solo error de TypeScript.
 * **Compilación de Producción:** Next.js 16.3.8 Turbopack completado con éxito (`pnpm build` -> exit code 0).
 
+---
+
+## 20. Detalle de Ejecución del Paso 2: Módulo de Compras & Retenciones Fiscales (Completada ✅)
+
+### 1. Arquitectura de Dominio y Justificación (Ponytail Ultra & ECC)
+* **Objetivo del Requerimiento:**
+  - Implementar el **Paso 2** de la expansión fiscal: Gestión de compras a proveedores (`INBOUND`), recepción de facturas comerciales/fiscales, emisión obligatoria de **Comprobantes de Retención de IVA** (75% / 100% para Sujetos Pasivos Especiales - SPE en Venezuela conforme a la Providencia SNAT/2015/0049), generación del archivo oficial **TXT del SENIAT** para declaración fiscal periódica, y soporte para **Chile** (**Factura de Compra DTE 46 / RCV** por cambio de sujeto pasivo según normativa del SII).
+* **Desacoplamiento Hexagonal (`RetentionAdapterPort`):**
+  - La lógica tributaria de retenciones está 100% aislada de las entidades core del comercio mediante adaptadores desacoplados:
+    - [`VenezuelaRetentionAdapter`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/adapters/retention-adapter.ts): Retención del 75% (general) y 100% (proveedores no domiciliados o sin RIF), numeración legal de 14 dígitos (`YYYYMMXXXXXXXX`), y formateo de la línea oficial de 16 columnas separadas por tabulador para el TXT del SENIAT.
+    - [`ChileRetentionAdapter`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/adapters/retention-adapter.ts): Factura de Compra (DTE 46) con retención total de IVA por cambio de sujeto pasivo y numeración `DTE-46-XXXXXX`.
+    - [`GlobalRetentionAdapter`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/adapters/retention-adapter.ts): Retención en la fuente internacional configurable (*Withholding Tax*).
+
+### 2. Paquete Creado: `@marketos/plugin-purchasing-retentions`
+* **Modelos de Dominio:** [`packages/types/src/purchasing.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/types/src/purchasing.ts)
+  - Interfaces: `Supplier`, `PurchaseInvoice`, `PurchaseInvoiceItem`, `RetentionVoucher`, `CreatePurchaseInvoiceInput`, `CreateRetentionVoucherInput`, `SeniatRetentionTxtRow`.
+  - Re-exportado en [`packages/types/src/index.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/types/src/index.ts) y registrado en `TenantModuleId`.
+* **Manifiesto del Plugin:** [`packages/plugins/purchasing-retentions/src/manifest.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/manifest.ts) (`id: "purchasing_retentions"`, `category: "growth_operations"`).
+* **Motor de Servicios:** [`packages/plugins/purchasing-retentions/src/services/purchasing-service.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/services/purchasing-service.ts)
+  - `preparePurchaseInvoice`: Desglosa automáticamente base imponible e importe exento, calcula IVA (16% o 19%), aplica el porcentaje de retención seleccionado (75% / 100%), genera el número de comprobante oficial de 14 dígitos y calcula el neto a pagar al proveedor.
+  - `buildSeniatRetentionTxt`: Genera el contenido del archivo `.txt` uniendo las líneas oficiales con retornos `\r\n`.
+* **Componentes de Interfaz de Usuario (UI/UX Pro Max & Impeccable):**
+  - [`purchasing-manager-admin.tsx`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/components/purchasing-manager-admin.tsx): Consola administrativa con 4 tarjetas KPI (Total Compras, Total IVA Retenido a Enterar, Comprobantes Emitidos, Proveedores Registrados), 3 pestañas operativas (**Facturas de Compra**, **Comprobantes de Retención**, **Directorio de Proveedores**), buscador en tiempo real y selector con botón para **Descargar TXT SENIAT** para el período fiscal seleccionado (`YYYYMM`).
+  - [`register-purchase-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/components/register-purchase-modal.tsx): Modal para registrar facturas de proveedores con selector o creación instantánea de proveedor, control de ítems exentos o gravados, N° de Factura, N° de Control SENIAT, interruptor de retención de IVA (75% / 100%) y desglose contable en tiempo real.
+  - [`printable-retention-voucher-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/components/printable-retention-voucher-modal.tsx): Documento formal imprimible formato Carta/A4 según la Providencia Administrativa SNAT/2015/0049, con cajas de Agente de Retención y Proveedor, desglose de factura y alícuotas, leyenda legal y líneas de firma y sello.
+
+### 3. Persistencia Multi-Tenant (`@marketos/database`)
+* **Repositorio Creado:** [`packages/database/src/repositories/purchasing.repository.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/database/src/repositories/purchasing.repository.ts)
+  - Métodos con aislamiento estricto de inquilinos (AgentShield):
+    - `getPurchaseInvoices(tenantId)`
+    - `getPurchaseInvoiceById(tenantId, id)`
+    - `savePurchaseInvoice(tenantId, invoice)`
+    - `getRetentionVouchers(tenantId, taxPeriod?)`
+    - `saveRetentionVoucher(tenantId, voucher)`
+    - `getSuppliers(tenantId)`
+    - `saveSupplier(tenantId, supplier)`
+  - Bitácora de auditoría inmutable en `AuditRepository.recordAuditLog` al registrar facturas y emitir comprobantes.
+  - Runtime en memoria integrado en [`mock-data.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/database/src/mock-data.ts) (`purchaseInvoices`, `retentionVouchers`, `suppliers`).
+
+### 4. Integración en `apps/web`
+* **Server Actions Seguras:** [`apps/web/src/app/admin/purchasing-actions.ts`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/app/admin/purchasing-actions.ts)
+  - `getPurchaseInvoicesAction(tenantId)`: Con validación de guardia `assertAuthorizedTenantAdmin`.
+  - `getRetentionVouchersAction(tenantId, taxPeriod)`: Listado de comprobantes por inquilino y período.
+  - `registerPurchaseInvoiceAction(tenantId, input)`: Registro integral de factura, proveedor y comprobante de retención.
+  - `generateSeniatTxtAction(tenantId, taxPeriod)`: Generación segura del archivo TXT con nombre estándar `RET_IVA_YYYYMM_RIF.txt`.
+* **Carga en el Servidor:** [`apps/web/src/app/admin/page.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/app/admin/page.tsx)
+  - Incorporada la carga concurrente en `Promise.all` de `purchaseInvoices`, `retentionVouchers` y `suppliers`.
+* **Panel de Control:** [`apps/web/src/components/admin-dashboard.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/admin-dashboard.tsx)
+  - Añadida la pestaña condicional **"Compras & Retenciones"** bajo la categoría de Finanzas cuando el módulo `purchasing_retentions` está activo.
+  - Conexión completa de acciones y toasts de feedback inmediato.
+* **Catálogo de Plugins:** [`apps/web/src/components/tenant-plugins-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/tenant-plugins-modal.tsx)
+  - Registrado el plugin `purchasing_retentions` disponible para activación por parte de los comercios.
+
+### 5. Verificación Rigurosa y Calidad de Código
+* **Pruebas de Unidad Propias:** Evaluadas y aprobadas en [`packages/plugins/purchasing-retentions/src/__tests__/run-checks.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/__tests__/run-checks.ts) cubriendo retenciones del 75% y 100%, formato de 14 dígitos, formato TXT del SENIAT de 16 columnas y adaptadores de Chile y Global.
+* **Pruebas Monorepo:** 11 de 11 suites de prueba aprobadas al 100% (`pnpm test` -> 0 fallos).
+* **Verificación de Tipos Global:** 15 de 15 proyectos en `pnpm check-types` aprobados sin un solo error de TypeScript.
+* **Compilación de Producción:** Next.js 16.3.8 Turbopack completado con éxito (`pnpm build` -> exit code 0).
+
+
 
 
 

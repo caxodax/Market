@@ -27,6 +27,9 @@ import {
   ProductRecipe,
   FiscalDocument,
   CreateFiscalDocumentInput,
+  PurchaseInvoice,
+  RetentionVoucher,
+  Supplier,
 } from "@marketos/types";
 
 import {
@@ -50,6 +53,10 @@ import {
   updateTenantSettingsAction,
 } from "../app/admin/actions";
 import { issueFiscalDocumentAction } from "../app/admin/invoicing-actions";
+import {
+  registerPurchaseInvoiceAction,
+  generateSeniatTxtAction,
+} from "../app/admin/purchasing-actions";
 import dynamic from "next/dynamic";
 import { stopImpersonationAction } from "../app/platform/actions";
 import { logoutUserAction } from "../app/login/actions";
@@ -110,6 +117,10 @@ const MtoCpqAdminPanel = dynamic(
 );
 const InvoicingManagerAdmin = dynamic(
   () => import("@marketos/plugin-invoicing").then((m) => m.InvoicingManagerAdmin),
+  { loading: TabLoading }
+);
+const PurchasingManagerAdmin = dynamic(
+  () => import("@marketos/plugin-purchasing-retentions").then((m) => m.PurchasingManagerAdmin),
   { loading: TabLoading }
 );
 const IssueDocumentModal = dynamic(
@@ -199,6 +210,7 @@ import {
   Puzzle,
   ScanBarcode,
   ReceiptText,
+  ShoppingBag,
 } from "lucide-react";
 
 interface AdminDashboardProps {
@@ -224,6 +236,9 @@ interface AdminDashboardProps {
   initialRawMaterials?: RawMaterial[];
   initialRecipes?: ProductRecipe[];
   initialFiscalDocuments?: FiscalDocument[];
+  initialPurchaseInvoices?: PurchaseInvoice[];
+  initialRetentionVouchers?: RetentionVoucher[];
+  initialSuppliers?: Supplier[];
 }
 
 interface AdminToast {
@@ -268,6 +283,9 @@ export function AdminDashboard({
   initialRawMaterials = [],
   initialRecipes = [],
   initialFiscalDocuments = [],
+  initialPurchaseInvoices = [],
+  initialRetentionVouchers = [],
+  initialSuppliers = [],
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<
     | "PAYMENTS"
@@ -288,6 +306,7 @@ export function AdminDashboard({
     | "STOREFRONT_STUDIO"
     | "MTO_CPQ"
     | "INVOICING"
+    | "PURCHASING"
   >("PAYMENTS");
 
   const [settingsState, setSettingsState] = useState(settings);
@@ -300,6 +319,9 @@ export function AdminDashboard({
   const [auditLogs, setAuditLogs] = useState(initialAuditLogs);
   const [staff, setStaff] = useState<UserProfile[]>(initialStaffMembers);
   const [fiscalDocuments, setFiscalDocuments] = useState<FiscalDocument[]>(initialFiscalDocuments);
+  const [purchaseInvoices, setPurchaseInvoices] = useState<PurchaseInvoice[]>(initialPurchaseInvoices);
+  const [retentionVouchers, setRetentionVouchers] = useState<RetentionVoucher[]>(initialRetentionVouchers);
+  const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
   const [invoicingOrderTarget, setInvoicingOrderTarget] = useState<Order | null>(null);
   const [isQuickInvoiceModalOpen, setIsQuickInvoiceModalOpen] = useState(false);
 
@@ -970,7 +992,8 @@ export function AdminDashboard({
       | "PLUGINS"
       | "STOREFRONT_STUDIO"
       | "MTO_CPQ"
-      | "INVOICING";
+      | "INVOICING"
+      | "PURCHASING";
 
     category: ModuleCategory;
     label: string;
@@ -1180,6 +1203,20 @@ export function AdminDashboard({
           },
         ]
       : []),
+    ...(activeModuleIds.includes("purchasing_retentions")
+      ? [
+          {
+            id: "PURCHASING" as const,
+            category: "FINANCE" as const,
+            label: `Compras & Retenciones (${purchaseInvoices.length})`,
+            shortLabel: "Compras",
+            description: "Facturas de proveedores y retención de IVA SPE",
+            icon: <ShoppingBag className="w-4 h-4 shrink-0" />,
+            badge: purchaseInvoices.length > 0 ? `${purchaseInvoices.length}` : null,
+            badgeClassName: "bg-purple-500/10 text-purple-600 border border-purple-500/20 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+          },
+        ]
+      : []),
 
     // 4. Administración
     {
@@ -1261,6 +1298,7 @@ export function AdminDashboard({
     REPORTS: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER"],
     RATES: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_CASHIER"],
     INVOICING: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_CASHIER"],
+    PURCHASING: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_CASHIER"],
 
     // 4. Administración & Gobierno (Exclusivo Dueño / Super Admin / Gerente)
     STORES: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER"],
@@ -2620,6 +2658,45 @@ export function AdminDashboard({
                   });
                 }
                 return res;
+              }}
+            />
+          </div>
+        )}
+
+        {/* TAB: COMPRAS & RETENCIONES FISCALES */}
+        {activeTab === "PURCHASING" && (
+          <div className="animate-in fade-in">
+            <PurchasingManagerAdmin
+              tenantId={settingsState.tenant_id}
+              settings={settingsState}
+              activeModuleIds={activeModuleIds}
+              initialInvoices={purchaseInvoices}
+              initialVouchers={retentionVouchers}
+              initialSuppliers={suppliers}
+              defaultExchangeRate={rate.value}
+              onRegisterPurchase={async (input) => {
+                const res = await registerPurchaseInvoiceAction(settingsState.tenant_id, input);
+                if (res.success && res.invoice) {
+                  setPurchaseInvoices((prev) => [res.invoice!, ...prev]);
+                  if (res.voucher) {
+                    setRetentionVouchers((prev) => [res.voucher!, ...prev]);
+                  }
+                  showToast({
+                    type: "success",
+                    title: "Compra Registrada",
+                    message: `Factura ${res.invoice.invoice_number} guardada exitosamente.`,
+                  });
+                } else {
+                  showToast({
+                    type: "error",
+                    title: "Error al Registrar",
+                    message: res.error || "No se pudo registrar la factura de compra.",
+                  });
+                }
+                return res;
+              }}
+              onDownloadSeniatTxt={async (taxPeriod) => {
+                return await generateSeniatTxtAction(settingsState.tenant_id, taxPeriod);
               }}
             />
           </div>

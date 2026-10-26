@@ -16,7 +16,8 @@ export type TenantModuleId =
   | "storefront_pro"        // Vitrina Pro: Banners, sliders, reels, testimonios y maquetador visual
   | "pos_registers"         // POS: Multi-Caja, Turnos, Arqueo (Cierre X/Z), PIN por cajero
   | "invoicing"             // Facturación: Facturas, Notas de Crédito, Notas de Débito, Guías de Despacho
-  | "local_chile";          // Localización Chile: RUT, IVA 19%, SII, DTE, Boletas Electrónicas
+  | "local_chile"           // Localización Chile: RUT, IVA 19%, SII, DTE, Boletas Electrónicas
+  | "purchasing_retentions";// Compras & Retenciones: Facturas de compra, Retención IVA/ISLR (SPE) y DTE 46;
 
 export type PluginCategory =
   | "location"              // Localización por país

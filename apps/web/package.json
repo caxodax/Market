@@ -19,6 +19,7 @@
     "@marketos/plugin-local-venezuela": "workspace:*",
     "@marketos/plugin-mto-cpq": "workspace:*",
     "@marketos/plugin-promotions-coupons": "workspace:*",
+    "@marketos/plugin-purchasing-retentions": "workspace:*",
     "@marketos/plugin-storefront-pro": "workspace:*",
 
     "@marketos/types": "workspace:*",

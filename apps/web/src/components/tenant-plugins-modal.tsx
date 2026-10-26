@@ -33,6 +33,7 @@ import {
   Eye,
   Monitor,
   ReceiptText,
+  ShoppingBag,
 } from "lucide-react";
 import { PluginDetailModal } from "./plugin-detail-modal";
 
@@ -313,6 +314,26 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
     ],
     targetAudience:
       "Comercios operando en Chile con exigencias de tributación SII y RUT.",
+    themeColor: "purple",
+  },
+  {
+    id: "purchasing_retentions",
+    name: "Compras & Retenciones Fiscales (SPE / DTE 46)",
+    badge: "v1.0.0 • Sujetos Pasivos Especiales",
+    category: "Finanzas Locales",
+    categoryShort: "Compras & Retenciones",
+    description:
+      "Registro de facturas de proveedores, emisión legal de Comprobantes de Retención de IVA (75% / 100% SPE SENIAT Providencia SNAT/2015/0049) y generación del archivo TXT oficial para el portal fiscal.",
+    icon: <ShoppingBag className="w-5 h-5 text-purple-500" />,
+    features: [
+      "Registro de facturas de compras de insumos y mercancía con N° de Control",
+      "Cálculo automático de retención de IVA (75% o 100%) para Sujetos Pasivos Especiales",
+      "Emisión e impresión de Comprobantes de Retención con numeración oficial de 14 dígitos",
+      "Exportación instantánea del archivo TXT de 16 columnas para declaración ante el SENIAT",
+      "Soporte para Factura de Compra (DTE 46) con retención de IVA por cambio de sujeto pasivo (Chile)",
+    ],
+    targetAudience:
+      "Comercios calificados como Sujetos Pasivos Especiales (SPE) o que requieren retener IVA a proveedores y generar el archivo TXT para el SENIAT o DTE 46 en Chile.",
     themeColor: "purple",
   },
 ];

@@ -26,6 +26,9 @@ import type {
   ProductModifierGroup,
   PlatformSettings,
   FiscalDocument,
+  PurchaseInvoice,
+  RetentionVoucher,
+  Supplier,
 } from "@marketos/types";
 
 export const INITIAL_TENANT: Tenant = {
@@ -1866,6 +1869,9 @@ export const state = {
   recipes: INITIAL_RECIPES,
   modifierGroups: INITIAL_MODIFIER_GROUPS,
   fiscalDocuments: [] as FiscalDocument[],
+  purchaseInvoices: [] as PurchaseInvoice[],
+  retentionVouchers: [] as RetentionVoucher[],
+  suppliers: [] as Supplier[],
   platformSettings: {
     id: "default",
     platform_name: "MarketOS",

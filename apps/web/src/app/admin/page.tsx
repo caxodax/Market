@@ -1,6 +1,10 @@
 import React from "react";
 import { redirect } from "next/navigation";
-import { MarketOSRepository, InvoicingRepository } from "@marketos/database";
+import {
+  MarketOSRepository,
+  InvoicingRepository,
+  PurchasingRepository,
+} from "@marketos/database";
 import { AdminDashboard } from "../../components/admin-dashboard";
 import { SuspendedAdminScreen } from "../../components/suspended-admin-screen";
 import { getCurrentUser } from "../login/actions";
@@ -95,6 +99,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     rawMaterials,
     existingRecipes,
     fiscalDocuments,
+    purchaseInvoices,
+    retentionVouchers,
+    suppliers,
   ] = await Promise.all([
     MarketOSRepository.getTenantSettings(targetTenantId),
     MarketOSRepository.getProducts(targetTenantId),
@@ -116,6 +123,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     MarketOSRepository.getRawMaterials(targetTenantId),
     MarketOSRepository.getProductRecipes(targetTenantId),
     InvoicingRepository.getFiscalDocuments(targetTenantId),
+    PurchasingRepository.getPurchaseInvoices(targetTenantId),
+    PurchasingRepository.getRetentionVouchers(targetTenantId),
+    PurchasingRepository.getSuppliers(targetTenantId),
   ]);
 
   return (
@@ -159,6 +169,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         initialRawMaterials={rawMaterials}
         initialRecipes={existingRecipes}
         initialFiscalDocuments={fiscalDocuments}
+        initialPurchaseInvoices={purchaseInvoices}
+        initialRetentionVouchers={retentionVouchers}
+        initialSuppliers={suppliers}
       />
     </div>
   );

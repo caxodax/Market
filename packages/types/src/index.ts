@@ -10,6 +10,7 @@ export * from "./barcode-retail.ts";
 export * from "./pos.ts";
 export * from "./storefront-pro.ts";
 export * from "./invoicing.ts";
+export * from "./purchasing.ts";
 
 import type { SelectedModifier } from "./food-service.ts";
 
