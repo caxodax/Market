@@ -117,7 +117,7 @@ flowchart TD
 | **Analítica Comercial** | **PLUGIN** | `analytics`: Visitas en tiempo real, atribución de canales (WhatsApp, Instagram) y tasa de conversión. |
 | **Personalización & Cotizador** | **PLUGIN** | `mto_cpq`: Matrices de costeo para fabricación bajo pedido y hojas de taller. |
 | **Retail & Código de Barras** | **PLUGIN** | `barcode_retail`: Lectura EAN-13, balanzas y picking optimizado. |
-| **Web Push Marketing** | **PLUGIN** | Campañas de difusión y notificaciones automáticas de cambio de estado. |
+| **Web Push & Notificaciones PWA** | **PLUGIN** | `push_notifications`: Campañas de difusión masiva (todos, con compras, sin compras), avisos de cambio de estado y suscripciones VAPID. |
 
 ---
 

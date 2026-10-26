@@ -6,6 +6,10 @@ import {
   DEFAULT_VAPID_PRIVATE_KEY,
   DEFAULT_VAPID_SUBJECT,
 } from "./push-constants";
+import {
+  buildOrderStatusPushPayload,
+  filterPushSubscriptions,
+} from "@marketos/plugin-push-notifications";
 
 // Inicializar configuración VAPID
 const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC_KEY;
@@ -96,6 +100,20 @@ export async function sendTenantPushBroadcast(
 }> {
   const { tenantId, title, body, url, icon, badge, tag, targetType = "all", createdBy } = input;
 
+  // 0. Verificar si el tenant tiene activo el plugin de Notificaciones Push
+  const isModuleActive = await MarketOSRepository.isModuleActiveForTenant(
+    tenantId,
+    "push_notifications"
+  );
+  if (!isModuleActive) {
+    return {
+      success: false,
+      sentCount: 0,
+      totalTargeted: 0,
+      message: "El plugin de Notificaciones Push no está activado para esta tienda.",
+    };
+  }
+
   // 1. Obtener suscriptores activos exclusivos de este tenant
   const allSubscriptions = await MarketOSRepository.getPushSubscriptions(tenantId);
 
@@ -108,13 +126,8 @@ export async function sendTenantPushBroadcast(
     };
   }
 
-  // Segmentación por perfil de cliente
-  let subscriptions = allSubscriptions;
-  if (targetType === "with_orders") {
-    subscriptions = allSubscriptions.filter((s) => Boolean(s.customer_id));
-  } else if (targetType === "without_orders") {
-    subscriptions = allSubscriptions.filter((s) => !s.customer_id);
-  }
+  // Segmentación por perfil de cliente usando helper del plugin
+  const subscriptions = filterPushSubscriptions(allSubscriptions, targetType);
 
   if (subscriptions.length === 0) {
     return {
@@ -194,6 +207,13 @@ export async function sendOrderStatusPushNotification(input: {
   } = input;
 
   try {
+    // 0. Verificar si el tenant tiene activo el módulo de notificaciones push
+    const isModuleActive = await MarketOSRepository.isModuleActiveForTenant(
+      tenantId,
+      "push_notifications"
+    );
+    if (!isModuleActive) return;
+
     const subscriptions = await MarketOSRepository.getPushSubscriptions(tenantId);
     // Filtrar suscriptores asociados al teléfono o ID del cliente
     const targetSubs = subscriptions.filter(
@@ -204,44 +224,13 @@ export async function sendOrderStatusPushNotification(input: {
 
     if (targetSubs.length === 0) return;
 
-    let title = `Actualización de tu Pedido #${orderNumber}`;
-    let body = `El estado de tu pedido ha cambiado a: ${status}.`;
-
-    switch (status) {
-      case "APPROVED":
-      case "PAYMENT_APPROVED":
-        title = `🎉 ¡Pago Aprobado! (${orderNumber})`;
-        body = `Tu comprobante ha sido verificado en ${storeName}. Tu pedido está en preparación.`;
-        break;
-      case "REJECTED":
-        title = `⚠️ Aviso sobre tu pago (${orderNumber})`;
-        body = rejectionReason
-          ? `El pago no pudo verificarse: ${rejectionReason}. Por favor contáctanos.`
-          : `El comprobante de tu pedido no pudo ser validado. Por favor contáctanos.`;
-        break;
-      case "PREPARING":
-        title = `📦 Preparando tu Pedido (${orderNumber})`;
-        body = `Estamos empacando tus productos cuidadosamente en ${storeName}.`;
-        break;
-      case "READY":
-        title = `🛍️ ¡Pedido Listo! (${orderNumber})`;
-        body = `Tu pedido está listo para ser despachado o retirado en tienda.`;
-        break;
-      case "DELIVERING":
-        title = `🛵 ¡Tu pedido va en camino! (${orderNumber})`;
-        body = driverName
-          ? `El repartidor ${driverName} está en ruta hacia tu dirección.`
-          : `El repartidor está en ruta hacia tu dirección de entrega.`;
-        break;
-      case "COMPLETED":
-        title = `✅ ¡Pedido Entregado con Éxito! (${orderNumber})`;
-        body = `Gracias por tu compra en ${storeName}. ¡Esperamos que disfrutes tus productos!`;
-        break;
-      case "CANCELLED":
-        title = `Aviso: Pedido Cancelado (${orderNumber})`;
-        body = `Tu pedido ha sido cancelado en ${storeName}.`;
-        break;
-    }
+    const payload = buildOrderStatusPushPayload({
+      orderNumber,
+      status,
+      storeName,
+      driverName,
+      rejectionReason,
+    });
 
     await Promise.allSettled(
       targetSubs.map((sub) =>
@@ -251,14 +240,7 @@ export async function sendOrderStatusPushNotification(input: {
             p256dh: sub.p256dh,
             auth: sub.auth,
           },
-          {
-            title,
-            body,
-            url: `/?order=${orderNumber}`,
-            icon: "/icon-192.png",
-            badge: "/apple-touch-icon.png",
-            tag: `order-${orderNumber}`,
-          }
+          payload
         )
       )
     );

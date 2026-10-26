@@ -1115,16 +1115,20 @@ export function AdminDashboard({
           },
         ]
       : []),
-    {
-      id: "PUSH",
-      category: "CATALOG",
-      label: "Notificaciones Push",
-      shortLabel: "Push",
-      description: "Difusiones Web Push a móviles",
-      icon: <BellRing className="w-4 h-4 shrink-0" />,
-      badge: "PWA",
-      badgeClassName: "bg-amber-500/10 text-amber-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
-    },
+    ...(activeModuleIds.includes("push_notifications")
+      ? [
+          {
+            id: "PUSH" as const,
+            category: "CATALOG" as const,
+            label: "Notificaciones Push",
+            shortLabel: "Push",
+            description: "Difusiones Web Push a móviles",
+            icon: <BellRing className="w-4 h-4 shrink-0" />,
+            badge: "PWA",
+            badgeClassName: "bg-amber-500/10 text-amber-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+          },
+        ]
+      : []),
     ...(activeModuleIds.includes("storefront_pro")
       ? [
           {
@@ -2632,7 +2636,7 @@ export function AdminDashboard({
         )}
 
         {/* TAB 6: WEB PUSH NOTIFICATIONS BROADCAST HUB */}
-        {activeTab === "PUSH" && (
+        {activeTab === "PUSH" && activeModuleIds.includes("push_notifications") && (
           <PushNotificationsManager
             tenantId={settings.tenant_id}
             settings={settingsState}

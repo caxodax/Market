@@ -36,6 +36,7 @@ import {
   ShoppingBag,
   TrendingUp,
   BookOpen,
+  BellRing,
 } from "lucide-react";
 import { PluginDetailModal } from "./plugin-detail-modal";
 
@@ -376,6 +377,26 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
     targetAudience:
       "Cualquier dueño de tienda que quiera conocer de dónde vienen sus clientes, qué productos ven más y cuál es la efectividad de sus campañas y enlaces.",
     themeColor: "emerald",
+  },
+  {
+    id: "push_notifications",
+    name: "Web Push & Campañas PWA",
+    badge: "v1.0.0 • Notificaciones Móviles",
+    category: "Marketing & Ventas",
+    categoryShort: "Push PWA",
+    description:
+      "Envío de notificaciones push a navegadores y dispositivos móviles (PWA). Permite crear difusiones de promociones segmentadas y despachar alertas automáticas de cambio de estado de pedidos en tiempo real con estándar VAPID.",
+    icon: <BellRing className="w-5 h-5 text-amber-500" />,
+    features: [
+      "Difusiones de Marketing: Campañas masivas con título, texto, enlace y badge",
+      "Segmentación Avanzada: Filtra por todos los clientes, con compras o sin compras",
+      "Alertas de Pedido en Vivo: Notifica al cliente cuando su pago es aprobado, pedido listo o en camino",
+      "Suscripciones PWA Multi-dispositivo: Compatible con Android, iOS (Safari PWA) y Escritorio",
+      "Limpieza Automática: Purga inteligente de suscripciones expiradas (404/410 Gone)",
+    ],
+    targetAudience:
+      "Tiendas que quieren retener clientes, anunciar ofertas directamente a la pantalla de bloqueo y mantener informados a sus compradores sobre el estado de sus pedidos.",
+    themeColor: "amber",
   },
 ];
 

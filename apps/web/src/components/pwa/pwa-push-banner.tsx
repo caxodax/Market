@@ -25,12 +25,14 @@ interface PwaPushBannerProps {
   tenantId: string;
   storeName: string;
   logoUrl?: string | null;
+  isPushEnabled?: boolean;
 }
 
 export function PwaPushBanner({
   tenantId,
   storeName,
   logoUrl,
+  isPushEnabled = true,
 }: PwaPushBannerProps) {
   const [mounted, setMounted] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
@@ -149,8 +151,8 @@ export function PwaPushBanner({
     return null;
   }
 
-  // Si ambos servicios ya están listos (instalada y notificaciones concedidas)
-  if (isInstalled && pushGranted) {
+  // Si ambos servicios ya están listos (instalada y notificaciones concedidas o deshabilitadas por plugin)
+  if (isInstalled && (pushGranted || !isPushEnabled)) {
     return null;
   }
 

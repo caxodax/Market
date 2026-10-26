@@ -261,6 +261,7 @@ export function StorefrontPage({
           tenantId={settings.tenant_id}
           storeName={settings.business_name}
           logoUrl={settings.logo_url}
+          isPushEnabled={activeModuleIds?.includes("push_notifications") ?? false}
         />
       </div>
       </CartProvider>

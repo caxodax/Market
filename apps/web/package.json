@@ -23,6 +23,7 @@
     "@marketos/plugin-storefront-pro": "workspace:*",
     "@marketos/plugin-analytics": "workspace:*",
     "@marketos/plugin-accounting": "workspace:*",
+    "@marketos/plugin-push-notifications": "workspace:*",
 
     "@marketos/types": "workspace:*",
     "@marketos/ui": "workspace:*",
