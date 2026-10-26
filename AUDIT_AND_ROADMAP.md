@@ -111,6 +111,12 @@ flowchart TD
 | **Cupones y Promociones** | **PLUGIN** | `promotions_coupons`: descuentos porcentuales y cupones temporales. |
 | **Storefront Pro** | **PLUGIN** | `storefront_pro`: bloques drag-and-drop, sliders y carruseles publicitarios. |
 | **Modificadores Restaurant** | **PLUGIN** | `food_service`: ingredientes extra, salsas, recetas y comanda a cocina. |
+| **Facturación Fiscal Universal & PAC** | **PLUGIN** | `invoicing`: Facturas, Notas de Crédito/Débito, Guías de Despacho, Libro de Ventas, CxC e imprentas digitales PAC (TFHKA, Novus). |
+| **Compras & Retenciones SPE** | **PLUGIN** | `purchasing_retentions`: Facturas de proveedores, comprobantes de retención IVA (75%/100%), archivo TXT SENIAT y CxP. |
+| **Contabilidad NIIF & PUC** | **PLUGIN** | `accounting`: Plan Único de Cuentas (4 niveles), asientos por partida doble y Balance de Comprobación (Sumas y Saldos). |
+| **Analítica Comercial** | **PLUGIN** | `analytics`: Visitas en tiempo real, atribución de canales (WhatsApp, Instagram) y tasa de conversión. |
+| **Personalización & Cotizador** | **PLUGIN** | `mto_cpq`: Matrices de costeo para fabricación bajo pedido y hojas de taller. |
+| **Retail & Código de Barras** | **PLUGIN** | `barcode_retail`: Lectura EAN-13, balanzas y picking optimizado. |
 | **Web Push Marketing** | **PLUGIN** | Campañas de difusión y notificaciones automáticas de cambio de estado. |
 
 ---
