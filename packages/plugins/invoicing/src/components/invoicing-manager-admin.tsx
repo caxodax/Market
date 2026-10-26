@@ -11,6 +11,7 @@ import type {
 import { formatCurrency } from "@marketos/utils";
 import { PrintableDocumentModal } from "./printable-document-modal";
 import { IssueDocumentModal } from "./issue-document-modal";
+import { SalesBookModal } from "./sales-book-modal";
 import { resolveFiscalAdapter } from "../adapters/fiscal-adapter";
 import {
   Receipt,
@@ -26,6 +27,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ExternalLink,
+  FileSpreadsheet,
 } from "lucide-react";
 
 export interface InvoicingManagerAdminProps {
@@ -58,6 +60,7 @@ export function InvoicingManagerAdmin({
   const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
   const [issueModalType, setIssueModalType] = useState<FiscalDocumentType>("INVOICE");
   const [issueModalInitialOrder, setIssueModalInitialOrder] = useState<Order | null>(null);
+  const [isSalesBookModalOpen, setIsSalesBookModalOpen] = useState(false);
 
   // Sync documents when initialDocuments updates
   React.useEffect(() => {
@@ -192,6 +195,15 @@ export function InvoicingManagerAdmin({
           >
             <RotateCcw className="w-3.5 h-3.5 text-rose-500" />
             <span>Nota de Crédito</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsSalesBookModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-primary/30 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-colors cursor-pointer shadow-xs"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>Libro de Ventas</span>
           </button>
         </div>
       </div>
@@ -395,6 +407,15 @@ export function InvoicingManagerAdmin({
         initialOrder={issueModalInitialOrder}
         existingInvoices={documents.filter((d) => d.document_type === "INVOICE")}
         availableDrivers={availableDrivers}
+      />
+
+      {/* Official Sales Book Modal */}
+      <SalesBookModal
+        isOpen={isSalesBookModalOpen}
+        onClose={() => setIsSalesBookModalOpen(false)}
+        documents={documents}
+        settings={settings}
+        tenantId={tenantId}
       />
     </div>
   );

@@ -11,6 +11,7 @@ import type {
 import { formatCurrency } from "@marketos/utils";
 import { RegisterPurchaseModal } from "./register-purchase-modal";
 import { PrintableRetentionVoucherModal } from "./printable-retention-voucher-modal";
+import { PurchasesBookModal } from "./purchases-book-modal";
 import { resolveRetentionAdapter } from "../adapters/retention-adapter";
 import {
   ShoppingBag,
@@ -73,6 +74,7 @@ export function PurchasingManagerAdmin({
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [viewingVoucher, setViewingVoucher] = useState<RetentionVoucher | null>(null);
   const [isDownloadingTxt, setIsDownloadingTxt] = useState(false);
+  const [isPurchasesBookModalOpen, setIsPurchasesBookModalOpen] = useState(false);
 
   // Sync state if initial props change
   React.useEffect(() => {
@@ -242,6 +244,15 @@ export function PurchasingManagerAdmin({
               </button>
             </div>
           )}
+
+          <button
+            type="button"
+            onClick={() => setIsPurchasesBookModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-purple-500/30 bg-purple-500/5 text-purple-600 dark:text-purple-400 text-xs font-bold hover:bg-purple-500/10 transition-colors cursor-pointer shadow-xs"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>Libro de Compras</span>
+          </button>
 
           <button
             type="button"
@@ -601,6 +612,16 @@ export function PurchasingManagerAdmin({
         isOpen={Boolean(viewingVoucher)}
         onClose={() => setViewingVoucher(null)}
         settings={settings}
+      />
+
+      {/* Official Purchases Book Modal */}
+      <PurchasesBookModal
+        isOpen={isPurchasesBookModalOpen}
+        onClose={() => setIsPurchasesBookModalOpen(false)}
+        invoices={invoices}
+        vouchers={vouchers}
+        settings={settings}
+        tenantId={tenantId}
       />
     </div>
   );

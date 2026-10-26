@@ -832,12 +832,19 @@ flowchart TD
 
 ## 21. Plan de Evolución Fiscal & Tesorería (Prioridades 11, 12 y 13)
 
-### 1. Libros Fiscales Oficiales de Ventas y Compras (Prioridad 11)
-* **Objetivo:** Cumplir con la obligación formal mensual del Código Orgánico Tributario / Ley del IVA (Venezuela: Art. 56 y Providencia 00071 / Chile: RCV del SII) permitiendo exportar en Excel (.xlsx) y PDF el Libro de Ventas y Libro de Compras para el contador.
-* **Ubicación Arquitectónica:**
-  - **Libro de Ventas:** En [`@marketos/plugin-invoicing`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/invoicing) (ya que este plugin posee la colección `fiscal_documents` con facturas, notas de débito y crédito).
-  - **Libro de Compras:** En [`@marketos/plugin-purchasing-retentions`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions) (ya que posee `purchase_invoices` y retenciones de IVA/ISLR).
-  - **Columnas y formatos desacoplados:** Los encabezados y cálculos de alícuotas se delegan a `FiscalAdapterPort` y `RetentionAdapterPort`.
+### 1. Libros Fiscales Oficiales de Ventas y Compras (Prioridad 11 - Completada ✅)
+* **Objetivo:** Cumplir con la obligación formal mensual del Código Orgánico Tributario / Ley del IVA (Venezuela: Art. 56 y Providencia 00071 / Chile: RCV del SII) permitiendo exportar en Excel (.csv con UTF-8 BOM y delimitador estándar `;`) y previsualizar/imprimir en PDF el Libro de Ventas y Libro de Compras para el contador.
+* **Ubicación Arquitectónica e Implementación:**
+  - **Libro de Ventas:** En [`@marketos/plugin-invoicing`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/invoicing)
+    - Servicio: [`sales-book-service.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/invoicing/src/services/sales-book-service.ts) (`buildSalesBook` y `exportSalesBookCsv`).
+    - Modal de visualización interactiva: [`sales-book-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/invoicing/src/components/sales-book-modal.tsx) con selector de período mensual (`YYYY-MM`), conmutador de moneda (Bs / USD), KPIs en tiempo real (Total Ventas, Base Imponible, Débito IVA, Exento, IGTF 3%), tabla paginada con notas de crédito en negativo y botones de descarga a Excel e impresión/PDF.
+  - **Libro de Compras:** En [`@marketos/plugin-purchasing-retentions`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions)
+    - Servicio: [`purchases-book-service.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/services/purchases-book-service.ts) (`buildPurchasesBook` y `exportPurchasesBookCsv`).
+    - Modal interactivo: [`purchases-book-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/components/purchases-book-modal.tsx) con filtro de período, KPIs de Crédito Fiscal IVA, cruce automático con Comprobantes de Retención emitidos (14 dígitos), y exportación instantánea a Excel e impresión/PDF.
+* **Pruebas y Verificación:**
+  - Pruebas automatizadas en ambos plugins aprobadas con 100% de éxito.
+  - 16/16 proyectos con 0 errores de TypeScript (`pnpm check-types`).
+  - Next.js 16.3.8 Turbopack build completado con éxito (`pnpm build`).
 
 ### 2. Retenciones de ISLR (Decreto 1.808)
 * **Objetivo:** Permitir a Sujetos Pasivos Especiales retener Impuesto Sobre la Renta a personas naturales y jurídicas prestadoras de servicios según la tabla de conceptos oficiales (1%, 2%, 3%, 5%) y exportar el archivo XML para el SENIAT.
