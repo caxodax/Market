@@ -109,6 +109,8 @@ export interface TenantBillingSettings {
     token?: string;
     environment?: "SANDBOX" | "PRODUCTION";
   };
+  // Imprenta Digital Autorizada (PAC - Providencia SNAT/00093)
+  pac_config?: import("./invoicing.ts").DigitalPacConfig;
 }
 
 export interface TenantSettings {

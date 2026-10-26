@@ -99,11 +99,51 @@ export interface FiscalDocument {
   amount_due?: number;
   payments?: AccountPaymentRecord[];
 
+  // Imprenta Digital Autorizada (PAC - Providencia SNAT/00093)
+  pac_status?: PacCertificationStatus;
+  pac_certification?: DigitalPacCertification;
+  pac_error_message?: string | null;
+
   // Metadatos y Leyendas Legales
   qr_data?: string | null;
   legal_legend?: string | null;     // Leyenda SENIAT / SII / Comercial
   created_at: string;
   created_by?: string | null;
+}
+
+export type DigitalPacProvider =
+  | "THE_FACTORY_HKA"
+  | "NOVUS"
+  | "UNIDIGITAL"
+  | "PROCERT"
+  | "ABC_DIGITAL"
+  | "MOCK_PAC";
+
+export type PacCertificationStatus =
+  | "NOT_CONFIGURED" // Sin PAC (Forma Libre / Máquina Fiscal / Contingencia)
+  | "PENDING"        // Registrada localmente, pendiente de transmisión al PAC
+  | "CERTIFIED"      // Certificada y sellada con éxito por la Imprenta Digital
+  | "FAILED";        // Error en la transmisión o rechazada por el PAC
+
+export interface DigitalPacCertification {
+  certified_at: string;
+  control_number: string;          // N° de Control asignado por la imprenta digital
+  digital_seal: string;            // Sello digital / Hash criptográfico (SHA-256)
+  qr_url: string;                  // URL oficial de verificación del documento fiscal ante SENIAT / PAC
+  provider: DigitalPacProvider;
+  authorization_number?: string;   // N° de Providencia de la imprenta autorizada
+  pac_invoice_id?: string;         // Identificador interno en la nube del PAC
+}
+
+export interface DigitalPacConfig {
+  enabled: boolean;
+  provider: DigitalPacProvider;
+  api_url?: string;
+  api_key?: string;
+  token?: string;
+  company_rif?: string;
+  environment: "SANDBOX" | "PRODUCTION";
+  auto_transmit?: boolean;         // Transmitir y certificar inmediatamente al emitir
 }
 
 export interface CreateFiscalDocumentInput {
@@ -139,6 +179,9 @@ export interface CreateFiscalDocumentInput {
   apply_igtf?: boolean;
 
   transport_info?: FiscalDocumentTransportInfo;
+
+  // Certificación PAC
+  pac_transmit?: boolean;
 }
 
 /**

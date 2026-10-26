@@ -12,6 +12,14 @@ import {
   recordCustomerPayment,
   addDaysToDate,
 } from "../services/invoicing-service.ts";
+import {
+  buildTheFactoryHkaPayload,
+  buildNovusPayload,
+  generateMockPacCertification,
+  certifyDocumentWithPac,
+  getPacProviderLabel,
+  PAC_PROVIDERS_METADATA,
+} from "../services/digital-pac-service.ts";
 import { INVOICING_MANIFEST } from "../manifest.ts";
 import type { TenantSettings, FiscalDocument } from "@marketos/types";
 
@@ -328,4 +336,94 @@ assert.throws(() => {
 }, /no puede exceder el saldo pendiente/);
 console.log("  ✔ Settling debt transitions status to PAID and protects against overpayment");
 
-console.log("🎉 All 16 @marketos/plugin-invoicing checks passed successfully!");
+// 17. The Factory HKA (TFHKA) Payload Formatting
+const tfhkaPayload = buildTheFactoryHkaPayload(invoiceDoc);
+assert.strictEqual(tfhkaPayload.emisor.rif, "J-12345678-0");
+assert.strictEqual(tfhkaPayload.cliente.tipoIdentificacion, "V");
+assert.strictEqual(tfhkaPayload.cliente.numeroIdentificacion, "18765432");
+assert.strictEqual(tfhkaPayload.documento.tipoDocumento, "01"); // Factura
+assert.strictEqual(tfhkaPayload.totales.baseImponible, 10.0);
+assert.strictEqual(tfhkaPayload.totales.montoIva, 1.6);
+assert.strictEqual(tfhkaPayload.totales.montoTotal, 11.6);
+assert.strictEqual(tfhkaPayload.items.length, 1);
+assert.strictEqual(tfhkaPayload.items[0].descripcion, "Cafe Molido 500g");
+console.log("  ✔ The Factory HKA payload conforms to TFHKA REST specification");
+
+// 18. Novus Payload Formatting
+const novusPayload = buildNovusPayload(invoiceDoc);
+assert.strictEqual(novusPayload.pac_partner, "NOVUS_VE");
+assert.strictEqual(novusPayload.emitter_tax_id, "J-12345678-0");
+assert.strictEqual(novusPayload.receiver_tax_id, "V-18765432");
+assert.strictEqual(novusPayload.breakdown.grand_total, 11.6);
+assert.strictEqual(novusPayload.line_details.length, 1);
+console.log("  ✔ Novus payload adheres to Novus digital invoicing schema");
+
+// 19. Mock PAC Certification Generation
+const mockPacCert = generateMockPacCertification(invoiceDoc, "THE_FACTORY_HKA");
+assert.ok(mockPacCert.control_number.startsWith("00-"));
+assert.strictEqual(mockPacCert.provider, "THE_FACTORY_HKA");
+assert.strictEqual(mockPacCert.authorization_number, PAC_PROVIDERS_METADATA.THE_FACTORY_HKA.resolution);
+assert.strictEqual(mockPacCert.digital_seal.length, 64, "Digital seal must be a 64-char hex hash");
+assert.ok(mockPacCert.qr_url.includes("seniat.gob.ve"));
+console.log("  ✔ generateMockPacCertification creates official-format digital control and SHA seal");
+
+// 20. Async Certify Document with PAC (Sandbox / Mock)
+const certifiedDoc = await certifyDocumentWithPac(invoiceDoc, {
+  enabled: true,
+  provider: "THE_FACTORY_HKA",
+  environment: "SANDBOX",
+});
+assert.strictEqual(certifiedDoc.pac_status, "CERTIFIED");
+assert.ok(certifiedDoc.pac_certification);
+assert.strictEqual(certifiedDoc.pac_certification?.provider, "THE_FACTORY_HKA");
+assert.strictEqual(certifiedDoc.control_number, certifiedDoc.pac_certification?.control_number);
+assert.strictEqual(certifiedDoc.pac_error_message, null);
+console.log("  ✔ certifyDocumentWithPac transitions status to CERTIFIED and sets official control number");
+
+// 21. Graceful error handling on unreachable remote PAC
+const failedDoc = await certifyDocumentWithPac(
+  invoiceDoc,
+  {
+    enabled: true,
+    provider: "THE_FACTORY_HKA",
+    environment: "PRODUCTION",
+    api_url: "http://127.0.0.1:59999/nonexistent-pac-endpoint",
+  },
+  { timeoutMs: 300 }
+);
+assert.strictEqual(failedDoc.pac_status, "FAILED");
+assert.ok(failedDoc.pac_error_message?.includes("Error de conexión"));
+console.log("  ✔ certifyDocumentWithPac handles network failures gracefully without throwing exceptions");
+
+// 22. Auto-Transmit on invoice issuance when PAC is active
+const pacEnabledSettings: TenantSettings = {
+  ...mockSettings,
+  billing_settings: {
+    ...mockSettings.billing_settings,
+    pac_config: {
+      enabled: true,
+      provider: "NOVUS",
+      environment: "SANDBOX",
+      auto_transmit: true,
+    },
+  },
+} as unknown as TenantSettings;
+
+const autoCertifiedInvoice = prepareFiscalDocument({
+  input: {
+    document_type: "INVOICE",
+    customer_name: "Maria Rodriguez",
+    customer_id_doc: "V-20123456",
+    items: [{ name: "Azucar 1Kg", quantity: 3, unit_price: 1.2 }],
+    currency: "USD",
+  },
+  settings: pacEnabledSettings,
+  existingCount: 5,
+  activeModuleIds: ["local_venezuela"],
+});
+assert.strictEqual(autoCertifiedInvoice.pac_status, "CERTIFIED");
+assert.ok(autoCertifiedInvoice.pac_certification);
+assert.strictEqual(autoCertifiedInvoice.pac_certification?.provider, "NOVUS");
+console.log("  ✔ prepareFiscalDocument auto-certifies document when PAC auto-transmit is enabled");
+
+console.log("🎉 All 22 @marketos/plugin-invoicing checks passed successfully!");

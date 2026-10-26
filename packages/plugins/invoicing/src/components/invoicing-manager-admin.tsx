@@ -7,13 +7,16 @@ import type {
   TenantSettings,
   CreateFiscalDocumentInput,
   Order,
+  DigitalPacConfig,
 } from "@marketos/types";
 import { formatCurrency } from "@marketos/utils";
 import { PrintableDocumentModal } from "./printable-document-modal";
 import { IssueDocumentModal } from "./issue-document-modal";
 import { SalesBookModal } from "./sales-book-modal";
+import { PacConfigModal } from "./pac-config-modal";
 import { resolveFiscalAdapter } from "../adapters/fiscal-adapter";
 import { recordCustomerPayment } from "../services/invoicing-service";
+import { certifyDocumentWithPac } from "../services/digital-pac-service";
 import {
   Receipt,
   FileText,
@@ -32,6 +35,8 @@ import {
   CreditCard,
   DollarSign,
   Clock,
+  ShieldCheck,
+  RefreshCw,
   X,
 } from "lucide-react";
 
@@ -43,6 +48,7 @@ export interface InvoicingManagerAdminProps {
   onIssueDocument: (input: CreateFiscalDocumentInput) => Promise<{ success: boolean; error?: string; document?: FiscalDocument }>;
   availableDrivers?: Array<{ id: string; name: string; phone: string; vehicle_plate?: string }>;
   orders?: Order[];
+  onUpdatePacConfig?: (config: DigitalPacConfig) => Promise<void> | void;
 }
 
 export function InvoicingManagerAdmin({
@@ -53,6 +59,7 @@ export function InvoicingManagerAdmin({
   onIssueDocument,
   availableDrivers = [],
   orders = [],
+  onUpdatePacConfig,
 }: InvoicingManagerAdminProps) {
   const adapter = resolveFiscalAdapter(undefined, activeModuleIds);
 
@@ -61,6 +68,13 @@ export function InvoicingManagerAdmin({
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("ALL");
   const [cxcStatusFilter, setCxcStatusFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // PAC State
+  const [isPacConfigModalOpen, setIsPacConfigModalOpen] = useState(false);
+  const [pacConfig, setPacConfig] = useState<DigitalPacConfig | undefined>(
+    settings.billing_settings?.pac_config
+  );
+  const [certifyingId, setCertifyingId] = useState<string | null>(null);
 
   // Modals state
   const [viewingDoc, setViewingDoc] = useState<FiscalDocument | null>(null);
@@ -77,6 +91,21 @@ export function InvoicingManagerAdmin({
   const [paymentReference, setPaymentReference] = useState<string>("");
   const [paymentNotes, setPaymentNotes] = useState<string>("");
   const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  const handleCertifyDocument = async (doc: FiscalDocument) => {
+    setCertifyingId(doc.id);
+    try {
+      const effectiveConfig: DigitalPacConfig = pacConfig || {
+        enabled: true,
+        provider: "MOCK_PAC",
+        environment: "SANDBOX",
+      };
+      const updated = await certifyDocumentWithPac(doc, effectiveConfig);
+      setDocuments((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+    } finally {
+      setCertifyingId(null);
+    }
+  };
 
   // Sync documents when initialDocuments updates
   React.useEffect(() => {
@@ -315,6 +344,19 @@ export function InvoicingManagerAdmin({
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>Libro de Ventas</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setIsPacConfigModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-500/10 transition-colors cursor-pointer shadow-xs"
+            title="Configurar conexión con Imprentas Digitales Autorizadas (PAC: The Factory HKA, Novus, etc.)"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Imprenta Digital (PAC)</span>
+            {pacConfig?.enabled && (
+              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
+            )}
+          </button>
         </div>
       </div>
 
@@ -449,6 +491,7 @@ export function InvoicingManagerAdmin({
                     <th className="p-3">Tipo</th>
                     <th className="p-3">Nº Documento</th>
                     <th className="p-3">Nº Control</th>
+                    <th className="p-3">Estado PAC</th>
                     <th className="p-3">Fecha</th>
                     <th className="p-3">Cliente / Receptor</th>
                     <th className="p-3">Afecta Factura</th>
@@ -459,7 +502,7 @@ export function InvoicingManagerAdmin({
                 <tbody className="divide-y divide-border/60">
                   {filteredDocuments.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-muted-foreground space-y-2">
+                      <td colSpan={9} className="p-8 text-center text-muted-foreground space-y-2">
                         <FileText className="w-8 h-8 mx-auto opacity-30" />
                         <p className="font-semibold text-xs">No se encontraron documentos fiscales emitidos</p>
                         <p className="text-[11px] text-muted-foreground/80">
@@ -479,6 +522,54 @@ export function InvoicingManagerAdmin({
                           </td>
                           <td className="p-3 font-mono font-bold text-foreground">{doc.document_number}</td>
                           <td className="p-3 font-mono text-muted-foreground">{doc.control_number || "—"}</td>
+                          <td className="p-3 whitespace-nowrap">
+                            {doc.pac_status === "CERTIFIED" ? (
+                              <span
+                                className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                                title={`Certificada por ${doc.pac_certification?.provider || "PAC"}. Sello: ${doc.pac_certification?.digital_seal ? doc.pac_certification.digital_seal.substring(0, 16) + "..." : "OK"}`}
+                              >
+                                <ShieldCheck className="w-3 h-3" />
+                                <span>Certificada</span>
+                              </span>
+                            ) : doc.pac_status === "PENDING" ? (
+                              <div className="inline-flex items-center gap-1">
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                                  Pendiente
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCertifyDocument(doc)}
+                                  disabled={certifyingId === doc.id}
+                                  className="px-1.5 py-0.5 text-[9px] font-bold rounded-md bg-amber-500 text-white hover:bg-amber-600 transition-colors cursor-pointer disabled:opacity-50"
+                                  title="Transmitir y certificar documento ante el PAC"
+                                >
+                                  {certifyingId === doc.id ? "..." : "Timbrar"}
+                                </button>
+                              </div>
+                            ) : doc.pac_status === "FAILED" ? (
+                              <div className="inline-flex items-center gap-1">
+                                <span
+                                  className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-600 border border-rose-500/20"
+                                  title={doc.pac_error_message || "Error al transmitir al PAC"}
+                                >
+                                  Fallo
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCertifyDocument(doc)}
+                                  disabled={certifyingId === doc.id}
+                                  className="px-1.5 py-0.5 text-[9px] font-bold rounded-md bg-rose-500 text-white hover:bg-rose-600 transition-colors cursor-pointer disabled:opacity-50"
+                                  title="Reintentar transmisión"
+                                >
+                                  {certifyingId === doc.id ? "..." : "Reintentar"}
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground font-medium">
+                                Forma Libre
+                              </span>
+                            )}
+                          </td>
                           <td className="p-3 text-muted-foreground whitespace-nowrap">
                             {new Date(doc.created_at).toLocaleDateString("es-ES")}
                           </td>
@@ -923,6 +1014,19 @@ export function InvoicingManagerAdmin({
         documents={documents}
         settings={settings}
         tenantId={tenantId}
+      />
+
+      {/* Authorized Digital Printer (PAC) Settings Modal */}
+      <PacConfigModal
+        isOpen={isPacConfigModalOpen}
+        onClose={() => setIsPacConfigModalOpen(false)}
+        config={pacConfig}
+        onSaveConfig={(cfg) => {
+          setPacConfig(cfg);
+          if (onUpdatePacConfig) {
+            onUpdatePacConfig(cfg);
+          }
+        }}
       />
     </div>
   );

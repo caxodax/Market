@@ -8,6 +8,7 @@ import type {
   TenantSettings,
 } from "@marketos/types";
 import { resolveFiscalAdapter } from "../adapters/fiscal-adapter.ts";
+import { generateMockPacCertification } from "./digital-pac-service.ts";
 
 export interface PrepareFiscalDocumentOptions {
   input: CreateFiscalDocumentInput;
@@ -164,6 +165,48 @@ export function prepareFiscalDocument(
     amount_paid: amountPaid,
     amount_due: amountDue,
     payments: [],
+
+    // Imprenta Digital Autorizada (PAC - Providencia SNAT/00093)
+    pac_status: settings.billing_settings?.pac_config?.enabled
+      ? (settings.billing_settings.pac_config.auto_transmit || input.pac_transmit ? "CERTIFIED" : "PENDING")
+      : "NOT_CONFIGURED",
+    pac_certification:
+      settings.billing_settings?.pac_config?.enabled &&
+      (settings.billing_settings.pac_config.auto_transmit || input.pac_transmit) &&
+      (settings.billing_settings.pac_config.provider === "MOCK_PAC" ||
+        settings.billing_settings.pac_config.environment === "SANDBOX")
+        ? generateMockPacCertification(
+            {
+              id: `fdoc_${Date.now()}`,
+              tenant_id: settings.tenant_id,
+              document_type: input.document_type,
+              document_number: documentNumber,
+              control_number: controlNumber,
+              status: "ISSUED",
+              customer_name: input.customer_name,
+              customer_id_doc: input.customer_id_doc,
+              emitter_business_name:
+                settings.billing_settings?.emitter_fiscal_data?.business_name ||
+                settings.business_name,
+              emitter_id_doc:
+                settings.billing_settings?.emitter_fiscal_data?.rif ||
+                "J-00000000-0",
+              emitter_address:
+                settings.billing_settings?.emitter_fiscal_data?.fiscal_address ||
+                settings.address ||
+                "Sede Principal",
+              items,
+              subtotal_exempt: breakdown.subtotalExempt,
+              subtotal_taxable: breakdown.subtotalTaxable,
+              iva_rate_percent: breakdown.ivaRatePercent,
+              iva_amount: breakdown.ivaAmount,
+              total_amount: breakdown.total,
+              currency: input.currency || "USD",
+              created_at: now,
+            } as FiscalDocument,
+            settings.billing_settings.pac_config.provider
+          )
+        : undefined,
 
     created_at: now,
     created_by: actorName || "Admin",

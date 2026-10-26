@@ -269,8 +269,49 @@ export function PrintableDocumentModal({
                         <QrCode className="w-12 h-12 text-black" />
                       </div>
                       <span className="text-[10px] text-muted-foreground font-mono">
-                        Validación y Timbrado Digital CUV MarketOS
+                        {doc.pac_certification
+                          ? "Certificación Fiscal SENIAT / Imprenta Digital Autorizada"
+                          : "Validación y Timbrado Digital CUV MarketOS"}
                       </span>
+                    </div>
+                  )}
+
+                  {doc.pac_certification && (
+                    <div className="mt-3 p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-emerald-600 font-bold text-[11px]">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>EMISIÓN DIGITAL CERTIFICADA (Providencia SNAT/00093)</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-[10px] text-muted-foreground font-mono">
+                        <div>
+                          <span className="text-foreground font-semibold">Imprenta Digital:</span> {doc.pac_certification.provider}
+                        </div>
+                        <div>
+                          <span className="text-foreground font-semibold">Autorización:</span> {doc.pac_certification.authorization_number || "SNAT/00093"}
+                        </div>
+                        <div>
+                          <span className="text-foreground font-semibold">Nº Control:</span> {doc.pac_certification.control_number}
+                        </div>
+                        <div>
+                          <span className="text-foreground font-semibold">Fecha Timbrado:</span> {new Date(doc.pac_certification.certified_at).toLocaleString("es-ES")}
+                        </div>
+                      </div>
+                      <div className="pt-1 border-t border-emerald-500/20 text-[9px] font-mono text-muted-foreground break-all">
+                        <span className="text-foreground font-semibold">Sello Digital:</span> {doc.pac_certification.digital_seal}
+                      </div>
+                      {doc.pac_certification.qr_url && (
+                        <div className="pt-0.5 text-[9px] text-emerald-600 truncate">
+                          <span>Verificación SENIAT: </span>
+                          <a
+                            href={doc.pac_certification.qr_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline font-mono"
+                          >
+                            {doc.pac_certification.qr_url}
+                          </a>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -429,6 +470,17 @@ export function PrintableDocumentModal({
                   </div>
                 )}
               </div>
+
+              {/* PAC Digital Thermal Stamp */}
+              {doc.pac_certification && (
+                <div className="text-[9px] text-center pt-2 pb-1 border-t border-dashed border-black space-y-0.5">
+                  <p className="font-bold">*** EMISIÓN DIGITAL CERTIFICADA ***</p>
+                  <p>PAC: {doc.pac_certification.provider}</p>
+                  <p>CTRL: {doc.pac_certification.control_number}</p>
+                  <p className="break-all font-mono">SELLO: {doc.pac_certification.digital_seal.substring(0, 24)}...</p>
+                  <p>AUT: {doc.pac_certification.authorization_number || "SNAT/00093"}</p>
+                </div>
+              )}
 
               {/* Thermal Footer */}
               <div className="text-center text-[9px] text-neutral-600 pt-1 space-y-1">

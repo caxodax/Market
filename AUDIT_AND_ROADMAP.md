@@ -908,9 +908,35 @@ flowchart TD
      - 16 de 16 proyectos limpios en TypeScript (`pnpm check-types`).
      - Build de producción Turbopack 100% exitoso (`pnpm build`).
 
-### 4. Integración con Imprentas Digitales Autorizadas (PACs: The Factory HKA / Novus) (Prioridad 13)
-* **Objetivo:** Cumplimiento de la Providencia SNAT/00093 (G.O. N° 43.484) antes del 18 de abril de 2027 (muerte definitiva de la Forma Libre física).
-* **Ubicación Arquitectónica:** Implementación de un proveedor digital dentro de `FiscalAdapterPort` que consume los endpoints REST/JSON del PAC.
+### 4. Integración con Imprentas Digitales Autorizadas (PACs: The Factory HKA / Novus) (Prioridad 13 - Completada ✅)
+* **Objetivo:** Cumplir con la Providencia SNAT/00093 (G.O. N° 43.484) antes de su entrada en vigencia definitiva el **18 de abril de 2027** (sustitución obligatoria de Forma Libre y talonarios manuales por Imprentas Digitales Autorizadas o Máquinas Fiscales).
+* **Ubicación Arquitectónica e Implementación:** Dentro de [`@marketos/plugin-invoicing`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/invoicing) y [`@marketos/types`](file:///home/lmontes/Documentos/Telegram/Market/packages/types).
+* **Entregables Implementados:**
+  1. **Tipos de Dominio y Contratos Tipados (`@marketos/types`):**
+     - `DigitalPacProvider`: `"THE_FACTORY_HKA" | "NOVUS" | "UNIDIGITAL" | "PROCERT" | "ABC_DIGITAL" | "MOCK_PAC"`.
+     - `PacCertificationStatus`: `"NOT_CONFIGURED" | "PENDING" | "CERTIFIED" | "FAILED"`.
+     - `DigitalPacCertification`: metadatos devueltos por el PAC (N° de Control asignado, Sello Digital Hash SHA-256 de 64 caracteres, URL de verificación SENIAT con QR, providencia del PAC y timestamp).
+     - `DigitalPacConfig`: credenciales por comercio (`enabled`, `provider`, `api_url`, `api_key`, `token`, `environment: SANDBOX | PRODUCTION`, `auto_transmit`).
+     - Integración en `FiscalDocument`: `pac_status`, `pac_certification`, `pac_error_message`.
+     - Integración en `TenantBillingSettings`: `pac_config`.
+  2. **Motor de Certificación y Servicio PAC (`digital-pac-service.ts`):**
+     - Formateador de esquemas REST para **The Factory HKA (TFHKA)**: `buildTheFactoryHkaPayload` (mapeo canónico de emisor, receptor, documento, desglose de bases y alícuotas, ítems).
+     - Formateador para **Novus Facturación Digital**: `buildNovusPayload`.
+     - Generador determinista de certificación para entorno Sandbox/Mock (`generateMockPacCertification`): genera correlativo oficial de control SENIAT (`00-XXXXXX`), sello digital SHA-256 de 64 caracteres y URL oficial de consulta tributaria sin dependencias externas (Ponytail).
+     - Motor de transmisión resiliente (`certifyDocumentWithPac`): llamadas HTTP REST seguras con timeout vía `AbortController`, protección total contra caídas de red (cambia estado a `FAILED` con mensaje descriptivo sin interrumpir la operación del comercio).
+  3. **Certificación Reactiva en Emisión (`invoicing-service.ts`):**
+     - `prepareFiscalDocument` inicializa automáticamente el estado `pac_status` según la configuración del comercio y auto-certifica documentos cuando `auto_transmit` o `pac_transmit` está activo.
+  4. **Plantilla Imprimible con Sello y Verificación Fiscal (`printable-document-modal.tsx`):**
+     - **Formato Carta / A4:** Bloque oficial de certificación fiscal digital con sello de seguridad, proveedor PAC, resolución SENIAT (SNAT/00093), N° de Control asignado, Sello Digital Hash y enlace oficial a la URL de validación.
+     - **Formato Ticket Térmico 80mm:** Leyenda compacta de emisión digital certificada con PAC emisor, N° Control, hash abreviado y resolución.
+  5. **Consola Administrativa de Facturación (`invoicing-manager-admin.tsx` y `pac-config-modal.tsx`):**
+     - **Nueva columna en la tabla de facturación:** Badge interactivo de "Certificada PAC" (verde), "Pendiente" (ámbar con botón de timbrado inmediato), "Fallo" (rojo con botón de reintento) y "Forma Libre" (neutro).
+     - **Modal de Configuración PAC (`pac-config-modal.tsx`):** Selector de imprenta digital autorizada, conmutador de entorno (Sandbox vs Producción), campos para credenciales y API token, interruptor de auto-timbrado y botón para probar conectividad en vivo.
+* **Verificación y Pruebas Unitarias:**
+  - Suite de pruebas de facturación ampliada a 22 checks en [`run-checks.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/invoicing/src/__tests__/run-checks.ts): validación de payloads TFHKA y Novus, certificación Mock PAC, transmisión asíncrona, manejo de errores de red y auto-timbrado en emisión.
+  - 13/13 suites de pruebas exitosas en el monorepo (`pnpm test`).
+  - 16/16 proyectos con 0 errores TypeScript (`pnpm check-types`).
+  - Compilación de producción Next.js 16.3.8 Turbopack completada con éxito (`pnpm build`).
 
 ---
 
