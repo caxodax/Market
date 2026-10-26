@@ -846,9 +846,38 @@ flowchart TD
   - 16/16 proyectos con 0 errores de TypeScript (`pnpm check-types`).
   - Next.js 16.3.8 Turbopack build completado con éxito (`pnpm build`).
 
-### 2. Retenciones de ISLR (Decreto 1.808)
-* **Objetivo:** Permitir a Sujetos Pasivos Especiales retener Impuesto Sobre la Renta a personas naturales y jurídicas prestadoras de servicios según la tabla de conceptos oficiales (1%, 2%, 3%, 5%) y exportar el archivo XML para el SENIAT.
-* **Ubicación Arquitectónica:** Dentro de [`@marketos/plugin-purchasing-retentions`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions).
+### 2. Retenciones de ISLR (Decreto 1.808) + Generador Oficial de XML para el SENIAT (Completada ✅)
+* **Objetivo:** Permitir a Sujetos Pasivos Especiales retener Impuesto Sobre la Renta (ISLR) a personas naturales y jurídicas prestadoras de servicios según la tabla de conceptos oficiales del Decreto N° 1.808 (1%, 2%, 3%, 5%), generar comprobantes de retención legales independientes y exportar el archivo XML oficial para declaración en el portal fiscal del SENIAT.
+* **Ubicación Arquitectónica e Implementación:** Dentro de [`@marketos/plugin-purchasing-retentions`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions) y [`@marketos/types`](file:///home/lmontes/Documentos/Telegram/Market/packages/types).
+* **Entregables Implementados:**
+  1. **Tabla de Conceptos Oficiales (`OFFICIAL_ISLR_CONCEPTS`):** En [`packages/plugins/purchasing-retentions/src/constants/islr-concepts.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/constants/islr-concepts.ts) y [`packages/types/src/purchasing.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/types/src/purchasing.ts):
+     - `001`: Honorarios Profesionales PN Residentes (3%)
+     - `002`: Honorarios Profesionales PJ Domiciliadas (5%)
+     - `003`: Comisiones Mercantiles PN (3%)
+     - `004`: Comisiones Mercantiles PJ (5%)
+     - `055`: Ejecución de Obras y Prestación de Servicios PJ (2%)
+     - `056`: Ejecución de Obras y Prestación de Servicios PN (1%)
+     - `053`: Fletes y Transporte Terrestre Nacional (3%)
+     - `027`: Arrendamiento de Inmuebles PJ (5%)
+     - `028`: Publicidad y Propaganda Comercial PJ (5%)
+  2. **Motor de Cálculo y Doble Retención Simultánea:** En [`purchasing-service.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/services/purchasing-service.ts):
+     - Soporte para emitir factura con retención de IVA (Providencia 0049: 75%/100% sobre IVA) y retención de ISLR (Decreto 1.808: % sobre base imponible) simultáneamente.
+     - Cálculo exacto de monto neto a pagar al proveedor: $\text{Neto} = \text{Total Factura} - \text{Retención IVA} - \text{Retención ISLR}$.
+     - Generación coordinada de vouchers con correlativos correlativos independientes (`20261000000001` para IVA, `20261000000002` para ISLR).
+  3. **Generador Oficial de XML para el SENIAT:** Funciones `buildSeniatIslrXml` y `buildSeniatIslrXmlFromInvoices` en [`purchasing-service.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/services/purchasing-service.ts) conformes a la especificación DTD del portal fiscal:
+     - Header estándar `<?xml version="1.0" encoding="ISO-8859-1"?>`.
+     - Elemento raíz `<RelacionRetencionesISLR RifAgente="..." Periodo="...">`.
+     - Elementos hijos `<DetalleRetencion>` conteniendo `<RifRetenido>`, `<NumeroFactura>`, `<NumeroControl>`, `<FechaOperacion>` (`DD/MM/YYYY`), `<CodigoConcepto>`, `<MontoOperacion>` y `<PorcentajeRetencion>`.
+     - Escapado XML RFC-compliant nativo sin dependencias externas (Ponytail).
+  4. **Experiencia de Usuario e Integración UI:**
+     - [`register-purchase-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/components/register-purchase-modal.tsx): Interruptor para retención ISLR, selector de concepto oficial con autocompletado de alícuota y desglose interactivo del monto neto a pagar.
+     - [`printable-retention-voucher-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/components/printable-retention-voucher-modal.tsx): Plantilla imprimible adaptable según `voucher_type`: renderiza comprobante oficial de IVA o comprobante oficial de ISLR con mención expresa al Decreto N° 1.808, concepto aplicado y base imponible.
+     - [`purchasing-manager-admin.tsx`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/components/purchasing-manager-admin.tsx): Botón de descarga de "XML ISLR" junto al "TXT IVA", KPI de ISLR Retenido, filtro por tipo de comprobante (Todos / IVA / ISLR) y badges coloreados (`ISLR` en índigo, `IVA` en morado).
+  5. **Verificación y Pruebas:**
+     - Suite de pruebas de retenciones ampliada en [`packages/plugins/purchasing-retentions/src/__tests__/run-checks.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/__tests__/run-checks.ts) cubriendo cálculo dual, generación XML y conversión a VES.
+     - 13/13 suites aprobadas (`pnpm test`).
+     - 16/16 proyectos con 0 errores TypeScript (`pnpm check-types`).
+     - Compilación de producción exitosa en Turbopack (`pnpm build`).
 
 ### 3. Módulo Simple de Cuentas por Cobrar (CxC) y Cuentas por Pagar (CxP) (Prioridad 12)
 * **Objetivo:** Gestión de ventas a crédito a clientes y compras a crédito con proveedores:

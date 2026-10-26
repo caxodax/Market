@@ -214,6 +214,112 @@ console.log("  Testing buildSeniatRetentionTxt...");
   assert.ok(lines[1].includes("J222222222\t002"));
 }
 
+// ─── 5.1. ISLR RETENTIONS (DECRETO 1.808) & SENIAT XML GENERATOR ────────────
+console.log("  Testing ISLR retentions (Decreto 1.808) and SENIAT XML generator...");
+{
+  const { buildSeniatIslrXml, buildSeniatIslrXmlFromInvoices } = await import(
+    "../services/purchasing-service.ts"
+  );
+  const { OFFICIAL_ISLR_CONCEPTS } = await import("../constants/islr-concepts.ts");
+
+  assert.ok(OFFICIAL_ISLR_CONCEPTS.length >= 8, "Must declare standard Decreto 1.808 concepts");
+  const concept055 = OFFICIAL_ISLR_CONCEPTS.find((c) => c.code === "055");
+  assert.equal(concept055?.default_rate_percent, 2, "Concept 055 rate must be 2%");
+
+  // Test purchase invoice with simultaneous VAT + ISLR retentions
+  const inputDual: CreatePurchaseInvoiceInput = {
+    supplier_name: "Constructora & Mantenimiento Alpha C.A.",
+    supplier_tax_id: "J-40999888-7",
+    invoice_number: "FAC-0050",
+    control_number: "00-001234",
+    invoice_date: "2026-10-20",
+    currency: "USD",
+    exchange_rate_applied: 50.0,
+    items: [
+      { name: "Mantenimiento General de Servidores", quantity: 1, unit_price: 1000.0, is_exempt: false },
+    ],
+    auto_generate_retention: true,
+    retention_rate_percent: 75.0,
+    apply_islr_retention: true,
+    islr_concept_code: "055", // 2%
+  };
+
+  const { invoice, retentionVoucher, islrRetentionVoucher } = preparePurchaseInvoice({
+    input: inputDual,
+    settings: mockSettings,
+    existingCount: 0,
+    activeModuleIds: ["local_venezuela"],
+    actorName: "Contador Fiscal",
+    defaultIvaRate: 16.0,
+  });
+
+  assert.equal(invoice.subtotal_taxable, 1000.0);
+  assert.equal(invoice.iva_amount, 160.0); // 16% de 1000
+  assert.equal(invoice.total_amount, 1160.0);
+  assert.equal(invoice.retained_vat_amount, 120.0); // 75% de 160
+  assert.equal(invoice.retained_islr_amount, 20.0); // 2% de 1000 base
+  assert.equal(invoice.islr_concept_code, "055");
+  assert.equal(invoice.islr_retention_rate_percent, 2);
+
+  // Check VAT voucher
+  assert.ok(retentionVoucher);
+  assert.equal(retentionVoucher?.voucher_type, "VAT");
+  assert.equal(retentionVoucher?.voucher_number, "20261000000001");
+  assert.equal(retentionVoucher?.retained_amount, 120.0);
+
+  // Check ISLR voucher
+  assert.ok(islrRetentionVoucher, "ISLR voucher must be generated when apply_islr_retention is true");
+  assert.equal(islrRetentionVoucher?.voucher_type, "INCOME_TAX");
+  assert.equal(islrRetentionVoucher?.voucher_number, "20261000000002");
+  assert.equal(islrRetentionVoucher?.retained_amount, 20.0);
+  assert.equal(islrRetentionVoucher?.retained_amount_ves, 1000.0); // 20 * 50
+  assert.equal(islrRetentionVoucher?.islr_concept_code, "055");
+  assert.ok(islrRetentionVoucher?.legal_legend?.includes("Decreto N° 1.808"));
+
+  // Test direct XML generation with SeniatIslrXmlRow
+  const xmlOutput = buildSeniatIslrXml({
+    agentRif: "J-30987654-1",
+    taxPeriod: "202610",
+    rows: [
+      {
+        rifRetenido: "J-40999888-7",
+        numeroFactura: "FAC-0050",
+        numeroControl: "00-001234",
+        fechaOperacion: "2026-10-20",
+        codigoConcepto: "055",
+        montoOperacion: 50000.0, // 1000 USD * 50 Bs/$
+        porcentajeRetencion: 2.0,
+      },
+    ],
+  });
+
+  assert.ok(xmlOutput.startsWith('<?xml version="1.0" encoding="ISO-8859-1"?>'), "Must contain SENIAT XML header");
+  assert.ok(xmlOutput.includes('<RelacionRetencionesISLR RifAgente="J309876541" Periodo="202610">'));
+  assert.ok(xmlOutput.includes("<DetalleRetencion>"));
+  assert.ok(xmlOutput.includes("<RifRetenido>J409998887</RifRetenido>"));
+  assert.ok(xmlOutput.includes("<NumeroFactura>FAC-0050</NumeroFactura>"));
+  assert.ok(xmlOutput.includes("<NumeroControl>00-001234</NumeroControl>"));
+  assert.ok(xmlOutput.includes("<FechaOperacion>20/10/2026</FechaOperacion>"), "Must format date to DD/MM/YYYY");
+  assert.ok(xmlOutput.includes("<CodigoConcepto>055</CodigoConcepto>"));
+  assert.ok(xmlOutput.includes("<MontoOperacion>50000.00</MontoOperacion>"));
+  assert.ok(xmlOutput.includes("<PorcentajeRetencion>2.00</PorcentajeRetencion>"));
+  assert.ok(xmlOutput.includes("</DetalleRetencion>"));
+  assert.ok(xmlOutput.includes("</RelacionRetencionesISLR>"));
+
+  // Test buildSeniatIslrXmlFromInvoices
+  const invoicesList: import("@marketos/types").PurchaseInvoice[] = [invoice];
+  const xmlFromInvoices = buildSeniatIslrXmlFromInvoices({
+    agentRif: "J-30987654-1",
+    taxPeriod: "202610",
+    invoices: invoicesList,
+  });
+
+  assert.ok(xmlFromInvoices.includes('<RelacionRetencionesISLR RifAgente="J309876541" Periodo="202610">'));
+  assert.ok(xmlFromInvoices.includes("<RifRetenido>J409998887</RifRetenido>"));
+  assert.ok(xmlFromInvoices.includes("<MontoOperacion>50000.00</MontoOperacion>"), "Must convert to VES taxable base");
+}
+
+
 // ─── 6. PURCHASES BOOK TESTS ────────────────────────────────────────────────
 console.log("  Testing buildPurchasesBook & exportPurchasesBookCsv...");
 {

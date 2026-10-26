@@ -76,10 +76,18 @@ export function PrintableRetentionVoucherModal({
             {/* Header: Title and Legal reference */}
             <div className="text-center pb-4 border-b border-neutral-400">
               <h1 className="text-base font-black uppercase tracking-wider text-neutral-900">
-                COMPROBANTE DE RETENCIÓN DEL IMPUESTO AL VALOR AGREGADO (IVA)
+                {voucher.voucher_type === "INCOME_TAX"
+                  ? "COMPROBANTE DE RETENCIÓN DEL IMPUESTO SOBRE LA RENTA (ISLR)"
+                  : voucher.voucher_type === "CHILE_DTE_46"
+                  ? "FACTURA DE COMPRA DTE-46 (CAMBIO DE SUJETO SII)"
+                  : "COMPROBANTE DE RETENCIÓN DEL IMPUESTO AL VALOR AGREGADO (IVA)"}
               </h1>
               <p className="text-[11px] text-neutral-600 mt-1">
-                Ley del IVA - Artículo 11 / Providencia Administrativa SNAT/2015/0049
+                {voucher.voucher_type === "INCOME_TAX"
+                  ? "Ley de ISLR / Reglamento Parcial en Materia de Retenciones (Decreto N° 1.808)"
+                  : voucher.voucher_type === "CHILE_DTE_46"
+                  ? "D.L. 825 Ley sobre Impuesto a las Ventas y Servicios / Res. Ex. SII"
+                  : "Ley del IVA - Artículo 11 / Providencia Administrativa SNAT/2015/0049"}
               </p>
               <div className="inline-block mt-2 px-3 py-1 bg-neutral-100 border border-neutral-400 rounded-md font-mono font-bold text-xs">
                 N° DE COMPROBANTE: {voucher.voucher_number}
@@ -137,10 +145,20 @@ export function PrintableRetentionVoucherModal({
                     <th className="p-2 border-r border-neutral-300">N° Control</th>
                     <th className="p-2 border-r border-neutral-300 text-right">Total Factura</th>
                     <th className="p-2 border-r border-neutral-300 text-right">Base Imponible</th>
-                    <th className="p-2 border-r border-neutral-300 text-right">% Alíc.</th>
-                    <th className="p-2 border-r border-neutral-300 text-right">Impuesto IVA</th>
-                    <th className="p-2 border-r border-neutral-300 text-right">% Ret.</th>
-                    <th className="p-2 text-right bg-purple-50 text-purple-900 font-black">IVA Retenido</th>
+                    {voucher.voucher_type === "INCOME_TAX" ? (
+                      <>
+                        <th className="p-2 border-r border-neutral-300">Concepto ISLR</th>
+                        <th className="p-2 border-r border-neutral-300 text-right">% Ret.</th>
+                        <th className="p-2 text-right bg-indigo-50 text-indigo-900 font-black">ISLR Retenido</th>
+                      </>
+                    ) : (
+                      <>
+                        <th className="p-2 border-r border-neutral-300 text-right">% Alíc.</th>
+                        <th className="p-2 border-r border-neutral-300 text-right">Impuesto IVA</th>
+                        <th className="p-2 border-r border-neutral-300 text-right">% Ret.</th>
+                        <th className="p-2 text-right bg-purple-50 text-purple-900 font-black">IVA Retenido</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -154,14 +172,29 @@ export function PrintableRetentionVoucherModal({
                     <td className="p-2 border-r border-neutral-200 text-right font-mono">
                       {formatCurrency(voucher.taxable_base_amount, voucher.currency === "VES" ? "USD" : voucher.currency)}
                     </td>
-                    <td className="p-2 border-r border-neutral-200 text-right">{voucher.iva_rate_percent}%</td>
-                    <td className="p-2 border-r border-neutral-200 text-right font-mono">
-                      {formatCurrency(voucher.iva_total_amount, voucher.currency === "VES" ? "USD" : voucher.currency)}
-                    </td>
-                    <td className="p-2 border-r border-neutral-200 text-right font-bold">{voucher.retention_rate_percent}%</td>
-                    <td className="p-2 text-right font-mono font-black text-purple-900 bg-purple-50">
-                      {formatCurrency(voucher.retained_amount, voucher.currency === "VES" ? "USD" : voucher.currency)}
-                    </td>
+                    {voucher.voucher_type === "INCOME_TAX" ? (
+                      <>
+                        <td className="p-2 border-r border-neutral-200 text-[10px]">
+                          {voucher.islr_concept_code ? `[${voucher.islr_concept_code}] ` : ""}
+                          {voucher.islr_concept_name || "Servicios y Obras"}
+                        </td>
+                        <td className="p-2 border-r border-neutral-200 text-right font-bold">{voucher.retention_rate_percent}%</td>
+                        <td className="p-2 text-right font-mono font-black text-indigo-900 bg-indigo-50">
+                          {formatCurrency(voucher.retained_amount, voucher.currency === "VES" ? "USD" : voucher.currency)}
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="p-2 border-r border-neutral-200 text-right">{voucher.iva_rate_percent}%</td>
+                        <td className="p-2 border-r border-neutral-200 text-right font-mono">
+                          {formatCurrency(voucher.iva_total_amount, voucher.currency === "VES" ? "USD" : voucher.currency)}
+                        </td>
+                        <td className="p-2 border-r border-neutral-200 text-right font-bold">{voucher.retention_rate_percent}%</td>
+                        <td className="p-2 text-right font-mono font-black text-purple-900 bg-purple-50">
+                          {formatCurrency(voucher.retained_amount, voucher.currency === "VES" ? "USD" : voucher.currency)}
+                        </td>
+                      </>
+                    )}
                   </tr>
 
                   {/* Equivalent in Bolívares if exchange rate applies */}
@@ -176,14 +209,26 @@ export function PrintableRetentionVoucherModal({
                       <td className="p-2 border-r border-neutral-200 text-right">
                         Bs. {(voucher.taxable_base_amount * voucher.exchange_rate_applied).toFixed(2)}
                       </td>
-                      <td className="p-2 border-r border-neutral-200 text-right">-</td>
-                      <td className="p-2 border-r border-neutral-200 text-right">
-                        Bs. {(voucher.iva_total_amount * voucher.exchange_rate_applied).toFixed(2)}
-                      </td>
-                      <td className="p-2 border-r border-neutral-200 text-right">-</td>
-                      <td className="p-2 text-right font-bold text-neutral-900">
-                        Bs. {voucher.retained_amount_ves.toFixed(2)}
-                      </td>
+                      {voucher.voucher_type === "INCOME_TAX" ? (
+                        <>
+                          <td className="p-2 border-r border-neutral-200 text-right">-</td>
+                          <td className="p-2 border-r border-neutral-200 text-right">-</td>
+                          <td className="p-2 text-right font-bold text-neutral-900">
+                            Bs. {voucher.retained_amount_ves.toFixed(2)}
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="p-2 border-r border-neutral-200 text-right">-</td>
+                          <td className="p-2 border-r border-neutral-200 text-right">
+                            Bs. {(voucher.iva_total_amount * voucher.exchange_rate_applied).toFixed(2)}
+                          </td>
+                          <td className="p-2 border-r border-neutral-200 text-right">-</td>
+                          <td className="p-2 text-right font-bold text-neutral-900">
+                            Bs. {voucher.retained_amount_ves.toFixed(2)}
+                          </td>
+                        </>
+                      )}
                     </tr>
                   )}
                 </tbody>
@@ -194,9 +239,9 @@ export function PrintableRetentionVoucherModal({
             <div className="flex justify-end mb-6">
               <div className="w-64 border border-neutral-400 bg-neutral-100 p-3 rounded text-right space-y-1">
                 <div className="text-[11px] text-neutral-700 font-bold uppercase">
-                  TOTAL IMPUESTO RETENIDO:
+                  {voucher.voucher_type === "INCOME_TAX" ? "TOTAL ISLR RETENIDO:" : "TOTAL IMPUESTO RETENIDO:"}
                 </div>
-                <div className="text-base font-black text-purple-950 font-mono">
+                <div className={`text-base font-black font-mono ${voucher.voucher_type === "INCOME_TAX" ? "text-indigo-950" : "text-purple-950"}`}>
                   {formatCurrency(voucher.retained_amount, voucher.currency === "VES" ? "USD" : voucher.currency)}
                 </div>
                 {voucher.retained_amount_ves && (

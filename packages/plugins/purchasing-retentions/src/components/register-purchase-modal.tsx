@@ -9,6 +9,7 @@ import type {
   Supplier,
 } from "@marketos/types";
 import { formatCurrency } from "@marketos/utils";
+import { OFFICIAL_ISLR_CONCEPTS } from "../constants/islr-concepts";
 import {
   X,
   Plus,
@@ -18,6 +19,7 @@ import {
   FileText,
   DollarSign,
   ShieldCheck,
+  Percent,
   Loader2,
   AlertCircle,
 } from "lucide-react";
@@ -27,7 +29,13 @@ export interface RegisterPurchaseModalProps {
   onClose: () => void;
   onPurchaseRegistered: (
     input: CreatePurchaseInvoiceInput
-  ) => Promise<{ success: boolean; error?: string; invoice?: PurchaseInvoice; voucher?: RetentionVoucher }>;
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+    invoice?: PurchaseInvoice;
+    voucher?: RetentionVoucher;
+    islrVoucher?: RetentionVoucher;
+  }>;
   settings: TenantSettings;
   activeModuleIds?: string[];
   existingSuppliers?: Supplier[];
@@ -66,14 +74,27 @@ export function RegisterPurchaseModal({
     Array<{ name: string; quantity: number; unit_price: number; is_exempt?: boolean }>
   >([{ name: "", quantity: 1, unit_price: 0, is_exempt: false }]);
 
-  // Retention Settings
+  // Retention Settings (IVA)
   const [autoRetention, setAutoRetention] = useState(isVenezuela || isChile);
   const [retentionRate, setRetentionRate] = useState<number>(isChile ? 100 : 75);
+
+  // Retention Settings (ISLR - Decreto 1.808)
+  const [applyIslr, setApplyIslr] = useState(false);
+  const [islrConceptCode, setIslrConceptCode] = useState<string>("055");
+  const [islrRate, setIslrRate] = useState<number>(2.0);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const handleConceptChange = (code: string) => {
+    setIslrConceptCode(code);
+    const concept = OFFICIAL_ISLR_CONCEPTS.find((c) => c.code === code);
+    if (concept) {
+      setIslrRate(concept.default_rate_percent);
+    }
+  };
 
   // Autocomplete supplier when selected
   const handleSelectExistingSupplier = (supId: string) => {
@@ -124,7 +145,8 @@ export function RegisterPurchaseModal({
   const ivaAmount = Number(((subtotalTaxable * defaultIvaPercent) / 100).toFixed(2));
   const totalAmount = Number((subtotalExempt + subtotalTaxable + ivaAmount).toFixed(2));
   const retainedVat = autoRetention ? Number(((ivaAmount * retentionRate) / 100).toFixed(2)) : 0;
-  const netPayableToSupplier = Number((totalAmount - retainedVat).toFixed(2));
+  const retainedIslr = applyIslr && subtotalTaxable > 0 ? Number(((subtotalTaxable * islrRate) / 100).toFixed(2)) : 0;
+  const netPayableToSupplier = Number((totalAmount - retainedVat - retainedIslr).toFixed(2));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,6 +186,9 @@ export function RegisterPurchaseModal({
         auto_generate_retention: autoRetention && ivaAmount > 0,
         retention_rate_percent: retentionRate,
         retention_type: isChile ? "CHILE_DTE_46" : "VAT",
+        apply_islr_retention: applyIslr && subtotalTaxable > 0,
+        islr_concept_code: islrConceptCode,
+        islr_retention_rate_percent: islrRate,
       });
 
       if (res.success) {
@@ -471,6 +496,66 @@ export function RegisterPurchaseModal({
             )}
           </div>
 
+          {/* ISLR Retention Options (Decreto 1.808) */}
+          {isVenezuela && (
+            <div className="p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/20 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Percent className="w-4 h-4 text-indigo-600" />
+                  <span className="text-xs font-bold text-foreground">
+                    Aplicar Retención de ISLR (Decreto N° 1.808)
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  aria-label="Aplicar Retención de ISLR"
+                  checked={applyIslr}
+                  onChange={(e) => setApplyIslr(e.target.checked)}
+                  className="w-4 h-4 text-indigo-600 rounded focus:ring-0 cursor-pointer"
+                />
+              </div>
+
+              {applyIslr && (
+                <div className="space-y-3 pt-2 border-t border-indigo-500/10">
+                  <div>
+                    <label className="text-[11px] font-semibold text-muted-foreground block mb-1">
+                      Concepto de Retención (Decreto 1.808) *
+                    </label>
+                    <select
+                      aria-label="Concepto de Retención de ISLR"
+                      value={islrConceptCode}
+                      onChange={(e) => handleConceptChange(e.target.value)}
+                      className="w-full text-xs px-2.5 py-1.5 bg-background border border-border rounded-lg text-foreground focus:outline-hidden"
+                    >
+                      {OFFICIAL_ISLR_CONCEPTS.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          [{c.code}] {c.name} ({c.default_rate_percent}%)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-4 text-xs">
+                    <span className="text-muted-foreground text-[11px]">Alícuota ISLR (%):</span>
+                    <input
+                      type="number"
+                      aria-label="Alícuota ISLR"
+                      step="0.5"
+                      min="0.5"
+                      max="100"
+                      value={islrRate}
+                      onChange={(e) => setIslrRate(Number(e.target.value))}
+                      className="w-20 px-2.5 py-1 text-xs font-mono font-bold bg-background border border-border rounded-lg text-foreground text-center"
+                    />
+                    <span className="text-[11px] text-muted-foreground">
+                      Base imponible: {formatCurrency(subtotalTaxable, currency)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Summary Breakdown */}
           <div className="p-4 rounded-xl bg-muted/60 border border-border space-y-1.5 text-xs">
             <div className="flex justify-between text-muted-foreground">
@@ -491,16 +576,24 @@ export function RegisterPurchaseModal({
             </div>
 
             {autoRetention && (
-              <>
-                <div className="flex justify-between font-bold text-purple-600 border-t border-purple-500/20 pt-1">
-                  <span>Retención IVA a Enterar al Fisco ({retentionRate}%):</span>
-                  <span className="font-mono">-{formatCurrency(retainedVat, currency)}</span>
-                </div>
-                <div className="flex justify-between font-black text-emerald-600 border-t border-border pt-1">
-                  <span>MONTO NETO A PAGAR AL PROVEEDOR:</span>
-                  <span className="font-mono text-sm">{formatCurrency(netPayableToSupplier, currency)}</span>
-                </div>
-              </>
+              <div className="flex justify-between font-bold text-purple-600 border-t border-purple-500/20 pt-1">
+                <span>Retención IVA a Enterar al Fisco ({retentionRate}%):</span>
+                <span className="font-mono">-{formatCurrency(retainedVat, currency)}</span>
+              </div>
+            )}
+
+            {retainedIslr > 0 && (
+              <div className="flex justify-between font-bold text-indigo-600 border-t border-indigo-500/20 pt-1">
+                <span>Retención ISLR Decreto 1.808 ({islrRate}%):</span>
+                <span className="font-mono">-{formatCurrency(retainedIslr, currency)}</span>
+              </div>
+            )}
+
+            {(autoRetention || retainedIslr > 0) && (
+              <div className="flex justify-between font-black text-emerald-600 border-t border-border pt-1">
+                <span>MONTO NETO A PAGAR AL PROVEEDOR:</span>
+                <span className="font-mono text-sm">{formatCurrency(netPayableToSupplier, currency)}</span>
+              </div>
             )}
           </div>
 

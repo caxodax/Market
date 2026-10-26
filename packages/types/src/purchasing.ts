@@ -57,6 +57,9 @@ export interface PurchaseInvoice {
   retention_voucher_id?: string | null;
   retained_vat_amount?: number;    // Monto retenido de IVA
   retained_islr_amount?: number;   // Monto retenido de ISLR
+  islr_concept_code?: string | null; // Código oficial de concepto Decreto 1.808 (ej. "055")
+  islr_retention_rate_percent?: number | null; // % de retención ISLR aplicado (ej. 2, 3, 5)
+  islr_retention_voucher_id?: string | null; // ID de comprobante ISLR si se emite por separado
 
   created_at: string;
   created_by?: string | null;
@@ -105,6 +108,8 @@ export interface RetentionVoucher {
   retained_amount_ves?: number;
 
   legal_legend?: string;
+  islr_concept_code?: string | null;
+  islr_concept_name?: string | null;
   created_at: string;
   created_by?: string | null;
 }
@@ -132,18 +137,24 @@ export interface CreatePurchaseInvoiceInput {
   currency?: "USD" | "EUR" | "CLP" | "VES";
   exchange_rate_applied?: number;
 
-  // Parámetros de emisión automática de retención
+  // Parámetros de emisión automática de retención IVA
   auto_generate_retention?: boolean;
   retention_rate_percent?: number; // 75 o 100 (default 75 para SPE ordinarios)
   retention_type?: RetentionVoucherType;
+
+  // Parámetros de retención de ISLR (Decreto 1.808)
+  apply_islr_retention?: boolean;
+  islr_concept_code?: string;
+  islr_retention_rate_percent?: number;
 }
 
 export interface CreateRetentionVoucherInput {
   purchase_invoice_id: string;
   voucher_type: RetentionVoucherType;
-  retention_rate_percent: number;  // 75 o 100
+  retention_rate_percent: number;  // 75 o 100 para IVA, o porcentaje ISLR (1, 2, 3, 5)
   tax_period?: string;             // YYYYMM
   issue_date?: string;
+  islr_concept_code?: string;
 }
 
 /**
@@ -212,4 +223,97 @@ export interface PurchasesBookReport {
   entries: PurchasesBookEntry[];
   totals: PurchasesBookTotals;
 }
+
+/**
+ * Concepto oficial de retención de Impuesto Sobre la Renta (ISLR)
+ * según el Decreto N° 1.808 (Reglamento Parcial en materia de Retenciones).
+ */
+export interface IslrConcept {
+  code: string;                 // Código oficial de 3 dígitos (ej. "055", "001", "002")
+  name: string;                 // Nombre descriptivo oficial
+  entity_type: "PN" | "PJ" | "ALL"; // Persona Natural, Jurídica o Ambos
+  default_rate_percent: number; // Porcentaje de retención según Decreto 1.808
+  description?: string;
+}
+
+export const OFFICIAL_ISLR_CONCEPTS: IslrConcept[] = [
+  {
+    code: "001",
+    name: "Honorarios Profesionales (Personas Naturales Residentes)",
+    entity_type: "PN",
+    default_rate_percent: 3,
+    description: "Servicios y honorarios de profesionales independientes PN (Decreto 1.808 Art. 9 Num. 1)",
+  },
+  {
+    code: "002",
+    name: "Honorarios Profesionales (Personas Jurídicas Domiciliadas)",
+    entity_type: "PJ",
+    default_rate_percent: 5,
+    description: "Servicios profesionales y asesorías de empresas PJ (Decreto 1.808 Art. 9 Num. 1)",
+  },
+  {
+    code: "003",
+    name: "Comisiones Mercantiles y Mediaciones (Personas Naturales)",
+    entity_type: "PN",
+    default_rate_percent: 3,
+    description: "Comisiones y corretajes pagados a personas naturales (Decreto 1.808 Art. 9 Num. 2)",
+  },
+  {
+    code: "004",
+    name: "Comisiones Mercantiles y Mediaciones (Personas Jurídicas)",
+    entity_type: "PJ",
+    default_rate_percent: 5,
+    description: "Comisiones y corretajes pagados a empresas PJ (Decreto 1.808 Art. 9 Num. 2)",
+  },
+  {
+    code: "055",
+    name: "Ejecución de Obras y Prestación de Servicios (Personas Jurídicas)",
+    entity_type: "PJ",
+    default_rate_percent: 2,
+    description: "Contratos de servicio general, contratistas y mantenimiento PJ (Decreto 1.808 Art. 9 Num. 11)",
+  },
+  {
+    code: "056",
+    name: "Ejecución de Obras y Prestación de Servicios (Personas Naturales)",
+    entity_type: "PN",
+    default_rate_percent: 1,
+    description: "Contratistas de obras y oficios varios PN (Decreto 1.808 Art. 9 Num. 11)",
+  },
+  {
+    code: "053",
+    name: "Fletes y Transporte Terrestre de Carga Nacional",
+    entity_type: "ALL",
+    default_rate_percent: 3,
+    description: "Servicio de flete y transporte de mercancías nacional (Decreto 1.808 Art. 9 Num. 8)",
+  },
+  {
+    code: "027",
+    name: "Arrendamiento de Bienes Inmuebles (Personas Jurídicas)",
+    entity_type: "PJ",
+    default_rate_percent: 5,
+    description: "Cánones de arrendamiento de locales y oficinas PJ (Decreto 1.808 Art. 9 Num. 5)",
+  },
+  {
+    code: "028",
+    name: "Publicidad y Propaganda Comercial (Personas Jurídicas)",
+    entity_type: "PJ",
+    default_rate_percent: 5,
+    description: "Servicios de publicidad, medios y mercadeo PJ (Decreto 1.808 Art. 9 Num. 13)",
+  },
+];
+
+/**
+ * Representa una fila del archivo XML oficial del SENIAT para retenciones de ISLR
+ * según especificación técnica del portal fiscal (RelacionRetencionesISLR / DetalleRetencion).
+ */
+export interface SeniatIslrXmlRow {
+  rifRetenido: string;            // RIF del proveedor retenido (sin guiones, ej. J123456789)
+  numeroFactura: string;          // Número de factura emitida por el proveedor
+  numeroControl: string;          // Número de control fiscal SENIAT (ej. 00-001234)
+  fechaOperacion: string;         // Fecha de la operación: DD/MM/YYYY o YYYY-MM-DD
+  codigoConcepto: string;         // Código de 3 dígitos (ej. "055", "001")
+  montoOperacion: number;         // Monto base imponible sujeta a retención en Bs.
+  porcentajeRetencion: number;    // Porcentaje de retención aplicado (ej. 2.00, 5.00)
+}
+
 

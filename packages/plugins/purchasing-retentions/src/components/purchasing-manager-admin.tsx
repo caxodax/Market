@@ -13,6 +13,7 @@ import { RegisterPurchaseModal } from "./register-purchase-modal";
 import { PrintableRetentionVoucherModal } from "./printable-retention-voucher-modal";
 import { PurchasesBookModal } from "./purchases-book-modal";
 import { resolveRetentionAdapter } from "../adapters/retention-adapter";
+import { buildSeniatIslrXmlFromInvoices } from "../services/purchasing-service";
 import {
   ShoppingBag,
   ShieldCheck,
@@ -27,6 +28,7 @@ import {
   FileSpreadsheet,
   AlertCircle,
   ExternalLink,
+  Percent,
 } from "lucide-react";
 
 export interface PurchasingManagerAdminProps {
@@ -39,8 +41,17 @@ export interface PurchasingManagerAdminProps {
   defaultExchangeRate?: number;
   onRegisterPurchase: (
     input: CreatePurchaseInvoiceInput
-  ) => Promise<{ success: boolean; error?: string; invoice?: PurchaseInvoice; voucher?: RetentionVoucher }>;
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+    invoice?: PurchaseInvoice;
+    voucher?: RetentionVoucher;
+    islrVoucher?: RetentionVoucher;
+  }>;
   onDownloadSeniatTxt?: (
+    taxPeriod: string
+  ) => Promise<{ success: boolean; error?: string; content?: string; filename?: string }>;
+  onDownloadSeniatIslrXml?: (
     taxPeriod: string
   ) => Promise<{ success: boolean; error?: string; content?: string; filename?: string }>;
 }
@@ -55,6 +66,7 @@ export function PurchasingManagerAdmin({
   defaultExchangeRate = 1,
   onRegisterPurchase,
   onDownloadSeniatTxt,
+  onDownloadSeniatIslrXml,
 }: PurchasingManagerAdminProps) {
   const isVenezuela = activeModuleIds.includes("local_venezuela");
   const isChile = activeModuleIds.includes("local_chile");
@@ -65,6 +77,7 @@ export function PurchasingManagerAdmin({
   const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
 
   const [activeTab, setActiveTab] = useState<"INVOICES" | "VOUCHERS" | "SUPPLIERS">("INVOICES");
+  const [voucherTypeFilter, setVoucherTypeFilter] = useState<"ALL" | "VAT" | "INCOME_TAX">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState<string>(
     new Date().toISOString().slice(0, 7).replace("-", "")
@@ -74,6 +87,7 @@ export function PurchasingManagerAdmin({
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [viewingVoucher, setViewingVoucher] = useState<RetentionVoucher | null>(null);
   const [isDownloadingTxt, setIsDownloadingTxt] = useState(false);
+  const [isDownloadingXml, setIsDownloadingXml] = useState(false);
   const [isPurchasesBookModalOpen, setIsPurchasesBookModalOpen] = useState(false);
 
   // Sync state if initial props change
@@ -92,8 +106,13 @@ export function PurchasingManagerAdmin({
   // Derived KPIs
   const stats = useMemo(() => {
     const totalPurchases = invoices.reduce((acc, inv) => acc + inv.total_amount, 0);
-    const totalVatRetained = vouchers.reduce((acc, v) => acc + v.retained_amount, 0);
-    const totalVatRetainedVes = vouchers.reduce(
+    const totalVatRetained = vouchers
+      .filter((v) => v.voucher_type === "VAT" || v.voucher_type === "CHILE_DTE_46")
+      .reduce((acc, v) => acc + v.retained_amount, 0);
+    const totalIslrRetained = vouchers
+      .filter((v) => v.voucher_type === "INCOME_TAX")
+      .reduce((acc, v) => acc + v.retained_amount, 0);
+    const totalRetainedVes = vouchers.reduce(
       (acc, v) => acc + (v.retained_amount_ves || 0),
       0
     );
@@ -101,7 +120,8 @@ export function PurchasingManagerAdmin({
     return {
       totalPurchases,
       totalVatRetained,
-      totalVatRetainedVes,
+      totalIslrRetained,
+      totalRetainedVes,
       vouchersCount: vouchers.length,
       suppliersCount: suppliers.length,
     };
@@ -120,16 +140,20 @@ export function PurchasingManagerAdmin({
   }, [invoices, searchQuery]);
 
   const filteredVouchers = useMemo(() => {
-    if (!searchQuery.trim()) return vouchers;
+    let list = vouchers;
+    if (voucherTypeFilter !== "ALL") {
+      list = list.filter((v) => v.voucher_type === voucherTypeFilter);
+    }
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase();
-    return vouchers.filter(
+    return list.filter(
       (v) =>
         v.voucher_number.toLowerCase().includes(q) ||
         v.supplier_name.toLowerCase().includes(q) ||
         v.supplier_tax_id.toLowerCase().includes(q) ||
         v.invoice_number.toLowerCase().includes(q)
     );
-  }, [vouchers, searchQuery]);
+  }, [vouchers, searchQuery, voucherTypeFilter]);
 
   const filteredSuppliers = useMemo(() => {
     if (!searchQuery.trim()) return suppliers;
@@ -147,8 +171,11 @@ export function PurchasingManagerAdmin({
     const res = await onRegisterPurchase(input);
     if (res.success && res.invoice) {
       setInvoices((prev) => [res.invoice!, ...prev]);
-      if (res.voucher) {
-        setVouchers((prev) => [res.voucher!, ...prev]);
+      const newVouchers: RetentionVoucher[] = [];
+      if (res.voucher) newVouchers.push(res.voucher);
+      if (res.islrVoucher) newVouchers.push(res.islrVoucher);
+      if (newVouchers.length > 0) {
+        setVouchers((prev) => [...newVouchers, ...prev]);
       }
       // Add or update supplier if not exists
       setSuppliers((prev) => {
@@ -156,22 +183,22 @@ export function PurchasingManagerAdmin({
         if (exists) return prev;
         const newSup: Supplier = {
           id: `sup_${input.supplier_tax_id.replace(/[^A-Za-z0-9]/g, "")}`,
-          tenant_id: tenantId,
+          tenantId: tenantId,
           name: input.supplier_name,
-          tax_id: input.supplier_tax_id,
+          taxId: input.supplier_tax_id,
           phone: input.supplier_phone || null,
           address: input.supplier_address || null,
           default_retention_rate: input.retention_rate_percent,
           is_active: true,
           created_at: new Date().toISOString(),
-        };
+        } as any;
         return [newSup, ...prev];
       });
     }
     return res;
   };
 
-  // Handle TXT Download
+  // Handle TXT Download (IVA Providencia 0049)
   const handleDownloadTxt = async () => {
     if (!onDownloadSeniatTxt) return;
     try {
@@ -188,12 +215,60 @@ export function PurchasingManagerAdmin({
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
       } else {
-        alert(res.error || "No se encontraron retenciones para el período fiscal seleccionado.");
+        alert(res.error || "No se encontraron retenciones de IVA para el período fiscal seleccionado.");
       }
     } catch (err: any) {
       alert(err?.message || "Error al generar el archivo TXT para el SENIAT.");
     } finally {
       setIsDownloadingTxt(false);
+    }
+  };
+
+  // Handle XML Download (ISLR Decreto 1.808)
+  const handleDownloadXml = async () => {
+    try {
+      setIsDownloadingXml(true);
+      if (onDownloadSeniatIslrXml) {
+        const res = await onDownloadSeniatIslrXml(selectedPeriod);
+        if (res.success && res.content) {
+          const blob = new Blob([res.content], { type: "application/xml;charset=iso-8859-1" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = res.filename || `SENIAT_ISLR_${selectedPeriod}.xml`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          return;
+        } else {
+          alert(res.error || "No se encontraron retenciones de ISLR para el período seleccionado.");
+          return;
+        }
+      }
+
+      // Default generator from registered invoices
+      const agentRif =
+        settings.billing_settings?.emitter_fiscal_data?.rif || "J-00000000-0";
+      const xmlContent = buildSeniatIslrXmlFromInvoices({
+        agentRif,
+        taxPeriod: selectedPeriod,
+        invoices,
+      });
+
+      const blob = new Blob([xmlContent], { type: "application/xml;charset=iso-8859-1" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `SENIAT_ISLR_${selectedPeriod}.xml`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err?.message || "Error al generar el archivo XML de ISLR para el SENIAT.");
+    } finally {
+      setIsDownloadingXml(false);
     }
   };
 
@@ -222,7 +297,7 @@ export function PurchasingManagerAdmin({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {isVenezuela && onDownloadSeniatTxt && (
+          {isVenezuela && (
             <div className="flex items-center gap-1.5 bg-card border border-border rounded-xl p-1 shadow-xs">
               <input
                 type="text"
@@ -233,14 +308,27 @@ export function PurchasingManagerAdmin({
                 onChange={(e) => setSelectedPeriod(e.target.value.replace(/[^0-9]/g, ""))}
                 className="w-20 px-2 py-1 text-xs font-mono font-bold bg-muted/60 border-none rounded-lg text-foreground focus:outline-hidden text-center"
               />
+              {onDownloadSeniatTxt && (
+                <button
+                  type="button"
+                  onClick={handleDownloadTxt}
+                  disabled={isDownloadingTxt || selectedPeriod.length !== 6}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 text-xs font-bold transition-all cursor-pointer disabled:opacity-40"
+                  title="Exportar archivo TXT para declaración de Retenciones de IVA (Providencia 0049)"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isDownloadingTxt ? "Generando..." : "TXT IVA"}</span>
+                </button>
+              )}
               <button
                 type="button"
-                onClick={handleDownloadTxt}
-                disabled={isDownloadingTxt || selectedPeriod.length !== 6}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 text-xs font-bold transition-all cursor-pointer disabled:opacity-40"
+                onClick={handleDownloadXml}
+                disabled={isDownloadingXml || selectedPeriod.length !== 6}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 text-xs font-bold transition-all cursor-pointer disabled:opacity-40"
+                title="Exportar archivo XML para declaración de Retenciones de ISLR (Decreto 1.808)"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>{isDownloadingTxt ? "Generando..." : "Descargar TXT SENIAT"}</span>
+                <span>{isDownloadingXml ? "Generando..." : "XML ISLR"}</span>
               </button>
             </div>
           )}
@@ -291,34 +379,36 @@ export function PurchasingManagerAdmin({
             {formatCurrency(stats.totalVatRetained, settings.default_currency || "USD")}
           </div>
           <div className="text-[11px] text-muted-foreground font-mono">
-            {stats.totalVatRetainedVes > 0 ? `Bs. ${stats.totalVatRetainedVes.toFixed(2)}` : "En divisa base"}
+            Providencia SNAT/2015/0049
+          </div>
+        </div>
+
+        {/* Total ISLR Retenido */}
+        <div className="p-4 rounded-2xl bg-card border border-border shadow-xs space-y-1">
+          <div className="flex items-center justify-between text-indigo-600">
+            <span className="text-xs font-bold">ISLR Retenido (Decreto 1.808)</span>
+            <Percent className="w-4 h-4" />
+          </div>
+          <div className="text-xl font-black text-indigo-600 font-mono">
+            {formatCurrency(stats.totalIslrRetained, settings.default_currency || "USD")}
+          </div>
+          <div className="text-[11px] text-muted-foreground font-mono">
+            Declaración XML SENIAT
           </div>
         </div>
 
         {/* Comprobantes Emitidos */}
         <div className="p-4 rounded-2xl bg-card border border-border shadow-xs space-y-1">
           <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-medium">Comprobantes de Retención</span>
-            <FileSpreadsheet className="w-4 h-4 text-purple-600" />
+            <span className="text-xs font-medium">Comprobantes Emitidos</span>
+            <FileSpreadsheet className="w-4 h-4 text-primary" />
           </div>
           <div className="text-xl font-black text-foreground font-mono">
             {stats.vouchersCount}
           </div>
           <div className="text-[11px] text-muted-foreground">
-            {isVenezuela ? "Providencia SNAT/2015/0049" : "Vouchers de retención"}
+            IVA e ISLR generados
           </div>
-        </div>
-
-        {/* Proveedores */}
-        <div className="p-4 rounded-2xl bg-card border border-border shadow-xs space-y-1">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-medium">Proveedores Registrados</span>
-            <Building className="w-4 h-4 text-emerald-600" />
-          </div>
-          <div className="text-xl font-black text-foreground font-mono">
-            {stats.suppliersCount}
-          </div>
-          <div className="text-[11px] text-muted-foreground">Directorio comercial</div>
         </div>
       </div>
 
@@ -361,16 +451,50 @@ export function PurchasingManagerAdmin({
           </button>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative w-full sm:w-64">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Buscar por número, RIF o nombre..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-card border border-border rounded-xl text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20"
-          />
+        {/* Search Bar & Type filter if in VOUCHERS */}
+        <div className="flex items-center gap-2">
+          {activeTab === "VOUCHERS" && (
+            <div className="flex items-center gap-1 bg-muted/60 border border-border rounded-xl p-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setVoucherTypeFilter("ALL")}
+                className={`px-2 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                  voucherTypeFilter === "ALL" ? "bg-background text-foreground shadow-xs" : "text-muted-foreground"
+                }`}
+              >
+                Todos
+              </button>
+              <button
+                type="button"
+                onClick={() => setVoucherTypeFilter("VAT")}
+                className={`px-2 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                  voucherTypeFilter === "VAT" ? "bg-purple-500/20 text-purple-700 dark:text-purple-300" : "text-muted-foreground"
+                }`}
+              >
+                IVA
+              </button>
+              <button
+                type="button"
+                onClick={() => setVoucherTypeFilter("INCOME_TAX")}
+                className={`px-2 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                  voucherTypeFilter === "INCOME_TAX" ? "bg-indigo-500/20 text-indigo-700 dark:text-indigo-300" : "text-muted-foreground"
+                }`}
+              >
+                ISLR
+              </button>
+            </div>
+          )}
+
+          <div className="relative w-full sm:w-64">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Buscar por número, RIF o nombre..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 text-xs bg-card border border-border rounded-xl text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
         </div>
       </div>
 
@@ -386,7 +510,7 @@ export function PurchasingManagerAdmin({
                   <th className="p-3">Proveedor</th>
                   <th className="p-3 text-right">Subtotal Base</th>
                   <th className="p-3 text-right">IVA</th>
-                  <th className="p-3 text-right">IVA Retenido</th>
+                  <th className="p-3 text-right">Retenciones</th>
                   <th className="p-3 text-right">Neto a Pagar</th>
                   <th className="p-3 pr-4 text-center">Acciones</th>
                 </tr>
@@ -400,8 +524,18 @@ export function PurchasingManagerAdmin({
                   </tr>
                 ) : (
                   filteredInvoices.map((inv) => {
-                    const voucher = vouchers.find((v) => v.purchase_invoice_id === inv.id);
-                    const netPayable = inv.total_amount - (inv.retained_vat_amount || 0);
+                    const vatVoucher = vouchers.find(
+                      (v) =>
+                        v.purchase_invoice_id === inv.id &&
+                        (v.voucher_type === "VAT" || v.voucher_type === "CHILE_DTE_46")
+                    );
+                    const islrVoucher = vouchers.find(
+                      (v) => v.purchase_invoice_id === inv.id && v.voucher_type === "INCOME_TAX"
+                    );
+
+                    const totalRetained =
+                      (inv.retained_vat_amount || 0) + (inv.retained_islr_amount || 0);
+                    const netPayable = inv.total_amount - totalRetained;
 
                     return (
                       <tr key={inv.id} className="hover:bg-muted/30 transition-colors">
@@ -428,30 +562,54 @@ export function PurchasingManagerAdmin({
                         <td className="p-3 text-right font-mono">
                           {formatCurrency(inv.iva_amount, inv.currency)}
                         </td>
-                        <td className="p-3 text-right font-mono font-bold text-purple-600">
-                          {inv.retained_vat_amount
-                            ? `-${formatCurrency(inv.retained_vat_amount, inv.currency)}`
-                            : "0.00"}
+                        <td className="p-3 text-right font-mono">
+                          {inv.retained_vat_amount ? (
+                            <span className="block font-bold text-purple-600">
+                              IVA: -{formatCurrency(inv.retained_vat_amount, inv.currency)}
+                            </span>
+                          ) : null}
+                          {inv.retained_islr_amount ? (
+                            <span className="block font-bold text-indigo-600 text-[10px]">
+                              ISLR: -{formatCurrency(inv.retained_islr_amount, inv.currency)}
+                            </span>
+                          ) : null}
+                          {!inv.retained_vat_amount && !inv.retained_islr_amount && (
+                            <span className="text-muted-foreground">0.00</span>
+                          )}
                         </td>
                         <td className="p-3 text-right font-mono font-black text-emerald-600">
                           {formatCurrency(netPayable, inv.currency)}
                         </td>
                         <td className="p-3 pr-4 text-center whitespace-nowrap">
-                          {voucher ? (
-                            <button
-                              type="button"
-                              onClick={() => setViewingVoucher(voucher)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-500/10 text-purple-700 hover:bg-purple-500/20 text-[11px] font-bold transition-colors cursor-pointer"
-                              title="Ver Comprobante de Retención"
-                            >
-                              <ShieldCheck className="w-3.5 h-3.5" />
-                              <span>Ver Retención</span>
-                            </button>
-                          ) : (
-                            <span className="text-[11px] text-muted-foreground italic">
-                              Sin retención
-                            </span>
-                          )}
+                          <div className="inline-flex items-center gap-1.5">
+                            {vatVoucher && (
+                              <button
+                                type="button"
+                                onClick={() => setViewingVoucher(vatVoucher)}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-purple-500/10 text-purple-700 hover:bg-purple-500/20 text-[10px] font-bold transition-colors cursor-pointer"
+                                title="Ver Comprobante de Retención IVA"
+                              >
+                                <ShieldCheck className="w-3 h-3" />
+                                <span>IVA</span>
+                              </button>
+                            )}
+                            {islrVoucher && (
+                              <button
+                                type="button"
+                                onClick={() => setViewingVoucher(islrVoucher)}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-500/10 text-indigo-700 hover:bg-indigo-500/20 text-[10px] font-bold transition-colors cursor-pointer"
+                                title="Ver Comprobante de Retención ISLR (Decreto 1.808)"
+                              >
+                                <Percent className="w-3 h-3" />
+                                <span>ISLR</span>
+                              </button>
+                            )}
+                            {!vatVoucher && !islrVoucher && (
+                              <span className="text-[11px] text-muted-foreground italic">
+                                Sin retención
+                              </span>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -470,12 +628,12 @@ export function PurchasingManagerAdmin({
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-muted/50 border-b border-border text-muted-foreground font-semibold">
-                  <th className="p-3 pl-4">N° Comprobante</th>
+                  <th className="p-3 pl-4">Tipo / Comprobante</th>
                   <th className="p-3">Período / Emisión</th>
                   <th className="p-3">Proveedor Retenido</th>
                   <th className="p-3">Factura Afectada</th>
                   <th className="p-3 text-right">% Ret.</th>
-                  <th className="p-3 text-right">IVA Retenido</th>
+                  <th className="p-3 text-right">Impuesto Retenido</th>
                   <th className="p-3 text-right">Equivalente Bs.</th>
                   <th className="p-3 pr-4 text-center">Acciones</th>
                 </tr>
@@ -490,8 +648,30 @@ export function PurchasingManagerAdmin({
                 ) : (
                   filteredVouchers.map((v) => (
                     <tr key={v.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="p-3 pl-4 whitespace-nowrap font-mono font-bold text-foreground">
-                        {v.voucher_number}
+                      <td className="p-3 pl-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          {v.voucher_type === "INCOME_TAX" ? (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300">
+                              ISLR
+                            </span>
+                          ) : v.voucher_type === "CHILE_DTE_46" ? (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300">
+                              DTE-46
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300">
+                              IVA
+                            </span>
+                          )}
+                          <span className="font-mono font-bold text-foreground">
+                            {v.voucher_number}
+                          </span>
+                        </div>
+                        {v.islr_concept_code && (
+                          <span className="block text-[10px] text-muted-foreground pl-0.5">
+                            [{v.islr_concept_code}] {v.islr_concept_name || "Decreto 1.808"}
+                          </span>
+                        )}
                       </td>
                       <td className="p-3 whitespace-nowrap">
                         <span className="font-semibold text-foreground">
@@ -515,10 +695,10 @@ export function PurchasingManagerAdmin({
                           </span>
                         )}
                       </td>
-                      <td className="p-3 text-right font-bold text-purple-700">
+                      <td className={`p-3 text-right font-bold ${v.voucher_type === "INCOME_TAX" ? "text-indigo-700" : "text-purple-700"}`}>
                         {v.retention_rate_percent}%
                       </td>
-                      <td className="p-3 text-right font-mono font-black text-purple-900">
+                      <td className={`p-3 text-right font-mono font-black ${v.voucher_type === "INCOME_TAX" ? "text-indigo-900 dark:text-indigo-300" : "text-purple-900 dark:text-purple-300"}`}>
                         {formatCurrency(v.retained_amount, v.currency === "VES" ? "USD" : v.currency)}
                       </td>
                       <td className="p-3 text-right font-mono text-muted-foreground">
