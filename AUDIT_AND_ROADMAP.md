@@ -879,14 +879,34 @@ flowchart TD
      - 16/16 proyectos con 0 errores TypeScript (`pnpm check-types`).
      - Compilación de producción exitosa en Turbopack (`pnpm build`).
 
-### 3. Módulo Simple de Cuentas por Cobrar (CxC) y Cuentas por Pagar (CxP) (Prioridad 12)
-* **Objetivo:** Gestión de ventas a crédito a clientes y compras a crédito con proveedores:
-  - Registro de condición de pago (`CASH` vs `CREDIT`), fecha de vencimiento (`due_date`) y días de plazo.
-  - Registro de abonos parciales y liquidación total.
-  - Vista de cobranzas pendientes con saldo por cliente y cuentas por pagar a proveedores.
-* **Ubicación Arquitectónica:**
-  - Los datos de deuda y abonos se vinculan en las entidades existentes `FiscalDocument` (Ventas/CxC) y `PurchaseInvoice` (Compras/CxP).
-  - La interfaz de Tesorería puede operar en un plugin coordinado o como sub-pestañas operativas de los módulos de Facturación y Compras.
+### 3. Módulo Simple de Cuentas por Cobrar (CxC) y Cuentas por Pagar (CxP) (Prioridad 12 - Completada ✅)
+* **Objetivo:** Gestión integral de ventas a crédito a clientes y compras a crédito con proveedores:
+  - Registro de condición de pago (`CASH` vs `CREDIT`), fecha de vencimiento (`due_date`) calculada automáticamente según los días de plazo (7, 15, 30, 45, 60, 90 días).
+  - Máquina de estados de deuda: `PENDING` (pendiente), `PARTIALLY_PAID` (abonada), `PAID` (saldada), `OVERDUE` (vencida).
+  - Registro de abonos parciales y liquidación total (`AccountPaymentRecord`: monto, fecha, método, referencia y notas).
+  - Protección de integridad financiera contra sobrepagos (`overpay protection`).
+  - Detección reactiva de deuda neta con proveedores: deducidas automáticamente las retenciones fiscales de IVA (75%/100%) e ISLR (Decreto 1.808): $\text{Deuda Neta} = \text{Total Factura} - \text{Retención IVA} - \text{Retención ISLR}$.
+* **Ubicación Arquitectónica e Implementación:**
+  1. **Tipos de Dominio Compartidos (`@marketos/types`):**
+     - En [`packages/types/src/invoicing.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/types/src/invoicing.ts) y [`packages/types/src/purchasing.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/types/src/purchasing.ts): definición de `PaymentCondition`, `PaymentTermStatus`, `AccountPaymentRecord`.
+     - Extensiones a `FiscalDocument` / `CreateFiscalDocumentInput`: `payment_condition`, `credit_term_days`, `due_date`, `payment_status`, `amount_paid`, `amount_due`, `payments`.
+     - Extensiones a `PurchaseInvoice` / `CreatePurchaseInvoiceInput`: `payment_condition`, `credit_term_days`, `due_date`, `payment_status`, `net_payable_amount`, `amount_paid`, `amount_due`, `payments`.
+  2. **Servicios y Motores de Crédito:**
+     - En [`invoicing-service.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/invoicing/src/services/invoicing-service.ts): `prepareFiscalDocument` computa automáticamente términos de pago y fecha de vencimiento para facturas a crédito; función pura `recordCustomerPayment` para asentar abonos, actualizar saldo y transicionar estados.
+     - En [`purchasing-service.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/services/purchasing-service.ts): `preparePurchaseInvoice` calcula la deuda neta al proveedor tras retenciones fiscales duales; función `recordSupplierPayment` para registrar pagos y abonos a proveedores con protección contra excedentes.
+     - Utilidad nativa de fechas estándar `addDaysToDate` sin dependencias externas pesadas (Ponytail).
+  3. **Vistas e Interfaz Administrativa de Cuentas por Cobrar (CxC):**
+     - [`issue-document-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/invoicing/src/components/issue-document-modal.tsx): Selector de condición de pago (Contado vs Crédito CxC), selector de plazo con cálculo en vivo de fecha de vencimiento.
+     - [`invoicing-manager-admin.tsx`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/invoicing/src/components/invoicing-manager-admin.tsx): Pestaña dedicada "Cuentas por Cobrar (CxC)" con KPIs en vivo (Total por Cobrar, Total Cobrado, Saldo Vencido en rojo, Conteo de Facturas a Crédito), tabla de clientes deudores con alertas visuales de vencimiento, filtro por estado (`ALL`, `PENDING`, `PARTIALLY_PAID`, `OVERDUE`, `PAID`) y modal interactivo de registro de abonos con botón express "Saldo Total".
+  4. **Vistas e Interfaz Administrativa de Cuentas por Pagar (CxP):**
+     - [`register-purchase-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/components/register-purchase-modal.tsx): Selector de condición de pago al proveedor (Contado vs Crédito CxP) con plazo en días y vencimiento proyectado.
+     - [`purchasing-manager-admin.tsx`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/components/purchasing-manager-admin.tsx): Nueva pestaña "Cuentas por Pagar" con KPIs en tiempo real (Deuda Neta Pendiente, Total Pagado, Deuda Vencida, Compras a Crédito), tabla de proveedores con desglose de retenciones deducidas y saldo neto, filtro por estado y modal de abono y liquidación a proveedores.
+  5. **Verificación y Pruebas Unitarias:**
+     - Tests en [`packages/plugins/invoicing/src/__tests__/run-checks.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/invoicing/src/__tests__/run-checks.ts): inicialización de factura a crédito, abono parcial con transición a `PARTIALLY_PAID`, liquidación total a `PAID` y bloqueo de sobrepago.
+     - Tests en [`packages/plugins/purchasing-retentions/src/__tests__/run-checks.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/purchasing-retentions/src/__tests__/run-checks.ts): inicialización de deuda neta proveedor tras retención simultánea IVA (75%) e ISLR (2%), abonos parciales, liquidación completa y protección contra sobrepagos.
+     - 13 de 13 suites de pruebas exitosas (`pnpm test`).
+     - 16 de 16 proyectos limpios en TypeScript (`pnpm check-types`).
+     - Build de producción Turbopack 100% exitoso (`pnpm build`).
 
 ### 4. Integración con Imprentas Digitales Autorizadas (PACs: The Factory HKA / Novus) (Prioridad 13)
 * **Objetivo:** Cumplimiento de la Providencia SNAT/00093 (G.O. N° 43.484) antes del 18 de abril de 2027 (muerte definitiva de la Forma Libre física).

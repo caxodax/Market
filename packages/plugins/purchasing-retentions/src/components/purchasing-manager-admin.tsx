@@ -13,7 +13,10 @@ import { RegisterPurchaseModal } from "./register-purchase-modal";
 import { PrintableRetentionVoucherModal } from "./printable-retention-voucher-modal";
 import { PurchasesBookModal } from "./purchases-book-modal";
 import { resolveRetentionAdapter } from "../adapters/retention-adapter";
-import { buildSeniatIslrXmlFromInvoices } from "../services/purchasing-service";
+import {
+  buildSeniatIslrXmlFromInvoices,
+  recordSupplierPayment,
+} from "../services/purchasing-service";
 import {
   ShoppingBag,
   ShieldCheck,
@@ -29,6 +32,10 @@ import {
   AlertCircle,
   ExternalLink,
   Percent,
+  CreditCard,
+  Clock,
+  CheckCircle2,
+  X,
 } from "lucide-react";
 
 export interface PurchasingManagerAdminProps {
@@ -76,8 +83,9 @@ export function PurchasingManagerAdmin({
   const [vouchers, setVouchers] = useState<RetentionVoucher[]>(initialVouchers);
   const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
 
-  const [activeTab, setActiveTab] = useState<"INVOICES" | "VOUCHERS" | "SUPPLIERS">("INVOICES");
+  const [activeTab, setActiveTab] = useState<"INVOICES" | "VOUCHERS" | "SUPPLIERS" | "CXP">("INVOICES");
   const [voucherTypeFilter, setVoucherTypeFilter] = useState<"ALL" | "VAT" | "INCOME_TAX">("ALL");
+  const [cxpStatusFilter, setCxpStatusFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState<string>(
     new Date().toISOString().slice(0, 7).replace("-", "")
@@ -89,6 +97,15 @@ export function PurchasingManagerAdmin({
   const [isDownloadingTxt, setIsDownloadingTxt] = useState(false);
   const [isDownloadingXml, setIsDownloadingXml] = useState(false);
   const [isPurchasesBookModalOpen, setIsPurchasesBookModalOpen] = useState(false);
+
+  // CxP Payment Modal state
+  const [paymentInvoice, setPaymentInvoice] = useState<PurchaseInvoice | null>(null);
+  const [supplierPaymentAmount, setSupplierPaymentAmount] = useState<string>("");
+  const [supplierPaymentDate, setSupplierPaymentDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [supplierPaymentMethod, setSupplierPaymentMethod] = useState<string>("TRANSFERENCIA");
+  const [supplierPaymentReference, setSupplierPaymentReference] = useState<string>("");
+  const [supplierPaymentNotes, setSupplierPaymentNotes] = useState<string>("");
+  const [supplierPaymentError, setSupplierPaymentError] = useState<string | null>(null);
 
   // Sync state if initial props change
   React.useEffect(() => {
@@ -165,6 +182,142 @@ export function PurchasingManagerAdmin({
         (s.phone && s.phone.toLowerCase().includes(q))
     );
   }, [suppliers, searchQuery]);
+
+  // CxP Metrics
+  const cxpStats = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    const creditInvoices = invoices.filter(
+      (inv) => inv.payment_condition === "CREDIT"
+    );
+
+    const totalNetPayable = creditInvoices.reduce((sum, inv) => {
+      const net =
+        inv.net_payable_amount ??
+        Math.max(
+          0,
+          inv.total_amount -
+            (inv.retained_vat_amount || 0) -
+            (inv.retained_islr_amount || 0)
+        );
+      const due = inv.amount_due ?? (inv.status === "PAID" ? 0 : net);
+      return sum + due;
+    }, 0);
+
+    const totalPaid = creditInvoices.reduce(
+      (sum, inv) => sum + (inv.amount_paid ?? 0),
+      0
+    );
+
+    const totalOverdue = creditInvoices
+      .filter((inv) => {
+        const net =
+          inv.net_payable_amount ??
+          Math.max(
+            0,
+            inv.total_amount -
+              (inv.retained_vat_amount || 0) -
+              (inv.retained_islr_amount || 0)
+          );
+        const due = inv.amount_due ?? (inv.status === "PAID" ? 0 : net);
+        const isPast = inv.due_date && inv.due_date < today;
+        return (inv.payment_status === "OVERDUE" || isPast) && due > 0.005;
+      })
+      .reduce((sum, inv) => {
+        const net =
+          inv.net_payable_amount ??
+          Math.max(
+            0,
+            inv.total_amount -
+              (inv.retained_vat_amount || 0) -
+              (inv.retained_islr_amount || 0)
+          );
+        return sum + (inv.amount_due ?? net);
+      }, 0);
+
+    return {
+      creditInvoicesCount: creditInvoices.length,
+      totalNetPayable,
+      totalPaid,
+      totalOverdue,
+    };
+  }, [invoices]);
+
+  const filteredCxPInvoices = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    return invoices.filter((inv) => {
+      if (inv.payment_condition !== "CREDIT") return false;
+      const net =
+        inv.net_payable_amount ??
+        Math.max(
+          0,
+          inv.total_amount -
+            (inv.retained_vat_amount || 0) -
+            (inv.retained_islr_amount || 0)
+        );
+      const isPast = inv.due_date && inv.due_date < today;
+      const computedStatus = (inv.amount_due ?? net) <= 0.005
+        ? "PAID"
+        : isPast || inv.payment_status === "OVERDUE"
+        ? "OVERDUE"
+        : (inv.amount_paid && inv.amount_paid > 0)
+        ? "PARTIALLY_PAID"
+        : "PENDING";
+
+      if (cxpStatusFilter !== "ALL" && computedStatus !== cxpStatusFilter) return false;
+
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        inv.supplier_name.toLowerCase().includes(q) ||
+        inv.supplier_tax_id.toLowerCase().includes(q) ||
+        inv.invoice_number.toLowerCase().includes(q)
+      );
+    });
+  }, [invoices, cxpStatusFilter, searchQuery]);
+
+  const handleOpenSupplierPaymentModal = (inv: PurchaseInvoice) => {
+    setPaymentInvoice(inv);
+    const net =
+      inv.net_payable_amount ??
+      Math.max(
+        0,
+        inv.total_amount -
+          (inv.retained_vat_amount || 0) -
+          (inv.retained_islr_amount || 0)
+      );
+    setSupplierPaymentAmount(String(inv.amount_due ?? net));
+    setSupplierPaymentDate(new Date().toISOString().split("T")[0]);
+    setSupplierPaymentMethod("TRANSFERENCIA");
+    setSupplierPaymentReference("");
+    setSupplierPaymentNotes("");
+    setSupplierPaymentError(null);
+  };
+
+  const handleRegisterSupplierPaymentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!paymentInvoice) return;
+    setSupplierPaymentError(null);
+    const amt = parseFloat(supplierPaymentAmount);
+    if (isNaN(amt) || amt <= 0) {
+      setSupplierPaymentError("Por favor ingresa un monto válido mayor a 0.");
+      return;
+    }
+
+    try {
+      const updated = recordSupplierPayment(paymentInvoice, {
+        amount: amt,
+        payment_date: supplierPaymentDate,
+        payment_method: supplierPaymentMethod,
+        reference: supplierPaymentReference.trim() || null,
+        notes: supplierPaymentNotes.trim() || null,
+      });
+
+      setInvoices((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+      setPaymentInvoice(null);
+    } catch (err: any) {
+      setSupplierPaymentError(err?.message || "Error al registrar el pago al proveedor.");
+    }
+  };
 
   // Handle register purchase wrapper
   const handleRegisterPurchaseWrapper = async (input: CreatePurchaseInvoiceInput) => {
@@ -448,6 +601,17 @@ export function PurchasingManagerAdmin({
             }`}
           >
             Proveedores ({suppliers.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("CXP")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeTab === "CXP"
+                ? "bg-background text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Cuentas por Pagar ({cxpStats.creditInvoicesCount})
           </button>
         </div>
 
@@ -771,6 +935,369 @@ export function PurchasingManagerAdmin({
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* CXP Tab Panel */}
+      {activeTab === "CXP" && (
+        <div className="space-y-4">
+          {/* CXP Metrics Summary */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div className="p-4 rounded-2xl bg-card border border-border shadow-xs space-y-1">
+              <p className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-amber-500" />
+                <span>Deuda Neta por Pagar</span>
+              </p>
+              <p className="text-xl font-black font-mono text-amber-500">
+                {formatCurrency(cxpStats.totalNetPayable, settings.default_currency || "USD")}
+              </p>
+              <p className="text-[10px] text-muted-foreground">Saldo neto deducidas retenciones</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-card border border-border shadow-xs space-y-1">
+              <p className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Total Pagado</span>
+              </p>
+              <p className="text-xl font-black font-mono text-emerald-500">
+                {formatCurrency(cxpStats.totalPaid, settings.default_currency || "USD")}
+              </p>
+              <p className="text-[10px] text-muted-foreground">Abonos realizados a proveedores</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-card border border-border shadow-xs space-y-1">
+              <p className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
+                <span>Deuda Vencida</span>
+              </p>
+              <p className="text-xl font-black font-mono text-rose-500">
+                {formatCurrency(cxpStats.totalOverdue, settings.default_currency || "USD")}
+              </p>
+              <p className="text-[10px] text-muted-foreground">Facturas con plazo expirado</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-card border border-border shadow-xs space-y-1">
+              <p className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5 text-primary" />
+                <span>Compras a Crédito</span>
+              </p>
+              <p className="text-xl font-black font-mono text-foreground">
+                {cxpStats.creditInvoicesCount}
+              </p>
+              <p className="text-[10px] text-muted-foreground">Total facturas recibidas a plazo</p>
+            </div>
+          </div>
+
+          {/* CXP Status Filter Pills */}
+          <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
+            {[
+              { id: "ALL", label: "Todas" },
+              { id: "PENDING", label: "Pendientes" },
+              { id: "PARTIALLY_PAID", label: "Abonadas" },
+              { id: "OVERDUE", label: "Vencidas" },
+              { id: "PAID", label: "Pagadas" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setCxpStatusFilter(tab.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors cursor-pointer ${
+                  cxpStatusFilter === tab.id
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* CXP Invoices Table */}
+          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-muted/50 border-b border-border text-muted-foreground font-semibold">
+                    <th className="p-3 pl-4">Factura Nº</th>
+                    <th className="p-3">Proveedor / RIF</th>
+                    <th className="p-3">Emisión</th>
+                    <th className="p-3">Vencimiento</th>
+                    <th className="p-3 text-right">Total Factura</th>
+                    <th className="p-3 text-right">Retenciones</th>
+                    <th className="p-3 text-right">Deuda Neta</th>
+                    <th className="p-3 text-right">Pagado</th>
+                    <th className="p-3 text-right">Saldo Pendiente</th>
+                    <th className="p-3 text-center">Estado</th>
+                    <th className="p-3 pr-4 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {filteredCxPInvoices.length === 0 ? (
+                    <tr>
+                      <td colSpan={11} className="p-8 text-center text-muted-foreground space-y-2">
+                        <CreditCard className="w-8 h-8 mx-auto opacity-30" />
+                        <p className="font-semibold text-xs">No hay facturas a crédito registradas con proveedores</p>
+                        <p className="text-[11px] text-muted-foreground/80">
+                          Al registrar una compra, marca la condición de pago como "Crédito (CxP)".
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredCxPInvoices.map((inv) => {
+                      const today = new Date().toISOString().split("T")[0];
+                      const retVat = inv.retained_vat_amount || 0;
+                      const retIslr = inv.retained_islr_amount || 0;
+                      const totalRet = retVat + retIslr;
+                      const netPayable = inv.net_payable_amount ?? Math.max(0, inv.total_amount - totalRet);
+                      const balance = inv.amount_due ?? (inv.status === "PAID" ? 0 : netPayable);
+                      const isPaid = balance <= 0.005;
+                      const isPast = inv.due_date && inv.due_date < today;
+                      const isOverdue = !isPaid && (inv.payment_status === "OVERDUE" || isPast);
+
+                      return (
+                        <tr key={inv.id} className="hover:bg-muted/15 transition-colors">
+                          <td className="p-3 pl-4">
+                            <p className="font-mono font-bold text-foreground">{inv.invoice_number}</p>
+                            <p className="text-[10px] font-mono text-muted-foreground">{inv.control_number || "—"}</p>
+                          </td>
+                          <td className="p-3">
+                            <p className="font-bold text-foreground">{inv.supplier_name}</p>
+                            <p className="text-[10px] font-mono text-muted-foreground">{inv.supplier_tax_id}</p>
+                          </td>
+                          <td className="p-3 text-muted-foreground whitespace-nowrap">
+                            {inv.invoice_date}
+                          </td>
+                          <td className="p-3 whitespace-nowrap">
+                            <p className={`font-mono font-semibold ${isOverdue ? "text-rose-500" : "text-foreground"}`}>
+                              {inv.due_date || "—"}
+                            </p>
+                            <span className="text-[10px] text-muted-foreground">
+                              {inv.credit_term_days ? `${inv.credit_term_days} días` : "Plazo"}
+                              {isOverdue && " • Vencida"}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right font-mono text-muted-foreground whitespace-nowrap">
+                            {formatCurrency(inv.total_amount, inv.currency)}
+                          </td>
+                          <td className="p-3 text-right font-mono text-purple-600 whitespace-nowrap font-semibold">
+                            {totalRet > 0 ? `-${formatCurrency(totalRet, inv.currency)}` : "—"}
+                          </td>
+                          <td className="p-3 text-right font-mono font-bold text-foreground whitespace-nowrap">
+                            {formatCurrency(netPayable, inv.currency)}
+                          </td>
+                          <td className="p-3 text-right font-mono text-emerald-600 font-semibold whitespace-nowrap">
+                            {formatCurrency(inv.amount_paid ?? 0, inv.currency)}
+                          </td>
+                          <td className="p-3 text-right font-mono font-black whitespace-nowrap">
+                            <span className={balance > 0 ? (isOverdue ? "text-rose-600" : "text-amber-600") : "text-emerald-600"}>
+                              {formatCurrency(balance, inv.currency)}
+                            </span>
+                          </td>
+                          <td className="p-3 text-center whitespace-nowrap">
+                            {isPaid ? (
+                              <span className="inline-block text-[10px] font-black px-2 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+                                Pagada
+                              </span>
+                            ) : isOverdue ? (
+                              <span className="inline-block text-[10px] font-black px-2 py-0.5 rounded-full border bg-rose-500/10 text-rose-600 border-rose-500/20">
+                                Vencida
+                              </span>
+                            ) : (inv.amount_paid && inv.amount_paid > 0) ? (
+                              <span className="inline-block text-[10px] font-black px-2 py-0.5 rounded-full border bg-amber-500/10 text-amber-600 border-amber-500/20">
+                                Abono Parcial
+                              </span>
+                            ) : (
+                              <span className="inline-block text-[10px] font-black px-2 py-0.5 rounded-full border bg-blue-500/10 text-blue-600 border-blue-500/20">
+                                Pendiente
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 pr-4 text-center whitespace-nowrap">
+                            {balance > 0.005 ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenSupplierPaymentModal(inv)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold shadow-xs hover:bg-primary/90 transition-colors cursor-pointer"
+                                title="Registrar Pago o Abono a Proveedor"
+                              >
+                                <DollarSign className="w-3 h-3" />
+                                <span>Abonar</span>
+                              </button>
+                            ) : (
+                              <span className="text-muted-foreground text-[11px] font-semibold">Saldada</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Supplier Payment / Abono Modal */}
+      {paymentInvoice && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 border-b border-border bg-muted/30 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-xl bg-primary/10 text-primary">
+                  <DollarSign className="w-4 h-4" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Registrar Pago a Proveedor</h3>
+                  <p className="text-[11px] text-muted-foreground">Factura {paymentInvoice.invoice_number}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPaymentInvoice(null)}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {supplierPaymentError && (
+              <div className="mx-4 mt-3 p-2.5 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-center gap-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{supplierPaymentError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleRegisterSupplierPaymentSubmit} className="p-4 space-y-3.5">
+              <div className="p-3 rounded-xl bg-muted/40 border border-border/80 space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Proveedor:</span>
+                  <span className="font-bold text-foreground truncate max-w-[200px]">{paymentInvoice.supplier_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total Factura:</span>
+                  <span className="font-mono">{formatCurrency(paymentInvoice.total_amount, paymentInvoice.currency)}</span>
+                </div>
+                {(paymentInvoice.retained_vat_amount || paymentInvoice.retained_islr_amount) && (
+                  <div className="flex justify-between text-purple-600 font-semibold">
+                    <span>Retenciones Fiscales:</span>
+                    <span className="font-mono">
+                      -{formatCurrency((paymentInvoice.retained_vat_amount || 0) + (paymentInvoice.retained_islr_amount || 0), paymentInvoice.currency)}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Deuda Neta:</span>
+                  <span className="font-mono font-semibold">
+                    {formatCurrency(paymentInvoice.net_payable_amount ?? paymentInvoice.total_amount, paymentInvoice.currency)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Pagado Previo:</span>
+                  <span className="font-mono text-emerald-600 font-semibold">{formatCurrency(paymentInvoice.amount_paid ?? 0, paymentInvoice.currency)}</span>
+                </div>
+                <div className="flex justify-between border-t border-border/60 pt-1 font-bold">
+                  <span className="text-foreground">Saldo Pendiente por Pagar:</span>
+                  <span className="font-mono text-amber-600">
+                    {formatCurrency(paymentInvoice.amount_due ?? paymentInvoice.total_amount, paymentInvoice.currency)}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-foreground">Monto a Pagar ($) *</label>
+                  <button
+                    type="button"
+                    onClick={() => setSupplierPaymentAmount(String(paymentInvoice.amount_due ?? paymentInvoice.net_payable_amount ?? paymentInvoice.total_amount))}
+                    className="text-[11px] font-bold text-primary hover:underline cursor-pointer"
+                  >
+                    Saldo Total
+                  </button>
+                </div>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max={paymentInvoice.amount_due ?? paymentInvoice.net_payable_amount ?? paymentInvoice.total_amount}
+                  value={supplierPaymentAmount}
+                  onChange={(e) => setSupplierPaymentAmount(e.target.value)}
+                  className="w-full h-9 px-3 rounded-xl border border-input bg-background font-mono text-xs font-bold text-foreground focus:ring-2 focus:ring-primary"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-foreground block mb-1">Fecha</label>
+                  <input
+                    type="date"
+                    value={supplierPaymentDate}
+                    onChange={(e) => setSupplierPaymentDate(e.target.value)}
+                    className="w-full h-9 px-2.5 rounded-xl border border-input bg-background text-xs text-foreground focus:ring-2 focus:ring-primary"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-foreground block mb-1">Método</label>
+                  <select
+                    value={supplierPaymentMethod}
+                    onChange={(e) => setSupplierPaymentMethod(e.target.value)}
+                    className="w-full h-9 px-2 rounded-xl border border-input bg-background text-xs text-foreground focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="TRANSFERENCIA">Transferencia</option>
+                    <option value="PAGO_MOVIL">Pago Móvil</option>
+                    <option value="EFECTIVO">Efectivo</option>
+                    <option value="ZELLE">Zelle</option>
+                    <option value="DEBITO">Punto / Débito</option>
+                    <option value="OTRO">Otro</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1">Referencia / Comprobante</label>
+                <input
+                  type="text"
+                  placeholder="Ej: 98765432"
+                  value={supplierPaymentReference}
+                  onChange={(e) => setSupplierPaymentReference(e.target.value)}
+                  className="w-full h-9 px-3 rounded-xl border border-input bg-background text-xs font-mono text-foreground focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1">Notas / Observación</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Abono a factura de insumos"
+                  value={supplierPaymentNotes}
+                  onChange={(e) => setSupplierPaymentNotes(e.target.value)}
+                  className="w-full h-9 px-3 rounded-xl border border-input bg-background text-xs text-foreground focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setPaymentInvoice(null)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold text-muted-foreground hover:bg-muted cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
+                >
+                  Confirmar Pago
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

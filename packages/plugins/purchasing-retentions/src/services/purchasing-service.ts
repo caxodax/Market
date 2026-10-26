@@ -1,5 +1,8 @@
 import type {
+  AccountPaymentRecord,
   CreatePurchaseInvoiceInput,
+  PaymentCondition,
+  PaymentTermStatus,
   PurchaseInvoice,
   PurchaseInvoiceItem,
   RetentionVoucher,
@@ -167,6 +170,23 @@ export function preparePurchaseInvoice(options: {
     };
   }
 
+  // Términos de Pago y Cuentas por Pagar (CxP)
+  const isCredit = input.payment_condition === "CREDIT";
+  const creditTermDays = isCredit ? (input.credit_term_days && input.credit_term_days > 0 ? input.credit_term_days : 30) : 0;
+  const dueDate = isCredit
+    ? (input.due_date || addDaysToDate(input.invoice_date, creditTermDays))
+    : input.invoice_date;
+
+  // Deuda Neta con el Proveedor = Total Factura - Retención IVA - Retención ISLR
+  const netPayableAmount = Number(
+    Math.max(0, totalAmount - (retainedVatAmount || 0) - (retainedIslrAmount || 0)).toFixed(2)
+  );
+
+  const paymentCondition: PaymentCondition = isCredit ? "CREDIT" : "CASH";
+  const paymentStatus: PaymentTermStatus = isCredit ? "PENDING" : "PAID";
+  const amountPaid = isCredit ? 0 : netPayableAmount;
+  const amountDue = isCredit ? netPayableAmount : 0;
+
   const invoice: PurchaseInvoice = {
     id: invoiceId,
     tenant_id: settings.tenant_id,
@@ -177,7 +197,7 @@ export function preparePurchaseInvoice(options: {
     control_number: input.control_number || null,
     invoice_date: input.invoice_date,
     received_date: now.split("T")[0],
-    status: "REGISTERED",
+    status: isCredit ? "REGISTERED" : "PAID",
     notes: input.notes || null,
 
     items,
@@ -196,6 +216,16 @@ export function preparePurchaseInvoice(options: {
     islr_concept_code: input.apply_islr_retention ? islrConceptCode : undefined,
     islr_retention_rate_percent: input.apply_islr_retention ? islrRate : undefined,
     islr_retention_voucher_id: islrRetentionVoucher?.id || null,
+
+    // Cuentas por Pagar (CxP)
+    payment_condition: paymentCondition,
+    credit_term_days: creditTermDays,
+    due_date: dueDate,
+    payment_status: paymentStatus,
+    net_payable_amount: netPayableAmount,
+    amount_paid: amountPaid,
+    amount_due: amountDue,
+    payments: [],
 
     created_at: now,
     created_by: actorName || "Admin",
@@ -397,4 +427,89 @@ export function buildSeniatIslrXmlFromInvoices(options: {
     taxPeriod: targetPeriod,
     rows,
   });
+}
+
+export function addDaysToDate(dateStr: string, days: number): string {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) {
+    const today = new Date();
+    today.setDate(today.getDate() + days);
+    return today.toISOString().split("T")[0];
+  }
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split("T")[0];
+}
+
+export interface RecordSupplierPaymentInput {
+  amount: number;
+  payment_date?: string; // YYYY-MM-DD
+  payment_method: string;
+  reference?: string | null;
+  notes?: string | null;
+  registered_by?: string | null;
+}
+
+export function recordSupplierPayment(
+  invoice: PurchaseInvoice,
+  payment: RecordSupplierPaymentInput
+): PurchaseInvoice {
+  if (payment.amount <= 0) {
+    throw new Error("El monto a registrar debe ser mayor a 0.");
+  }
+
+  const netPayable =
+    invoice.net_payable_amount ??
+    Number(
+      Math.max(
+        0,
+        invoice.total_amount -
+          (invoice.retained_vat_amount || 0) -
+          (invoice.retained_islr_amount || 0)
+      ).toFixed(2)
+    );
+
+  const currentDue =
+    invoice.amount_due ??
+    (invoice.payment_condition === "CREDIT" ? netPayable : 0);
+
+  if (payment.amount > currentDue + 0.01) {
+    throw new Error(
+      `El monto a abonar ($${payment.amount.toFixed(2)}) no puede exceder la deuda neta pendiente ($${currentDue.toFixed(2)}).`
+    );
+  }
+
+  const currentPaid = invoice.amount_paid ?? 0;
+  const newAmountPaid = Number((currentPaid + payment.amount).toFixed(2));
+  const newAmountDue = Number(Math.max(0, netPayable - newAmountPaid).toFixed(2));
+
+  const today = new Date().toISOString().split("T")[0];
+  let newStatus: PaymentTermStatus = "PENDING";
+  if (newAmountDue <= 0.005) {
+    newStatus = "PAID";
+  } else if (invoice.due_date && invoice.due_date < today) {
+    newStatus = "OVERDUE";
+  } else {
+    newStatus = "PARTIALLY_PAID";
+  }
+
+  const paymentRecord: AccountPaymentRecord = {
+    id: `pay_sup_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    amount: payment.amount,
+    payment_date: payment.payment_date || today,
+    payment_method: payment.payment_method,
+    reference: payment.reference || null,
+    notes: payment.notes || null,
+    registered_by: payment.registered_by || null,
+    created_at: new Date().toISOString(),
+  };
+
+  return {
+    ...invoice,
+    status: newAmountDue <= 0.005 ? "PAID" : invoice.status,
+    amount_paid: newAmountPaid,
+    amount_due: newAmountDue,
+    payment_status: newStatus,
+    net_payable_amount: netPayable,
+    payments: [...(invoice.payments || []), paymentRecord],
+  };
 }

@@ -4,6 +4,12 @@
  * SENIAT VAT & Income Tax Retentions (Sujetos Pasivos Especiales), and Chile DTE 46 / RCV.
  */
 
+import type {
+  PaymentCondition,
+  PaymentTermStatus,
+  AccountPaymentRecord,
+} from "./invoicing.ts";
+
 export interface Supplier {
   id: string;
   tenant_id: string;
@@ -60,6 +66,16 @@ export interface PurchaseInvoice {
   islr_concept_code?: string | null; // Código oficial de concepto Decreto 1.808 (ej. "055")
   islr_retention_rate_percent?: number | null; // % de retención ISLR aplicado (ej. 2, 3, 5)
   islr_retention_voucher_id?: string | null; // ID de comprobante ISLR si se emite por separado
+
+  // Términos de Pago y Cuentas por Pagar (CxP)
+  payment_condition?: PaymentCondition;
+  credit_term_days?: number;
+  due_date?: string | null;
+  payment_status?: PaymentTermStatus;
+  net_payable_amount?: number;      // Total Factura menos Retenciones (IVA + ISLR)
+  amount_paid?: number;
+  amount_due?: number;
+  payments?: AccountPaymentRecord[];
 
   created_at: string;
   created_by?: string | null;
@@ -125,6 +141,11 @@ export interface CreatePurchaseInvoiceInput {
   control_number?: string | null;
   invoice_date: string;
   notes?: string | null;
+
+  // Términos de Pago (Contado vs Crédito)
+  payment_condition?: PaymentCondition;
+  credit_term_days?: number;
+  due_date?: string | null;
 
   items: Array<{
     name: string;

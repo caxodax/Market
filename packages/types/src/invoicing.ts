@@ -12,6 +12,20 @@ export type FiscalDocumentType =
 
 export type FiscalDocumentStatus = "ISSUED" | "ANNULLED";
 
+export type PaymentCondition = "CASH" | "CREDIT";
+export type PaymentTermStatus = "PENDING" | "PARTIALLY_PAID" | "PAID" | "OVERDUE";
+
+export interface AccountPaymentRecord {
+  id: string;
+  amount: number;
+  payment_date: string; // YYYY-MM-DD
+  payment_method: string;
+  reference?: string | null;
+  notes?: string | null;
+  registered_by?: string | null;
+  created_at: string;
+}
+
 export interface FiscalDocumentItem {
   id: string;
   product_id?: string;
@@ -76,6 +90,15 @@ export interface FiscalDocument {
   // Datos de Transporte / Despacho
   transport_info?: FiscalDocumentTransportInfo;
 
+  // Términos de Pago y Cuentas por Cobrar (CxC)
+  payment_condition?: PaymentCondition;
+  credit_term_days?: number;
+  due_date?: string | null;
+  payment_status?: PaymentTermStatus;
+  amount_paid?: number;
+  amount_due?: number;
+  payments?: AccountPaymentRecord[];
+
   // Metadatos y Leyendas Legales
   qr_data?: string | null;
   legal_legend?: string | null;     // Leyenda SENIAT / SII / Comercial
@@ -91,6 +114,11 @@ export interface CreateFiscalDocumentInput {
   affected_document_number?: string | null;
   reason?: string | null;
   return_items_to_inventory?: boolean;
+
+  // Términos de Pago (Contado vs Crédito)
+  payment_condition?: PaymentCondition;
+  credit_term_days?: number;
+  due_date?: string | null;
 
   customer_name: string;
   customer_id_doc: string;

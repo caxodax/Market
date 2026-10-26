@@ -1,7 +1,10 @@
 import type {
+  AccountPaymentRecord,
   CreateFiscalDocumentInput,
   FiscalDocument,
   FiscalDocumentItem,
+  PaymentCondition,
+  PaymentTermStatus,
   TenantSettings,
 } from "@marketos/types";
 import { resolveFiscalAdapter } from "../adapters/fiscal-adapter.ts";
@@ -93,6 +96,19 @@ export function prepareFiscalDocument(
   });
 
   const now = new Date().toISOString();
+  const todayStr = now.split("T")[0];
+
+  // 9. Términos de Pago (Contado vs Crédito)
+  const isCredit = input.payment_condition === "CREDIT";
+  const creditTermDays = isCredit ? (input.credit_term_days && input.credit_term_days > 0 ? input.credit_term_days : 30) : 0;
+  const dueDate = isCredit
+    ? (input.due_date || addDaysToDate(todayStr, creditTermDays))
+    : todayStr;
+
+  const paymentCondition: PaymentCondition = isCredit ? "CREDIT" : "CASH";
+  const paymentStatus: PaymentTermStatus = isCredit ? "PENDING" : "PAID";
+  const amountPaid = isCredit ? 0 : breakdown.total;
+  const amountDue = isCredit ? breakdown.total : 0;
 
   return {
     id: `fdoc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -139,7 +155,86 @@ export function prepareFiscalDocument(
     transport_info: input.transport_info,
     qr_data: qrData,
     legal_legend: legalLegend,
+
+    // Cuentas por Cobrar (CxC)
+    payment_condition: paymentCondition,
+    credit_term_days: creditTermDays,
+    due_date: dueDate,
+    payment_status: paymentStatus,
+    amount_paid: amountPaid,
+    amount_due: amountDue,
+    payments: [],
+
     created_at: now,
     created_by: actorName || "Admin",
+  };
+}
+
+export function addDaysToDate(dateStr: string, days: number): string {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) {
+    const today = new Date();
+    today.setDate(today.getDate() + days);
+    return today.toISOString().split("T")[0];
+  }
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split("T")[0];
+}
+
+export interface RecordCustomerPaymentInput {
+  amount: number;
+  payment_date?: string; // YYYY-MM-DD
+  payment_method: string;
+  reference?: string | null;
+  notes?: string | null;
+  registered_by?: string | null;
+}
+
+export function recordCustomerPayment(
+  document: FiscalDocument,
+  payment: RecordCustomerPaymentInput
+): FiscalDocument {
+  if (payment.amount <= 0) {
+    throw new Error("El monto a registrar debe ser mayor a 0.");
+  }
+
+  const currentDue = document.amount_due ?? (document.payment_condition === "CREDIT" ? document.total_amount : 0);
+  if (payment.amount > currentDue + 0.01) {
+    throw new Error(
+      `El monto a abonar ($${payment.amount.toFixed(2)}) no puede exceder el saldo pendiente ($${currentDue.toFixed(2)}).`
+    );
+  }
+
+  const currentPaid = document.amount_paid ?? 0;
+  const newAmountPaid = Number((currentPaid + payment.amount).toFixed(2));
+  const newAmountDue = Number(Math.max(0, document.total_amount - newAmountPaid).toFixed(2));
+
+  const today = new Date().toISOString().split("T")[0];
+  let newStatus: PaymentTermStatus = "PENDING";
+  if (newAmountDue <= 0.005) {
+    newStatus = "PAID";
+  } else if (document.due_date && document.due_date < today) {
+    newStatus = "OVERDUE";
+  } else {
+    newStatus = "PARTIALLY_PAID";
+  }
+
+  const paymentRecord: AccountPaymentRecord = {
+    id: `pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    amount: payment.amount,
+    payment_date: payment.payment_date || today,
+    payment_method: payment.payment_method,
+    reference: payment.reference || null,
+    notes: payment.notes || null,
+    registered_by: payment.registered_by || null,
+    created_at: new Date().toISOString(),
+  };
+
+  return {
+    ...document,
+    amount_paid: newAmountPaid,
+    amount_due: newAmountDue,
+    payment_status: newStatus,
+    payments: [...(document.payments || []), paymentRecord],
   };
 }

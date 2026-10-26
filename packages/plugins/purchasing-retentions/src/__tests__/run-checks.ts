@@ -9,6 +9,8 @@ import {
   preparePurchaseInvoice,
   prepareRetentionVoucher,
   buildSeniatRetentionTxt,
+  recordSupplierPayment,
+  addDaysToDate,
 } from "../services/purchasing-service.ts";
 import type { TenantSettings, CreatePurchaseInvoiceInput, SeniatRetentionTxtRow } from "@marketos/types";
 
@@ -422,6 +424,90 @@ console.log("  Testing buildPurchasesBook & exportPurchasesBookCsv...");
   assert.ok(csv.includes("Distribuidora Polar C.A."));
   assert.ok(csv.includes("20261000000001"), "CSV must include retention voucher number");
   assert.ok(csv.includes("TOTALES GENERALES"), "CSV must include totals row");
+}
+
+// ─── 8. CUENTAS POR PAGAR (CxP) TESTS ──────────────────────────────────────────
+console.log("  Testing Accounts Payable (CxP) and Supplier Payments...");
+{
+  // 1. Credit Purchase Invoice with dual withholding (VAT 75% + ISLR 2%)
+  const creditInput: CreatePurchaseInvoiceInput = {
+    supplier_name: "Molinos Nacionales C.A.",
+    supplier_tax_id: "J-00022334-9",
+    invoice_number: "FACT-MOL-4421",
+    invoice_date: "2026-10-20",
+    payment_condition: "CREDIT",
+    credit_term_days: 30,
+    items: [
+      { name: "Saco Harina Trigo 50kg", quantity: 20, unit_price: 50.0, is_exempt: false },
+    ],
+    currency: "USD",
+    auto_generate_retention: true,
+    retention_rate_percent: 75.0,
+    apply_islr_retention: true,
+    islr_concept_code: "055", // 2.0%
+    islr_retention_rate_percent: 2.0,
+  };
+
+  const { invoice, retentionVoucher, islrRetentionVoucher } = preparePurchaseInvoice({
+    input: creditInput,
+    settings: mockSettings,
+    existingCount: 5,
+    activeModuleIds: ["local_venezuela"],
+  });
+
+  // Base: 1000, IVA 16%: 160, Total: 1160
+  // Retención IVA 75%: 120.00
+  // Retención ISLR 2%: 20.00
+  // Net Payable to Supplier: 1160 - 120 - 20 = 1020.00
+  assert.equal(invoice.total_amount, 1160.0);
+  assert.equal(invoice.retained_vat_amount, 120.0);
+  assert.equal(invoice.retained_islr_amount, 20.0);
+  assert.equal(invoice.payment_condition, "CREDIT");
+  assert.equal(invoice.credit_term_days, 30);
+  assert.equal(invoice.net_payable_amount, 1020.0, "Net payable must equal total - retained VAT - retained ISLR");
+  assert.equal(invoice.amount_paid, 0.0);
+  assert.equal(invoice.amount_due, 1020.0);
+  assert.equal(invoice.payment_status, "PENDING");
+  assert.equal(invoice.due_date, "2026-11-19");
+  console.log("    ✔ Credit purchase invoice accurately computes net payable debt after retentions");
+
+  // 2. Partial Abono to Supplier
+  const partialPaid = recordSupplierPayment(invoice, {
+    amount: 500.0,
+    payment_method: "TRANSFERENCIA",
+    reference: "TRF-BANCO-776655",
+    notes: "Abono 500$ inicial",
+  });
+
+  assert.equal(partialPaid.amount_paid, 500.0);
+  assert.equal(partialPaid.amount_due, 520.0);
+  assert.equal(partialPaid.payment_status, "PARTIALLY_PAID");
+  assert.equal(partialPaid.payments?.length, 1);
+  assert.equal(partialPaid.payments?.[0].amount, 500.0);
+  assert.equal(partialPaid.payments?.[0].payment_method, "TRANSFERENCIA");
+  console.log("    ✔ Supplier abono updates net debt and sets status to PARTIALLY_PAID");
+
+  // 3. Full Settlement of Supplier Debt
+  const fullySettled = recordSupplierPayment(partialPaid, {
+    amount: 520.0,
+    payment_method: "PAGO_MOVIL",
+    reference: "PM-889900",
+  });
+
+  assert.equal(fullySettled.amount_paid, 1020.0);
+  assert.equal(fullySettled.amount_due, 0.0);
+  assert.equal(fullySettled.payment_status, "PAID");
+  assert.equal(fullySettled.status, "PAID");
+  assert.equal(fullySettled.payments?.length, 2);
+
+  // Overpay protection
+  assert.throws(() => {
+    recordSupplierPayment(fullySettled, {
+      amount: 50.0,
+      payment_method: "EFECTIVO",
+    });
+  }, /no puede exceder la deuda neta pendiente/);
+  console.log("    ✔ Settling supplier debt transitions status to PAID and protects against overpayment");
 }
 
 console.log("✅ All checks passed successfully for @marketos/plugin-purchasing-retentions!");

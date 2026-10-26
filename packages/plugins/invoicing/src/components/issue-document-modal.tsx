@@ -7,6 +7,7 @@ import type {
   FiscalDocumentType,
   CreateFiscalDocumentInput,
   TenantSettings,
+  PaymentCondition,
 } from "@marketos/types";
 import { formatCurrency } from "@marketos/utils";
 import { resolveFiscalAdapter } from "../adapters/fiscal-adapter";
@@ -23,6 +24,7 @@ import {
   ShieldCheck,
   Receipt,
   HelpCircle,
+  CreditCard,
 } from "lucide-react";
 
 export interface IssueDocumentModalProps {
@@ -80,6 +82,10 @@ export function IssueDocumentModal({
   const [vehiclePlate, setVehiclePlate] = useState<string>("");
   const [packagesCount, setPackagesCount] = useState<number>(1);
   const [transportReason, setTransportReason] = useState<string>("Venta y Entrega a Domicilio");
+
+  // Payment Condition & Terms (CxC)
+  const [paymentCondition, setPaymentCondition] = useState<PaymentCondition>("CASH");
+  const [creditTermDays, setCreditTermDays] = useState<number>(30);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -203,6 +209,8 @@ export function IssueDocumentModal({
         affected_document_number: affectedNumber || null,
         reason: reason.trim() || null,
         return_items_to_inventory: docType === "CREDIT_NOTE" ? returnItemsToInventory : false,
+        payment_condition: docType === "INVOICE" ? paymentCondition : "CASH",
+        credit_term_days: docType === "INVOICE" && paymentCondition === "CREDIT" ? creditTermDays : undefined,
         customer_name: customerName.trim(),
         customer_id_doc: customerIdDoc.trim().toUpperCase(),
         customer_phone: customerPhone.trim() || null,
@@ -486,6 +494,76 @@ export function IssueDocumentModal({
                   />
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Condición de Pago Comercial (Contado vs Crédito CxC) */}
+          {docType === "INVOICE" && (
+            <div className="p-3.5 rounded-xl border border-border bg-muted/20 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <CreditCard className="w-3.5 h-3.5 text-primary" />
+                  Condición de Pago
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentCondition("CASH")}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                      paymentCondition === "CASH"
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Contado
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentCondition("CREDIT")}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                      paymentCondition === "CREDIT"
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Crédito (CxC)
+                  </button>
+                </div>
+              </div>
+
+              {paymentCondition === "CREDIT" && (
+                <div className="pt-2 border-t border-border/60 grid grid-cols-2 gap-3 animate-in fade-in duration-150">
+                  <div>
+                    <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+                      Plazo de Crédito
+                    </label>
+                    <select
+                      value={creditTermDays}
+                      onChange={(e) => setCreditTermDays(Number(e.target.value))}
+                      className="w-full h-8 px-2 rounded-lg border border-input bg-background text-xs text-foreground focus:ring-1 focus:ring-primary"
+                    >
+                      <option value={7}>7 Días</option>
+                      <option value={15}>15 Días</option>
+                      <option value={30}>30 Días</option>
+                      <option value={45}>45 Días</option>
+                      <option value={60}>60 Días</option>
+                      <option value={90}>90 Días</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+                      Vencimiento Estimado
+                    </label>
+                    <div className="h-8 px-2 flex items-center rounded-lg border border-dashed border-border bg-muted/40 text-xs font-mono font-bold text-foreground">
+                      {(() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + creditTermDays);
+                        return d.toISOString().split("T")[0];
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

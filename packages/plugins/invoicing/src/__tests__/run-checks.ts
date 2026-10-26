@@ -7,7 +7,11 @@ import {
   GlobalFiscalAdapter,
   resolveFiscalAdapter,
 } from "../adapters/fiscal-adapter.ts";
-import { prepareFiscalDocument } from "../services/invoicing-service.ts";
+import {
+  prepareFiscalDocument,
+  recordCustomerPayment,
+  addDaysToDate,
+} from "../services/invoicing-service.ts";
 import { INVOICING_MANIFEST } from "../manifest.ts";
 import type { TenantSettings, FiscalDocument } from "@marketos/types";
 
@@ -267,4 +271,61 @@ assert.ok(csvOutput.includes(";"), "CSV must use semicolon as column delimiter")
 assert.ok(csvOutput.includes("TOTALES GENERALES"), "CSV must contain summary totals row");
 console.log("  ✔ exportSalesBookCsv generates Excel-compliant UTF-8 BOM semicolon-delimited CSV");
 
-console.log("🎉 All 13 @marketos/plugin-invoicing checks passed successfully!");
+// 14. Accounts Receivable (CxC) - Invoice issued on Credit
+const creditInvoice = prepareFiscalDocument({
+  input: {
+    document_type: "INVOICE",
+    customer_name: "Distribuidora Los Andes",
+    customer_id_doc: "J-30987654-1",
+    payment_condition: "CREDIT",
+    credit_term_days: 15,
+    items: [{ name: "Caja de Aceite Vegetal", quantity: 2, unit_price: 25.0 }],
+  },
+  settings: mockSettings,
+  existingCount: 20,
+  activeModuleIds: ["local_venezuela"],
+});
+assert.strictEqual(creditInvoice.payment_condition, "CREDIT");
+assert.strictEqual(creditInvoice.credit_term_days, 15);
+assert.strictEqual(creditInvoice.payment_status, "PENDING");
+assert.strictEqual(creditInvoice.amount_paid, 0);
+assert.strictEqual(creditInvoice.amount_due, 58.0); // 50 + 16% IVA = 58.00
+assert.ok(creditInvoice.due_date, "Credit invoice must have a calculated due_date");
+console.log("  ✔ Credit invoice initializes with payment_status PENDING and amount_due = total");
+
+// 15. Record Partial Customer Payment / Abono (CxC)
+const partiallyPaid = recordCustomerPayment(creditInvoice, {
+  amount: 20.0,
+  payment_method: "TRANSFERENCIA",
+  reference: "TRF-998877",
+  notes: "Primer abono 20$",
+});
+assert.strictEqual(partiallyPaid.amount_paid, 20.0);
+assert.strictEqual(partiallyPaid.amount_due, 38.0);
+assert.strictEqual(partiallyPaid.payment_status, "PARTIALLY_PAID");
+assert.strictEqual(partiallyPaid.payments?.length, 1);
+assert.strictEqual(partiallyPaid.payments?.[0].amount, 20.0);
+assert.strictEqual(partiallyPaid.payments?.[0].payment_method, "TRANSFERENCIA");
+console.log("  ✔ Customer abono transitions status to PARTIALLY_PAID and updates balance");
+
+// 16. Record Total Customer Payment / Full Settlement & Overpay Protection
+const fullyPaid = recordCustomerPayment(partiallyPaid, {
+  amount: 38.0,
+  payment_method: "PAGO_MOVIL",
+  reference: "PM-112233",
+});
+assert.strictEqual(fullyPaid.amount_paid, 58.0);
+assert.strictEqual(fullyPaid.amount_due, 0.0);
+assert.strictEqual(fullyPaid.payment_status, "PAID");
+assert.strictEqual(fullyPaid.payments?.length, 2);
+
+// Overpay protection
+assert.throws(() => {
+  recordCustomerPayment(fullyPaid, {
+    amount: 10.0,
+    payment_method: "EFECTIVO",
+  });
+}, /no puede exceder el saldo pendiente/);
+console.log("  ✔ Settling debt transitions status to PAID and protects against overpayment");
+
+console.log("🎉 All 16 @marketos/plugin-invoicing checks passed successfully!");
