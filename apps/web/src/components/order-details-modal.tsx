@@ -268,7 +268,7 @@ export function OrderDetailsModal({
         {/* Datos del Cliente y Despacho */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
           {/* Tarjeta Cliente con Cédula destacada */}
-          <div className="bg-muted/40 p-3.5 rounded-2xl border border-border space-y-1.5">
+          <div className="bg-muted/40 p-3.5 rounded-2xl border border-border space-y-1.5 min-w-0">
             <div className="flex items-center justify-between">
               <span className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5 text-primary" />
@@ -354,7 +354,7 @@ export function OrderDetailsModal({
           </div>
 
           {/* Tarjeta Dirección / Modalidad */}
-          <div className="bg-muted/40 p-3.5 rounded-2xl border border-border space-y-1.5">
+          <div className="bg-muted/40 p-3.5 rounded-2xl border border-border space-y-1.5 min-w-0">
             <span className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider flex items-center gap-1.5">
               {order.delivery_type === "DELIVERY" ? (
                 <Truck className="w-3.5 h-3.5 text-primary" />
@@ -409,12 +409,12 @@ export function OrderDetailsModal({
                 )}
 
                 {drivers.length > 0 ? (
-                  <div className="space-y-2">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                      <span className="text-muted-foreground font-semibold flex items-center gap-1">
-                        <Truck className="w-3.5 h-3.5 text-primary" />
+                  <div className="space-y-2 pt-0.5">
+                    <div className="space-y-1">
+                      <label className="text-muted-foreground font-semibold flex items-center gap-1 text-[11px]">
+                        <Truck className="w-3.5 h-3.5 text-primary shrink-0" />
                         <span>Asignar Motorizado / Repartidor:</span>
-                      </span>
+                      </label>
                       <select
                         value={selectedDriverId}
                         onChange={(e) => {
@@ -424,7 +424,7 @@ export function OrderDetailsModal({
                             onUpdateStatus(order.id, "DELIVERING", newDrvId);
                           }
                         }}
-                        className="bg-card border border-border rounded-xl px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-xs cursor-pointer"
+                        className="w-full bg-card border border-border rounded-xl px-2.5 py-2 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-xs cursor-pointer truncate"
                       >
                         {drivers.map((drv) => (
                           <option key={drv.id} value={drv.id}>
@@ -439,10 +439,10 @@ export function OrderDetailsModal({
                         href={driverDispatchUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all active:scale-98"
+                        className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all active:scale-98 text-center"
                       >
-                        <MessageCircle className="w-4 h-4" />
-                        <span>📲 Despachar Comanda por WhatsApp a {assignedDriver?.name}</span>
+                        <MessageCircle className="w-4 h-4 shrink-0" />
+                        <span className="truncate">📲 Despachar Comanda por WhatsApp a {assignedDriver?.name}</span>
                       </a>
                     )}
                   </div>
