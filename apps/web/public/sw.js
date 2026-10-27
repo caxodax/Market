@@ -110,6 +110,11 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
+  // Ignorar protocolos no soportados por Cache API (ej: chrome-extension://, moz-extension://)
+  if (!url.protocol.startsWith('http')) {
+    return;
+  }
+
   // Excluir llamadas API o Server Actions de Next.js
   if (url.pathname.startsWith('/api/') || request.headers.get('next-action')) {
     return;
@@ -122,7 +127,7 @@ self.addEventListener('fetch', (event) => {
         .then((response) => {
           if (response.status === 200) {
             const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy).catch(() => null));
           }
           return response;
         })
@@ -156,7 +161,7 @@ self.addEventListener('fetch', (event) => {
         const fetchPromise = fetch(request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, responseToCache));
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, responseToCache).catch(() => null));
           }
           return networkResponse;
         }).catch(() => null);
