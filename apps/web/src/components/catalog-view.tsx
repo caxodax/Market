@@ -44,6 +44,10 @@ import {
   Check,
   X,
   LayoutGrid,
+  Trash2,
+  Plus,
+  Minus,
+  ShieldCheck,
 } from "lucide-react";
 
 interface CatalogViewProps {
@@ -75,8 +79,12 @@ export function CatalogView({
   activeModuleIds = [],
   modifierGroups = [],
 }: CatalogViewProps) {
-  const { totalItems, totalUsd, setIsOpen, addItem } = useCart();
+  const { items, totalItems, totalUsd, setIsOpen, addItem, removeItem, updateQuantity } = useCart();
   const { favorites, favoritesCount } = useFavorites();
+
+  const freeShippingThreshold = 25;
+  const freeShippingProgress = Math.min(100, Math.round((totalUsd / freeShippingThreshold) * 100));
+  const remainingForFreeShipping = Math.max(0, freeShippingThreshold - totalUsd);
 
   const effectiveRateInfo = useMemo(() => {
     return calculateEffectiveExchangeRate(exchangeRate, settings.currency_settings);
@@ -209,8 +217,8 @@ export function CatalogView({
         totalItems > 0 ? "pb-32 sm:pb-24" : "pb-20"
       }`}
     >
-      {/* Search and Category Combobox Bar - Sticky under StoreHeader */}
-      <div className="bg-background/95 backdrop-blur border-b border-border sticky top-[92px] sm:top-[102px] z-20 shadow-xs">
+      {/* Search and Category Combobox Bar - Sticky under StoreHeader (Mobile/Tablet Only) */}
+      <div className="bg-background/95 backdrop-blur border-b border-border sticky top-[92px] sm:top-[102px] z-20 shadow-xs lg:hidden">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-2.5 space-y-2">
           {/* STEP 1: CATEGORÍAS (Explicitly ABOVE the search bar for both Mobile and Desktop) */}
           <div className="relative">
@@ -532,259 +540,713 @@ export function CatalogView({
         </div>
       </div>
 
-      {/* Main Catalog Section */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 pt-3 sm:pt-4">
-        {/* Storefront Pro: Body Modular Sections (Hero, Bubbles, Rails, Reels, Badges, etc.) */}
-        {isStorefrontProActive && storefrontConfig ? (
-          <div className="mb-4">
-            <StorefrontProRenderer
-              config={storefrontConfig}
-              position="body"
-              categories={categories}
-              products={products}
-              selectedStore={stores[0]}
-              exchangeRate={exchangeRate}
-              selectedCategoryId={selectedCategoryIds[0] || null}
-              onSelectCategory={(catId) => {
-                if (catId) {
-                  setSelectedCategoryIds([catId]);
-                  if (setControlledCategory) setControlledCategory(catId);
-                } else {
-                  setSelectedCategoryIds([]);
-                  if (setControlledCategory) setControlledCategory(null);
-                }
-              }}
-              onAddToCart={addItem}
-              onActionClick={(link) => {
-                if (link?.startsWith("category:")) {
-                  const catTarget = link.replace("category:", "").toLowerCase();
-                  const found = categories.find(
-                    (c) => c.id.toLowerCase() === catTarget || c.name.toLowerCase().includes(catTarget)
-                  );
-                  if (found) {
-                    setSelectedCategoryIds([found.id]);
-                    if (setControlledCategory) setControlledCategory(found.id);
-                  }
-                } else if (link === "catalog") {
-                  document.getElementById("catalog-section")?.scrollIntoView({ behavior: "smooth" });
-                }
-              }}
-            />
-          </div>
-        ) : (
-          /* Promotional VIP Banner Capsule (Clean & Compact) */
-          <div className="mb-4 p-2.5 sm:p-3 rounded-2xl bg-gradient-to-r from-primary/10 via-amber-500/10 to-primary/5 border border-primary/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-xs">
-                <Tag className="w-4 h-4" />
-              </div>
-              <div className="min-w-0 text-xs">
-                <span className="font-extrabold text-foreground tracking-tight">
-                  Cupones Activos:{" "}
-                </span>
-                <span className="text-muted-foreground text-[11px]">
-                  Usa <code className="font-mono font-bold text-primary bg-primary/10 px-1 py-0.5 rounded">BIENVENIDO</code> ($2 OFF) o <code className="font-mono font-bold text-primary bg-primary/10 px-1 py-0.5 rounded">SHOP10</code> (10% OFF).
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-foreground/80 self-end sm:self-auto bg-background/90 px-2.5 py-1 rounded-xl border border-border shadow-2xs shrink-0">
-              <Truck className="w-3 h-3 text-primary shrink-0" />
-              <span>Delivery gratis en Nueva Segovia</span>
-            </div>
-          </div>
-        )}
-
-        {/* Section Heading with Counter */}
-        <div id="catalog-section" className="flex items-center justify-between mb-3 sm:mb-4 scroll-mt-28">
-          <h2 className="text-xs sm:text-sm font-black tracking-tight text-foreground flex items-center gap-1.5">
-            {isFavoritesOnly ? (
-              <>
-                <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />
-                <span>Mis Productos Favoritos</span>
-              </>
-            ) : selectedCategoryIds.length === 1 ? (
-              <>
-                <Sparkles className="w-4 h-4 text-primary" />
-                <span>{categories.find((c) => c.id === selectedCategoryIds[0])?.name || "Catálogo"}</span>
-              </>
-            ) : selectedCategoryIds.length > 1 ? (
-              <>
-                <Sparkles className="w-4 h-4 text-primary" />
-                <span>Categorías Seleccionadas ({selectedCategoryIds.length})</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 text-primary" />
-                <span>Catálogo Disponible</span>
-              </>
-            )}
-            <span className="text-[11px] sm:text-xs text-muted-foreground font-semibold">
-              ({totalProducts} {totalProducts === 1 ? "producto" : "productos"})
-            </span>
-          </h2>
-
-          {activeFiltersCount > 0 && (
-            <button
-              onClick={selectAllCategories}
-              className="text-xs font-bold text-primary hover:underline transition-colors cursor-pointer"
-            >
-              Ver todo
-            </button>
-          )}
-        </div>
-
-        {/* Products Grid with Reactive Section Transition */}
-        <div
-          key={`${selectedCategoryIds.join("-")}-${isFavoritesOnly}-${searchQuery}-${currentPage}-${pageSize}`}
-          className="animate-in fade-in duration-200"
-        >
-          {filteredProducts.length === 0 ? (
-            isFavoritesOnly ? (
-              <div className="p-10 text-center rounded-2xl border border-dashed border-rose-500/30 bg-rose-500/5 max-w-lg mx-auto">
-                <div className="w-12 h-12 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-500 mx-auto mb-3">
-                  <Heart className="w-6 h-6 stroke-[1.8]" />
+      {/* 3-Column Desktop / Responsive Catalog Container */}
+      <div className="max-w-[1536px] mx-auto px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 xl:gap-6 items-start">
+          {/* Left Column: Category Sidebar (Desktop Only) */}
+          <aside className="hidden lg:block lg:col-span-3 xl:col-span-2 sticky top-[100px] max-h-[calc(100vh-7.5rem)] overflow-y-auto space-y-3.5 pr-1 scrollbar-thin">
+            <div className="rounded-2xl border border-border bg-card p-3.5 shadow-xs space-y-2.5">
+              <div className="flex items-center justify-between pb-2 border-b border-border">
+                <div className="flex items-center gap-1.5 font-black text-xs uppercase tracking-wider text-muted-foreground">
+                  <LayoutGrid className="w-3.5 h-3.5 text-primary" />
+                  <span>Categorías</span>
                 </div>
-                <p className="font-bold text-foreground text-sm">
-                  Aún no tienes productos favoritos
-                </p>
-                <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
-                  Toca el corazón (❤️) en la esquina de cualquier producto para guardarlo aquí y comprarlo en un clic.
-                </p>
-                <button
-                  onClick={selectAllCategories}
-                  className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-transform active:scale-95 cursor-pointer shadow-xs"
-                >
-                  <span>Explorar todo el catálogo</span>
-                </button>
+                {activeFiltersCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={selectAllCategories}
+                    className="text-[11px] font-bold text-primary hover:underline cursor-pointer"
+                  >
+                    Limpiar
+                  </button>
+                )}
               </div>
-            ) : (
-              <div className="p-10 text-center rounded-2xl border border-dashed border-border bg-card/60 max-w-md mx-auto">
-                <SlidersHorizontal className="w-9 h-9 text-muted-foreground mx-auto mb-3 opacity-40" />
-                <p className="font-bold text-foreground text-sm">
-                  No se encontraron productos
-                </p>
-                <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
-                  Prueba con otro término de búsqueda o selecciona otra categoría.
-                </p>
-                <button
-                  onClick={() => {
-                    setSearchQuery("");
-                    selectAllCategories();
-                  }}
-                  className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-transform active:scale-95 cursor-pointer shadow-xs"
+
+              {/* Todas las categorías */}
+              <button
+                type="button"
+                onClick={selectAllCategories}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  selectedCategoryIds.length === 0 && !isFavoritesOnly
+                    ? "bg-primary text-primary-foreground shadow-xs font-black"
+                    : "text-foreground hover:bg-muted"
+                }`}
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Todas</span>
+                </div>
+                <span
+                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full font-bold ${
+                    selectedCategoryIds.length === 0 && !isFavoritesOnly
+                      ? "bg-white/20 text-white"
+                      : "bg-muted text-muted-foreground"
+                  }`}
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Ver todos los productos</span>
-                </button>
-              </div>
-            )
-          ) : (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-4">
-                {paginatedProducts.map((product) => {
-                  const mods = getProductModifierGroups(product);
-                  const hasModifiers = mods.length > 0;
+                  {products.length}
+                </span>
+              </button>
+
+              {/* Favoritos */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFavoritesOnly(!isFavoritesOnly);
+                  if (!isFavoritesOnly) setSelectedCategoryIds([]);
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  isFavoritesOnly
+                    ? "bg-rose-500 text-white shadow-xs font-black"
+                    : "text-foreground hover:bg-rose-500/10 hover:text-rose-600"
+                }`}
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <Heart
+                    className={`w-3.5 h-3.5 shrink-0 ${
+                      isFavoritesOnly ? "fill-white text-white" : "text-rose-500"
+                    }`}
+                  />
+                  <span className="truncate">Favoritos</span>
+                </div>
+                <span
+                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full font-bold ${
+                    isFavoritesOnly ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {favoritesCount}
+                </span>
+              </button>
+
+              {/* List of categories */}
+              <div className="space-y-1 pt-1.5 border-t border-border/50 max-h-[calc(100vh-22rem)] overflow-y-auto pr-0.5">
+                {categories.map((cat) => {
+                  const isSelected = selectedCategoryIds.includes(cat.id);
+                  const count = products.filter((p) => p.category_id === cat.id).length;
                   return (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      exchangeRate={effectiveRateInfo.effectiveRate}
-                      baseCurrency={effectiveRateInfo.baseCurrency}
-                      showVesPrice={isVenezuelaActive}
-                      hasModifiers={hasModifiers}
-                      onOpenModifiers={(prod) => setCustomizingProduct(prod)}
-                    />
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => toggleCategory(cat.id)}
+                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer text-left ${
+                        isSelected
+                          ? "bg-primary/10 text-primary font-black border border-primary/25 shadow-2xs"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <span className="truncate mr-1.5">{cat.name}</span>
+                      <span
+                        className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full shrink-0 font-bold ${
+                          isSelected
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
                   );
                 })}
               </div>
+            </div>
 
-              {/* Responsive User-Selectable Pagination Bar */}
-              {totalProducts > 0 && (
-                <div className="mt-8 mb-4 p-3.5 sm:p-4 rounded-2xl bg-card border border-border flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 shadow-xs">
-                  {/* Page Size Selector (10, 20, 50) */}
-                  <div className="flex items-center gap-2 text-xs w-full sm:w-auto justify-between sm:justify-start">
-                    <span className="font-bold text-muted-foreground whitespace-nowrap">
-                      Por página:
+            {/* Store Guarantee Box */}
+            <div className="rounded-2xl border border-border/60 bg-muted/30 p-3 space-y-2 text-[11px]">
+              <div className="flex items-center gap-2 text-foreground font-bold">
+                <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span>Garantía de Tienda</span>
+              </div>
+              <p className="text-muted-foreground leading-relaxed">
+                Precios oficiales en tiempo real, pesaje exacto y empaque cuidadoso.
+              </p>
+            </div>
+          </aside>
+
+          {/* Center Column: Search, Banner, Catalog & Pagination */}
+          <main className="col-span-12 lg:col-span-6 xl:col-span-7 min-w-0">
+            {/* Desktop Search Bar (Hidden on mobile because mobile uses the sticky bar) */}
+            <div className="hidden lg:block mb-4 space-y-2">
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder={
+                    selectedCategoryIds.length === 1
+                      ? `Buscar en ${categories.find((c) => c.id === selectedCategoryIds[0])?.name || "esta categoría"}...`
+                      : "Buscar productos (ej. Harina, Queso, Café, Refresco)..."
+                  }
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full h-11 pl-10 pr-12 rounded-xl border border-input bg-card/60 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all shadow-2xs"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-muted transition-colors cursor-pointer"
+                    title="Limpiar búsqueda"
+                    aria-label="Limpiar búsqueda"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Desktop Active Filter Chips */}
+              {activeFiltersCount > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap pt-0.5 animate-in fade-in duration-150">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mr-1">
+                    Filtros:
+                  </span>
+
+                  {isFavoritesOnly && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 px-2 py-0.5 rounded-lg shadow-2xs">
+                      <Heart className="w-3 h-3 fill-rose-500" />
+                      <span>Favoritos ({favoritesCount})</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsFavoritesOnly(false)}
+                        className="hover:opacity-70 p-0.5 cursor-pointer"
+                        title="Quitar filtro de favoritos"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                     </span>
-                    <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/50">
-                      {[10, 20, 50].map((size) => (
+                  )}
+
+                  {selectedCategoryIds.map((catId) => {
+                    const cat = categories.find((c) => c.id === catId);
+                    if (!cat) return null;
+                    return (
+                      <span
+                        key={catId}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-lg shadow-2xs"
+                      >
+                        <span>{cat.name}</span>
                         <button
-                          key={size}
+                          type="button"
+                          onClick={() => toggleCategory(catId)}
+                          className="hover:opacity-70 p-0.5 cursor-pointer"
+                          title={`Quitar categoría ${cat.name}`}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
+
+                  <button
+                    type="button"
+                    onClick={selectAllCategories}
+                    className="text-[10px] font-bold text-muted-foreground hover:text-foreground underline ml-1 cursor-pointer"
+                  >
+                    Limpiar todo
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Storefront Pro: Body Modular Sections (Hero, Bubbles, Rails, Reels, Badges, etc.) */}
+            {isStorefrontProActive && storefrontConfig ? (
+              <div className="mb-4">
+                <StorefrontProRenderer
+                  config={storefrontConfig}
+                  position="body"
+                  categories={categories}
+                  products={products}
+                  selectedStore={stores[0]}
+                  exchangeRate={exchangeRate}
+                  selectedCategoryId={selectedCategoryIds[0] || null}
+                  onSelectCategory={(catId) => {
+                    if (catId) {
+                      setSelectedCategoryIds([catId]);
+                      if (setControlledCategory) setControlledCategory(catId);
+                    } else {
+                      setSelectedCategoryIds([]);
+                      if (setControlledCategory) setControlledCategory(null);
+                    }
+                  }}
+                  onAddToCart={addItem}
+                  onActionClick={(link) => {
+                    if (link?.startsWith("category:")) {
+                      const catTarget = link.replace("category:", "").toLowerCase();
+                      const found = categories.find(
+                        (c) => c.id.toLowerCase() === catTarget || c.name.toLowerCase().includes(catTarget)
+                      );
+                      if (found) {
+                        setSelectedCategoryIds([found.id]);
+                        if (setControlledCategory) setControlledCategory(found.id);
+                      }
+                    } else if (link === "catalog") {
+                      document.getElementById("catalog-section")?.scrollIntoView({ behavior: "smooth" });
+                    }
+                  }}
+                />
+              </div>
+            ) : (
+              /* Supermarket Pro Promotional VIP Banner Capsule */
+              <div className="mb-4 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-primary/15 via-primary/5 to-amber-500/10 border border-primary/20 relative overflow-hidden shadow-xs">
+                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="space-y-1.5 max-w-xl">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] sm:text-[11px] font-black tracking-wide uppercase">
+                      <Sparkles className="w-3 h-3" />
+                      <span>Supermarket Pro • Compra Rápida</span>
+                    </div>
+                    <h1 className="text-sm sm:text-base lg:text-lg font-black text-foreground tracking-tight leading-tight">
+                      Todo lo que necesitas, directo a tu puerta
+                    </h1>
+                    <p className="text-xs text-muted-foreground font-medium">
+                      Productos frescos, variedad garantizada y precios oficiales al cambio del día.
+                    </p>
+                    <div className="pt-1 flex items-center gap-1.5 flex-wrap text-xs">
+                      <span className="font-bold text-foreground text-[11px]">Cupones:</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (typeof navigator !== "undefined") navigator.clipboard?.writeText("BIENVENIDO");
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-background border border-primary/30 text-primary font-mono text-[11px] font-black hover:bg-primary/5 transition-colors cursor-pointer"
+                        title="Copiar cupón BIENVENIDO"
+                      >
+                        <Tag className="w-3 h-3" />
+                        <span>BIENVENIDO ($2 OFF)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (typeof navigator !== "undefined") navigator.clipboard?.writeText("SHOP10");
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-background border border-primary/30 text-primary font-mono text-[11px] font-black hover:bg-primary/5 transition-colors cursor-pointer"
+                        title="Copiar cupón SHOP10"
+                      >
+                        <Tag className="w-3 h-3" />
+                        <span>SHOP10 (10% OFF)</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 flex md:flex-col items-center md:items-end gap-2">
+                    <div className="flex items-center gap-2 bg-background/90 px-3 py-2 rounded-xl border border-border shadow-2xs">
+                      <Truck className="w-4 h-4 text-primary shrink-0" />
+                      <div className="text-left md:text-right">
+                        <p className="text-xs font-black text-foreground leading-tight">Delivery Express</p>
+                        <p className="text-[10px] text-muted-foreground font-semibold">Despacho en tu zona</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Section Heading with Counter */}
+            <div id="catalog-section" className="flex items-center justify-between mb-3 sm:mb-4 scroll-mt-28">
+              <h2 className="text-xs sm:text-sm font-black tracking-tight text-foreground flex items-center gap-1.5">
+                {isFavoritesOnly ? (
+                  <>
+                    <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />
+                    <span>Mis Productos Favoritos</span>
+                  </>
+                ) : selectedCategoryIds.length === 1 ? (
+                  <>
+                    <Sparkles className="w-4 h-4 text-primary" />
+                    <span>{categories.find((c) => c.id === selectedCategoryIds[0])?.name || "Catálogo"}</span>
+                  </>
+                ) : selectedCategoryIds.length > 1 ? (
+                  <>
+                    <Sparkles className="w-4 h-4 text-primary" />
+                    <span>Categorías Seleccionadas ({selectedCategoryIds.length})</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 text-primary" />
+                    <span>Catálogo Disponible</span>
+                  </>
+                )}
+                <span className="text-[11px] sm:text-xs text-muted-foreground font-semibold">
+                  ({totalProducts} {totalProducts === 1 ? "producto" : "productos"})
+                </span>
+              </h2>
+
+              {activeFiltersCount > 0 && (
+                <button
+                  onClick={selectAllCategories}
+                  className="text-xs font-bold text-primary hover:underline transition-colors cursor-pointer"
+                >
+                  Ver todo
+                </button>
+              )}
+            </div>
+
+            {/* Products Grid with Reactive Section Transition */}
+            <div
+              key={`${selectedCategoryIds.join("-")}-${isFavoritesOnly}-${searchQuery}-${currentPage}-${pageSize}`}
+              className="animate-in fade-in duration-200"
+            >
+              {filteredProducts.length === 0 ? (
+                isFavoritesOnly ? (
+                  <div className="p-10 text-center rounded-2xl border border-dashed border-rose-500/30 bg-rose-500/5 max-w-lg mx-auto">
+                    <div className="w-12 h-12 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-500 mx-auto mb-3">
+                      <Heart className="w-6 h-6 stroke-[1.8]" />
+                    </div>
+                    <p className="font-bold text-foreground text-sm">
+                      Aún no tienes productos favoritos
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
+                      Toca el corazón (❤️) en la esquina de cualquier producto para guardarlo aquí y comprarlo en un clic.
+                    </p>
+                    <button
+                      onClick={selectAllCategories}
+                      className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-transform active:scale-95 cursor-pointer shadow-xs"
+                    >
+                      <span>Explorar todo el catálogo</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-10 text-center rounded-2xl border border-dashed border-border bg-card/60 max-w-md mx-auto">
+                    <SlidersHorizontal className="w-9 h-9 text-muted-foreground mx-auto mb-3 opacity-40" />
+                    <p className="font-bold text-foreground text-sm">
+                      No se encontraron productos
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
+                      Prueba con otro término de búsqueda o selecciona otra categoría.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        selectAllCategories();
+                      }}
+                      className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-transform active:scale-95 cursor-pointer shadow-xs"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Ver todos los productos</span>
+                    </button>
+                  </div>
+                )
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2.5 sm:gap-4">
+                    {paginatedProducts.map((product) => {
+                      const mods = getProductModifierGroups(product);
+                      const hasModifiers = mods.length > 0;
+                      return (
+                        <ProductCard
+                          key={product.id}
+                          product={product}
+                          exchangeRate={effectiveRateInfo.effectiveRate}
+                          baseCurrency={effectiveRateInfo.baseCurrency}
+                          showVesPrice={isVenezuelaActive}
+                          hasModifiers={hasModifiers}
+                          onOpenModifiers={(prod) => setCustomizingProduct(prod)}
+                        />
+                      );
+                    })}
+                  </div>
+
+                  {/* Responsive User-Selectable Pagination Bar */}
+                  {totalProducts > 0 && (
+                    <div className="mt-8 mb-4 p-3.5 sm:p-4 rounded-2xl bg-card border border-border flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 shadow-xs">
+                      {/* Page Size Selector (10, 20, 50) */}
+                      <div className="flex items-center gap-2 text-xs w-full sm:w-auto justify-between sm:justify-start">
+                        <span className="font-bold text-muted-foreground whitespace-nowrap">
+                          Por página:
+                        </span>
+                        <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/50">
+                          {[10, 20, 50].map((size) => (
+                            <button
+                              key={size}
+                              type="button"
+                              onClick={() => {
+                                setPageSize(size);
+                                const el = document.getElementById("catalog-section");
+                                if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                              }}
+                              className={`px-2.5 py-1 rounded-lg font-black text-xs transition-all cursor-pointer ${
+                                pageSize === size
+                                  ? "bg-primary text-primary-foreground shadow-2xs"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                              }`}
+                            >
+                              {size}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Range Counter */}
+                      <div className="text-xs text-muted-foreground font-semibold text-center order-last sm:order-none">
+                        Mostrando{" "}
+                        <span className="font-bold text-foreground">
+                          {(currentPage - 1) * pageSize + 1}
+                        </span>{" "}
+                        -{" "}
+                        <span className="font-bold text-foreground">
+                          {Math.min(currentPage * pageSize, totalProducts)}
+                        </span>{" "}
+                        de{" "}
+                        <span className="font-bold text-foreground">{totalProducts}</span> productos
+                      </div>
+
+                      {/* Page Navigation Buttons */}
+                      <div className="flex items-center gap-1.5 w-full sm:w-auto justify-center sm:justify-end">
+                        <button
                           type="button"
                           onClick={() => {
-                            setPageSize(size);
+                            setCurrentPage((p) => Math.max(1, p - 1));
                             const el = document.getElementById("catalog-section");
                             if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
                           }}
-                          className={`px-2.5 py-1 rounded-lg font-black text-xs transition-all cursor-pointer ${
-                            pageSize === size
-                              ? "bg-primary text-primary-foreground shadow-2xs"
-                              : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                          }`}
+                          disabled={currentPage === 1}
+                          className="h-9 px-3 rounded-xl border border-border bg-card hover:bg-muted text-xs font-bold text-foreground disabled:opacity-40 disabled:pointer-events-none transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                          aria-label="Página anterior"
                         >
-                          {size}
+                          <ChevronLeft className="w-4 h-4" />
+                          <span>Anterior</span>
                         </button>
-                      ))}
+
+                        <div className="px-3 py-1.5 rounded-xl bg-muted/60 border border-border/50 text-xs font-black text-foreground min-w-[70px] text-center">
+                          {currentPage} / {totalPages}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCurrentPage((p) => Math.min(totalPages, p + 1));
+                            const el = document.getElementById("catalog-section");
+                            if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                          }}
+                          disabled={currentPage === totalPages}
+                          className="h-9 px-3 rounded-xl border border-border bg-card hover:bg-muted text-xs font-bold text-foreground disabled:opacity-40 disabled:pointer-events-none transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                          aria-label="Página siguiente"
+                        >
+                          <span>Siguiente</span>
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-
-                  {/* Range Counter */}
-                  <div className="text-xs text-muted-foreground font-semibold text-center order-last sm:order-none">
-                    Mostrando{" "}
-                    <span className="font-bold text-foreground">
-                      {(currentPage - 1) * pageSize + 1}
-                    </span>{" "}
-                    -{" "}
-                    <span className="font-bold text-foreground">
-                      {Math.min(currentPage * pageSize, totalProducts)}
-                    </span>{" "}
-                    de{" "}
-                    <span className="font-bold text-foreground">{totalProducts}</span> productos
-                  </div>
-
-                  {/* Page Navigation Buttons */}
-                  <div className="flex items-center gap-1.5 w-full sm:w-auto justify-center sm:justify-end">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCurrentPage((p) => Math.max(1, p - 1));
-                        const el = document.getElementById("catalog-section");
-                        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-                      }}
-                      disabled={currentPage === 1}
-                      className="h-9 px-3 rounded-xl border border-border bg-card hover:bg-muted text-xs font-bold text-foreground disabled:opacity-40 disabled:pointer-events-none transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
-                      aria-label="Página anterior"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                      <span>Anterior</span>
-                    </button>
-
-                    <div className="px-3 py-1.5 rounded-xl bg-muted/60 border border-border/50 text-xs font-black text-foreground min-w-[70px] text-center">
-                      {currentPage} / {totalPages}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCurrentPage((p) => Math.min(totalPages, p + 1));
-                        const el = document.getElementById("catalog-section");
-                        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-                      }}
-                      disabled={currentPage === totalPages}
-                      className="h-9 px-3 rounded-xl border border-border bg-card hover:bg-muted text-xs font-bold text-foreground disabled:opacity-40 disabled:pointer-events-none transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
-                      aria-label="Página siguiente"
-                    >
-                      <span>Siguiente</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
+                  )}
+                </>
               )}
-            </>
-          )}
+            </div>
+          </main>
+
+          {/* Right Column: Sticky Side Cart (Desktop Only) */}
+          <aside
+            id="desktop-side-cart"
+            className="hidden lg:flex lg:col-span-3 xl:col-span-3 sticky top-[100px] max-h-[calc(100vh-7.5rem)] rounded-2xl border border-border bg-card shadow-xs flex-col overflow-hidden transition-all duration-300"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-3.5 border-b border-border bg-muted/20">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                  <ShoppingBag className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-foreground">
+                    Tu Pedido
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground font-semibold">
+                    {totalItems} {totalItems === 1 ? "artículo" : "artículos"}
+                  </p>
+                </div>
+              </div>
+              {totalItems > 0 && (
+                <span className="text-xs font-black text-primary font-mono">
+                  {formatCurrency(totalUsd, effectiveRateInfo.baseCurrency)}
+                </span>
+              )}
+            </div>
+
+            {/* Motivational Free Shipping Progress Bar */}
+            <div className="px-3.5 py-2.5 bg-muted/30 border-b border-border text-xs">
+              <div className="flex items-center justify-between text-[11px] font-bold mb-1.5">
+                <span className="flex items-center gap-1.5 text-foreground truncate mr-1">
+                  <Truck className="w-3.5 h-3.5 text-primary shrink-0" />
+                  {totalUsd >= freeShippingThreshold ? (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-extrabold truncate">
+                      ¡Delivery Gratis Desbloqueado! 🎉
+                    </span>
+                  ) : (
+                    <span className="truncate">
+                      Faltan{" "}
+                      <strong className="text-primary font-mono">
+                        {formatCurrency(remainingForFreeShipping, effectiveRateInfo.baseCurrency)}
+                      </strong>{" "}
+                      para Envío Gratis
+                    </span>
+                  )}
+                </span>
+                <span className="text-[10px] font-mono text-muted-foreground shrink-0 font-bold">
+                  {freeShippingProgress}%
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-300 rounded-full ${
+                    totalUsd >= freeShippingThreshold ? "bg-emerald-500" : "bg-primary"
+                  }`}
+                  style={{ width: `${freeShippingProgress}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Scrollable Items List */}
+            {items.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center my-auto">
+                <div className="w-12 h-12 rounded-2xl bg-muted/70 flex items-center justify-center text-muted-foreground/60 mb-2.5">
+                  <ShoppingBag className="w-6 h-6 stroke-[1.5]" />
+                </div>
+                <p className="text-xs font-bold text-foreground">Tu carrito está vacío</p>
+                <p className="text-[11px] text-muted-foreground mt-1 max-w-[190px]">
+                  Agrega productos del catálogo para comenzar tu compra.
+                </p>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto p-3 space-y-2.5 divide-y divide-border/40 scrollbar-thin">
+                {items.map((item) => {
+                  const itemLineKey = item.id || item.product.id;
+                  const unitPrice = item.unit_price_usd ?? item.product.price_usd;
+                  const lineTotalUsd = unitPrice * item.quantity;
+                  const isMaxStock =
+                    item.product.stock !== undefined && item.quantity >= item.product.stock;
+
+                  return (
+                    <div key={itemLineKey} className="pt-2.5 first:pt-0 flex gap-2.5 items-start">
+                      <img
+                        src={item.product.image_url || ""}
+                        alt={item.product.name}
+                        width={48}
+                        height={48}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-12 h-12 rounded-lg object-cover bg-muted shrink-0 border border-border/50"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src =
+                            "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z'/%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M16 10a4 4 0 0 1-8 0'/%3E%3C/svg%3E";
+                          e.currentTarget.className =
+                            "w-12 h-12 rounded-lg object-contain p-2 bg-muted/40 shrink-0 opacity-40 border border-border/50";
+                        }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-1">
+                          <h4 className="text-xs font-bold text-foreground truncate" title={item.product.name}>
+                            {item.product.name}
+                          </h4>
+                          <button
+                            type="button"
+                            onClick={() => removeItem(itemLineKey)}
+                            className="p-0.5 text-muted-foreground hover:text-destructive transition-colors shrink-0 cursor-pointer"
+                            title="Eliminar"
+                            aria-label="Eliminar producto"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {item.selected_modifiers && item.selected_modifiers.length > 0 && (
+                          <div className="mt-0.5 flex flex-wrap gap-1">
+                            {item.selected_modifiers.map((mod, i) => (
+                              <span
+                                key={i}
+                                className="text-[9px] px-1 py-0.2 rounded bg-muted text-muted-foreground font-medium truncate max-w-[140px]"
+                              >
+                                {mod.option_name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="mt-1 flex items-center justify-between">
+                          <div>
+                            <span className="text-xs font-black text-primary">
+                              {formatCurrency(lineTotalUsd, effectiveRateInfo.baseCurrency)}
+                            </span>
+                            {isVenezuelaActive && (
+                              <span className="block text-[10px] text-muted-foreground font-mono">
+                                Bs.{" "}
+                                {convertUsdToVes(
+                                  lineTotalUsd,
+                                  effectiveRateInfo.effectiveRate
+                                ).toLocaleString("es-VE", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center rounded-lg border border-border bg-background shadow-2xs">
+                            <button
+                              type="button"
+                              onClick={() => updateQuantity(itemLineKey, item.quantity - 1)}
+                              className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                              aria-label="Disminuir"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+                            <span className="px-1.5 text-xs font-black min-w-[18px] text-center">
+                              {item.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={isMaxStock}
+                              onClick={() => updateQuantity(itemLineKey, item.quantity + 1)}
+                              className="p-1 text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                              title={isMaxStock ? "Máximo stock alcanzado" : "Aumentar"}
+                              aria-label="Aumentar"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Side Cart Footer with Subtotals & Checkout CTA */}
+            {items.length > 0 && (
+              <div className="p-3.5 border-t border-border bg-muted/20 space-y-2.5">
+                <div className="space-y-1">
+                  <div className="flex items-baseline justify-between text-xs">
+                    <span className="text-muted-foreground font-semibold">Subtotal:</span>
+                    <span className="text-base font-black text-foreground">
+                      {formatCurrency(totalUsd, effectiveRateInfo.baseCurrency)}
+                    </span>
+                  </div>
+                  {isVenezuelaActive && (
+                    <div className="flex items-baseline justify-between text-[11px]">
+                      <span className="text-muted-foreground font-medium">Tasa oficial BCV:</span>
+                      <span className="font-bold text-primary font-mono">
+                        Bs.{" "}
+                        {totalVes.toLocaleString("es-VE", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsCheckoutOpen(true)}
+                  className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-primary/90 transition-all active:scale-[0.98] shadow-md cursor-pointer"
+                >
+                  <span>Continuar al Pago</span>
+                  <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                </button>
+
+                <div className="flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground font-medium">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Compra 100% segura</span>
+                </div>
+              </div>
+            )}
+          </aside>
         </div>
-      </main>
+      </div>
 
       {/* Sticky Mobile Bottom Cart Bar (Thumb-Zone Ergonomics) */}
       {totalItems > 0 && (

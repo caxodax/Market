@@ -270,7 +270,17 @@ export function StoreHeader({
 
           {/* Cart Trigger Button (Primary conversion action) */}
           <button
-            onClick={() => setIsOpen(true)}
+            onClick={() => {
+              setIsOpen(true);
+              if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+                const el = document.getElementById("desktop-side-cart");
+                if (el) {
+                  el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                  el.classList.add("ring-2", "ring-primary");
+                  setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 1200);
+                }
+              }
+            }}
             className="relative min-h-[38px] min-w-[38px] sm:min-w-0 sm:px-3.5 sm:py-1.5 inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 shadow-sm cursor-pointer"
             aria-label="Abrir carrito de compras"
           >

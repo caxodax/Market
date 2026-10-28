@@ -39,7 +39,7 @@ export function CartDrawer({
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-hidden"
+      className="fixed inset-0 z-50 overflow-hidden lg:hidden"
       role="dialog"
       aria-modal="true"
       aria-label="Carrito de compras"
