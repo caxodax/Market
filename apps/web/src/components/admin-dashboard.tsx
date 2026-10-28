@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   TenantSettings,
@@ -223,6 +223,7 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
+  ChevronLeft,
   ChevronRight,
   Zap,
   Crown,
@@ -569,6 +570,23 @@ export function AdminDashboard({
     const matchItem = order.items?.some((it) => it.product_name.toLowerCase().includes(q));
     return Boolean(matchNumber || matchName || matchPhone || matchAddress || matchItem);
   });
+
+  // ── Orders Pagination State ──────────────────────────────────────────────
+  const [orderPage, setOrderPage] = useState<number>(1);
+  const [orderPageSize, setOrderPageSize] = useState<number>(25);
+
+  useEffect(() => {
+    setOrderPage(1);
+  }, [orderSearchQuery, orderStatusFilter, storeFilter]);
+
+  const totalOrderItems = filteredOrders.length;
+  const totalOrderPages = Math.max(1, Math.ceil(totalOrderItems / orderPageSize));
+  const activeOrderPage = Math.min(orderPage, totalOrderPages);
+
+  const paginatedOrders = useMemo(() => {
+    const start = (activeOrderPage - 1) * orderPageSize;
+    return filteredOrders.slice(start, start + orderPageSize);
+  }, [filteredOrders, activeOrderPage, orderPageSize]);
 
   // Modals state
   const [selectedOrderForModal, setSelectedOrderForModal] = useState<Order | null>(null);
@@ -2429,8 +2447,9 @@ export function AdminDashboard({
                 )}
               </div>
             ) : (
-              <div className="grid gap-3">
-                {filteredOrders.map((order) => {
+              <>
+                <div className="grid gap-3">
+                {paginatedOrders.map((order) => {
                   const driver = drivers.find((d) => d.id === order.driver_id) || drivers[0];
 
                   return (
@@ -2599,7 +2618,64 @@ export function AdminDashboard({
                   );
                 })}
               </div>
-            )}
+
+              {totalOrderPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-border text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <span>
+                      Mostrando {(activeOrderPage - 1) * orderPageSize + 1} a{" "}
+                      {Math.min(activeOrderPage * orderPageSize, totalOrderItems)} de {totalOrderItems} pedidos
+                    </span>
+                    <span className="text-muted-foreground/40">•</span>
+                    <label className="flex items-center gap-1.5 font-medium">
+                      <span>Por pág:</span>
+                      <select
+                        value={orderPageSize}
+                        onChange={(e) => {
+                          setOrderPageSize(Number(e.target.value));
+                          setOrderPage(1);
+                        }}
+                        className="px-2 py-1 rounded-lg border border-border bg-card text-foreground font-bold cursor-pointer text-xs"
+                      >
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setOrderPage((p) => Math.max(1, p - 1))}
+                      disabled={activeOrderPage <= 1}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-border bg-background hover:bg-muted font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      aria-label="Página anterior de pedidos"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <span>Anterior</span>
+                    </button>
+
+                    <span className="px-3 py-1.5 rounded-xl bg-muted/40 border border-border font-mono font-bold text-foreground">
+                      {activeOrderPage} / {totalOrderPages}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => setOrderPage((p) => Math.min(totalOrderPages, p + 1))}
+                      disabled={activeOrderPage >= totalOrderPages}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-border bg-background hover:bg-muted font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      aria-label="Página siguiente de pedidos"
+                    >
+                      <span>Siguiente</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
           </div>
         )}
 

@@ -13,6 +13,8 @@ import {
   DollarSign,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   User,
   Clock,
   Building2,
@@ -312,6 +314,23 @@ export function AuditTrailViewer({
     });
   }, [tenantScopedLogs, activeCategory, searchQuery]);
 
+  // ── Pagination Calculation ───────────────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(25);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, activeCategory, selectedTenant]);
+
+  const totalLogsCount = filteredLogs.length;
+  const totalPages = Math.max(1, Math.ceil(totalLogsCount / pageSize));
+  const activePage = Math.min(currentPage, totalPages);
+
+  const paginatedLogs = useMemo(() => {
+    const start = (activePage - 1) * pageSize;
+    return filteredLogs.slice(start, start + pageSize);
+  }, [filteredLogs, activePage, pageSize]);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* ────────────────────────────────────────────────────────── */}
@@ -594,8 +613,9 @@ export function AuditTrailViewer({
           )}
         </div>
       ) : (
-        <div className="space-y-3">
-          {filteredLogs.map((log) => {
+        <>
+          <div className="space-y-3">
+          {paginatedLogs.map((log) => {
             const isLogin = log.action === "USER_LOGIN" || log.action.includes("LOGIN");
             const isSupport =
               log.action.includes("SUPPORT_IMPERSONATION") ||
@@ -1192,7 +1212,64 @@ export function AuditTrailViewer({
             );
           })}
         </div>
-      )}
-    </div>
+
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-border text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <span>
+                Mostrando {(activePage - 1) * pageSize + 1} a{" "}
+                {Math.min(activePage * pageSize, totalLogsCount)} de {totalLogsCount} eventos
+              </span>
+              <span className="text-muted-foreground/40">•</span>
+              <label className="flex items-center gap-1.5 font-medium">
+                <span>Por pág:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="px-2 py-1 rounded-lg border border-border bg-card text-foreground font-bold cursor-pointer text-xs"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={activePage <= 1}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-border bg-background hover:bg-muted font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                aria-label="Página anterior de auditoría"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Anterior</span>
+              </button>
+
+              <span className="px-3 py-1.5 rounded-xl bg-muted/40 border border-border font-mono font-bold text-foreground">
+                {activePage} / {totalPages}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={activePage >= totalPages}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-border bg-background hover:bg-muted font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                aria-label="Página siguiente de auditoría"
+              >
+                <span>Siguiente</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+      </>
+    )}
+  </div>
   );
 }

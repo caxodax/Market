@@ -162,7 +162,8 @@ export class CatalogRepository {
     tenantId: string,
     categoryId?: string,
     query?: string,
-    limit?: number
+    limit?: number,
+    offset?: number
   ): Promise<(Product & { stock: number })[]> {
     const supabase = getSupabase();
     if (supabase) {
@@ -181,7 +182,11 @@ export class CatalogRepository {
       }
 
       if (limit && limit > 0) {
-        q = q.limit(limit);
+        if (offset && offset > 0) {
+          q = q.range(offset, offset + limit - 1);
+        } else {
+          q = q.limit(limit);
+        }
       }
 
       const { data, error } = await q;
@@ -221,7 +226,8 @@ export class CatalogRepository {
       return true;
     });
 
-    return limit && limit > 0 ? filtered.slice(0, limit) : filtered;
+    const start = offset && offset > 0 ? offset : 0;
+    return limit && limit > 0 ? filtered.slice(start, start + limit) : (start > 0 ? filtered.slice(start) : filtered);
   }
 
 /**

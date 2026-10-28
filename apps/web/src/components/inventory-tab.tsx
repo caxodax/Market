@@ -67,7 +67,7 @@ export function InventoryTab({
   const [viewMode, setViewMode] = useState<"cards" | "list">("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
-  const [pageSize, setPageSize] = useState<number>(10);
+  const [pageSize, setPageSize] = useState<number>(25);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
@@ -648,6 +648,7 @@ export function InventoryTab({
                 <option value={10}>10</option>
                 <option value={25}>25</option>
                 <option value={50}>50</option>
+                <option value={100}>100</option>
               </select>
             </div>
           </div>

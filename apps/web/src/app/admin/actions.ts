@@ -632,10 +632,10 @@ export async function saveManualRateAction(
 /**
  * Fetch fresh audit logs for tenant
  */
-export async function getAuditLogsAction(tenantId: string, limit = 100) {
+export async function getAuditLogsAction(tenantId: string, limit = 100, offset = 0) {
   try {
     await assertAuthorizedTenantAdmin(tenantId);
-    const logs = await MarketOSRepository.getAuditLogs(tenantId, limit);
+    const logs = await MarketOSRepository.getAuditLogs(tenantId, limit, offset);
     return { success: true, logs };
   } catch (error) {
     console.error("Error fetching audit logs:", error);
@@ -768,10 +768,10 @@ export async function updateCouponAction(input: UpdateCouponInput) {
 /**
  * Fetch latest enriched orders for tenant dashboard
  */
-export async function getLatestOrdersAction(tenantId: string) {
+export async function getLatestOrdersAction(tenantId: string, limit = 50, offset = 0) {
   try {
     await assertAuthorizedTenantAdmin(tenantId);
-    const orders = await MarketOSRepository.getTenantOrders(tenantId);
+    const orders = await MarketOSRepository.getTenantOrders(tenantId, limit, offset);
     return { success: true, orders };
   } catch (error) {
     console.error("Error fetching latest orders:", error);

@@ -830,7 +830,7 @@ export class OrderRepository {
 /**
    * Get Orders for Tenant Admin with full enrichment (items, customer, payment details)
    */
-  static async getTenantOrders(tenantId: string, limit?: number): Promise<Order[]> {
+  static async getTenantOrders(tenantId: string, limit?: number, offset?: number): Promise<Order[]> {
     const resolvedTenant = await TenantRepository.getTenant(tenantId);
     const actualTenantId = resolvedTenant?.id || tenantId;
 
@@ -844,7 +844,11 @@ export class OrderRepository {
           .order("created_at", { ascending: false });
 
         if (limit && limit > 0) {
-          query = query.limit(limit);
+          if (offset && offset > 0) {
+            query = query.range(offset, offset + limit - 1);
+          } else {
+            query = query.limit(limit);
+          }
         }
 
         const { data: rawOrders, error } = await query;
@@ -960,7 +964,8 @@ export class OrderRepository {
         };
       });
 
-    return limit && limit > 0 ? filtered.slice(0, limit) : filtered;
+    const start = offset && offset > 0 ? offset : 0;
+    return limit && limit > 0 ? filtered.slice(start, start + limit) : (start > 0 ? filtered.slice(start) : filtered);
   }
 
 /**

@@ -93,8 +93,8 @@ export class AuditRepository {
   /**
    * Get Audit Logs for Tenant Admin
    */
-  static async getAuditLogs(tenantId: string, limit = 50): Promise<AuditLog[]> {
-    return this.getGlobalAuditLogs({ tenantId, limit });
+  static async getAuditLogs(tenantId: string, limit = 50, offset = 0): Promise<AuditLog[]> {
+    return this.getGlobalAuditLogs({ tenantId, limit, offset });
   }
 
   /**
@@ -102,6 +102,7 @@ export class AuditRepository {
    */
   static async getGlobalAuditLogs(filters?: AuditLogFilters): Promise<AuditLog[]> {
     const limit = filters?.limit || 100;
+    const offset = filters?.offset || 0;
     const supabase = getSupabase();
 
     const tenantMap = new Map<string, string>();
@@ -112,8 +113,13 @@ export class AuditRepository {
         let query = supabase
           .from("audit_logs")
           .select("*")
-          .order("created_at", { ascending: false })
-          .limit(limit);
+          .order("created_at", { ascending: false });
+
+        if (offset > 0) {
+          query = query.range(offset, offset + limit - 1);
+        } else {
+          query = query.limit(limit);
+        }
 
         if (filters?.tenantId && filters.tenantId !== "ALL") {
           query = query.eq("tenant_id", filters.tenantId);
@@ -267,7 +273,7 @@ export class AuditRepository {
         }
 
         if (combined.length > 0) {
-          return combined.slice(0, limit);
+          return combined.slice(offset, offset + limit);
         }
       } catch (e) {
         console.warn("[MarketOS] Error fetching global audit logs from Supabase:", e);
@@ -306,7 +312,7 @@ export class AuditRepository {
       );
     }
 
-    return results.slice(0, limit).map((l) => ({
+    return results.slice(offset, offset + limit).map((l) => ({
       ...l,
       tenant_name:
         l.tenant_name ||
