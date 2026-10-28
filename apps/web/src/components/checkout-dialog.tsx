@@ -189,41 +189,28 @@ export function CheckoutDialog({
     id: "PAGO_MOVIL" | "BANK_TRANSFER" | "ZELLE" | "CASH_USD";
     label: string;
     icon: React.ReactNode;
-  }[] = isVenezuelaActive
-    ? [
-        {
-          id: "PAGO_MOVIL",
-          label: "Pago Móvil",
-          icon: <QrCode className="w-4 h-4 text-emerald-500" />,
-        },
-        {
-          id: "BANK_TRANSFER",
-          label: "Transferencia Bs.",
-          icon: <CreditCard className="w-4 h-4 text-blue-500" />,
-        },
-        {
-          id: "ZELLE",
-          label: "Zelle USD",
-          icon: <DollarSign className="w-4 h-4 text-purple-500" />,
-        },
-        {
-          id: "CASH_USD",
-          label: "Efectivo",
-          icon: <Receipt className="w-4 h-4 text-amber-500" />,
-        },
-      ]
-    : [
-        {
-          id: "ZELLE",
-          label: "Zelle USD",
-          icon: <DollarSign className="w-4 h-4 text-purple-500" />,
-        },
-        {
-          id: "CASH_USD",
-          label: "Efectivo",
-          icon: <Receipt className="w-4 h-4 text-amber-500" />,
-        },
-      ];
+  }[] = [
+    {
+      id: "PAGO_MOVIL",
+      label: "Pago Móvil",
+      icon: <QrCode className="w-4 h-4 text-emerald-500" />,
+    },
+    {
+      id: "BANK_TRANSFER",
+      label: "Transferencia Bs.",
+      icon: <CreditCard className="w-4 h-4 text-blue-500" />,
+    },
+    {
+      id: "ZELLE",
+      label: "Zelle USD",
+      icon: <DollarSign className="w-4 h-4 text-purple-500" />,
+    },
+    {
+      id: "CASH_USD",
+      label: "Efectivo",
+      icon: <Receipt className="w-4 h-4 text-amber-500" />,
+    },
+  ];
 
   const enabledMethodKeys = paymentSettings?.enabled_methods;
   const availablePaymentMethods =
@@ -231,7 +218,9 @@ export function CheckoutDialog({
       ? allPaymentMethodOptions.filter((opt) =>
           enabledMethodKeys.includes(opt.id)
         )
-      : allPaymentMethodOptions;
+      : isVenezuelaActive || Boolean(settings.currency_settings?.base_currency)
+        ? allPaymentMethodOptions
+        : allPaymentMethodOptions.filter((opt) => opt.id === "ZELLE" || opt.id === "CASH_USD");
 
   const activePaymentMethod = availablePaymentMethods.some(
     (m) => m.id === paymentMethod

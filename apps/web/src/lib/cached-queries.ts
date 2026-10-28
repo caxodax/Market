@@ -8,6 +8,7 @@ import type {
   Store,
   ExchangeRate,
   DeliveryZone,
+  TenantModuleId,
 } from "@marketos/types";
 
 /**
@@ -42,7 +43,7 @@ export const getCachedTenantSettings = (tenantId: string): Promise<TenantSetting
     async () => MarketOSRepository.getTenantSettings(tenantId),
     [`tenant-settings-${tenantId}`],
     {
-      revalidate: 300,
+      revalidate: 60,
       tags: [`tenant-settings-${tenantId}`],
     }
   )();
@@ -124,6 +125,20 @@ export const getCachedDeliveryZones = (tenantId: string): Promise<DeliveryZone[]
 };
 
 /**
+ * Obtener Módulos Activos del Tenant con caché de 60 segundos
+ */
+export const getCachedTenantActiveModuleIds = (tenantId: string): Promise<TenantModuleId[]> => {
+  return unstable_cache(
+    async () => MarketOSRepository.getTenantActiveModuleIds(tenantId),
+    [`tenant-modules-${tenantId}`],
+    {
+      revalidate: 60,
+      tags: [`tenant-modules-${tenantId}`],
+    }
+  )();
+};
+
+/**
  * ═══════════════════════════════════════════════════════════════════════
  * Invalidadores de Caché (Llamados desde Server Actions)
  * ═══════════════════════════════════════════════════════════════════════
@@ -149,6 +164,8 @@ export function invalidateSettingsCache(tenantId: string) {
   try {
     revalidateTag(`tenant-settings-${tenantId}`, { expire: 0 });
     revalidateTag(`tenant-info-${tenantId.toLowerCase()}`, { expire: 0 });
+    revalidateTag(`tenant-modules-${tenantId}`, { expire: 0 });
+    revalidateTag(`tenant-rate-${tenantId}`, { expire: 0 });
   } catch (e) {
     // Ignored
   }
@@ -181,9 +198,11 @@ export function invalidateTenantCache(tenantIdOrSlug: string, optionalSlug?: str
     revalidateTag(`tenant-products-${tenantIdOrSlug}`, { expire: 0 });
     revalidateTag(`tenant-categories-${tenantIdOrSlug}`, { expire: 0 });
     revalidateTag(`tenant-stores-${tenantIdOrSlug}`, { expire: 0 });
+    revalidateTag(`tenant-modules-${tenantIdOrSlug}`, { expire: 0 });
     if (optionalSlug && optionalSlug.toLowerCase() !== key) {
       revalidateTag(`tenant-info-${optionalSlug.toLowerCase()}`, { expire: 0 });
       revalidateTag(`tenant-settings-${optionalSlug}`, { expire: 0 });
+      revalidateTag(`tenant-modules-${optionalSlug}`, { expire: 0 });
     }
   } catch (e) {
     // Ignored in non-server action contexts

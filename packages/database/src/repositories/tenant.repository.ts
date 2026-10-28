@@ -1598,7 +1598,6 @@ export class TenantRepository {
       }
     }
 
-    if (isLiveDatabaseConfigured()) return [];
     return (state.tenantModules || []).filter((m) => m.tenant_id === tenantId);
   }
 

@@ -666,8 +666,8 @@ export async function updateTenantSettingsAction(
 
     const settings = await MarketOSRepository.updateTenantSettings(tenantId, updates);
     invalidateSettingsCache(tenantId);
-    revalidatePath("/admin");
-    revalidatePath("/");
+    revalidatePath("/admin", "layout");
+    revalidatePath("/", "layout");
     return { success: true, settings };
   } catch (error) {
     console.error("Error updating tenant settings:", error);

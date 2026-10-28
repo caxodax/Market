@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { TenantSettings, ExchangeRate, Store } from "@marketos/types";
-import { formatCurrency } from "@marketos/utils";
+import { formatCurrency, calculateEffectiveExchangeRate } from "@marketos/utils";
 import { useCart } from "../context/cart-context";
 import { useFavorites } from "../context/favorites-context";
 import {
@@ -47,6 +47,10 @@ export function StoreHeader({
   const { favoritesCount } = useFavorites();
   const [logoError, setLogoError] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const effectiveRateInfo = useMemo(() => {
+    return calculateEffectiveExchangeRate(exchangeRate, settings.currency_settings);
+  }, [exchangeRate, settings.currency_settings]);
 
   return (
     <header className="sticky top-0 z-30 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
@@ -92,12 +96,29 @@ export function StoreHeader({
             </div>
           )}
 
-          {activeModuleIds?.includes("local_venezuela") && (
-            <div className="flex items-center gap-1.5 shrink-0 font-mono text-[11px]">
+          {(activeModuleIds?.includes("local_venezuela") || Boolean(settings.currency_settings?.base_currency)) && (
+            <div
+              className="flex items-center gap-1.5 shrink-0 font-mono text-[11px]"
+              title={effectiveRateInfo.label}
+            >
               <TrendingUp className="w-3 h-3 text-emerald-400" />
-              <span className="hidden xs:inline text-white/70">BCV:</span>
-              <strong className="text-white">
-                Bs. {exchangeRate.value.toFixed(2)}
+              <span className="text-white/80 flex items-center gap-1">
+                {effectiveRateInfo.baseCurrency === "EUR" ? (
+                  <>
+                    <span className="text-xs">🇪🇺</span>
+                    <span className="hidden xs:inline">BCV EUR:</span>
+                    <span className="xs:hidden">EUR:</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xs">🇺🇸</span>
+                    <span className="hidden xs:inline">BCV USD:</span>
+                    <span className="xs:hidden">USD:</span>
+                  </>
+                )}
+              </span>
+              <strong className="text-white font-bold">
+                Bs. {effectiveRateInfo.effectiveRate.toFixed(2)}
               </strong>
             </div>
           )}

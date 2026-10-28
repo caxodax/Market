@@ -470,10 +470,10 @@ export function CheckoutStepPayment({
             <div className="flex items-center justify-between p-2.5 rounded-xl bg-primary/10 border border-primary/30">
               <div>
                 <span className="text-[10px] text-primary uppercase font-bold block">
-                  Monto exacto USD
+                  Monto exacto {baseCurrency}
                 </span>
                 <span className="font-mono font-black text-sm text-foreground">
-                  {formatCurrency(totalUsd, "USD")}
+                  {formatCurrency(totalUsd, baseCurrency)}
                 </span>
               </div>
               <button

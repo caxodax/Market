@@ -10,6 +10,7 @@ import {
   getCachedStores,
   getCachedExchangeRate,
   getCachedDeliveryZones,
+  getCachedTenantActiveModuleIds,
 } from "../lib/cached-queries";
 import { MarketOSRepository } from "@marketos/database";
 import { StorefrontPage } from "../components/storefront-page";
@@ -127,7 +128,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     getCachedStores(activeTenantId),
     getCachedExchangeRate(activeTenantId),
     getCachedDeliveryZones(activeTenantId),
-    MarketOSRepository.getTenantActiveModuleIds(activeTenantId),
+    getCachedTenantActiveModuleIds(activeTenantId),
     MarketOSRepository.getProductModifierGroups(activeTenantId),
   ]);
 
