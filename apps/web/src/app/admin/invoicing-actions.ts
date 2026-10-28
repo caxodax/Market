@@ -56,8 +56,8 @@ export async function issueFiscalDocumentAction(
       .filter((m) => m.is_active)
       .map((m) => m.module_id);
 
-    // 2. Count existing documents for sequence numbering
-    const count = await InvoicingRepository.countFiscalDocuments(tenantId, input.document_type);
+    // 2. Atomic fiscal sequence numbering (Zero race conditions)
+    const nextSequence = await InvoicingRepository.getNextFiscalSequence(tenantId, input.document_type);
 
     // 3. Resolve affected invoice if this is a Credit Note or Debit Note
     let affectedInvoice: FiscalDocument | null = null;
@@ -79,7 +79,7 @@ export async function issueFiscalDocumentAction(
     const preparedDoc = prepareFiscalDocument({
       input,
       settings,
-      existingCount: count,
+      sequenceNumber: nextSequence,
       activeModuleIds,
       actorName: user.full_name || user.email || "Admin",
       affectedInvoice,

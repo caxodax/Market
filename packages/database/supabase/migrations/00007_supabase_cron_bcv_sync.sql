@@ -23,10 +23,13 @@ BEGIN
         'https://marketos.app/api/cron/bcv-sync'
     );
 
-    -- Ejecuta petición HTTP asíncrona segura vía pg_net sin bloquear Postgres
+    -- Ejecuta petición HTTP asíncrona segura vía pg_net enviando Authorization Bearer si está configurado
     PERFORM net.http_get(
         url := endpoint_url,
-        headers := '{"Accept": "application/json", "User-Agent": "Supabase-pg_net-MarketOS"}'::jsonb
+        headers := jsonb_build_object(
+            'Accept', 'application/json',
+            'Authorization', 'Bearer ' || COALESCE(current_setting('app.settings.cron_secret', true), '')
+        )
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

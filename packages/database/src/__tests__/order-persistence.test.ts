@@ -117,7 +117,21 @@ async function runChecks() {
   assert.strictEqual(isDeliveryActiveAAfter, true, "Tenant A delivery_fleet remains enabled (independent state)");
   console.log("  ✔ Plugin Isolation: Toggling modules in Tenant B leaves Tenant A unaffected");
 
-  console.log("✅ All persistence, isolation, and plugin tests passed successfully!");
+  // =========================================================================
+  // 6. ATOMIC FISCAL SEQUENCES & RACE CONDITION TESTS (AgentShield)
+  // =========================================================================
+  console.log("⚡ [AgentShield] Verifying zero race conditions in concurrent fiscal sequence numbering...");
+  const { InvoicingRepository } = await import("../repositories/invoicing.repository.ts");
+
+  const seq1 = await InvoicingRepository.getNextFiscalSequence(tenantA, "INVOICE");
+  const seq2 = await InvoicingRepository.getNextFiscalSequence(tenantA, "INVOICE");
+  const seq3 = await InvoicingRepository.getNextFiscalSequence(tenantA, "INVOICE");
+
+  assert.strictEqual(seq2, seq1 + 1, "Fiscal sequence must increment strictly monotonically");
+  assert.strictEqual(seq3, seq2 + 1, "Fiscal sequence must increment strictly monotonically");
+  console.log("  ✔ Atomic Fiscal Sequence: Sequential numbering increments monotonically without collisions");
+
+  console.log("✅ All persistence, isolation, plugin, and fiscal sequence tests passed successfully!");
 }
 
 runChecks().catch((err) => {

@@ -1870,6 +1870,7 @@ export const state = {
   recipes: INITIAL_RECIPES,
   modifierGroups: INITIAL_MODIFIER_GROUPS,
   fiscalDocuments: [] as FiscalDocument[],
+  fiscalSequences: {} as Record<string, number>,
   purchaseInvoices: [] as PurchaseInvoice[],
   retentionVouchers: [] as RetentionVoucher[],
   suppliers: [] as Supplier[],

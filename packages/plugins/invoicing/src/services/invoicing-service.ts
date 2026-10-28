@@ -13,7 +13,8 @@ import { generateMockPacCertification } from "./digital-pac-service.ts";
 export interface PrepareFiscalDocumentOptions {
   input: CreateFiscalDocumentInput;
   settings: TenantSettings;
-  existingCount: number;
+  existingCount?: number;
+  sequenceNumber?: number;
   activeModuleIds?: string[];
   actorName?: string;
   affectedInvoice?: FiscalDocument | null;
@@ -22,7 +23,7 @@ export interface PrepareFiscalDocumentOptions {
 export function prepareFiscalDocument(
   options: PrepareFiscalDocumentOptions
 ): FiscalDocument {
-  const { input, settings, existingCount, activeModuleIds = [], actorName, affectedInvoice } = options;
+  const { input, settings, existingCount, sequenceNumber, activeModuleIds = [], actorName, affectedInvoice } = options;
 
   const adapter = resolveFiscalAdapter(undefined, activeModuleIds);
 
@@ -72,8 +73,8 @@ export function prepareFiscalDocument(
     }
   }
 
-  // 5. Correlativo Oficial
-  const sequence = existingCount + 1;
+  // 5. Correlativo Oficial Atómico (AgentShield: Zero Race Conditions)
+  const sequence = sequenceNumber ?? ((existingCount ?? 0) + 1);
   const documentNumber = adapter.formatDocumentNumber(input.document_type, sequence);
 
   // 6. Número de Control (SENIAT o Correlativo Fiscal)

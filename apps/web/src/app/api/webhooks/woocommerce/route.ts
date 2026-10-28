@@ -140,7 +140,7 @@ export async function POST(request: Request) {
 
     if (activeModuleIds.includes("invoicing") && totalUsd > 0) {
       try {
-        const count = await InvoicingRepository.countFiscalDocuments(tenantId, "INVOICE");
+        const nextSequence = await InvoicingRepository.getNextFiscalSequence(tenantId, "INVOICE");
         const invoiceInput: CreateFiscalDocumentInput = {
           document_type: "INVOICE",
           customer_name: customerName,
@@ -163,7 +163,7 @@ export async function POST(request: Request) {
         const preparedDoc = prepareFiscalDocument({
           input: invoiceInput,
           settings,
-          existingCount: count,
+          sequenceNumber: nextSequence,
           activeModuleIds,
           actorName: "WooCommerce Webhook Connector",
         });

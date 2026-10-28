@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { MarketOSRepository } from "@marketos/database";
-import { invalidateExchangeRateCache } from "@/lib/cached-queries";
+import { invalidateExchangeRateCache } from "../../../../lib/cached-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -10,29 +10,25 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get("authorization");
+    const cronSecret = process.env.CRON_SECRET;
     const { searchParams } = new URL(request.url);
     const secretParam = searchParams.get("secret");
-    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = request.headers.get("authorization");
 
-    const userAgent = request.headers.get("user-agent") || "";
-    const isVercelCron = request.headers.get("x-vercel-cron") === "1";
-    const isSupabasePgNet = userAgent.includes("Supabase-pg_net");
+    // AgentShield: Strict Token Authentication (Bearer token or ?secret= parameter)
+    // Never trust User-Agent header (easily spoofable)
+    const isAuthorized = Boolean(cronSecret)
+      ? authHeader === `Bearer ${cronSecret}` || secretParam === cronSecret
+      : process.env.NODE_ENV !== "production";
 
-    // AgentShield: Verify authorization (Vercel Cron, Supabase pg_net, or Bearer/secret token)
-    if (!isVercelCron && !isSupabasePgNet) {
-      if (cronSecret) {
-        const isBearerValid = authHeader === `Bearer ${cronSecret}`;
-        const isParamValid = secretParam === cronSecret;
-        if (!isBearerValid && !isParamValid) {
-          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-      } else if (process.env.NODE_ENV === "production") {
+    if (!isAuthorized) {
+      if (!cronSecret && process.env.NODE_ENV === "production") {
         return NextResponse.json(
           { error: "Cron execution disabled: CRON_SECRET is not configured in production" },
           { status: 403 }
         );
       }
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const tenantIdParam = searchParams.get("tenantId");

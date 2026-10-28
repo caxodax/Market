@@ -1060,10 +1060,13 @@ BEGIN
         'https://marketos.app/api/cron/bcv-sync'
     );
 
-    -- Ejecuta petición HTTP asíncrona segura vía pg_net sin bloquear Postgres
+    -- Ejecuta petición HTTP asíncrona segura vía pg_net enviando Authorization Bearer si está configurado
     PERFORM net.http_get(
         url := endpoint_url,
-        headers := '{"Accept": "application/json", "User-Agent": "Supabase-pg_net-MarketOS"}'::jsonb
+        headers := jsonb_build_object(
+            'Accept', 'application/json',
+            'Authorization', 'Bearer ' || COALESCE(current_setting('app.settings.cron_secret', true), '')
+        )
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -1342,5 +1345,67 @@ DROP POLICY IF EXISTS "Public can view active modifier groups" ON public.product
 CREATE POLICY "Public can view active modifier groups"
 ON public.product_modifier_groups FOR SELECT
 USING (is_active = true);
+
+-- ==============================================================================
+-- 31. ATOMIC FISCAL SEQUENCES (AgentShield: Race Condition Prevention)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.tenant_fiscal_sequences (
+  tenant_id TEXT NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  document_type TEXT NOT NULL,
+  last_sequence INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (tenant_id, document_type)
+);
+
+ALTER TABLE public.tenant_fiscal_sequences ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Tenant staff can manage fiscal sequences" ON public.tenant_fiscal_sequences;
+CREATE POLICY "Tenant staff can manage fiscal sequences"
+ON public.tenant_fiscal_sequences FOR ALL
+USING (tenant_id = public.current_user_tenant_id() OR public.is_super_admin());
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'uq_fiscal_documents_tenant_type_num'
+  ) THEN
+    ALTER TABLE public.fiscal_documents
+      ADD CONSTRAINT uq_fiscal_documents_tenant_type_num
+      UNIQUE (tenant_id, document_type, document_number);
+  END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.get_next_fiscal_sequence(
+  p_tenant_id TEXT,
+  p_document_type TEXT
+)
+RETURNS INTEGER AS $$
+DECLARE
+  v_next_seq INTEGER;
+  v_initial_max INTEGER;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.tenant_fiscal_sequences 
+    WHERE tenant_id = p_tenant_id AND document_type = p_document_type
+  ) THEN
+    SELECT COALESCE(MAX(NULLIF(regexp_replace(document_number, '\D', '', 'g'), '')::INTEGER), 0)
+    INTO v_initial_max
+    FROM public.fiscal_documents
+    WHERE tenant_id = p_tenant_id AND document_type = p_document_type;
+
+    INSERT INTO public.tenant_fiscal_sequences (tenant_id, document_type, last_sequence, updated_at)
+    VALUES (p_tenant_id, p_document_type, v_initial_max, NOW())
+    ON CONFLICT (tenant_id, document_type) DO NOTHING;
+  END IF;
+
+  UPDATE public.tenant_fiscal_sequences
+  SET last_sequence = last_sequence + 1,
+      updated_at = NOW()
+  WHERE tenant_id = p_tenant_id AND document_type = p_document_type
+  RETURNING last_sequence INTO v_next_seq;
+
+  RETURN v_next_seq;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 

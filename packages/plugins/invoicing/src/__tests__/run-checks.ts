@@ -426,4 +426,21 @@ assert.ok(autoCertifiedInvoice.pac_certification);
 assert.strictEqual(autoCertifiedInvoice.pac_certification?.provider, "NOVUS");
 console.log("  ✔ prepareFiscalDocument auto-certifies document when PAC auto-transmit is enabled");
 
-console.log("🎉 All 22 @marketos/plugin-invoicing checks passed successfully!");
+// 23. Prepare Fiscal Document - Atomic sequenceNumber Injection (Race Condition Fix)
+const directSeqInvoice = prepareFiscalDocument({
+  input: {
+    document_type: "INVOICE",
+    customer_name: "Carlos Sanchez",
+    customer_id_doc: "V-12345678",
+    items: [{ name: "Harina PAN", quantity: 1, unit_price: 1.5 }],
+    currency: "USD",
+  },
+  settings: mockSettings,
+  sequenceNumber: 42,
+  activeModuleIds: ["local_venezuela"],
+});
+assert.strictEqual(directSeqInvoice.document_number, "FACT-000042");
+assert.strictEqual(directSeqInvoice.control_number, "00-000042");
+console.log("  ✔ prepareFiscalDocument accurately respects atomic sequenceNumber injection");
+
+console.log("🎉 All 23 @marketos/plugin-invoicing checks passed successfully!");
