@@ -81,11 +81,6 @@ export function CatalogView({
 }: CatalogViewProps) {
   const { items, totalItems, totalUsd, setIsOpen, addItem, removeItem, updateQuantity } = useCart();
   const { favorites, favoritesCount } = useFavorites();
-
-  const freeShippingThreshold = 25;
-  const freeShippingProgress = Math.min(100, Math.round((totalUsd / freeShippingThreshold) * 100));
-  const remainingForFreeShipping = Math.max(0, freeShippingThreshold - totalUsd);
-
   const effectiveRateInfo = useMemo(() => {
     return calculateEffectiveExchangeRate(exchangeRate, settings.currency_settings);
   }, [exchangeRate, settings.currency_settings]);
@@ -828,8 +823,10 @@ export function CatalogView({
                     <div className="flex items-center gap-2 bg-background/90 px-3 py-2 rounded-xl border border-border shadow-2xs">
                       <Truck className="w-4 h-4 text-primary shrink-0" />
                       <div className="text-left md:text-right">
-                        <p className="text-xs font-black text-foreground leading-tight">Delivery Express</p>
-                        <p className="text-[10px] text-muted-foreground font-semibold">Despacho en tu zona</p>
+                        <p className="text-xs font-black text-foreground leading-tight">Despacho a Domicilio</p>
+                        <p className="text-[10px] text-muted-foreground font-semibold">
+                          {deliveryZones && deliveryZones.length > 0 ? `${deliveryZones.length} zonas activas` : "Envíos directos"}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -1055,37 +1052,15 @@ export function CatalogView({
               )}
             </div>
 
-            {/* Motivational Free Shipping Progress Bar */}
-            <div className="px-3.5 py-2.5 bg-muted/30 border-b border-border text-xs">
-              <div className="flex items-center justify-between text-[11px] font-bold mb-1.5">
-                <span className="flex items-center gap-1.5 text-foreground truncate mr-1">
-                  <Truck className="w-3.5 h-3.5 text-primary shrink-0" />
-                  {totalUsd >= freeShippingThreshold ? (
-                    <span className="text-emerald-600 dark:text-emerald-400 font-extrabold truncate">
-                      ¡Delivery Gratis Desbloqueado! 🎉
-                    </span>
-                  ) : (
-                    <span className="truncate">
-                      Faltan{" "}
-                      <strong className="text-primary font-mono">
-                        {formatCurrency(remainingForFreeShipping, effectiveRateInfo.baseCurrency)}
-                      </strong>{" "}
-                      para Envío Gratis
-                    </span>
-                  )}
-                </span>
-                <span className="text-[10px] font-mono text-muted-foreground shrink-0 font-bold">
-                  {freeShippingProgress}%
-                </span>
+            {/* Active Delivery Info Banner */}
+            <div className="px-3.5 py-2.5 bg-muted/25 border-b border-border flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 text-foreground font-semibold min-w-0">
+                <Truck className="w-4 h-4 text-primary shrink-0" />
+                <span className="truncate">Despacho a Domicilio</span>
               </div>
-              <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-300 rounded-full ${
-                    totalUsd >= freeShippingThreshold ? "bg-emerald-500" : "bg-primary"
-                  }`}
-                  style={{ width: `${freeShippingProgress}%` }}
-                />
-              </div>
+              <span className="text-[11px] text-muted-foreground font-semibold shrink-0">
+                {deliveryZones && deliveryZones.length > 0 ? `${deliveryZones.length} zonas activas` : "Entrega directa"}
+              </span>
             </div>
 
             {/* Scrollable Items List */}

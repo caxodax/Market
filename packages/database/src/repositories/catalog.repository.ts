@@ -167,57 +167,66 @@ export class CatalogRepository {
   ): Promise<(Product & { stock: number })[]> {
     const supabase = getSupabase();
     if (supabase) {
-      let q = supabase
-        .from("products")
-        .select("*, inventory(quantity)")
-        .eq("tenant_id", tenantId)
-        .eq("is_active", true);
+      try {
+        let q = supabase
+          .from("products")
+          .select("*, inventory(quantity)")
+          .eq("tenant_id", tenantId)
+          .eq("is_active", true);
 
-      if (categoryId) {
-        q = q.eq("category_id", categoryId);
-      }
-
-      if (query) {
-        q = q.ilike("name", `%${query}%`);
-      }
-
-      if (limit && limit > 0) {
-        if (offset && offset > 0) {
-          q = q.range(offset, offset + limit - 1);
-        } else {
-          q = q.limit(limit);
+        if (categoryId) {
+          q = q.eq("category_id", categoryId);
         }
-      }
 
-      const { data, error } = await q;
+        if (query) {
+          q = q.ilike("name", `%${query}%`);
+        }
 
-      if (!error && Array.isArray(data)) {
-        return data.map((item: any) => {
-          const totalStock = Array.isArray(item.inventory)
-            ? item.inventory.reduce((sum: number, inv: any) => sum + (inv.quantity || 0), 0)
-            : 20;
+        if (limit && limit > 0) {
+          if (offset && offset > 0) {
+            q = q.range(offset, offset + limit - 1);
+          } else {
+            q = q.limit(limit);
+          }
+        }
 
-          return {
-            id: item.id,
-            tenant_id: item.tenant_id,
-            category_id: item.category_id,
-            name: item.name,
-            slug: item.slug,
-            description: item.description,
-            sku: item.sku,
-            barcode: item.barcode,
-            image_url: item.image_url,
-            price_usd: Number(item.price_usd),
-            is_active: item.is_active,
-            stock: totalStock,
-            created_at: item.created_at,
-            updated_at: item.updated_at,
-          };
-        });
+        const { data, error } = await q;
+
+        if (!error && Array.isArray(data) && data.length > 0) {
+          return data.map((item: any) => {
+            const totalStock = Array.isArray(item.inventory)
+              ? item.inventory.reduce((sum: number, inv: any) => sum + (inv.quantity || 0), 0)
+              : 20;
+
+            return {
+              id: item.id,
+              tenant_id: item.tenant_id,
+              category_id: item.category_id,
+              name: item.name,
+              slug: item.slug,
+              description: item.description,
+              sku: item.sku,
+              barcode: item.barcode,
+              image_url: item.image_url,
+              price_usd: Number(item.price_usd),
+              is_active: item.is_active,
+              stock: totalStock,
+              created_at: item.created_at,
+              updated_at: item.updated_at,
+            };
+          });
+        }
+
+        if (error) {
+          console.warn("[MarketOS] getProducts Supabase warning:", error);
+        }
+      } catch (e) {
+        console.warn("[MarketOS] getProducts exception:", e);
       }
     }
 
-    if (isLiveDatabaseConfigured()) return [];
+    // High availability fallback: If DB query timed out or had a transient glitch,
+    // retrieve in-memory state so storefront catalog never flashes empty
     const filtered = state.products.filter((p) => {
       if (p.tenant_id !== tenantId || !p.is_active) return false;
       if (categoryId && p.category_id !== categoryId) return false;

@@ -396,6 +396,16 @@ export class OrderRepository {
       }
     }
 
+    // Build cash notes if applicable
+    const extraCashNotes: string[] = [];
+    if (input.cashTenderedUsd) {
+      extraCashNotes.push(`Paga con: $${input.cashTenderedUsd.toFixed(2)}`);
+    }
+    if (input.changeRequiredUsd) {
+      extraCashNotes.push(`Vuelto: $${input.changeRequiredUsd.toFixed(2)}`);
+    }
+    const combinedNotes = [input.notes, ...extraCashNotes].filter(Boolean).join(" | ") || null;
+
     const newOrder: Order = {
       id: generateUuid(),
       tenant_id: input.tenantId,
@@ -421,7 +431,7 @@ export class OrderRepository {
       subtotal_taxable_usd: subtotalTaxableUsd,
       iva_amount_usd: ivaAmountUsd,
       iva_amount_ves: ivaAmountVes,
-      notes: input.notes || null,
+      notes: combinedNotes,
       cash_tendered_usd: input.cashTenderedUsd ?? null,
       change_required_usd: input.changeRequiredUsd ?? null,
       created_at: new Date().toISOString(),
@@ -447,16 +457,6 @@ export class OrderRepository {
     // 6. Insert Order into Supabase
     if (supabase) {
       try {
-        // Build cash notes if applicable
-        const extraCashNotes: string[] = [];
-        if (newOrder.cash_tendered_usd) {
-          extraCashNotes.push(`Paga con: $${newOrder.cash_tendered_usd.toFixed(2)}`);
-        }
-        if (newOrder.change_required_usd) {
-          extraCashNotes.push(`Vuelto: $${newOrder.change_required_usd.toFixed(2)}`);
-        }
-        const combinedNotes = [newOrder.notes, ...extraCashNotes].filter(Boolean).join(" | ");
-
         // Strictly safe columns matching Supabase orders table schema
         const orderInsertPayload: any = {
           tenant_id: newOrder.tenant_id,
