@@ -1149,4 +1149,88 @@ export async function saveProductRecipeAction(recipe: import("@marketos/types").
   }
 }
 
+/**
+ * On-demand Admin Tab Getters (Lazy Loading for Performance & Minimal TTFB)
+ */
+export async function getStaffAction(tenantId: string) {
+  try {
+    await assertAuthorizedTenantAdmin(tenantId);
+    const staff = await MarketOSRepository.getTenantStaff(tenantId);
+    return { success: true, staff };
+  } catch (error) {
+    console.error("Error fetching staff:", error);
+    return { success: false, error: "Error al obtener equipo de trabajo" };
+  }
+}
+
+export async function getRatesHistoryAction(tenantId: string, limit = 40) {
+  try {
+    await assertAuthorizedTenantAdmin(tenantId);
+    const history = await MarketOSRepository.getExchangeRateHistory(tenantId, limit);
+    return { success: true, history };
+  } catch (error) {
+    console.error("Error fetching rates history:", error);
+    return { success: false, error: "Error al obtener historial de tasas" };
+  }
+}
+
+export async function getCouponsAction(tenantId: string) {
+  try {
+    await assertAuthorizedTenantAdmin(tenantId);
+    const coupons = await MarketOSRepository.getCoupons(tenantId);
+    return { success: true, coupons };
+  } catch (error) {
+    console.error("Error fetching coupons:", error);
+    return { success: false, error: "Error al obtener cupones" };
+  }
+}
+
+export async function getDeliveryZonesAction(tenantId: string) {
+  try {
+    await assertAuthorizedTenantAdmin(tenantId);
+    const zones = await MarketOSRepository.getDeliveryZones(tenantId, true);
+    return { success: true, zones };
+  } catch (error) {
+    console.error("Error fetching delivery zones:", error);
+    return { success: false, error: "Error al obtener zonas de entrega" };
+  }
+}
+
+export async function getDriversAction(tenantId: string) {
+  try {
+    await assertAuthorizedTenantAdmin(tenantId);
+    const drivers = await MarketOSRepository.getDrivers(tenantId, true);
+    return { success: true, drivers };
+  } catch (error) {
+    console.error("Error fetching drivers:", error);
+    return { success: false, error: "Error al obtener repartidores" };
+  }
+}
+
+export async function getStorageTelemetryAction(tenantId: string) {
+  try {
+    await assertAuthorizedTenantAdmin(tenantId);
+    const telemetry = await MarketOSRepository.getTenantStorageTelemetry(tenantId);
+    return { success: true, telemetry };
+  } catch (error) {
+    console.error("Error fetching storage telemetry:", error);
+    return { success: false, error: "Error al obtener telemetría de almacenamiento" };
+  }
+}
+
+export async function getAllTenantsAction() {
+  try {
+    const user = await getCurrentUser();
+    if (!user || user.role !== "PLATFORM_SUPER_ADMIN") {
+      return { success: false, error: "Acceso no autorizado", tenants: [] };
+    }
+    const tenants = await MarketOSRepository.getAllTenants();
+    return { success: true, tenants };
+  } catch (error) {
+    console.error("Error fetching all tenants:", error);
+    return { success: false, error: "Error al obtener comercios", tenants: [] };
+  }
+}
+
+
 

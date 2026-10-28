@@ -7,18 +7,8 @@ import type {
   UpdateDriverInput,
 } from "@marketos/types";
 import { state } from "../mock-data.ts";
-import { getSupabase } from "./base.ts";
-
-function generateUuid(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
+import { getSupabase, generateUuid, isLiveDatabaseConfigured } from "./base.ts";
+import { TenantRepository } from "./tenant.repository.ts";
 
 export class DeliveryRepository {
   /**
@@ -41,9 +31,13 @@ export class DeliveryRepository {
       }
 
       const { data, error } = await query;
-      if (!error && data && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         return data as DeliveryZone[];
       }
+    }
+
+    if (isLiveDatabaseConfigured()) {
+      return [];
     }
 
     return state.deliveryZones
@@ -215,14 +209,77 @@ export class DeliveryRepository {
       }
 
       const { data, error } = await query;
-      if (!error && data && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         return data as Driver[];
       }
+    }
+
+    if (isLiveDatabaseConfigured()) {
+      return [];
     }
 
     return state.drivers.filter(
       (d) => d.tenant_id === tenantId && (includeInactive || d.is_active)
     );
+  }
+
+  /**
+   * Create a new driver
+   */
+  static async createDriver(input: CreateDriverInput): Promise<Driver> {
+    // 🔒 FEATURE FLAG: Drivers module is unlocked on Growth & Enterprise plans
+    const limits = await TenantRepository.getTenantPlanLimits(input.tenantId);
+    if (!limits.features.drivers) {
+      throw new Error(
+        `PLAN_FEATURE_LOCKED: El módulo de repartidores y motoristas dedicados requiere el plan Growth o Enterprise. Tu plan actual (${limits.plan.name}) no incluye esta funcionalidad.`
+      );
+    }
+
+    const supabase = getSupabase();
+    const id = generateUuid();
+    const now = new Date().toISOString();
+
+    const newDriver: Driver = {
+      id,
+      tenant_id: input.tenantId,
+      store_id: input.storeId || null,
+      name: input.name.trim(),
+      phone: input.phone.trim(),
+      vehicle_type: input.vehicleType,
+      plate_number: input.plateNumber ? input.plateNumber.trim() : null,
+      is_active: input.isActive !== undefined ? input.isActive : true,
+      created_at: now,
+      updated_at: now,
+    };
+
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("drivers")
+          .insert({
+            id: newDriver.id,
+            tenant_id: newDriver.tenant_id,
+            store_id: newDriver.store_id,
+            name: newDriver.name,
+            phone: newDriver.phone,
+            vehicle_type: newDriver.vehicle_type,
+            plate_number: newDriver.plate_number,
+            is_active: newDriver.is_active,
+          })
+          .select("*")
+          .single();
+
+        if (!error && data) {
+          state.drivers.push(data as Driver);
+          return data as Driver;
+        }
+      } catch (e) {
+        console.warn("[Supabase] createDriver fallback:", e);
+      }
+    }
+
+    state.drivers.push(newDriver);
+    return newDriver;
   }
 
   /**

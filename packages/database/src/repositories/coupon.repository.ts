@@ -4,7 +4,8 @@ import type {
   UpdateCouponInput,
 } from "@marketos/types";
 import { state } from "../mock-data.ts";
-import { getSupabase } from "./base.ts";
+import { getSupabase, isLiveDatabaseConfigured } from "./base.ts";
+import { AuditRepository } from "./audit.repository.ts";
 
 export class CouponRepository {
   /**
@@ -166,14 +167,148 @@ export class CouponRepository {
         .eq("tenant_id", tenantId)
         .order("created_at", { ascending: false });
 
-      if (!error && data) {
+      if (!error && Array.isArray(data)) {
         return data as Coupon[];
       }
+    }
+
+    if (isLiveDatabaseConfigured()) {
+      return [];
     }
 
     return state.coupons
       .filter((c) => c.tenant_id === tenantId)
       .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+  }
+
+  /**
+   * Create a new Coupon with discount amount, start date & expiration date
+   */
+  static async createCoupon(input: CreateCouponInput): Promise<Coupon> {
+    const cleanCode = input.code.trim().toUpperCase();
+    const newCoupon: Coupon = {
+      id: `coupon-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      tenant_id: input.tenantId,
+      code: cleanCode,
+      description: input.description?.trim() || null,
+      discount_type: input.discountType,
+      discount_value: Number(input.discountValue),
+      min_order_amount_usd: Number(input.minOrderAmountUsd) || 0,
+      max_discount_usd: input.maxDiscountUsd ? Number(input.maxDiscountUsd) : null,
+      usage_limit: input.usageLimit ? Number(input.usageLimit) : null,
+      usage_limit_per_customer: input.usageLimitPerCustomer ? Number(input.usageLimitPerCustomer) : null,
+      usage_count: 0,
+      is_active: true,
+      starts_at: input.startsAt || null,
+      expires_at: input.expiresAt || null,
+      created_at: new Date().toISOString(),
+    };
+
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("coupons")
+        .insert({
+          tenant_id: newCoupon.tenant_id,
+          code: newCoupon.code,
+          description: newCoupon.description,
+          discount_type: newCoupon.discount_type,
+          discount_value: newCoupon.discount_value,
+          min_order_amount_usd: newCoupon.min_order_amount_usd,
+          max_discount_usd: newCoupon.max_discount_usd,
+          usage_limit: newCoupon.usage_limit,
+          usage_limit_per_customer: newCoupon.usage_limit_per_customer,
+          usage_count: 0,
+          is_active: true,
+          starts_at: newCoupon.starts_at,
+          expires_at: newCoupon.expires_at,
+        })
+        .select()
+        .single();
+
+      if (!error && data) {
+        newCoupon.id = data.id;
+      }
+    }
+
+    state.coupons.unshift(newCoupon);
+
+    try {
+      await AuditRepository.recordAuditLog({
+        tenantId: input.tenantId,
+        action: "CUPÓN_CREADO",
+        entity: "coupons",
+        entityId: newCoupon.id,
+        newData: {
+          code: newCoupon.code,
+          discount_type: newCoupon.discount_type,
+          discount_value: newCoupon.discount_value,
+          expires_at: newCoupon.expires_at,
+        },
+      });
+    } catch {}
+
+    return newCoupon;
+  }
+
+  /**
+   * Update an existing Coupon
+   */
+  static async updateCoupon(input: UpdateCouponInput): Promise<Coupon | null> {
+    const supabase = getSupabase();
+    const updatePayload: Record<string, any> = {};
+
+    if (input.code !== undefined) updatePayload.code = input.code.trim().toUpperCase();
+    if (input.description !== undefined) updatePayload.description = input.description?.trim() || null;
+    if (input.discountType !== undefined) updatePayload.discount_type = input.discountType;
+    if (input.discountValue !== undefined) updatePayload.discount_value = Number(input.discountValue);
+    if (input.minOrderAmountUsd !== undefined) updatePayload.min_order_amount_usd = Number(input.minOrderAmountUsd);
+    if (input.maxDiscountUsd !== undefined) updatePayload.max_discount_usd = input.maxDiscountUsd ? Number(input.maxDiscountUsd) : null;
+    if (input.usageLimit !== undefined) updatePayload.usage_limit = input.usageLimit ? Number(input.usageLimit) : null;
+    if (input.usageLimitPerCustomer !== undefined) updatePayload.usage_limit_per_customer = input.usageLimitPerCustomer ? Number(input.usageLimitPerCustomer) : null;
+    if (input.startsAt !== undefined) updatePayload.starts_at = input.startsAt || null;
+    if (input.expiresAt !== undefined) updatePayload.expires_at = input.expiresAt || null;
+    if (input.isActive !== undefined) updatePayload.is_active = input.isActive;
+
+    if (supabase) {
+      try {
+        await supabase
+          .from("coupons")
+          .update(updatePayload)
+          .eq("id", input.couponId)
+          .eq("tenant_id", input.tenantId);
+      } catch (err) {
+        console.warn("[MarketOS] Update coupon Supabase error:", err);
+      }
+    }
+
+    const c = state.coupons.find((cp) => cp.id === input.couponId && cp.tenant_id === input.tenantId);
+    if (c) {
+      if (input.code !== undefined) c.code = input.code.trim().toUpperCase();
+      if (input.description !== undefined) c.description = input.description?.trim() || null;
+      if (input.discountType !== undefined) c.discount_type = input.discountType;
+      if (input.discountValue !== undefined) c.discount_value = Number(input.discountValue);
+      if (input.minOrderAmountUsd !== undefined) c.min_order_amount_usd = Number(input.minOrderAmountUsd);
+      if (input.maxDiscountUsd !== undefined) c.max_discount_usd = input.maxDiscountUsd ? Number(input.maxDiscountUsd) : null;
+      if (input.usageLimit !== undefined) c.usage_limit = input.usageLimit ? Number(input.usageLimit) : null;
+      if (input.usageLimitPerCustomer !== undefined) c.usage_limit_per_customer = input.usageLimitPerCustomer ? Number(input.usageLimitPerCustomer) : null;
+      if (input.startsAt !== undefined) c.starts_at = input.startsAt || null;
+      if (input.expiresAt !== undefined) c.expires_at = input.expiresAt || null;
+      if (input.isActive !== undefined) c.is_active = input.isActive;
+
+      try {
+        await AuditRepository.recordAuditLog({
+          tenantId: input.tenantId,
+          action: "CUPÓN_ACTUALIZADO",
+          entity: "coupons",
+          entityId: input.couponId,
+          newData: updatePayload,
+        });
+      } catch {}
+
+      return c;
+    }
+    return null;
   }
 
   /**

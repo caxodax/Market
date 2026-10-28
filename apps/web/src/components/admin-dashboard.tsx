@@ -51,11 +51,25 @@ import {
   deleteRawMaterialAction,
   saveProductRecipeAction,
   updateTenantSettingsAction,
+  getStaffAction,
+  getRatesHistoryAction,
+  getCouponsAction,
+  getDeliveryZonesAction,
+  getDriversAction,
+  getRawMaterialsAction,
+  getProductRecipesAction,
+  getAuditLogsAction,
 } from "../app/admin/actions";
-import { issueFiscalDocumentAction } from "../app/admin/invoicing-actions";
+import {
+  issueFiscalDocumentAction,
+  getFiscalDocumentsAction,
+} from "../app/admin/invoicing-actions";
 import {
   registerPurchaseInvoiceAction,
   generateSeniatTxtAction,
+  getPurchaseInvoicesAction,
+  getRetentionVouchersAction,
+  getSuppliersAction,
 } from "../app/admin/purchasing-actions";
 import dynamic from "next/dynamic";
 import { stopImpersonationAction } from "../app/platform/actions";
@@ -230,8 +244,8 @@ interface AdminDashboardProps {
   payments: PaymentProof[];
   exchangeRate: ExchangeRate;
   ratesHistory?: RateHistoryItem[];
-  deliveryZones: DeliveryZone[];
-  drivers: Driver[];
+  deliveryZones?: DeliveryZone[];
+  drivers?: Driver[];
   auditLogs?: AuditLog[];
   currentUser?: UserProfile;
   staffMembers?: UserProfile[];
@@ -276,9 +290,9 @@ export function AdminDashboard({
   orders: initialOrders,
   payments: initialPayments,
   exchangeRate: initialRate,
-  ratesHistory = [],
-  deliveryZones,
-  drivers,
+  ratesHistory: initialRatesHistory = [],
+  deliveryZones: initialDeliveryZones = [],
+  drivers: initialDrivers = [],
   auditLogs: initialAuditLogs = [],
   currentUser,
   staffMembers: initialStaffMembers = [],
@@ -332,11 +346,88 @@ export function AdminDashboard({
   const [purchaseInvoices, setPurchaseInvoices] = useState<PurchaseInvoice[]>(initialPurchaseInvoices);
   const [retentionVouchers, setRetentionVouchers] = useState<RetentionVoucher[]>(initialRetentionVouchers);
   const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
+  const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>(initialDeliveryZones);
+  const [drivers, setDrivers] = useState<Driver[]>(initialDrivers);
+  const [ratesHistory, setRatesHistory] = useState<RateHistoryItem[]>(initialRatesHistory);
+  const [coupons, setCoupons] = useState<Coupon[]>(initialCoupons);
   const [invoicingOrderTarget, setInvoicingOrderTarget] = useState<Order | null>(null);
   const [isQuickInvoiceModalOpen, setIsQuickInvoiceModalOpen] = useState(false);
 
   // Ponytail Ultra: Auto-refresh admin data (orders, rate, payments) on tab focus and every 45s
   useAutoRefresh(45000);
+
+  // Ponytail Ultra: Lazy load secondary tab data on demand
+  const loadedTabsRef = useRef<Set<string>>(new Set([activeTab]));
+
+  useEffect(() => {
+    const tenantId = settingsState.tenant_id;
+    if (!tenantId || loadedTabsRef.current.has(activeTab)) return;
+
+    let isMounted = true;
+    const loadTabData = async () => {
+      try {
+        if (activeTab === "STAFF" && staff.length === 0) {
+          const res = await getStaffAction(tenantId);
+          if (isMounted && res.success && res.staff) setStaff(res.staff);
+        } else if (activeTab === "AUDIT" && auditLogs.length === 0) {
+          const res = await getAuditLogsAction(tenantId);
+          if (isMounted && res.success && res.logs) setAuditLogs(res.logs);
+        } else if (activeTab === "RAW_MATERIALS" && rawMaterials.length === 0) {
+          const res = await getRawMaterialsAction(tenantId);
+          if (isMounted && res.success && res.rawMaterials) setRawMaterials(res.rawMaterials);
+        } else if (activeTab === "RECIPES" && recipes.length === 0) {
+          const res = await getProductRecipesAction(tenantId);
+          if (isMounted && res.success && res.recipes) setRecipes(res.recipes);
+        } else if (activeTab === "INVOICING" && fiscalDocuments.length === 0) {
+          const docs = await getFiscalDocumentsAction(tenantId);
+          if (isMounted && Array.isArray(docs)) setFiscalDocuments(docs);
+        } else if (activeTab === "PURCHASING") {
+          const [invs, vous, sups] = await Promise.all([
+            purchaseInvoices.length === 0 ? getPurchaseInvoicesAction(tenantId) : Promise.resolve(null),
+            retentionVouchers.length === 0 ? getRetentionVouchersAction(tenantId) : Promise.resolve(null),
+            suppliers.length === 0 ? getSuppliersAction(tenantId) : Promise.resolve(null),
+          ]);
+          if (isMounted) {
+            if (Array.isArray(invs)) setPurchaseInvoices(invs);
+            if (Array.isArray(vous)) setRetentionVouchers(vous);
+            if (Array.isArray(sups)) setSuppliers(sups);
+          }
+        } else if (activeTab === "ACCOUNTING" && (fiscalDocuments.length === 0 || purchaseInvoices.length === 0)) {
+          const [docs, invs] = await Promise.all([
+            fiscalDocuments.length === 0 ? getFiscalDocumentsAction(tenantId) : Promise.resolve(null),
+            purchaseInvoices.length === 0 ? getPurchaseInvoicesAction(tenantId) : Promise.resolve(null),
+          ]);
+          if (isMounted) {
+            if (Array.isArray(docs)) setFiscalDocuments(docs);
+            if (Array.isArray(invs)) setPurchaseInvoices(invs);
+          }
+        } else if (activeTab === "DELIVERY" && (deliveryZones.length === 0 || drivers.length === 0)) {
+          const [zonesRes, driversRes] = await Promise.all([
+            deliveryZones.length === 0 ? getDeliveryZonesAction(tenantId) : Promise.resolve(null),
+            drivers.length === 0 ? getDriversAction(tenantId) : Promise.resolve(null),
+          ]);
+          if (isMounted) {
+            if (zonesRes?.success && zonesRes.zones) setDeliveryZones(zonesRes.zones);
+            if (driversRes?.success && driversRes.drivers) setDrivers(driversRes.drivers);
+          }
+        } else if (activeTab === "COUPONS" && coupons.length === 0) {
+          const res = await getCouponsAction(tenantId);
+          if (isMounted && res.success && res.coupons) setCoupons(res.coupons);
+        } else if (activeTab === "RATES" && ratesHistory.length === 0) {
+          const res = await getRatesHistoryAction(tenantId);
+          if (isMounted && res.success && res.history) setRatesHistory(res.history);
+        }
+        loadedTabsRef.current.add(activeTab);
+      } catch (err) {
+        console.error("Error loading tab data:", err);
+      }
+    };
+
+    loadTabData();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab, settingsState.tenant_id]);
 
   useEffect(() => {
     setRate(initialRate);

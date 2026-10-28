@@ -1843,32 +1843,50 @@ export const INITIAL_AUDIT_LOGS: AuditLog[] = [
   },
 ];
 
-// In-memory runtime state for fast MVP simulation if no live Supabase DB is connected
+/**
+ * Detects if a real Supabase database is connected or running in production.
+ * When true, mock arrays are strictly emptied to prevent ghost data leakage.
+ */
+export function isLiveDatabaseConfigured(): boolean {
+  if (typeof process === "undefined") return false;
+  if (process.env.NODE_ENV === "test" || process.env.VITEST === "true") {
+    return false;
+  }
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.SUPABASE_URL ||
+    process.env.NODE_ENV === "production"
+  );
+}
+
+const isLive = isLiveDatabaseConfigured();
+
+// In-memory runtime state for fast simulation (only populated with demo data in local dev without live DB)
 export const state = {
-  tenants: [INITIAL_TENANT, ...DEMO_ADDITIONAL_TENANTS],
-  settings: [INITIAL_SETTINGS, ...DEMO_ADDITIONAL_SETTINGS],
-  stores: INITIAL_STORES,
-  categories: INITIAL_CATEGORIES,
-  products: INITIAL_PRODUCTS,
+  tenants: isLive ? [INITIAL_TENANT] : [INITIAL_TENANT, ...DEMO_ADDITIONAL_TENANTS],
+  settings: isLive ? [INITIAL_SETTINGS] : [INITIAL_SETTINGS, ...DEMO_ADDITIONAL_SETTINGS],
+  stores: isLive ? [] : INITIAL_STORES,
+  categories: isLive ? [] : INITIAL_CATEGORIES,
+  products: isLive ? [] : INITIAL_PRODUCTS,
   rates: [INITIAL_EXCHANGE_RATE],
   rateHistory: INITIAL_RATE_HISTORY,
-  deliveryZones: [...INITIAL_DELIVERY_ZONES, ...DEMO_ADDITIONAL_DELIVERY_ZONES],
-  coupons: INITIAL_COUPONS,
-  drivers: INITIAL_DRIVERS,
+  deliveryZones: isLive ? [] : [...INITIAL_DELIVERY_ZONES, ...DEMO_ADDITIONAL_DELIVERY_ZONES],
+  coupons: isLive ? [] : INITIAL_COUPONS,
+  drivers: isLive ? [] : INITIAL_DRIVERS,
   plans: INITIAL_SUBSCRIPTION_PLANS,
-  subscriptions: [...INITIAL_TENANT_SUBSCRIPTIONS, ...DEMO_ADDITIONAL_SUBSCRIPTIONS],
-  orders: DEMO_INITIAL_ORDERS,
-  payments: DEMO_INITIAL_PAYMENTS,
-  auditLogs: [...INITIAL_AUDIT_LOGS],
-  customers: INITIAL_CUSTOMERS,
-  profiles: INITIAL_PROFILES,
+  subscriptions: isLive ? [INITIAL_TENANT_SUBSCRIPTIONS[0]] : [...INITIAL_TENANT_SUBSCRIPTIONS, ...DEMO_ADDITIONAL_SUBSCRIPTIONS],
+  orders: isLive ? [] : DEMO_INITIAL_ORDERS,
+  payments: isLive ? [] : DEMO_INITIAL_PAYMENTS,
+  auditLogs: isLive ? [] : [...INITIAL_AUDIT_LOGS],
+  customers: isLive ? [] : INITIAL_CUSTOMERS,
+  profiles: isLive ? [] : INITIAL_PROFILES,
   pushSubscriptions: [] as PushSubscriptionRecord[],
   pushLogs: [] as PushNotificationLog[],
   // Modular Plugins State
   tenantModules: INITIAL_TENANT_MODULES,
-  rawMaterials: INITIAL_RAW_MATERIALS,
-  recipes: INITIAL_RECIPES,
-  modifierGroups: INITIAL_MODIFIER_GROUPS,
+  rawMaterials: isLive ? [] : INITIAL_RAW_MATERIALS,
+  recipes: isLive ? [] : INITIAL_RECIPES,
+  modifierGroups: isLive ? [] : INITIAL_MODIFIER_GROUPS,
   fiscalDocuments: [] as FiscalDocument[],
   fiscalSequences: {} as Record<string, number>,
   purchaseInvoices: [] as PurchaseInvoice[],
@@ -1889,4 +1907,5 @@ export const state = {
     updated_at: new Date().toISOString(),
   } as PlatformSettings,
 };
+
 

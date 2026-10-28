@@ -5,7 +5,7 @@ import type {
 } from "@marketos/types";
 import { fetchBcvRate } from "@marketos/utils";
 import { state } from "../mock-data.ts";
-import { getSupabase } from "./base.ts";
+import { getSupabase, isLiveDatabaseConfigured } from "./base.ts";
 import { AuditRepository } from "./audit.repository.ts";
 
 export class ExchangeRateRepository {
@@ -119,7 +119,7 @@ export class ExchangeRateRepository {
         }
 
         const { data, error } = await query;
-        if (!error && data && data.length > 0) {
+        if (!error && Array.isArray(data)) {
           return data.map((item: any) => ({
             id: item.id,
             tenant_id: item.tenant_id,
@@ -135,6 +135,10 @@ export class ExchangeRateRepository {
       } catch (err) {
         console.warn("[MarketOS] Error fetching exchange rate history from Supabase:", err);
       }
+    }
+
+    if (isLiveDatabaseConfigured()) {
+      return [];
     }
 
     // Fallback to in-memory history state
