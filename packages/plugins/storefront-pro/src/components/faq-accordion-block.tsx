@@ -32,7 +32,7 @@ export function FaqAccordionBlock({ config }: FaqAccordionBlockProps) {
         {items.map((item) => (
           <details
             key={item.id}
-            className="group rounded-2xl border border-border bg-card text-card-foreground shadow-2xs overflow-hidden transition-all [&[open]]:border-primary/40 [&[open]]:shadow-xs"
+            className="group rounded-2xl border border-border bg-card text-card-foreground shadow-sm overflow-hidden transition-all [&[open]]:border-primary/40 [&[open]]:shadow-xs"
           >
             <summary className="flex items-center justify-between p-3.5 sm:p-4 text-xs sm:text-sm font-bold text-foreground cursor-pointer select-none hover:bg-muted/40 transition-colors list-none [&::-webkit-details-marker]:hidden">
               <span className="pr-4">{item.question}</span>

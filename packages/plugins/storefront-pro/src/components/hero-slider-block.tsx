@@ -47,9 +47,9 @@ export function HeroSliderBlock({ config, onActionClick }: HeroSliderBlockProps)
   };
 
   const aspectClass = {
-    "16:9": "aspect-video",
-    "21:9": "aspect-21/9 min-h-[220px] sm:min-h-[300px]",
-    "4:3": "aspect-4/3 sm:aspect-16/9",
+    "16:9": "aspect-[16/9] min-h-[190px] sm:min-h-[280px]",
+    "21:9": "aspect-[16/9] sm:aspect-[21/9] min-h-[200px] sm:min-h-[300px]",
+    "4:3": "aspect-[4/3] sm:aspect-[16/9] min-h-[200px]",
   }[config.aspectRatio || "21:9"];
 
   const textAlignmentClass = {
@@ -104,15 +104,15 @@ export function HeroSliderBlock({ config, onActionClick }: HeroSliderBlockProps)
         {/* Slide Content */}
         <div
           aria-live="polite"
-          className={`absolute inset-0 flex flex-col justify-end p-5 sm:p-8 md:p-12 z-10 ${textAlignmentClass}`}
+          className={`absolute inset-0 flex flex-col justify-end p-4 sm:p-8 md:p-12 z-10 ${textAlignmentClass}`}
         >
           {currentSlide.badgeText && (
-            <span className="inline-block px-2.5 py-1 mb-2 sm:mb-3 text-[10px] sm:text-xs font-black tracking-wider uppercase bg-primary text-primary-foreground rounded-full shadow-xs">
+            <span className="inline-block px-2.5 py-0.5 mb-1.5 sm:mb-3 text-[10px] sm:text-xs font-black tracking-wider uppercase bg-primary text-primary-foreground rounded-full shadow-xs">
               {currentSlide.badgeText}
             </span>
           )}
 
-          <h2 className="text-lg sm:text-2xl md:text-4xl font-extrabold text-white tracking-tight drop-shadow-md max-w-2xl leading-tight">
+          <h2 className="text-base sm:text-2xl md:text-4xl font-extrabold text-white tracking-tight drop-shadow-md max-w-2xl leading-tight">
             {currentSlide.title}
           </h2>
 
@@ -129,7 +129,7 @@ export function HeroSliderBlock({ config, onActionClick }: HeroSliderBlockProps)
                 e.stopPropagation();
                 if (onActionClick) onActionClick(currentSlide.ctaLink);
               }}
-              className="mt-3 sm:mt-5 inline-flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-primary text-primary-foreground text-xs sm:text-sm font-bold shadow-lg hover:scale-102 active:scale-98 transition-all cursor-pointer"
+              className="mt-2.5 sm:mt-4 inline-flex items-center gap-1.5 px-3.5 sm:px-5 py-1.5 sm:py-2.5 rounded-xl bg-primary text-primary-foreground text-xs sm:text-sm font-bold shadow-md hover:scale-[1.02] active:scale-98 transition-all cursor-pointer"
             >
               <span>{currentSlide.ctaText}</span>
               <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -144,21 +144,21 @@ export function HeroSliderBlock({ config, onActionClick }: HeroSliderBlockProps)
               type="button"
               onClick={handlePrev}
               aria-label="Diapositiva anterior"
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/40 hover:bg-black/70 text-white backdrop-blur-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20 cursor-pointer shadow-md focus:opacity-100"
+              className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-black/40 hover:bg-black/70 text-white backdrop-blur-sm flex items-center justify-center opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-20 cursor-pointer shadow-md focus:opacity-100"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
             <button
               type="button"
               onClick={handleNext}
               aria-label="Diapositiva siguiente"
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/40 hover:bg-black/70 text-white backdrop-blur-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20 cursor-pointer shadow-md focus:opacity-100"
+              className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-black/40 hover:bg-black/70 text-white backdrop-blur-sm flex items-center justify-center opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-20 cursor-pointer shadow-md focus:opacity-100"
             >
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
 
             {/* Dots Indicator */}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-20">
+            <div className="absolute bottom-2.5 sm:bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-20">
               {slides.map((_, i) => (
                 <button
                   key={i}
@@ -169,7 +169,7 @@ export function HeroSliderBlock({ config, onActionClick }: HeroSliderBlockProps)
                   }}
                   className={`h-1.5 rounded-full transition-all cursor-pointer ${
                     i === currentIndex
-                      ? "w-6 bg-primary"
+                      ? "w-5 sm:w-6 bg-primary"
                       : "w-1.5 bg-white/50 hover:bg-white/80"
                   }`}
                   aria-label={`Ir a diapositiva ${i + 1} de ${total}`}

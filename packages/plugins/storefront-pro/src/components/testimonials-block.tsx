@@ -34,7 +34,7 @@ export function TestimonialsBlock({ config }: TestimonialsBlockProps) {
         {items.map((item) => (
           <div
             key={item.id}
-            className="w-72 sm:w-auto shrink-0 snap-start p-4 rounded-2xl border border-border bg-card text-card-foreground shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-3"
+            className="w-72 sm:w-auto shrink-0 snap-start p-4 rounded-2xl border border-border bg-card text-card-foreground shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-3"
           >
             {/* Stars & Date */}
             <div className="flex items-center justify-between">

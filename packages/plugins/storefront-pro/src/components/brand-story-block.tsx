@@ -13,10 +13,10 @@ export function BrandStoryBlock({ config, selectedStore }: BrandStoryBlockProps)
   if (!config.storyContent && !config.title) return null;
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 my-4 sm:my-6">
-      <div className="rounded-2xl sm:rounded-3xl border border-border bg-card text-card-foreground shadow-xs overflow-hidden grid grid-cols-1 md:grid-cols-2">
-        {/* Photo */}
-        <div className="relative min-h-[220px] md:min-h-full bg-muted">
+    <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 my-3 sm:my-5">
+      <div className="rounded-2xl sm:rounded-3xl border border-border bg-card text-card-foreground shadow-sm overflow-hidden grid grid-cols-1 md:grid-cols-2">
+        {/* Photo with strict responsive height constraints */}
+        <div className="relative h-48 sm:h-64 md:h-full min-h-[180px] max-h-[280px] md:max-h-none w-full bg-muted overflow-hidden">
           <img
             src={
               config.imageUrl ||
@@ -32,7 +32,7 @@ export function BrandStoryBlock({ config, selectedStore }: BrandStoryBlockProps)
         </div>
 
         {/* Content */}
-        <div className="p-5 sm:p-8 flex flex-col justify-between space-y-4">
+        <div className="p-4 sm:p-6 md:p-8 flex flex-col justify-between space-y-4">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] sm:text-xs font-black uppercase tracking-wider">
               <StoreIcon className="w-3.5 h-3.5" />
@@ -46,7 +46,7 @@ export function BrandStoryBlock({ config, selectedStore }: BrandStoryBlockProps)
             </p>
           </div>
 
-          <div className="space-y-2.5 pt-3 border-t border-border/70 text-xs">
+          <div className="space-y-2 pt-3 border-t border-border/70 text-xs">
             {config.businessHours && (
               <div className="flex items-start gap-2 text-foreground/80">
                 <Clock className="w-4 h-4 text-primary shrink-0 mt-0.5" />

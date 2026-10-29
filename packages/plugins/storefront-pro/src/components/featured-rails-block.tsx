@@ -123,7 +123,7 @@ function RailItemView({
       {/* Snap Horizontal Scroll Container */}
       <div
         ref={scrollContainerRef}
-        className="flex items-stretch gap-3 overflow-x-auto no-scrollbar py-1 scroll-smooth snap-x snap-mandatory"
+        className="flex items-stretch gap-2.5 sm:gap-3 overflow-x-auto no-scrollbar py-1 scroll-smooth snap-x snap-mandatory"
       >
         {products.map((prod) => {
           const priceVes = convertUsdToVes(prod.price_usd, exchangeRate.value);
@@ -133,21 +133,21 @@ function RailItemView({
           return (
             <div
               key={prod.id}
-              className="w-40 sm:w-48 shrink-0 snap-start rounded-2xl border border-border bg-card text-card-foreground shadow-2xs hover:shadow-md transition-all flex flex-col overflow-hidden group"
+              className="w-[145px] sm:w-[175px] md:w-[190px] shrink-0 snap-start rounded-2xl border border-border bg-card text-card-foreground shadow-sm hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group"
             >
-              {/* Product Image */}
-              <div className="relative aspect-square w-full bg-muted overflow-hidden">
+              {/* Product Image Container with strict locked dimensions */}
+              <div className="relative aspect-square w-full h-36 sm:h-44 bg-muted/40 overflow-hidden flex items-center justify-center p-2 rounded-t-2xl">
                 <img
                   src={prod.image_url || "/brand/placeholder.png"}
                   alt={prod.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src =
                       "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='1.5'><rect width='18' height='18' x='3' y='3' rx='2'/><circle cx='8.5' cy='8.5' r='1.5'/><path d='m21 15-5-5L5 21'/></svg>";
                   }}
                 />
                 {isOutOfStock && (
-                  <div className="absolute inset-0 bg-background/80 backdrop-blur-2xs flex items-center justify-center">
+                  <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">
                     <span className="text-[10px] font-black uppercase tracking-wider text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md">
                       Agotado
                     </span>
@@ -156,7 +156,7 @@ function RailItemView({
               </div>
 
               {/* Product Info */}
-              <div className="p-2.5 sm:p-3 flex-1 flex flex-col justify-between space-y-2">
+              <div className="p-2 sm:p-2.5 flex-1 flex flex-col justify-between space-y-2">
                 <div>
                   <h4 className="text-xs sm:text-sm font-bold text-foreground line-clamp-1 group-hover:text-primary transition-colors">
                     {prod.name}
@@ -175,12 +175,12 @@ function RailItemView({
                   type="button"
                   disabled={isOutOfStock}
                   onClick={() => handleAdd(prod)}
-                  className={`w-full py-1.5 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                  className={`w-full h-8 sm:h-9 py-1 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
                     isOutOfStock
                       ? "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
                       : isJustAdded
-                        ? "bg-emerald-600 text-white shadow-xs scale-102"
-                        : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xs active:scale-98"
+                        ? "bg-emerald-600 text-white shadow-sm scale-[1.02]"
+                        : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm active:scale-98"
                   }`}
                 >
                   {isJustAdded ? (

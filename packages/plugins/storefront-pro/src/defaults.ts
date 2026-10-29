@@ -262,7 +262,7 @@ export function createDefaultStorefrontConfig(
       id: "block_flash_sale",
       type: "flash_sale",
       label: "Oferta Relámpago con Cuenta Regresiva",
-      enabled: true,
+      enabled: false,
       order: 4,
       config: {
         title: "⚡ Venta Flash de Temporada",

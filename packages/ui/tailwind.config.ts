@@ -68,6 +68,10 @@ const config: Omit<Config, "content"> = {
         md: "calc(var(--radius, 0.5rem) - 2px)",
         sm: "calc(var(--radius, 0.5rem) - 4px)",
       },
+      boxShadow: {
+        "2xs": "0 1px 2px 0 rgb(0 0 0 / 0.03)",
+        xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },

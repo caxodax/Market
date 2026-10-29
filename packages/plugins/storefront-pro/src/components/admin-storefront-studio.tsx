@@ -256,7 +256,7 @@ export function AdminStorefrontStudio({
                         : block.enabled
                         ? isExpanded
                           ? "border-primary/60 bg-card shadow-sm ring-1 ring-primary/20"
-                          : "border-border bg-card shadow-2xs"
+                          : "border-border bg-card shadow-sm"
                         : "border-dashed border-border/60 bg-muted/30 opacity-60"
                     }`}
                   >
@@ -332,7 +332,7 @@ export function AdminStorefrontStudio({
                         {/* Enable / Disable Toggle Switch or Core Badge */}
                         {isCatalog ? (
                           <span
-                            className="px-2.5 py-1 rounded-full bg-primary/15 text-primary text-[10px] font-black uppercase tracking-wider shadow-2xs select-none"
+                            className="px-2.5 py-1 rounded-full bg-primary/15 text-primary text-[10px] font-black uppercase tracking-wider shadow-sm select-none"
                             title="El catálogo de productos es el corazón de tu tienda y siempre permanece activo"
                           >
                             Núcleo Activo

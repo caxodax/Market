@@ -44,7 +44,7 @@ export function TrustBadgesBlock({ config }: TrustBadgesBlockProps) {
           return (
             <div
               key={badge.id}
-              className="p-3 sm:p-4 rounded-2xl border border-border bg-card text-card-foreground shadow-2xs flex items-center gap-3 transition-colors hover:border-primary/40"
+              className="p-3 sm:p-4 rounded-2xl border border-border bg-card text-card-foreground shadow-sm flex items-center gap-3 transition-colors hover:border-primary/40"
             >
               <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
                 <IconComp className="w-5 h-5" />

@@ -85,7 +85,7 @@ function ReelCard({
         playsInline
         muted
         loop
-        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-102"
+        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
       />
 
       {/* Overlay gradient */}
