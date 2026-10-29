@@ -13,7 +13,7 @@
 | :--- | :--- | :--- | :---: | :--- |
 | `food_service` | Gastronomía, Fast Food & Restaurantes | Restauración | **Completado** | BOM (escandallo), recetas, modificadores de salsas y extras. |
 | `mto_cpq` | Make-to-Order & CPQ (Cotizador Taller) | Fabricación | **Completado** | Matrices por m²/lineal/volumen, costeo Cost-Plus, fichas de taller sin precios y anticipos. |
-| `storefront_pro` | Vitrina Visual Pro & Layout Studio | Marketing | **Completado** | Maquetador de 10 bloques (Stories, Sliders, Reseñas, Flash Sale, FAQ, etc.). |
+| `storefront_pro` | Vitrina Visual Pro & Layout Studio | Marketing | **Completado** | Maquetador de 11 bloques modulares con reordenación dinámica ⬆️/⬇️ arriba/abajo del Catálogo y layout Full-Width. |
 | `local_venezuela` | Localización Oficial Venezuela | Finanzas | **Completado** | Tasa BCV automática en vivo, Pago Móvil, doble display USD/VES e IGTF. |
 | `delivery_fleet` | Delivery Propio & Motorizados | Logística | **Parcial (Core)** | Zonas de despacho, tarifas fijas y asignación de choferes. |
 | `promotions_coupons` | Marketing, Cupones & Descuentos | Ventas | **Parcial (Core)** | Códigos de descuento fijos o porcentuales con límites de uso. |

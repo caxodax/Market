@@ -1052,6 +1052,46 @@ flowchart TD
 * **Verificación de Tipos Estricta:** 17/17 proyectos con 0 errores TypeScript (`pnpm check-types`).
 * **Compilación de Producción:** Next.js 16.3.8 Turbopack completado con éxito (`pnpm build` -> exit code 0).
 
+---
+
+## 24. Optimización de Fluidez, Layout Desktop en 3 Columnas y Vitrina Pro Reorganizable (Completado ✅)
+
+> **Metodología aplicada**: **ECC (Engineering Excellence)** + **Ponytail (Modo Ultra - Cero Dependencias Innecesarias, YAGNI, Refactorización Precisa)** + **/brainstorming**.
+
+### 1. Paginación y Rendimiento en Listas Clave (Solución al Cuello de Botella)
+* **Problema:** `orders`, `products` y `auditLogs` se consultaban en bloque sin paginación offset/cursor, arriesgando degradación de memoria y tiempos de respuesta al superar cientos de registros.
+* **Solución Implementada:**
+  - Soporte de `.range(offset, offset + limit - 1)` en [`packages/database/src/repositories/`](file:///home/lmontes/Documentos/Telegram/Market/packages/database/src/repositories/).
+  - Paginador selector estándar (10, 20, 50 registros por página) en panel administrativo y catálogo público.
+  - Carga bajo demanda y eliminación de consultas redundantes masivas en el arranque inicial.
+
+### 2. Header Multidivisa en Vivo y Métodos de Pago Completos
+* **Tasa Oficial Dinámica EUR & USD:** [`apps/web/src/components/store-header.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/store-header.tsx) calcula en vivo la tasa según la moneda base configurada (`effectiveRateInfo`), mostrando la bandera y cotización exacta (`🇪🇺 BCV EUR: Bs. ...` o `🇺🇸 BCV USD: Bs. ...`).
+* **Resiliencia en Checkout:** [`apps/web/src/components/checkout-dialog.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/checkout-dialog.tsx) garantiza que todos los métodos habilitados por el comerciante (Pago Móvil, Zelle, Transferencia, Efectivo) se rendericen sin omisiones por estados en frío.
+* **Caché Reactiva Instantánea:** Reducción del TTL de configuración de 300s a 60s con revalidación forzada (`revalidateTag` y `revalidatePath`) al guardar cambios desde el panel de administración.
+
+### 3. Vitrina Visual Pro: Reordenación Dinámica y Arquitectura de 3 Zonas
+* **Diagnóstico del "Amontonamiento":**
+  - Anteriormente, todos los bloques modulares del plugin `storefront_pro` se inyectaban en una sola pila vertical dentro de la columna central de ~600px en desktop, empujando los productos del catálogo decenas de pantallas hacia abajo y dejando el carrito lateral flotando en el vacío.
+* **Solución Arquitectónica (Smart Multi-Zone Split):**
+  1. **Catálogo como Bloque Reorganizable (`catalog_grid`):**
+     - Se incorporó `"catalog_grid"` como tipo de bloque de primera clase en [`packages/types/src/storefront-pro.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/types/src/storefront-pro.ts).
+     - En el editor administrativo [`admin-storefront-studio.tsx`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/storefront-pro/src/components/admin-storefront-studio.tsx), se muestra con la tarjeta destacada **`🛍️ Catálogo de Productos y Carrito (Núcleo Activo)`**.
+     - El comerciante puede utilizar los botones **`⬆️ Subir`** y **`⬇️ Bajar`** para ubicar cualquier sección arriba o abajo del catálogo con total libertad.
+  2. **Renderizado Separado a Ancho Completo (`above_catalog` y `below_catalog`):**
+     - [`StorefrontProRenderer`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/storefront-pro/src/components/storefront-pro-renderer.tsx) ahora filtra y distribuye los bloques según su orden relativo al catálogo:
+       - **`position="above_catalog"`**: Renderiza a ancho completo (`max-w-7xl`) los bloques promocionales (Hero slider, burbujas de historias, ofertas flash) antes de la grilla de compra.
+       - **Núcleo de Compra en 3 Columnas**: Categorías fijas a la izquierda, Buscador + Grid de productos al centro, Carrito sticky a la derecha. Los productos aparecen de inmediato.
+       - **`position="below_catalog"`**: Renderiza a ancho completo al final de la página los bloques institucionales (Badges de confianza en 4 columnas, Testimonios en 3 columnas, Nuestra Historia en 2 columnas y FAQs en acordeón).
+  3. **Compatibilidad Retroactiva Transparente:**
+     - La utilidad [`normalizeStorefrontConfig`](file:///home/lmontes/Documentos/Telegram/Market/packages/plugins/storefront-pro/src/defaults.ts) detecta si un comercio tiene guardada una configuración previa sin `catalog_grid` y la inyecta automáticamente en la posición central, evitando desconfiguraciones.
+
+### 4. Verificación y Calidad de Código
+* **Pruebas Automatizadas:** 15/15 suites de pruebas aprobadas (`pnpm test` -> 0 fallos).
+* **Verificación de Tipos:** 18/18 proyectos TypeScript verificados sin errores (`pnpm check-types`).
+* **Control de Versiones:** Sincronizado en rama `main`.
+
+
 
 
 
