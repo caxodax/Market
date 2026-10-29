@@ -26,7 +26,7 @@ import {
   Globe,
   Sparkles,
 } from "lucide-react";
-import { createDefaultStorefrontConfig, createVenezuelaStorefrontConfig } from "../defaults";
+import { createDefaultStorefrontConfig, createVenezuelaStorefrontConfig, ensureCatalogBlock } from "../defaults";
 import { StorefrontProRenderer } from "./storefront-pro-renderer";
 import { BlockConfigForm } from "./block-config-forms";
 
@@ -50,9 +50,13 @@ export function AdminStorefrontStudio({
   onSave,
 }: AdminStorefrontStudioProps) {
   const [config, setConfig] = useState<StorefrontConfig>(() => {
-    return initialConfig && initialConfig.blocks && initialConfig.blocks.length > 0
+    const raw = initialConfig && initialConfig.blocks && initialConfig.blocks.length > 0
       ? initialConfig
       : createDefaultStorefrontConfig(businessName);
+    return {
+      ...raw,
+      blocks: ensureCatalogBlock(raw.blocks),
+    };
   });
 
   const [previewDevice, setPreviewDevice] = useState<"mobile" | "desktop">("mobile");
@@ -63,6 +67,9 @@ export function AdminStorefrontStudio({
 
   // Toggle block enabled/disabled
   const handleToggleBlock = (blockId: string) => {
+    const targetBlock = config.blocks.find((b) => b.id === blockId);
+    if (targetBlock?.type === "catalog_grid") return; // The catalog is the shopping core and cannot be disabled
+
     setConfig((prev) => ({
       ...prev,
       blocks: prev.blocks.map((b) => (b.id === blockId ? { ...b, enabled: !b.enabled } : b)),
@@ -238,12 +245,15 @@ export function AdminStorefrontStudio({
                 const isFirst = idx === 0;
                 const isLast = idx === config.blocks.length - 1;
                 const isExpanded = expandedBlockId === block.id;
+                const isCatalog = block.type === "catalog_grid";
 
                 return (
                   <div
                     key={block.id}
                     className={`rounded-xl border transition-all overflow-hidden ${
-                      block.enabled
+                      isCatalog
+                        ? "border-primary/50 bg-primary/5 shadow-xs ring-1 ring-primary/20"
+                        : block.enabled
                         ? isExpanded
                           ? "border-primary/60 bg-card shadow-sm ring-1 ring-primary/20"
                           : "border-border bg-card shadow-2xs"
@@ -278,7 +288,7 @@ export function AdminStorefrontStudio({
                         {/* Block Info */}
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-bold text-foreground truncate">
+                            <span className={`text-xs font-bold truncate ${isCatalog ? "text-primary font-black" : "text-foreground"}`}>
                               {block.label}
                             </span>
                             <span className="text-[10px] font-mono text-muted-foreground">
@@ -286,7 +296,13 @@ export function AdminStorefrontStudio({
                             </span>
                           </div>
                           <span className="text-[10px] text-muted-foreground block truncate">
-                            Tipo: <code className="font-mono">{block.type}</code>
+                            {isCatalog ? (
+                              <span className="text-primary/90 font-medium">
+                                Núcleo de Compra • Buscador, Categorías, Productos y Carrito
+                              </span>
+                            ) : (
+                              <>Tipo: <code className="font-mono">{block.type}</code></>
+                            )}
                           </span>
                         </div>
                       </div>
@@ -313,21 +329,30 @@ export function AdminStorefrontStudio({
                           )}
                         </button>
 
-                        {/* Enable / Disable Toggle Switch */}
-                        <button
-                          type="button"
-                          onClick={() => handleToggleBlock(block.id)}
-                          className={`w-11 h-6 rounded-full transition-colors p-0.5 relative cursor-pointer ${
-                            block.enabled ? "bg-primary" : "bg-muted-foreground/30"
-                          }`}
-                          title={block.enabled ? "Desactivar bloque" : "Activar bloque"}
-                        >
-                          <div
-                            className={`w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${
-                              block.enabled ? "translate-x-5" : "translate-x-0"
+                        {/* Enable / Disable Toggle Switch or Core Badge */}
+                        {isCatalog ? (
+                          <span
+                            className="px-2.5 py-1 rounded-full bg-primary/15 text-primary text-[10px] font-black uppercase tracking-wider shadow-2xs select-none"
+                            title="El catálogo de productos es el corazón de tu tienda y siempre permanece activo"
+                          >
+                            Núcleo Activo
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleBlock(block.id)}
+                            className={`w-11 h-6 rounded-full transition-colors p-0.5 relative cursor-pointer ${
+                              block.enabled ? "bg-primary" : "bg-muted-foreground/30"
                             }`}
-                          />
-                        </button>
+                            title={block.enabled ? "Desactivar bloque" : "Activar bloque"}
+                          >
+                            <div
+                              className={`w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${
+                                block.enabled ? "translate-x-5" : "translate-x-0"
+                              }`}
+                            />
+                          </button>
+                        )}
                       </div>
                     </div>
 

@@ -14,10 +14,10 @@ assert.strictEqual(STOREFRONT_PRO_MANIFEST.version, "1.0.0", "Version must be 1.
 assert.strictEqual(STOREFRONT_PRO_MANIFEST.country_code, "GLOBAL", "Plugin must be GLOBAL");
 console.log("  ✔ STOREFRONT_PRO_MANIFEST is valid and declared as GLOBAL");
 
-// 2. Default Configuration Generates 10 Blocks
+// 2. Default Configuration Generates 11 Blocks (including catalog_grid)
 const globalConfig = createDefaultStorefrontConfig("Mi Tienda Global");
 assert.strictEqual(globalConfig.version, "1.0.0", "Config version must be 1.0.0");
-assert.strictEqual(globalConfig.blocks.length, 10, "Must contain exactly 10 modular blocks");
+assert.strictEqual(globalConfig.blocks.length, 11, "Must contain exactly 11 modular blocks");
 
 const expectedBlockTypes = [
   "announcement_marquee",
@@ -25,6 +25,7 @@ const expectedBlockTypes = [
   "category_bubbles",
   "flash_sale",
   "featured_rails",
+  "catalog_grid",
   "product_reels",
   "trust_badges",
   "testimonials",
@@ -33,8 +34,8 @@ const expectedBlockTypes = [
 ];
 
 const foundTypes = globalConfig.blocks.map((b) => b.type);
-assert.deepStrictEqual(foundTypes, expectedBlockTypes, "All 10 expected block types must exist in sequential order");
-console.log("  ✔ Generates all 10 modular blocks in sequential order");
+assert.deepStrictEqual(foundTypes, expectedBlockTypes, "All 11 expected block types must exist in sequential order");
+console.log("  ✔ Generates all 11 modular blocks in sequential order");
 
 // 3. Multi-Tenant Global Neutrality (No Venezuelan references in global preset)
 const globalJson = JSON.stringify(globalConfig);
@@ -54,7 +55,7 @@ const veConfig = createVenezuelaStorefrontConfig("Bodegón Express");
 const veJson = JSON.stringify(veConfig);
 assert.ok(veJson.includes("BCV"), "Venezuela preset must contain BCV reference");
 assert.ok(veJson.includes("Pago Móvil"), "Venezuela preset must contain Pago Móvil reference");
-assert.strictEqual(veConfig.blocks.length, 10, "Venezuela preset must also have 10 blocks");
+assert.strictEqual(veConfig.blocks.length, 11, "Venezuela preset must also have 11 blocks");
 console.log("  ✔ Venezuela preset correctly populates local payment methods and BCV references");
 
 // 6. Block Re-ordering invariant test

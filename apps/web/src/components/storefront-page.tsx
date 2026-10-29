@@ -19,7 +19,7 @@ import { BranchSelectorModal } from "./branch-selector-modal";
 import { PwaPushBanner } from "./pwa/pwa-push-banner";
 import { ShieldCheck, MapPin, Heart } from "lucide-react";
 import { useAutoRefresh } from "../lib/use-auto-refresh";
-import { StorefrontProRenderer, createDefaultStorefrontConfig } from "@marketos/plugin-storefront-pro";
+import { StorefrontProRenderer, createDefaultStorefrontConfig, normalizeStorefrontConfig } from "@marketos/plugin-storefront-pro";
 
 interface StorefrontPageProps {
   settings: TenantSettings;
@@ -134,7 +134,7 @@ export function StorefrontPage({
 
   const isStorefrontProActive = activeModuleIds.includes("storefront_pro");
   const storefrontConfig = isStorefrontProActive
-    ? settings.storefront_config || createDefaultStorefrontConfig(settings.business_name)
+    ? normalizeStorefrontConfig(settings.storefront_config) || createDefaultStorefrontConfig(settings.business_name)
     : null;
 
   return (

@@ -292,39 +292,51 @@ export function createDefaultStorefrontConfig(
       },
     },
 
-    // 6. Product Reels (Short Videos)
+    // 6. Catálogo de Productos y Carrito (Núcleo de la Tienda)
+    {
+      id: "block_catalog_grid",
+      type: "catalog_grid",
+      label: "🛍️ Catálogo de Productos y Carrito",
+      enabled: true,
+      order: 6,
+      config: {
+        title: "Catálogo",
+      },
+    },
+
+    // 7. Product Reels (Short Videos)
     {
       id: "block_product_reels",
       type: "product_reels",
       label: "Videos Cortos / Reels de Productos",
       enabled: false,
-      order: 6,
+      order: 7,
       config: {
         autoplayOnHover: true,
         reels: [],
       },
     },
 
-    // 7. Trust Badges
+    // 8. Trust Badges
     {
       id: "block_trust_badges",
       type: "trust_badges",
       label: "Cintillo de Beneficios y Confianza",
       enabled: true,
-      order: 7,
+      order: 8,
       config: {
         columns: 4,
         badges: trustBadges,
       },
     },
 
-    // 8. Testimonials / Social Proof
+    // 9. Testimonials / Social Proof
     {
       id: "block_testimonials",
       type: "testimonials",
       label: "Reseñas de Clientes (Prueba Social)",
       enabled: true,
-      order: 8,
+      order: 9,
       config: {
         title: "Lo que opinan nuestros clientes",
         subtitle: "Comentarios reales y verificados de compradores recientes",
@@ -332,13 +344,13 @@ export function createDefaultStorefrontConfig(
       },
     },
 
-    // 9. Brand Story / Physical Presence
+    // 10. Brand Story / Physical Presence
     {
       id: "block_brand_story",
       type: "brand_story",
       label: "Nuestra Historia & Local Físico",
       enabled: true,
-      order: 9,
+      order: 10,
       config: {
         title: "Comprometidos con la Calidad",
         subtitle: "Conoce más sobre nuestro local y equipo de trabajo",
@@ -350,13 +362,13 @@ export function createDefaultStorefrontConfig(
       },
     },
 
-    // 10. FAQ Accordion
+    // 11. FAQ Accordion
     {
       id: "block_faq_accordion",
       type: "faq_accordion",
       label: "Preguntas Frecuentes (FAQ)",
       enabled: true,
-      order: 10,
+      order: 11,
       config: {
         title: "Preguntas Frecuentes",
         subtitle: "Todo lo que necesitas saber antes de realizar tu compra",
@@ -375,4 +387,57 @@ export function createDefaultStorefrontConfig(
 
 export function createVenezuelaStorefrontConfig(businessName: string = "Nuestra Tienda"): StorefrontConfig {
   return createDefaultStorefrontConfig({ businessName, preset: "venezuela" });
+}
+
+/**
+ * Ensures the 'catalog_grid' block is present in the blocks list.
+ * If missing (e.g. from an older database record), it automatically
+ * positions it between promotional blocks and trust/story blocks.
+ */
+export function ensureCatalogBlock(blocks: StorefrontBlock[]): StorefrontBlock[] {
+  if (!blocks || blocks.length === 0) return blocks;
+  if (blocks.some((b) => b.type === "catalog_grid")) {
+    return [...blocks].sort((a, b) => a.order - b.order);
+  }
+
+  const promoTypes = [
+    "announcement_marquee",
+    "hero_slider",
+    "category_bubbles",
+    "flash_sale",
+    "featured_rails",
+    "product_reels",
+  ];
+
+  let insertAfterOrder = 0;
+  for (const b of blocks) {
+    if (promoTypes.includes(b.type) && b.order > insertAfterOrder) {
+      insertAfterOrder = b.order;
+    }
+  }
+
+  const catalogBlock: StorefrontBlock = {
+    id: "block_catalog_grid",
+    type: "catalog_grid",
+    label: "🛍️ Catálogo de Productos y Carrito",
+    enabled: true,
+    order: insertAfterOrder + 0.5,
+    config: {
+      title: "Catálogo",
+    },
+  };
+
+  const sorted = [...blocks, catalogBlock].sort((a, b) => a.order - b.order);
+  return sorted.map((b, idx) => ({ ...b, order: idx + 1 }));
+}
+
+/**
+ * Normalizes a StorefrontConfig ensuring version and catalog_grid block existence.
+ */
+export function normalizeStorefrontConfig(config?: StorefrontConfig | null): StorefrontConfig | null {
+  if (!config) return null;
+  return {
+    ...config,
+    blocks: ensureCatalogBlock(config.blocks || []),
+  };
 }

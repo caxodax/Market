@@ -26,7 +26,7 @@ import { OrderSuccessModal } from "./order-success-modal";
 import { OrderTrackerModal } from "./order-tracker-modal";
 import { CustomerOrderTicketModal } from "./customer-order-ticket-modal";
 import { useFavorites } from "../context/favorites-context";
-import { StorefrontProRenderer, createDefaultStorefrontConfig } from "@marketos/plugin-storefront-pro";
+import { StorefrontProRenderer, createDefaultStorefrontConfig, normalizeStorefrontConfig } from "@marketos/plugin-storefront-pro";
 import { ModifierModal } from "@marketos/plugin-food-service";
 import {
   Search,
@@ -94,7 +94,7 @@ export function CatalogView({
   const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
   const isStorefrontProActive = activeModuleIds.includes("storefront_pro");
   const storefrontConfig = isStorefrontProActive
-    ? settings.storefront_config || createDefaultStorefrontConfig(settings.business_name)
+    ? normalizeStorefrontConfig(settings.storefront_config) || createDefaultStorefrontConfig(settings.business_name)
     : null;
 
   const getProductModifierGroups = (prod: Product): ProductModifierGroup[] => {
@@ -146,6 +146,31 @@ export function CatalogView({
     setSelectedCategoryIds([]);
     setIsFavoritesOnly(false);
     if (setControlledCategory) setControlledCategory(null);
+  };
+
+  const handleStorefrontSelectCategory = (catId: string | null) => {
+    if (catId) {
+      setSelectedCategoryIds([catId]);
+      if (setControlledCategory) setControlledCategory(catId);
+    } else {
+      setSelectedCategoryIds([]);
+      if (setControlledCategory) setControlledCategory(null);
+    }
+  };
+
+  const handleStorefrontActionClick = (link?: string) => {
+    if (link?.startsWith("category:")) {
+      const catTarget = link.replace("category:", "").toLowerCase();
+      const found = categories.find(
+        (c) => c.id.toLowerCase() === catTarget || c.name.toLowerCase().includes(catTarget)
+      );
+      if (found) {
+        setSelectedCategoryIds([found.id]);
+        if (setControlledCategory) setControlledCategory(found.id);
+      }
+    } else if (link === "catalog") {
+      document.getElementById("catalog-section")?.scrollIntoView({ behavior: "smooth" });
+    }
   };
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -535,6 +560,24 @@ export function CatalogView({
         </div>
       </div>
 
+      {/* Storefront Pro: Above-Catalog Modular Sections (Full Width Banners, Bubbles, Flash Sale, etc.) */}
+      {isStorefrontProActive && storefrontConfig && (
+        <div className="w-full">
+          <StorefrontProRenderer
+            config={storefrontConfig}
+            position="above_catalog"
+            categories={categories}
+            products={products}
+            selectedStore={stores[0]}
+            exchangeRate={exchangeRate}
+            selectedCategoryId={selectedCategoryIds[0] || null}
+            onSelectCategory={handleStorefrontSelectCategory}
+            onAddToCart={addItem}
+            onActionClick={handleStorefrontActionClick}
+          />
+        </div>
+      )}
+
       {/* 3-Column Desktop / Responsive Catalog Container */}
       <div className="max-w-[1536px] mx-auto px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 xl:gap-6 items-start">
@@ -740,45 +783,8 @@ export function CatalogView({
               )}
             </div>
 
-            {/* Storefront Pro: Body Modular Sections (Hero, Bubbles, Rails, Reels, Badges, etc.) */}
-            {isStorefrontProActive && storefrontConfig ? (
-              <div className="mb-4">
-                <StorefrontProRenderer
-                  config={storefrontConfig}
-                  position="body"
-                  categories={categories}
-                  products={products}
-                  selectedStore={stores[0]}
-                  exchangeRate={exchangeRate}
-                  selectedCategoryId={selectedCategoryIds[0] || null}
-                  onSelectCategory={(catId) => {
-                    if (catId) {
-                      setSelectedCategoryIds([catId]);
-                      if (setControlledCategory) setControlledCategory(catId);
-                    } else {
-                      setSelectedCategoryIds([]);
-                      if (setControlledCategory) setControlledCategory(null);
-                    }
-                  }}
-                  onAddToCart={addItem}
-                  onActionClick={(link) => {
-                    if (link?.startsWith("category:")) {
-                      const catTarget = link.replace("category:", "").toLowerCase();
-                      const found = categories.find(
-                        (c) => c.id.toLowerCase() === catTarget || c.name.toLowerCase().includes(catTarget)
-                      );
-                      if (found) {
-                        setSelectedCategoryIds([found.id]);
-                        if (setControlledCategory) setControlledCategory(found.id);
-                      }
-                    } else if (link === "catalog") {
-                      document.getElementById("catalog-section")?.scrollIntoView({ behavior: "smooth" });
-                    }
-                  }}
-                />
-              </div>
-            ) : (
-              /* Supermarket Pro Promotional VIP Banner Capsule */
+            {/* Supermarket Pro Promotional VIP Banner Capsule (Only when Storefront Pro is not active) */}
+            {!isStorefrontProActive && (
               <div className="mb-4 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-primary/15 via-primary/5 to-amber-500/10 border border-primary/20 relative overflow-hidden shadow-xs">
                 <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-3">
                   <div className="space-y-1.5 max-w-xl">
@@ -1222,6 +1228,24 @@ export function CatalogView({
           </aside>
         </div>
       </div>
+
+      {/* Storefront Pro: Below-Catalog Modular Sections (Trust Badges, Testimonials, Brand Story, FAQ, etc. spanning full width) */}
+      {isStorefrontProActive && storefrontConfig && (
+        <div className="w-full mt-6 mb-8">
+          <StorefrontProRenderer
+            config={storefrontConfig}
+            position="below_catalog"
+            categories={categories}
+            products={products}
+            selectedStore={stores[0]}
+            exchangeRate={exchangeRate}
+            selectedCategoryId={selectedCategoryIds[0] || null}
+            onSelectCategory={handleStorefrontSelectCategory}
+            onAddToCart={addItem}
+            onActionClick={handleStorefrontActionClick}
+          />
+        </div>
+      )}
 
       {/* Sticky Mobile Bottom Cart Bar (Thumb-Zone Ergonomics) */}
       {totalItems > 0 && (

@@ -115,6 +115,21 @@ export function BlockConfigForm({
         />
       );
 
+    case "catalog_grid":
+      return (
+        <div className="p-3.5 rounded-xl bg-primary/10 border border-primary/20 text-xs space-y-1.5">
+          <p className="font-extrabold text-foreground flex items-center gap-1.5">
+            <span>🛍️ Núcleo de la Tienda (Catálogo & Carrito)</span>
+          </p>
+          <p className="text-muted-foreground text-[11px] leading-relaxed">
+            Este bloque representa tu buscador, menú de categorías, cuadrícula de productos y el carrito de compra lateral fijo.
+          </p>
+          <div className="pt-1 text-[11px] text-primary font-bold">
+            💡 Consejo: Utiliza las flechas ⬆️ / ⬇️ en la lista para organizar libremente qué secciones de Vitrina Pro deseas ver antes o después del catálogo.
+          </div>
+        </div>
+      );
+
     default:
       return (
         <p className="text-xs text-muted-foreground italic">

@@ -5,10 +5,16 @@ export type StorefrontBlockType =
   | "flash_sale"
   | "featured_rails"
   | "product_reels"
+  | "catalog_grid"
   | "trust_badges"
   | "testimonials"
   | "brand_story"
   | "faq_accordion";
+
+// 0. Catalog Grid Anchor Config
+export interface CatalogGridConfig {
+  title?: string;
+}
 
 // 1. Ticker / Marquesina
 export interface AnnouncementMarqueeConfig {
@@ -158,6 +164,7 @@ export type BlockConfigMap = {
   flash_sale: FlashSaleConfig;
   featured_rails: FeaturedRailsConfig;
   product_reels: ProductReelsConfig;
+  catalog_grid: CatalogGridConfig;
   trust_badges: TrustBadgesConfig;
   testimonials: TestimonialsConfig;
   brand_story: BrandStoryConfig;
