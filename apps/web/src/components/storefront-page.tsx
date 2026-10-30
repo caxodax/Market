@@ -9,6 +9,7 @@ import {
   Store,
   ExchangeRate,
   DeliveryZone,
+  Coupon,
 } from "@marketos/types";
 import { CartProvider, useCart } from "../context/cart-context";
 import { FavoritesProvider } from "../context/favorites-context";
@@ -30,6 +31,7 @@ interface StorefrontPageProps {
   exchangeRate: ExchangeRate;
   activeModuleIds?: import("@marketos/types").TenantModuleId[];
   modifierGroups?: import("@marketos/types").ProductModifierGroup[];
+  coupons?: Coupon[];
 }
 
 function hexToHslString(hex: string): string {
@@ -104,6 +106,7 @@ export function StorefrontPage({
   exchangeRate,
   activeModuleIds = [],
   modifierGroups = [],
+  coupons = [],
 }: StorefrontPageProps) {
   // Ponytail Ultra: Auto-refresh store data & BCV rate on focus and every 60s without full reload
   useAutoRefresh(60000);
@@ -199,6 +202,7 @@ export function StorefrontPage({
             setSelectedCategory={setActiveCategory}
             activeModuleIds={activeModuleIds}
             modifierGroups={modifierGroups}
+            coupons={coupons}
           />
 
         {/* Storefront Footer */}

@@ -11,6 +11,7 @@ import {
   getCachedExchangeRate,
   getCachedDeliveryZones,
   getCachedTenantActiveModuleIds,
+  getCachedCoupons,
 } from "../lib/cached-queries";
 import { MarketOSRepository } from "@marketos/database";
 import { StorefrontPage } from "../components/storefront-page";
@@ -121,6 +122,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     deliveryZones,
     activeModuleIds,
     modifierGroups,
+    coupons,
   ] = await Promise.all([
     getCachedTenantSettings(activeTenantId),
     getCachedCategories(activeTenantId),
@@ -130,6 +132,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     getCachedDeliveryZones(activeTenantId),
     getCachedTenantActiveModuleIds(activeTenantId),
     MarketOSRepository.getProductModifierGroups(activeTenantId),
+    getCachedCoupons(activeTenantId),
   ]);
 
   return (
@@ -144,6 +147,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         exchangeRate={exchangeRate}
         activeModuleIds={activeModuleIds}
         modifierGroups={modifierGroups}
+        coupons={coupons}
       />
     </>
   );

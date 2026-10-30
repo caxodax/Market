@@ -15,6 +15,8 @@ import {
   StoreRateMode,
   StoreCurrencySettings,
   ExchangeRate,
+  StoreFaqItem,
+  StoreTrustBadgeItem,
 } from "@marketos/types";
 import { updateTenantSettingsAction, uploadStoreLogoAction } from "../app/admin/actions";
 import {
@@ -63,6 +65,10 @@ import {
   Calculator,
   ArrowRightLeft,
   CheckCircle2,
+  Plus,
+  Star,
+  BadgePercent,
+  Tag,
 } from "lucide-react";
 
 interface StoreSettingsTabProps {
@@ -145,6 +151,7 @@ export function StoreSettingsTab({
   exchangeRate,
 }: StoreSettingsTabProps) {
   const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
+  const isCouponsActive = activeModuleIds.includes("promotions_coupons");
   const [activeSubTab, setActiveSubTab] = useState<
     "GENERAL" | "CURRENCY" | "DOMAINS" | "PAYMENTS" | "BRANDING" | "OPERATIONS" | "FISCAL"
   >("GENERAL");
@@ -313,6 +320,68 @@ export function StoreSettingsTab({
     defaultOps.delivery_billing_mode || defaultBilling.delivery_billing_mode || "INVOICE_ITEM"
   );
 
+  // Core Base Storefront Customization States
+  const defaultTrustBadges: StoreTrustBadgeItem[] = [
+    { id: "tb-1", title: "Tasa Oficial BCV", subtitle: "Cobro exacto y transparente", icon: "bcv" },
+    { id: "tb-2", title: "Atención Rápida", subtitle: "Preparación ágil de pedidos", icon: "truck" },
+    { id: "tb-3", title: "Múltiples Pagos", subtitle: "Pago Móvil, Zelle o Efectivo", icon: "payment" },
+    { id: "tb-4", title: "Garantía y Calidad", subtitle: "Atención directa personalizada", icon: "quality" },
+  ];
+
+  const defaultFaqList: StoreFaqItem[] = [
+    { id: "faq-1", question: "¿A qué tasa de cambio procesan los pagos en bolívares?", answer: "Todos nuestros precios se calculan a la tasa oficial del Banco Central de Venezuela (BCV) del día." },
+    { id: "faq-2", question: "¿Cuáles son las modalidades de entrega y retiro?", answer: "Contamos con retiro directo en tienda y despacho según las opciones activas del comercio." },
+    { id: "faq-3", question: "¿Puedo pagar al momento de recibir o retirar?", answer: "¡Sí! Puedes pagar en efectivo (divisas o bolívares) o punto de venta según disponibilidad." },
+    { id: "faq-4", question: "¿Emiten comprobante o soporte de la compra?", answer: "Sí, todos los pedidos incluyen comprobante detallado con desglose de ítems, montos y tasa aplicada." },
+  ];
+
+  const [showHeroBanner, setShowHeroBanner] = useState(defaultOps.show_hero_banner ?? true);
+  const [heroTitle, setHeroTitle] = useState(defaultOps.hero_title || settings.business_name || "");
+  const [heroDescription, setHeroDescription] = useState(defaultOps.hero_description || "");
+  const [heroBadgeText, setHeroBadgeText] = useState(defaultOps.hero_badge_text || "");
+  const [deliveryEnabled, setDeliveryEnabled] = useState(defaultOps.delivery_enabled ?? true);
+  const [pickupEnabled, setPickupEnabled] = useState(defaultOps.pickup_enabled ?? true);
+  const [showCouponBadges, setShowCouponBadges] = useState(defaultOps.show_coupon_badges ?? true);
+  const [showTrustStrip, setShowTrustStrip] = useState(defaultOps.show_trust_strip ?? true);
+  const [trustBadges, setTrustBadges] = useState<StoreTrustBadgeItem[]>(
+    defaultOps.trust_badges && defaultOps.trust_badges.length > 0 ? defaultOps.trust_badges : defaultTrustBadges
+  );
+  const [showFaqSection, setShowFaqSection] = useState(defaultOps.show_faq_section ?? true);
+  const [faqItems, setFaqItems] = useState<StoreFaqItem[]>(
+    defaultOps.faq_items && defaultOps.faq_items.length > 0 ? defaultOps.faq_items : defaultFaqList
+  );
+
+  const handleAddFaqItem = () => {
+    setFaqItems((prev) => [
+      ...prev,
+      {
+        id: `faq-${Date.now()}`,
+        question: "",
+        answer: "",
+      },
+    ]);
+  };
+
+  const handleUpdateFaqItem = (id: string, field: "question" | "answer", value: string) => {
+    setFaqItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+    );
+  };
+
+  const handleRemoveFaqItem = (id: string) => {
+    setFaqItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleUpdateTrustBadge = (
+    id: string,
+    field: "title" | "subtitle" | "icon",
+    value: any
+  ) => {
+    setTrustBadges((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+    );
+  };
+
   const [fiscalBillingEnabled, setFiscalBillingEnabled] = useState(defaultBilling.fiscal_billing_enabled ?? false);
   const [billingMode, setBillingMode] = useState<FiscalBillingMode>(defaultBilling.billing_mode || "TICKET_ONLY");
   const [taxPayerType, setTaxPayerType] = useState<FiscalTaxPayerType>(defaultBilling.tax_payer_type || "ORDINARY");
@@ -438,6 +507,19 @@ export function StoreSettingsTab({
       custom_whatsapp_message: customWhatsappMessage.trim(),
       show_ticket_qr: showTicketQr,
       delivery_billing_mode: deliveryBillingMode,
+
+      // Core Base Storefront Customization
+      show_hero_banner: showHeroBanner,
+      hero_title: heroTitle.trim(),
+      hero_description: heroDescription.trim(),
+      hero_badge_text: heroBadgeText.trim(),
+      delivery_enabled: deliveryEnabled,
+      pickup_enabled: pickupEnabled,
+      show_coupon_badges: showCouponBadges,
+      show_trust_strip: showTrustStrip,
+      trust_badges: trustBadges,
+      show_faq_section: showFaqSection,
+      faq_items: faqItems,
     };
 
     const updatedBillingSettings: TenantBillingSettings = {
@@ -2156,6 +2238,167 @@ export function StoreSettingsTab({
             </div>
           </div>
 
+          {/* Modalidades de Despacho y Retiro (Delivery & Retiro en Tienda) */}
+          <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
+            <div>
+              <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+                <Truck className="w-4 h-4 text-primary" />
+                <span>Modalidades de Entrega y Retiro</span>
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Configura los métodos de recepción de pedidos habilitados para tu comercio.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              {/* Delivery Toggle Card */}
+              <div
+                className={`p-4 rounded-xl border-2 transition-all ${
+                  deliveryEnabled
+                    ? "border-emerald-500/40 bg-emerald-500/5 shadow-xs"
+                    : "border-border bg-muted/20 opacity-75"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Truck className={`w-4 h-4 ${deliveryEnabled ? "text-emerald-600" : "text-muted-foreground"}`} />
+                    <span className="font-bold text-xs text-foreground">Servicio de Delivery</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDeliveryEnabled(!deliveryEnabled)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      deliveryEnabled ? "bg-emerald-600" : "bg-muted-foreground/30"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        deliveryEnabled ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+                  {deliveryEnabled
+                    ? "🟢 Activo: Se calcularán zonas de envío, costo de flete y tiempos estimados en el checkout."
+                    : "🔴 Inactivo: La tienda no mencionará delivery ni tiempos de 45 min, eliminando fletes y enfocándose en retiro."}
+                </p>
+              </div>
+
+              {/* Pickup Toggle Card */}
+              <div
+                className={`p-4 rounded-xl border-2 transition-all ${
+                  pickupEnabled
+                    ? "border-emerald-500/40 bg-emerald-500/5 shadow-xs"
+                    : "border-border bg-muted/20 opacity-75"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Store className={`w-4 h-4 ${pickupEnabled ? "text-emerald-600" : "text-muted-foreground"}`} />
+                    <span className="font-bold text-xs text-foreground">Retiro en Sede / Tienda Física</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPickupEnabled(!pickupEnabled)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      pickupEnabled ? "bg-emerald-600" : "bg-muted-foreground/30"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        pickupEnabled ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+                  {pickupEnabled
+                    ? "🟢 Activo: Los clientes podrán ordenar y pasar a retirar por la dirección de tu local."
+                    : "🔴 Inactivo: Opción de retiro deshabilitada en el flujo de compra."}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Cabecera Principal de Portada (Hero Banner Base) */}
+          <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <span>Cabecera Principal de Portada (Hero Banner Base)</span>
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Personaliza el título, descripción y distintivo de estado en la parte superior del catálogo.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowHeroBanner(!showHeroBanner)}
+                className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  showHeroBanner ? "bg-emerald-600" : "bg-muted-foreground/30"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                    showHeroBanner ? "translate-x-7" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {showHeroBanner ? (
+              <div className="space-y-3 pt-2 border-t border-border/60">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="font-semibold text-muted-foreground block mb-1.5">
+                      Título Principal de la Portada
+                    </label>
+                    <input
+                      type="text"
+                      value={heroTitle}
+                      onChange={(e) => setHeroTitle(e.target.value)}
+                      placeholder={settings.business_name || "Nombre del Comercio"}
+                      className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-semibold focus:ring-2 focus:ring-primary focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-muted-foreground block mb-1.5">
+                      Distintivo / Badge de Estado
+                    </label>
+                    <input
+                      type="text"
+                      value={heroBadgeText}
+                      onChange={(e) => setHeroBadgeText(e.target.value)}
+                      placeholder={deliveryEnabled ? "Abierto hoy • Delivery en menos de 45 min" : "Atención en Sede • Lun a Vie"}
+                      className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="text-xs">
+                  <label className="font-semibold text-muted-foreground block mb-1.5">
+                    Descripción / Subtítulo del Comercio
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={heroDescription}
+                    onChange={(e) => setHeroDescription(e.target.value)}
+                    placeholder="Descripción atractiva de tus productos, especialidades o servicios ofrecidos..."
+                    className="w-full p-3 rounded-xl border border-input bg-background text-foreground text-xs leading-relaxed focus:ring-2 focus:ring-primary focus:outline-none resize-none"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-xl border border-dashed border-border bg-muted/30 text-xs text-muted-foreground font-medium">
+                ⚪ Banner de cabecera desactivado: La tienda entrará directamente a mostrar el buscador y las categorías sin cabecera visual.
+              </div>
+            )}
+          </div>
+
           {/* Announcement Banner Card */}
           <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -2269,6 +2512,225 @@ export function StoreSettingsTab({
                 </div>
               </div>
             </div>
+
+          {/* Promociones y Cupones en Vitrina */}
+          <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+                  <BadgePercent className="w-4 h-4 text-primary" />
+                  <span>Botones Rápidos de Cupones en Vitrina</span>
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Muestra u oculta los botones de cupones destacados debajo del buscador principal.
+                </p>
+              </div>
+
+              {isCouponsActive && (
+                <button
+                  type="button"
+                  onClick={() => setShowCouponBadges(!showCouponBadges)}
+                  className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    showCouponBadges ? "bg-emerald-600" : "bg-muted-foreground/30"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      showCouponBadges ? "translate-x-7" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              )}
+            </div>
+
+            {!isCouponsActive ? (
+              <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs space-y-1">
+                <div className="font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>Módulo de Cupones no instalado</span>
+                </div>
+                <p className="text-amber-600 dark:text-amber-300 text-[11px] leading-relaxed">
+                  Este comercio no tiene activado el plugin de Promociones y Cupones. Por tanto, los badges promocionales (ej. BIENVENIDO o SHOP10) están <strong>estrictamente deshabilitados</strong> y no se mostrarán en la vitrina.
+                </p>
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-xl border text-xs font-semibold">
+                {showCouponBadges ? (
+                  <span className="text-emerald-600 dark:text-emerald-400">
+                    🟢 Botones visibles: Los clientes podrán ver y copiar con un clic los cupones activos de tu tienda.
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    ⚪ Botones ocultos: Los clientes aún pueden ingresar cupones manualmente en el checkout, pero no se mostrarán botones en la vitrina.
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Cintillo de Confianza (Trust Strip) */}
+          <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-primary" />
+                  <span>Cintillo de Confianza (4 Puntos Clave)</span>
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  4 distintivos de valor que transmiten seguridad, respaldo y transparencia a tus compradores.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowTrustStrip(!showTrustStrip)}
+                className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  showTrustStrip ? "bg-emerald-600" : "bg-muted-foreground/30"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                    showTrustStrip ? "translate-x-7" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {showTrustStrip ? (
+              <div className="space-y-3 pt-2 border-t border-border/60">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {trustBadges.map((badge, idx) => (
+                    <div key={badge.id || idx} className="p-3 rounded-xl border border-border bg-background space-y-2 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-[11px] text-muted-foreground uppercase tracking-wider">
+                          Distintivo #{idx + 1}
+                        </span>
+                        <select
+                          value={badge.icon}
+                          onChange={(e) => handleUpdateTrustBadge(badge.id, "icon", e.target.value)}
+                          className="h-8 px-2 rounded-lg border border-input bg-card text-foreground text-xs font-medium focus:ring-1 focus:ring-primary focus:outline-none cursor-pointer"
+                        >
+                          <option value="bcv">🏛️ Tasa BCV</option>
+                          <option value="truck">🚚 Envíos / Delivery</option>
+                          <option value="payment">💳 Pagos Múltiples</option>
+                          <option value="quality">✨ Calidad Garantizada</option>
+                          <option value="shield">🛡️ Seguridad / Garantía</option>
+                          <option value="clock">⏱️ Rapidez / Horarios</option>
+                          <option value="star">⭐ Destacado</option>
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2">
+                        <input
+                          type="text"
+                          value={badge.title}
+                          onChange={(e) => handleUpdateTrustBadge(badge.id, "title", e.target.value)}
+                          placeholder="Título del distintivo"
+                          className="w-full h-8 px-2.5 rounded-lg border border-input bg-card text-foreground text-xs font-semibold focus:ring-1 focus:ring-primary focus:outline-none"
+                        />
+                        <input
+                          type="text"
+                          value={badge.subtitle}
+                          onChange={(e) => handleUpdateTrustBadge(badge.id, "subtitle", e.target.value)}
+                          placeholder="Subtítulo explicativo"
+                          className="w-full h-8 px-2.5 rounded-lg border border-input bg-card text-foreground text-[11px] text-muted-foreground focus:ring-1 focus:ring-primary focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-xl border border-dashed border-border bg-muted/30 text-xs text-muted-foreground font-medium">
+                ⚪ Cintillo de confianza desactivado: No se mostrarán estos distintivos en la tienda.
+              </div>
+            )}
+          </div>
+
+          {/* Sección de Preguntas Frecuentes (FAQ Accordion) */}
+          <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+                  <HelpCircle className="w-4 h-4 text-primary" />
+                  <span>Sección de Preguntas Frecuentes (FAQ)</span>
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Aclara dudas recurrentes sobre pagos, envíos, retiro y garantía al final de la vitrina.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowFaqSection(!showFaqSection)}
+                className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  showFaqSection ? "bg-emerald-600" : "bg-muted-foreground/30"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                    showFaqSection ? "translate-x-7" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {showFaqSection ? (
+              <div className="space-y-3 pt-2 border-t border-border/60">
+                <div className="space-y-3">
+                  {faqItems.map((item, idx) => (
+                    <div key={item.id || idx} className="p-3.5 rounded-xl border border-border bg-background space-y-2 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                          <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-black">
+                            {idx + 1}
+                          </span>
+                          <span>Pregunta #{idx + 1}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveFaqItem(item.id)}
+                          className="p-1 rounded-lg text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                          title="Eliminar pregunta"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <input
+                        type="text"
+                        value={item.question}
+                        onChange={(e) => handleUpdateFaqItem(item.id, "question", e.target.value)}
+                        placeholder="Ej. ¿Aceptan pagos en efectivo o divisas?"
+                        className="w-full h-9 px-3 rounded-lg border border-input bg-card text-foreground text-xs font-semibold focus:ring-1 focus:ring-primary focus:outline-none"
+                      />
+
+                      <textarea
+                        rows={2}
+                        value={item.answer}
+                        onChange={(e) => handleUpdateFaqItem(item.id, "answer", e.target.value)}
+                        placeholder="Escribe la respuesta clara que verá el cliente..."
+                        className="w-full p-2.5 rounded-lg border border-input bg-card text-foreground text-xs leading-relaxed focus:ring-1 focus:ring-primary focus:outline-none resize-none"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAddFaqItem}
+                  className="w-full py-2.5 rounded-xl border border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Añadir Pregunta Frecuente</span>
+                </button>
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-xl border border-dashed border-border bg-muted/30 text-xs text-muted-foreground font-medium">
+                ⚪ Preguntas frecuentes desactivadas: Esta sección no se mostrará en la tienda cliente.
+              </div>
+            )}
+          </div>
 
           {/* Modalidad de Facturación del Delivery (Normativa SENIAT) */}
           <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">

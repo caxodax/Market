@@ -62,6 +62,19 @@ export interface PaymentAccountSettings {
 
 export type DeliveryBillingMode = "INVOICE_ITEM" | "THIRD_PARTY";
 
+export interface StoreFaqItem {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+export interface StoreTrustBadgeItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  icon: "bcv" | "truck" | "payment" | "quality" | "shield" | "clock" | "star";
+}
+
 export interface StoreOperationalSettings {
   is_open?: boolean;
   closed_message?: string;
@@ -73,6 +86,19 @@ export interface StoreOperationalSettings {
   custom_whatsapp_message?: string;
   show_ticket_qr?: boolean;
   delivery_billing_mode?: DeliveryBillingMode; // "INVOICE_ITEM" (default, facturado en la cuenta) | "THIRD_PARTY" (externo / contra-entrega)
+
+  // Core Base Storefront Customization (Zero hardcoding)
+  show_hero_banner?: boolean;
+  hero_title?: string;
+  hero_description?: string;
+  hero_badge_text?: string;
+  delivery_enabled?: boolean;
+  pickup_enabled?: boolean;
+  show_coupon_badges?: boolean;
+  show_trust_strip?: boolean;
+  trust_badges?: StoreTrustBadgeItem[];
+  show_faq_section?: boolean;
+  faq_items?: StoreFaqItem[];
 }
 
 export type FiscalBillingMode = "TICKET_ONLY" | "DIGITAL_INVOICE" | "MANUAL_INVOICE";

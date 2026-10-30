@@ -9,6 +9,7 @@ import type {
   ExchangeRate,
   DeliveryZone,
   TenantModuleId,
+  Coupon,
 } from "@marketos/types";
 
 /**
@@ -137,6 +138,20 @@ export const getCachedDeliveryZones = (tenantId: string): Promise<DeliveryZone[]
 };
 
 /**
+ * Obtener Cupones del Tenant con caché de 60 segundos
+ */
+export const getCachedCoupons = (tenantId: string): Promise<Coupon[]> => {
+  return unstable_cache(
+    async () => MarketOSRepository.getCoupons(tenantId),
+    [`tenant-coupons-${tenantId}`],
+    {
+      revalidate: 60,
+      tags: [`tenant-coupons-${tenantId}`],
+    }
+  )();
+};
+
+/**
  * Obtener Módulos Activos del Tenant con caché de 60 segundos
  */
 export const getCachedTenantActiveModuleIds = (tenantId: string): Promise<TenantModuleId[]> => {
@@ -211,6 +226,7 @@ export function invalidateTenantCache(tenantIdOrSlug: string, optionalSlug?: str
     revalidateTag(`tenant-categories-${tenantIdOrSlug}`, { expire: 0 });
     revalidateTag(`tenant-stores-${tenantIdOrSlug}`, { expire: 0 });
     revalidateTag(`tenant-modules-${tenantIdOrSlug}`, { expire: 0 });
+    revalidateTag(`tenant-coupons-${tenantIdOrSlug}`, { expire: 0 });
     if (optionalSlug && optionalSlug.toLowerCase() !== key) {
       revalidateTag(`tenant-info-${optionalSlug.toLowerCase()}`, { expire: 0 });
       revalidateTag(`tenant-settings-${optionalSlug}`, { expire: 0 });

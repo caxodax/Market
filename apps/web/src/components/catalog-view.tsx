@@ -12,6 +12,9 @@ import {
   ProductModifierGroup,
   TenantModuleId,
   SelectedModifier,
+  StoreTrustBadgeItem,
+  StoreFaqItem,
+  Coupon,
 } from "@marketos/types";
 import {
   formatCurrency,
@@ -53,6 +56,7 @@ import {
   HelpCircle,
   MessageCircle,
   Zap,
+  Store as StoreIcon,
 } from "lucide-react";
 
 interface CatalogViewProps {
@@ -68,6 +72,28 @@ interface CatalogViewProps {
   setSelectedCategory?: (cat: string | null) => void;
   activeModuleIds?: TenantModuleId[];
   modifierGroups?: ProductModifierGroup[];
+  coupons?: Coupon[];
+}
+
+function getTrustBadgeIconComponent(icon: string) {
+  switch (icon) {
+    case "bcv":
+      return <Zap className="w-4 h-4" />;
+    case "truck":
+      return <Truck className="w-4 h-4" />;
+    case "payment":
+      return <CreditCard className="w-4 h-4" />;
+    case "quality":
+      return <ShieldCheck className="w-4 h-4" />;
+    case "shield":
+      return <ShieldCheck className="w-4 h-4" />;
+    case "clock":
+      return <Clock className="w-4 h-4" />;
+    case "star":
+      return <Sparkles className="w-4 h-4" />;
+    default:
+      return <ShieldCheck className="w-4 h-4" />;
+  }
 }
 
 export function CatalogView({
@@ -83,6 +109,7 @@ export function CatalogView({
   setSelectedCategory: setControlledCategory,
   activeModuleIds = [],
   modifierGroups = [],
+  coupons = [],
 }: CatalogViewProps) {
   const { items, totalItems, totalUsd, setIsOpen, addItem, removeItem, updateQuantity } = useCart();
   const { favorites, favoritesCount } = useFavorites();
@@ -97,10 +124,65 @@ export function CatalogView({
 
   const isFoodServiceActive = activeModuleIds.includes("food_service");
   const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
+  const isCouponsActive = activeModuleIds.includes("promotions_coupons");
   const isStorefrontProActive = activeModuleIds.includes("storefront_pro");
   const storefrontConfig = isStorefrontProActive
     ? normalizeStorefrontConfig(settings.storefront_config) || createDefaultStorefrontConfig(settings.business_name)
     : null;
+
+  // Operational & Storefront Base Configuration (Zero Hardcoding)
+  const opSettings = settings.operational_settings;
+  const isDeliveryEnabled = opSettings?.delivery_enabled !== false;
+  const isPickupEnabled = opSettings?.pickup_enabled !== false;
+  const isStoreOpen = opSettings?.is_open !== false;
+
+  const trustBadgesToRender: StoreTrustBadgeItem[] = useMemo(() => {
+    if (opSettings?.trust_badges && opSettings.trust_badges.length > 0) {
+      return opSettings.trust_badges;
+    }
+    return [
+      { id: "tb-1", title: "Tasa Oficial BCV", subtitle: "Cobro exacto del día", icon: "bcv" },
+      isDeliveryEnabled
+        ? { id: "tb-2", title: "Delivery Rápido", subtitle: "Despacho directo y seguro", icon: "truck" }
+        : { id: "tb-2", title: "Retiro en Sede", subtitle: "Listo para retirar en taller", icon: "clock" },
+      { id: "tb-3", title: "Múltiples Pagos", subtitle: "Pago Móvil, Zelle o Efectivo", icon: "payment" },
+      { id: "tb-4", title: "Garantía y Calidad", subtitle: "Atención directa personalizada", icon: "quality" },
+    ];
+  }, [opSettings?.trust_badges, isDeliveryEnabled]);
+
+  const faqItemsToRender: StoreFaqItem[] = useMemo(() => {
+    if (opSettings?.faq_items && opSettings.faq_items.length > 0) {
+      return opSettings.faq_items;
+    }
+    return [
+      {
+        id: "faq-1",
+        question: "¿Cuáles son los métodos de pago aceptados?",
+        answer: "Aceptamos Pago Móvil interbancario a la tasa oficial del día, transferencias bancarias nacionales, Zelle y efectivo según los métodos habilitados por la tienda.",
+      },
+      {
+        id: "faq-2",
+        question: "¿A qué tasa de cambio se calculan los precios?",
+        answer: "Todos los precios y totales en Bolívares se calculan automáticamente con la tasa oficial publicada por el Banco Central de Venezuela (BCV) correspondiente al día hábil.",
+      },
+      isDeliveryEnabled
+        ? {
+            id: "faq-3",
+            question: "¿Cómo funcionan los envíos y tiempos de entrega?",
+            answer: `Despachamos según nuestras zonas de reparto activas (${opSettings?.estimated_delivery_time || "en tiempo récord"}). Puedes verificar las zonas disponibles antes de pagar.`,
+          }
+        : {
+            id: "faq-3",
+            question: "¿Cómo funciona el retiro en sede o tienda física?",
+            answer: `Puedes realizar tu pedido por la web y pasar a retirar directamente por nuestra sede (${settings.address || "dirección principal"}) en nuestro horario de atención.`,
+          },
+      {
+        id: "faq-4",
+        question: "¿Cómo recibo el soporte o seguimiento de mi pedido?",
+        answer: "Al confirmar tu compra, se genera tu ticket digital con el detalle de los productos y un enlace directo a WhatsApp para coordinar los detalles en tiempo real.",
+      },
+    ];
+  }, [opSettings?.faq_items, isDeliveryEnabled, opSettings?.estimated_delivery_time, settings.address]);
 
   const getProductModifierGroups = (prod: Product): ProductModifierGroup[] => {
     if (!isFoodServiceActive || !modifierGroups || modifierGroups.length === 0) return [];
@@ -696,10 +778,12 @@ export function CatalogView({
             <div className="rounded-2xl border border-border/60 bg-muted/30 p-3 space-y-2 text-[11px]">
               <div className="flex items-center gap-2 text-foreground font-bold">
                 <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Garantía de Tienda</span>
+                <span>Garantía de Confianza</span>
               </div>
               <p className="text-muted-foreground leading-relaxed">
-                Precios oficiales en tiempo real, pesaje exacto y empaque cuidadoso.
+                {isDeliveryEnabled
+                  ? "Precios transparentes en tiempo real, calidad garantizada y despacho seguro."
+                  : "Precios transparentes en tiempo real, calidad garantizada y atención directa."}
               </p>
             </div>
           </aside>
@@ -789,122 +873,125 @@ export function CatalogView({
             </div>
 
             {/* Core Base Warm Hero Capsule & Native Trust Strip (When Storefront Pro is not active) */}
-            {!isStorefrontProActive && (
+            {!isStorefrontProActive && (opSettings?.show_hero_banner !== false || opSettings?.show_trust_strip !== false) && (
               <div className="mb-4 sm:mb-6 space-y-3">
-                {/* Modern Brand Hero Capsule (Azúcar Cacao Warmth) */}
-                <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-primary/15 via-background to-amber-500/10 border border-primary/20 relative overflow-hidden shadow-xs">
-                  {/* Subtle warm decorative glow */}
-                  <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+                {/* Modern Brand Hero Capsule (Zero Hardcoding) */}
+                {opSettings?.show_hero_banner !== false && (
+                  <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-primary/15 via-background to-amber-500/10 border border-primary/20 relative overflow-hidden shadow-xs">
+                    {/* Subtle warm decorative glow */}
+                    <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
 
-                  <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="space-y-2 max-w-xl">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] sm:text-[11px] font-black tracking-wide uppercase">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                          <span>Abierto hoy • Delivery en menos de 45 min</span>
-                        </span>
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] sm:text-[11px] font-black uppercase">
-                          <Sparkles className="w-3 h-3" />
-                          <span>Catálogo Oficial</span>
-                        </span>
-                      </div>
+                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="space-y-2 max-w-xl">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black tracking-wide uppercase ${
+                              isStoreOpen
+                                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                            }`}
+                          >
+                            <span
+                              className={`w-2 h-2 rounded-full ${
+                                isStoreOpen ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+                              }`}
+                            />
+                            <span>
+                              {!isStoreOpen
+                                ? (opSettings?.closed_message ? "Cerrado temporalmente" : "Cerrado hoy • Pedidos diferidos")
+                                : (opSettings?.hero_badge_text ||
+                                    (isDeliveryEnabled
+                                      ? "Abierto hoy • Delivery disponible"
+                                      : "Abierto hoy • Retiro en Sede"))}
+                            </span>
+                          </span>
 
-                      <h1 className="text-base sm:text-xl lg:text-2xl font-black text-foreground tracking-tight leading-tight">
-                        {settings.business_name || "Shop Market C.A."}
-                      </h1>
-                      <p className="text-xs sm:text-sm text-muted-foreground font-medium leading-relaxed">
-                        Precios oficiales en Bolívares y Dólares al cambio del día. Productos frescos, variedad garantizada y despacho directo a tu dirección.
-                      </p>
-
-                      {/* Interactive Discount Coupon Chips */}
-                      <div className="pt-1 flex items-center gap-1.5 flex-wrap text-xs">
-                        <span className="font-bold text-foreground text-[11px]">Cupones activos:</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (typeof navigator !== "undefined") navigator.clipboard?.writeText("BIENVENIDO");
-                          }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-card border border-primary/30 text-primary font-mono text-[11px] font-black hover:bg-primary/5 active:scale-95 transition-all cursor-pointer shadow-xs"
-                          title="Toca para copiar cupón BIENVENIDO"
-                        >
-                          <Tag className="w-3 h-3" />
-                          <span>BIENVENIDO ($2 OFF)</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (typeof navigator !== "undefined") navigator.clipboard?.writeText("SHOP10");
-                          }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-card border border-primary/30 text-primary font-mono text-[11px] font-black hover:bg-primary/5 active:scale-95 transition-all cursor-pointer shadow-xs"
-                          title="Toca para copiar cupón SHOP10"
-                        >
-                          <Tag className="w-3 h-3" />
-                          <span>SHOP10 (10% OFF)</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Sede & Delivery Badge */}
-                    <div className="shrink-0 flex md:flex-col items-center md:items-end gap-2">
-                      <div className="flex items-center gap-2.5 bg-card/90 backdrop-blur-sm px-3.5 py-2.5 rounded-2xl border border-border shadow-xs">
-                        <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                          <Truck className="w-4.5 h-4.5" />
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] sm:text-[11px] font-black uppercase">
+                            <Sparkles className="w-3 h-3" />
+                            <span>Catálogo Oficial</span>
+                          </span>
                         </div>
-                        <div className="text-left md:text-right">
-                          <p className="text-xs font-black text-foreground leading-tight">
-                            {stores[0]?.name || "Sucursal Nueva Segovia"}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground font-semibold">
-                            {deliveryZones && deliveryZones.length > 0 ? `${deliveryZones.length} zonas de reparto activas` : "Despacho express a domicilio"}
-                          </p>
+
+                        <h1 className="text-base sm:text-xl lg:text-2xl font-black text-foreground tracking-tight leading-tight">
+                          {opSettings?.hero_title || settings.business_name || "Catálogo Oficial"}
+                        </h1>
+                        <p className="text-xs sm:text-sm text-muted-foreground font-medium leading-relaxed">
+                          {opSettings?.hero_description ||
+                            (isDeliveryEnabled
+                              ? "Precios oficiales en Bolívares y Dólares al cambio del día. Productos frescos, variedad garantizada y despacho directo a tu dirección."
+                              : "Precios oficiales en Bolívares y Dólares al cambio del día. Calidad garantizada y retiro directo en sede comercial.")}
+                        </p>
+
+                        {/* Interactive Discount Coupon Chips (ONLY when module is active, enabled & coupons exist) */}
+                        {isCouponsActive && opSettings?.show_coupon_badges !== false && coupons && coupons.filter((c) => c.is_active).length > 0 && (
+                          <div className="pt-1 flex items-center gap-1.5 flex-wrap text-xs">
+                            <span className="font-bold text-foreground text-[11px]">Cupones activos:</span>
+                            {coupons
+                              .filter((c) => c.is_active)
+                              .slice(0, 3)
+                              .map((coupon) => (
+                                <button
+                                  key={coupon.id || coupon.code}
+                                  type="button"
+                                  onClick={() => {
+                                    if (typeof navigator !== "undefined") navigator.clipboard?.writeText(coupon.code);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-card border border-primary/30 text-primary font-mono text-[11px] font-black hover:bg-primary/5 active:scale-95 transition-all cursor-pointer shadow-xs"
+                                  title={`Toca para copiar cupón ${coupon.code}`}
+                                >
+                                  <Tag className="w-3 h-3" />
+                                  <span>
+                                    {coupon.code} ({coupon.discount_type === "FIXED_USD" ? `$${coupon.discount_value} OFF` : `${coupon.discount_value}% OFF`})
+                                  </span>
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Sede & Delivery Badge */}
+                      <div className="shrink-0 flex md:flex-col items-center md:items-end gap-2">
+                        <div className="flex items-center gap-2.5 bg-card/90 backdrop-blur-sm px-3.5 py-2.5 rounded-2xl border border-border shadow-xs">
+                          <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                            {isDeliveryEnabled ? <Truck className="w-4.5 h-4.5" /> : <StoreIcon className="w-4.5 h-4.5" />}
+                          </div>
+                          <div className="text-left md:text-right">
+                            <p className="text-xs font-black text-foreground leading-tight">
+                              {stores[0]?.name || settings.business_name || "Sede Principal"}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground font-semibold">
+                              {isDeliveryEnabled
+                                ? (deliveryZones && deliveryZones.length > 0
+                                    ? `${deliveryZones.length} zonas de reparto activas`
+                                    : "Despacho express a domicilio")
+                                : (isPickupEnabled ? "Retiro en sede disponible" : "Atención directa en tienda")}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
 
-                {/* Native Trust & Benefits Strip (Cintillo de Confianza 4 Pilares) */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-                  <div className="p-2.5 sm:p-3 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-xs flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                      <Zap className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-black text-foreground truncate">Tasa Oficial BCV</p>
-                      <p className="text-[10px] text-muted-foreground truncate font-medium">Al cambio oficial del día</p>
-                    </div>
+                {/* Native Trust & Benefits Strip (Configurable via operational_settings.trust_badges) */}
+                {opSettings?.show_trust_strip !== false && (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+                    {trustBadgesToRender.map((badge, idx) => (
+                      <div
+                        key={badge.id || idx}
+                        className="p-2.5 sm:p-3 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-xs flex items-center gap-2.5"
+                      >
+                        <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                          {getTrustBadgeIconComponent(badge.icon)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-foreground truncate">{badge.title}</p>
+                          <p className="text-[10px] text-muted-foreground truncate font-medium">{badge.subtitle}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-
-                  <div className="p-2.5 sm:p-3 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-xs flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                      <Truck className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-black text-foreground truncate">Delivery Rápido</p>
-                      <p className="text-[10px] text-muted-foreground truncate font-medium">Menos de 45 minutos</p>
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 sm:p-3 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-xs flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                      <CreditCard className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-black text-foreground truncate">Múltiples Pagos</p>
-                      <p className="text-[10px] text-muted-foreground truncate font-medium">Pago Móvil, Zelle y Efectivo</p>
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 sm:p-3 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-xs flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                      <ShieldCheck className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-black text-foreground truncate">Calidad 100%</p>
-                      <p className="text-[10px] text-muted-foreground truncate font-medium">Empaque y pesaje cuidado</p>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
             )}
 
@@ -1315,8 +1402,8 @@ export function CatalogView({
         </div>
       )}
 
-      {/* Native Storefront FAQ Accordion (Always present in Core Base) */}
-      {!isStorefrontProActive && (
+      {/* Native Storefront FAQ Accordion (Controlled by operational_settings) */}
+      {!isStorefrontProActive && opSettings?.show_faq_section !== false && (
         <section aria-label="Preguntas Frecuentes" className="max-w-[1536px] mx-auto px-3 sm:px-4 lg:px-6 my-8">
           <div className="rounded-2xl sm:rounded-3xl border border-border bg-card p-5 sm:p-8 space-y-5 shadow-xs">
             <div className="space-y-1">
@@ -1328,50 +1415,25 @@ export function CatalogView({
                 Todo lo que necesitas saber antes de comprar
               </h3>
               <p className="text-xs sm:text-sm text-muted-foreground font-medium">
-                Respuestas rápidas sobre métodos de pago, cálculo en Bolívares y despacho a domicilio.
+                Respuestas claras sobre métodos de pago, cálculo en Bolívares y atención comercial.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-              <details className="group rounded-2xl border border-border bg-background/60 p-3.5 sm:p-4 transition-all [&[open]]:border-primary/40 [&[open]]:shadow-xs">
-                <summary className="flex items-center justify-between text-xs sm:text-sm font-bold text-foreground cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
-                  <span className="pr-2">¿Cuáles son los métodos de pago aceptados?</span>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200 group-open:rotate-180 group-open:text-primary" />
-                </summary>
-                <p className="mt-2 text-xs text-muted-foreground leading-relaxed pt-2 border-t border-border/40">
-                  Aceptamos Pago Móvil interbancario a la tasa oficial del día, transferencias bancarias nacionales, Zelle, efectivo en Bolívares o Dólares, y Binance Pay.
-                </p>
-              </details>
-
-              <details className="group rounded-2xl border border-border bg-background/60 p-3.5 sm:p-4 transition-all [&[open]]:border-primary/40 [&[open]]:shadow-xs">
-                <summary className="flex items-center justify-between text-xs sm:text-sm font-bold text-foreground cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
-                  <span className="pr-2">¿A qué tasa de cambio se calculan los precios?</span>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200 group-open:rotate-180 group-open:text-primary" />
-                </summary>
-                <p className="mt-2 text-xs text-muted-foreground leading-relaxed pt-2 border-t border-border/40">
-                  Todos los precios y totales en Bolívares se calculan automáticamente con la tasa oficial publicada por el Banco Central de Venezuela (BCV) correspondiente al día hábil.
-                </p>
-              </details>
-
-              <details className="group rounded-2xl border border-border bg-background/60 p-3.5 sm:p-4 transition-all [&[open]]:border-primary/40 [&[open]]:shadow-xs">
-                <summary className="flex items-center justify-between text-xs sm:text-sm font-bold text-foreground cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
-                  <span className="pr-2">¿Cómo funcionan los envíos y tiempos de entrega?</span>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200 group-open:rotate-180 group-open:text-primary" />
-                </summary>
-                <p className="mt-2 text-xs text-muted-foreground leading-relaxed pt-2 border-t border-border/40">
-                  Despachamos directamente desde nuestra sede en Barquisimeto en un promedio de 30 a 45 minutos. Puedes seleccionar tu sector y verificar la tarifa exacta antes de pagar.
-                </p>
-              </details>
-
-              <details className="group rounded-2xl border border-border bg-background/60 p-3.5 sm:p-4 transition-all [&[open]]:border-primary/40 [&[open]]:shadow-xs">
-                <summary className="flex items-center justify-between text-xs sm:text-sm font-bold text-foreground cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
-                  <span className="pr-2">¿Cómo recibo el seguimiento de mi pedido?</span>
-                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200 group-open:rotate-180 group-open:text-primary" />
-                </summary>
-                <p className="mt-2 text-xs text-muted-foreground leading-relaxed pt-2 border-t border-border/40">
-                  Al confirmar tu compra, se genera tu ticket digital con el detalle de los productos y un enlace directo a WhatsApp para coordinar la entrega en tiempo real con nuestro equipo.
-                </p>
-              </details>
+              {faqItemsToRender.map((item, idx) => (
+                <details
+                  key={item.id || idx}
+                  className="group rounded-2xl border border-border bg-background/60 p-3.5 sm:p-4 transition-all [&[open]]:border-primary/40 [&[open]]:shadow-xs"
+                >
+                  <summary className="flex items-center justify-between text-xs sm:text-sm font-bold text-foreground cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
+                    <span className="pr-2">{item.question}</span>
+                    <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200 group-open:rotate-180 group-open:text-primary" />
+                  </summary>
+                  <p className="mt-2 text-xs text-muted-foreground leading-relaxed pt-2 border-t border-border/40">
+                    {item.answer}
+                  </p>
+                </details>
+              ))}
             </div>
           </div>
         </section>
