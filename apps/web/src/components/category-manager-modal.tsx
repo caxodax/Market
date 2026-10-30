@@ -58,11 +58,18 @@ export function CategoryManagerModal({
     try {
       const res = await createCategoryAction(tenantId, cleanName);
       if (res.success && res.category) {
-        const nextList = [...localCategories, res.category];
+        const cat = res.category;
+        const alreadyExists = localCategories.some(
+          (c) =>
+            c.id === cat.id ||
+            (c.slug && c.slug.toLowerCase().trim() === (cat.slug || "").toLowerCase().trim()) ||
+            c.name.toLowerCase().trim() === cat.name.toLowerCase().trim()
+        );
+        const nextList = alreadyExists ? localCategories : [...localCategories, cat];
         setLocalCategories(nextList);
         onCategoriesChanged(nextList);
         setNewCatName("");
-        setSuccessMsg(`Categoría "${cleanName}" creada exitosamente.`);
+        setSuccessMsg(alreadyExists ? `La categoría "${cat.name}" ya existe.` : `Categoría "${cleanName}" creada exitosamente.`);
         setTimeout(() => setSuccessMsg(null), 3000);
       } else {
         setErrorMsg(res.error || "No se pudo crear la categoría");

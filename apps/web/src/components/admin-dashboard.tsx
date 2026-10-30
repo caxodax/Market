@@ -3379,7 +3379,18 @@ export function AdminDashboard({
         onSaved={handleProductSaved}
         onDeleted={handleProductDeleted}
         onQuotaExceeded={() => triggerUpgradeModal("products")}
-        onCategoryCreated={(newCat) => setCategories((prev) => [...prev, newCat])}
+        onCategoryCreated={(newCat) =>
+          setCategories((prev) =>
+            prev.some(
+              (c) =>
+                c.id === newCat.id ||
+                (c.slug && c.slug.toLowerCase().trim() === (newCat.slug || "").toLowerCase().trim()) ||
+                c.name.toLowerCase().trim() === newCat.name.toLowerCase().trim()
+            )
+              ? prev
+              : [...prev, newCat]
+          )
+        }
       />
 
       {/* Staff Invitation & Role Assignment Modal */}

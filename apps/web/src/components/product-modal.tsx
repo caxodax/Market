@@ -82,7 +82,16 @@ export function ProductModal({
       const res = await createCategoryAction(tenantId, trimmed);
       if (res.success && res.category) {
         const created = res.category;
-        setLocalCategories((prev) => [...prev, created]);
+        setLocalCategories((prev) =>
+          prev.some(
+            (c) =>
+              c.id === created.id ||
+              (c.slug && c.slug.toLowerCase().trim() === (created.slug || "").toLowerCase().trim()) ||
+              c.name.toLowerCase().trim() === created.name.toLowerCase().trim()
+          )
+            ? prev
+            : [...prev, created]
+        );
         setCategoryId(created.id);
         setNewCatName("");
         setIsAddingCategory(false);

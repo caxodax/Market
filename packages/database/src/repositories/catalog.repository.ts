@@ -132,30 +132,69 @@ export class CatalogRepository {
     return null;
   }
 
-/**
+  /**
    * Get Categories for Tenant
    */
   static async getCategories(tenantId: string): Promise<Category[]> {
     const supabase = getSupabase();
+    const isPrimaryTenant = tenantId === "shop-market-ca" || tenantId === "shop-market";
+    const queryTenantId = isPrimaryTenant ? "shop-market-ca" : tenantId;
+
     if (supabase) {
       const { data, error } = await supabase
         .from("categories")
         .select("*")
-        .eq("tenant_id", tenantId)
+        .eq("tenant_id", queryTenantId)
         .eq("is_active", true)
         .order("sort_order", { ascending: true });
 
       if (!error && Array.isArray(data) && data.length > 0) {
         const existingIds = new Set(data.map((c: any) => c.id));
-        const inMemExtra = state.categories.filter((c) => c.tenant_id === tenantId && c.is_active && !existingIds.has(c.id));
-        return [...data, ...inMemExtra] as Category[];
+        const existingSlugs = new Set(data.map((c: any) => (c.slug || "").toLowerCase().trim()));
+        const existingNames = new Set(data.map((c: any) => (c.name || "").toLowerCase().trim()));
+
+        // In-memory fallback ONLY for runtime created items (e.g. during tests without DB insert permission)
+        // Never include hardcoded mock seeds (starts with "cat-") when database categories exist.
+        const inMemExtra = state.categories.filter((c) => {
+          if (c.tenant_id !== tenantId && !(isPrimaryTenant && c.tenant_id === "shop-market-ca")) return false;
+          if (!c.is_active) return false;
+          if (c.id.startsWith("cat-")) return false;
+          if (existingIds.has(c.id)) return false;
+          if (existingSlugs.has((c.slug || "").toLowerCase().trim())) return false;
+          if (existingNames.has((c.name || "").toLowerCase().trim())) return false;
+          return true;
+        });
+
+        const combined = [...data, ...inMemExtra] as Category[];
+
+        // Strict deduplication safeguard: ensure unique slug & name
+        const seenKeys = new Set<string>();
+        const uniqueCategories: Category[] = [];
+        for (const cat of combined) {
+          const key = (cat.slug || cat.name || "").toLowerCase().trim();
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            uniqueCategories.push(cat);
+          }
+        }
+        return uniqueCategories;
       }
     }
 
-    const isPrimaryTenant = tenantId === "shop-market-ca" || tenantId === "shop-market";
-    return state.categories
+    const fallbackList = state.categories
       .filter((c) => (c.tenant_id === tenantId || (isPrimaryTenant && c.tenant_id === "shop-market-ca")) && c.is_active)
       .sort((a, b) => a.sort_order - b.sort_order);
+
+    const seenKeys = new Set<string>();
+    const uniqueFallback: Category[] = [];
+    for (const cat of fallbackList) {
+      const key = (cat.slug || cat.name || "").toLowerCase().trim();
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        uniqueFallback.push(cat);
+      }
+    }
+    return uniqueFallback;
   }
 
   /**
@@ -179,14 +218,28 @@ export class CatalogRepository {
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "");
 
+    const isPrimaryTenant = tenantId === "shop-market-ca" || tenantId === "shop-market";
+    const queryTenantId = isPrimaryTenant ? "shop-market-ca" : tenantId;
+
+    // Check if category already exists to avoid creating duplicates
+    const currentCategories = await this.getCategories(tenantId);
+    const existing = currentCategories.find(
+      (c) =>
+        c.name.trim().toLowerCase() === cleanName.toLowerCase() ||
+        (c.slug && c.slug.toLowerCase().trim() === slug.toLowerCase().trim())
+    );
+    if (existing) {
+      return existing;
+    }
+
     const newId = generateUuid();
     const sortOrder =
       data.sort_order ??
-      (state.categories.filter((c) => c.tenant_id === tenantId).length + 1);
+      (currentCategories.length + 1);
 
     const newCategory: Category = {
       id: newId,
-      tenant_id: tenantId,
+      tenant_id: queryTenantId,
       name: cleanName,
       slug: slug || `cat-${Date.now()}`,
       image_url: data.image_url || null,
@@ -201,7 +254,7 @@ export class CatalogRepository {
           .from("categories")
           .insert({
             id: newCategory.id,
-            tenant_id: tenantId,
+            tenant_id: queryTenantId,
             name: newCategory.name,
             slug: newCategory.slug,
             image_url: newCategory.image_url,
@@ -212,9 +265,19 @@ export class CatalogRepository {
           .single();
 
         if (!error && inserted) {
-          state.categories.push(inserted as Category);
+          const already = state.categories.some((c) => c.id === inserted.id);
+          if (!already) state.categories.push(inserted as Category);
           return inserted as Category;
         } else if (error) {
+          if (error.code === "23505" || error.message?.includes("uq_tenant_category_slug")) {
+            const { data: found } = await supabase
+              .from("categories")
+              .select("*")
+              .eq("tenant_id", queryTenantId)
+              .eq("slug", newCategory.slug)
+              .maybeSingle();
+            if (found) return found as Category;
+          }
           console.warn("[MarketOS] createCategory Supabase warning:", error.message || error);
         }
       } catch (e) {
@@ -222,7 +285,14 @@ export class CatalogRepository {
       }
     }
 
-    state.categories.push(newCategory);
+    const alreadyInMem = state.categories.some(
+      (c) =>
+        (c.tenant_id === queryTenantId || c.tenant_id === tenantId) &&
+        (c.id === newCategory.id || c.slug === newCategory.slug || c.name.toLowerCase() === cleanName.toLowerCase())
+    );
+    if (!alreadyInMem) {
+      state.categories.push(newCategory);
+    }
     return newCategory;
   }
 
@@ -235,18 +305,23 @@ export class CatalogRepository {
     data: Partial<Pick<Category, "name" | "slug" | "image_url" | "sort_order" | "is_active">>
   ): Promise<Category | null> {
     const supabase = getSupabase();
+    const isPrimaryTenant = tenantId === "shop-market-ca" || tenantId === "shop-market";
+    const queryTenantId = isPrimaryTenant ? "shop-market-ca" : tenantId;
+
     if (supabase && isUuid(categoryId)) {
       try {
         const { data: updated, error } = await supabase
           .from("categories")
           .update(data)
-          .eq("tenant_id", tenantId)
+          .eq("tenant_id", queryTenantId)
           .eq("id", categoryId)
           .select()
           .single();
 
         if (!error && updated) {
-          const idx = state.categories.findIndex((c) => c.tenant_id === tenantId && c.id === categoryId);
+          const idx = state.categories.findIndex(
+            (c) => (c.tenant_id === tenantId || (isPrimaryTenant && c.tenant_id === "shop-market-ca")) && c.id === categoryId
+          );
           if (idx !== -1) {
             state.categories[idx] = { ...state.categories[idx], ...updated };
           }
@@ -257,7 +332,9 @@ export class CatalogRepository {
       }
     }
 
-    const idx = state.categories.findIndex((c) => c.tenant_id === tenantId && c.id === categoryId);
+    const idx = state.categories.findIndex(
+      (c) => (c.tenant_id === tenantId || (isPrimaryTenant && c.tenant_id === "shop-market-ca")) && c.id === categoryId
+    );
     if (idx !== -1) {
       state.categories[idx] = { ...state.categories[idx], ...data };
       return state.categories[idx];
@@ -270,12 +347,15 @@ export class CatalogRepository {
    */
   static async deleteCategory(tenantId: string, categoryId: string): Promise<boolean> {
     const supabase = getSupabase();
+    const isPrimaryTenant = tenantId === "shop-market-ca" || tenantId === "shop-market";
+    const queryTenantId = isPrimaryTenant ? "shop-market-ca" : tenantId;
+
     if (supabase && isUuid(categoryId)) {
       try {
         const { error } = await supabase
           .from("categories")
           .update({ is_active: false })
-          .eq("tenant_id", tenantId)
+          .eq("tenant_id", queryTenantId)
           .eq("id", categoryId);
 
         if (error) {
@@ -286,7 +366,9 @@ export class CatalogRepository {
       }
     }
 
-    const idx = state.categories.findIndex((c) => c.tenant_id === tenantId && c.id === categoryId);
+    const idx = state.categories.findIndex(
+      (c) => (c.tenant_id === tenantId || (isPrimaryTenant && c.tenant_id === "shop-market-ca")) && c.id === categoryId
+    );
     if (idx !== -1) {
       state.categories[idx].is_active = false;
     }
