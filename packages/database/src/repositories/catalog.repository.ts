@@ -34,9 +34,10 @@ export class CatalogRepository {
       }
     }
 
-    if (isLiveDatabaseConfigured()) return [];
+    const isPrimaryTenant = tenantId === "shop-market-ca" || tenantId === "shop-market";
+    if (isLiveDatabaseConfigured() && !isPrimaryTenant) return [];
     return state.stores.filter(
-      (s) => s.tenant_id === tenantId && (includeInactive || s.is_active)
+      (s) => (s.tenant_id === tenantId || (isPrimaryTenant && s.tenant_id === "shop-market-ca")) && (includeInactive || s.is_active)
     );
   }
 
@@ -149,9 +150,10 @@ export class CatalogRepository {
       }
     }
 
-    if (isLiveDatabaseConfigured()) return [];
+    const isPrimaryTenant = tenantId === "shop-market-ca" || tenantId === "shop-market";
+    if (isLiveDatabaseConfigured() && !isPrimaryTenant) return [];
     return state.categories
-      .filter((c) => c.tenant_id === tenantId && c.is_active)
+      .filter((c) => (c.tenant_id === tenantId || (isPrimaryTenant && c.tenant_id === "shop-market-ca")) && c.is_active)
       .sort((a, b) => a.sort_order - b.sort_order);
   }
 
@@ -190,7 +192,28 @@ export class CatalogRepository {
           }
         }
 
-        const { data, error } = await q;
+        let { data, error } = await q;
+
+        // If join with inventory fails, fallback to simple products select
+        if (error) {
+          console.warn("[MarketOS] getProducts join error, attempting simple select:", error.message || error);
+          let simpleQ = supabase
+            .from("products")
+            .select("*")
+            .eq("tenant_id", tenantId)
+            .eq("is_active", true);
+
+          if (categoryId) simpleQ = simpleQ.eq("category_id", categoryId);
+          if (query) simpleQ = simpleQ.ilike("name", `%${query}%`);
+          if (limit && limit > 0) {
+            simpleQ = offset && offset > 0 ? simpleQ.range(offset, offset + limit - 1) : simpleQ.limit(limit);
+          }
+          const retryRes = await simpleQ;
+          if (!retryRes.error && Array.isArray(retryRes.data) && retryRes.data.length > 0) {
+            data = retryRes.data;
+            error = null;
+          }
+        }
 
         if (!error && Array.isArray(data) && data.length > 0) {
           return data.map((item: any) => {
@@ -226,9 +249,13 @@ export class CatalogRepository {
     }
 
     // High availability fallback: If DB query timed out or had a transient glitch,
-    // retrieve in-memory state so storefront catalog never flashes empty
+    // retrieve in-memory state so storefront catalog never flashes empty.
     const filtered = state.products.filter((p) => {
-      if (p.tenant_id !== tenantId || !p.is_active) return false;
+      const matchesTenant =
+        p.tenant_id === tenantId ||
+        (tenantId === "shop-market" && p.tenant_id === "shop-market-ca") ||
+        (tenantId === "shop-market-ca" && p.tenant_id === "shop-market");
+      if (!matchesTenant || !p.is_active) return false;
       if (categoryId && p.category_id !== categoryId) return false;
       if (query && !p.name.toLowerCase().includes(query.toLowerCase()))
         return false;

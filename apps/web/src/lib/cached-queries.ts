@@ -54,17 +54,23 @@ export const getCachedTenantSettings = (tenantId: string): Promise<TenantSetting
  */
 export const getCachedCategories = (tenantId: string): Promise<Category[]> => {
   return unstable_cache(
-    async () => MarketOSRepository.getCategories(tenantId),
+    async () => {
+      const res = await MarketOSRepository.getCategories(tenantId);
+      if ((!res || res.length === 0) && (tenantId === "shop-market-ca" || tenantId === "shop-market")) {
+        return MarketOSRepository.getCategories("shop-market-ca");
+      }
+      return res;
+    },
     [`tenant-categories-${tenantId}`],
     {
-      revalidate: 600,
+      revalidate: 300,
       tags: [`tenant-categories-${tenantId}`],
     }
   )();
 };
 
 /**
- * Obtener Productos del Catálogo con caché de 3 minutos
+ * Obtener Productos del Catálogo con caché de 2 minutos y guardia de alta disponibilidad
  */
 export const getCachedProducts = (
   tenantId: string,
@@ -73,10 +79,16 @@ export const getCachedProducts = (
 ): Promise<(Product & { stock: number })[]> => {
   const cacheKey = `tenant-products-${tenantId}-${categoryId || "all"}-${query ? encodeURIComponent(query) : "all"}`;
   return unstable_cache(
-    async () => MarketOSRepository.getProducts(tenantId, categoryId, query),
+    async () => {
+      const res = await MarketOSRepository.getProducts(tenantId, categoryId, query);
+      if ((!res || res.length === 0) && !categoryId && !query && (tenantId === "shop-market-ca" || tenantId === "shop-market")) {
+        return MarketOSRepository.getProducts("shop-market-ca");
+      }
+      return res;
+    },
     [cacheKey],
     {
-      revalidate: 180,
+      revalidate: 120,
       tags: [`tenant-products-${tenantId}`],
     }
   )();

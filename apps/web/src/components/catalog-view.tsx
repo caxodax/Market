@@ -48,6 +48,11 @@ import {
   Plus,
   Minus,
   ShieldCheck,
+  CreditCard,
+  Clock,
+  HelpCircle,
+  MessageCircle,
+  Zap,
 } from "lucide-react";
 
 interface CatalogViewProps {
@@ -783,57 +788,120 @@ export function CatalogView({
               )}
             </div>
 
-            {/* Supermarket Pro Promotional VIP Banner Capsule (Only when Storefront Pro is not active) */}
+            {/* Core Base Warm Hero Capsule & Native Trust Strip (When Storefront Pro is not active) */}
             {!isStorefrontProActive && (
-              <div className="mb-4 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-primary/15 via-primary/5 to-amber-500/10 border border-primary/20 relative overflow-hidden shadow-xs">
-                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div className="space-y-1.5 max-w-xl">
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] sm:text-[11px] font-black tracking-wide uppercase">
-                      <Sparkles className="w-3 h-3" />
-                      <span>Supermarket Pro • Compra Rápida</span>
+              <div className="mb-4 sm:mb-6 space-y-3">
+                {/* Modern Brand Hero Capsule (Azúcar Cacao Warmth) */}
+                <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-primary/15 via-background to-amber-500/10 border border-primary/20 relative overflow-hidden shadow-xs">
+                  {/* Subtle warm decorative glow */}
+                  <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+
+                  <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-2 max-w-xl">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] sm:text-[11px] font-black tracking-wide uppercase">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          <span>Abierto hoy • Delivery en menos de 45 min</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] sm:text-[11px] font-black uppercase">
+                          <Sparkles className="w-3 h-3" />
+                          <span>Catálogo Oficial</span>
+                        </span>
+                      </div>
+
+                      <h1 className="text-base sm:text-xl lg:text-2xl font-black text-foreground tracking-tight leading-tight">
+                        {settings.business_name || "Shop Market C.A."}
+                      </h1>
+                      <p className="text-xs sm:text-sm text-muted-foreground font-medium leading-relaxed">
+                        Precios oficiales en Bolívares y Dólares al cambio del día. Productos frescos, variedad garantizada y despacho directo a tu dirección.
+                      </p>
+
+                      {/* Interactive Discount Coupon Chips */}
+                      <div className="pt-1 flex items-center gap-1.5 flex-wrap text-xs">
+                        <span className="font-bold text-foreground text-[11px]">Cupones activos:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (typeof navigator !== "undefined") navigator.clipboard?.writeText("BIENVENIDO");
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-card border border-primary/30 text-primary font-mono text-[11px] font-black hover:bg-primary/5 active:scale-95 transition-all cursor-pointer shadow-xs"
+                          title="Toca para copiar cupón BIENVENIDO"
+                        >
+                          <Tag className="w-3 h-3" />
+                          <span>BIENVENIDO ($2 OFF)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (typeof navigator !== "undefined") navigator.clipboard?.writeText("SHOP10");
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-card border border-primary/30 text-primary font-mono text-[11px] font-black hover:bg-primary/5 active:scale-95 transition-all cursor-pointer shadow-xs"
+                          title="Toca para copiar cupón SHOP10"
+                        >
+                          <Tag className="w-3 h-3" />
+                          <span>SHOP10 (10% OFF)</span>
+                        </button>
+                      </div>
                     </div>
-                    <h1 className="text-sm sm:text-base lg:text-lg font-black text-foreground tracking-tight leading-tight">
-                      Todo lo que necesitas, directo a tu puerta
-                    </h1>
-                    <p className="text-xs text-muted-foreground font-medium">
-                      Productos frescos, variedad garantizada y precios oficiales al cambio del día.
-                    </p>
-                    <div className="pt-1 flex items-center gap-1.5 flex-wrap text-xs">
-                      <span className="font-bold text-foreground text-[11px]">Cupones:</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (typeof navigator !== "undefined") navigator.clipboard?.writeText("BIENVENIDO");
-                        }}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-background border border-primary/30 text-primary font-mono text-[11px] font-black hover:bg-primary/5 transition-colors cursor-pointer"
-                        title="Copiar cupón BIENVENIDO"
-                      >
-                        <Tag className="w-3 h-3" />
-                        <span>BIENVENIDO ($2 OFF)</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (typeof navigator !== "undefined") navigator.clipboard?.writeText("SHOP10");
-                        }}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-background border border-primary/30 text-primary font-mono text-[11px] font-black hover:bg-primary/5 transition-colors cursor-pointer"
-                        title="Copiar cupón SHOP10"
-                      >
-                        <Tag className="w-3 h-3" />
-                        <span>SHOP10 (10% OFF)</span>
-                      </button>
+
+                    {/* Sede & Delivery Badge */}
+                    <div className="shrink-0 flex md:flex-col items-center md:items-end gap-2">
+                      <div className="flex items-center gap-2.5 bg-card/90 backdrop-blur-sm px-3.5 py-2.5 rounded-2xl border border-border shadow-xs">
+                        <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                          <Truck className="w-4.5 h-4.5" />
+                        </div>
+                        <div className="text-left md:text-right">
+                          <p className="text-xs font-black text-foreground leading-tight">
+                            {stores[0]?.name || "Sucursal Nueva Segovia"}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground font-semibold">
+                            {deliveryZones && deliveryZones.length > 0 ? `${deliveryZones.length} zonas de reparto activas` : "Despacho express a domicilio"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Native Trust & Benefits Strip (Cintillo de Confianza 4 Pilares) */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+                  <div className="p-2.5 sm:p-3 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-xs flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                      <Zap className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-black text-foreground truncate">Tasa Oficial BCV</p>
+                      <p className="text-[10px] text-muted-foreground truncate font-medium">Al cambio oficial del día</p>
                     </div>
                   </div>
 
-                  <div className="shrink-0 flex md:flex-col items-center md:items-end gap-2">
-                    <div className="flex items-center gap-2 bg-background/90 px-3 py-2 rounded-xl border border-border shadow-2xs">
-                      <Truck className="w-4 h-4 text-primary shrink-0" />
-                      <div className="text-left md:text-right">
-                        <p className="text-xs font-black text-foreground leading-tight">Despacho a Domicilio</p>
-                        <p className="text-[10px] text-muted-foreground font-semibold">
-                          {deliveryZones && deliveryZones.length > 0 ? `${deliveryZones.length} zonas activas` : "Envíos directos"}
-                        </p>
-                      </div>
+                  <div className="p-2.5 sm:p-3 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-xs flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                      <Truck className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-black text-foreground truncate">Delivery Rápido</p>
+                      <p className="text-[10px] text-muted-foreground truncate font-medium">Menos de 45 minutos</p>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 sm:p-3 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-xs flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                      <CreditCard className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-black text-foreground truncate">Múltiples Pagos</p>
+                      <p className="text-[10px] text-muted-foreground truncate font-medium">Pago Móvil, Zelle y Efectivo</p>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 sm:p-3 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-xs flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-black text-foreground truncate">Calidad 100%</p>
+                      <p className="text-[10px] text-muted-foreground truncate font-medium">Empaque y pesaje cuidado</p>
                     </div>
                   </div>
                 </div>
@@ -1245,6 +1313,68 @@ export function CatalogView({
             onActionClick={handleStorefrontActionClick}
           />
         </div>
+      )}
+
+      {/* Native Storefront FAQ Accordion (Always present in Core Base) */}
+      {!isStorefrontProActive && (
+        <section aria-label="Preguntas Frecuentes" className="max-w-[1536px] mx-auto px-3 sm:px-4 lg:px-6 my-8">
+          <div className="rounded-2xl sm:rounded-3xl border border-border bg-card p-5 sm:p-8 space-y-5 shadow-xs">
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] sm:text-xs font-black uppercase tracking-wider">
+                <HelpCircle className="w-3.5 h-3.5" />
+                <span>Preguntas Frecuentes</span>
+              </div>
+              <h3 className="text-base sm:text-xl font-extrabold text-foreground tracking-tight">
+                Todo lo que necesitas saber antes de comprar
+              </h3>
+              <p className="text-xs sm:text-sm text-muted-foreground font-medium">
+                Respuestas rápidas sobre métodos de pago, cálculo en Bolívares y despacho a domicilio.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+              <details className="group rounded-2xl border border-border bg-background/60 p-3.5 sm:p-4 transition-all [&[open]]:border-primary/40 [&[open]]:shadow-xs">
+                <summary className="flex items-center justify-between text-xs sm:text-sm font-bold text-foreground cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
+                  <span className="pr-2">¿Cuáles son los métodos de pago aceptados?</span>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200 group-open:rotate-180 group-open:text-primary" />
+                </summary>
+                <p className="mt-2 text-xs text-muted-foreground leading-relaxed pt-2 border-t border-border/40">
+                  Aceptamos Pago Móvil interbancario a la tasa oficial del día, transferencias bancarias nacionales, Zelle, efectivo en Bolívares o Dólares, y Binance Pay.
+                </p>
+              </details>
+
+              <details className="group rounded-2xl border border-border bg-background/60 p-3.5 sm:p-4 transition-all [&[open]]:border-primary/40 [&[open]]:shadow-xs">
+                <summary className="flex items-center justify-between text-xs sm:text-sm font-bold text-foreground cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
+                  <span className="pr-2">¿A qué tasa de cambio se calculan los precios?</span>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200 group-open:rotate-180 group-open:text-primary" />
+                </summary>
+                <p className="mt-2 text-xs text-muted-foreground leading-relaxed pt-2 border-t border-border/40">
+                  Todos los precios y totales en Bolívares se calculan automáticamente con la tasa oficial publicada por el Banco Central de Venezuela (BCV) correspondiente al día hábil.
+                </p>
+              </details>
+
+              <details className="group rounded-2xl border border-border bg-background/60 p-3.5 sm:p-4 transition-all [&[open]]:border-primary/40 [&[open]]:shadow-xs">
+                <summary className="flex items-center justify-between text-xs sm:text-sm font-bold text-foreground cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
+                  <span className="pr-2">¿Cómo funcionan los envíos y tiempos de entrega?</span>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200 group-open:rotate-180 group-open:text-primary" />
+                </summary>
+                <p className="mt-2 text-xs text-muted-foreground leading-relaxed pt-2 border-t border-border/40">
+                  Despachamos directamente desde nuestra sede en Barquisimeto en un promedio de 30 a 45 minutos. Puedes seleccionar tu sector y verificar la tarifa exacta antes de pagar.
+                </p>
+              </details>
+
+              <details className="group rounded-2xl border border-border bg-background/60 p-3.5 sm:p-4 transition-all [&[open]]:border-primary/40 [&[open]]:shadow-xs">
+                <summary className="flex items-center justify-between text-xs sm:text-sm font-bold text-foreground cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
+                  <span className="pr-2">¿Cómo recibo el seguimiento de mi pedido?</span>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200 group-open:rotate-180 group-open:text-primary" />
+                </summary>
+                <p className="mt-2 text-xs text-muted-foreground leading-relaxed pt-2 border-t border-border/40">
+                  Al confirmar tu compra, se genera tu ticket digital con el detalle de los productos y un enlace directo a WhatsApp para coordinar la entrega en tiempo real con nuestro equipo.
+                </p>
+              </details>
+            </div>
+          </div>
+        </section>
       )}
 
       {/* Sticky Mobile Bottom Cart Bar (Thumb-Zone Ergonomics) */}

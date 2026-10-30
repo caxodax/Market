@@ -89,7 +89,8 @@ export class TenantRepository {
         t.slug.toLowerCase() === cleanSearch ||
         (t.custom_domain && t.custom_domain.toLowerCase() === cleanSearch)
     );
-    if (isLiveDatabaseConfigured()) return null;
+    const isPrimaryTenant = cleanSearch === "shop-market-ca" || cleanSearch === "shop-market";
+    if (isLiveDatabaseConfigured() && !isPrimaryTenant) return null;
     return tenant || null;
   }
 

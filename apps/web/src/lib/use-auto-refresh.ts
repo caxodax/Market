@@ -4,23 +4,30 @@ import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 /**
- * Ponytail Ultra: Background auto-refresh hook.
+ * Ponytail Ultra & ECC: Background auto-refresh hook.
  * Zero external libraries, zero open websockets.
  * Uses Next.js native router.refresh() (RSC payload diff).
- * - Triggers when tab becomes visible / focused (phone unlocked, tab switched)
- * - Periodically updates (default 60s) only if document is visible
- * - Reconciles DOM changes in-place without page reload, preserving scroll & cart
+ * - Debounces tab focus / visibility transitions (minimum 60s between refreshes)
+ * - Skips background refresh if the user is currently typing in an input/textarea
+ * - Preserves user focus, scroll position, and local cart state without flashing
  */
-export function useAutoRefresh(intervalMs: number = 60000) {
+export function useAutoRefresh(intervalMs: number = 120000) {
   const router = useRouter();
   const lastRefreshRef = useRef<number>(Date.now());
 
   useEffect(() => {
+    const isUserInteracting = () => {
+      if (typeof document === "undefined") return false;
+      const tag = document.activeElement?.tagName?.toUpperCase();
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+    };
+
     const handleActive = () => {
       if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        if (isUserInteracting()) return;
         const now = Date.now();
-        // Debounce: don't refresh if refreshed less than 30s ago
-        if (now - lastRefreshRef.current >= 30000) {
+        // Debounce: don't refresh if refreshed less than 60s ago
+        if (now - lastRefreshRef.current >= 60000) {
           lastRefreshRef.current = now;
           router.refresh();
         }
@@ -32,6 +39,7 @@ export function useAutoRefresh(intervalMs: number = 60000) {
 
     const timer = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        if (isUserInteracting()) return;
         lastRefreshRef.current = Date.now();
         router.refresh();
       }

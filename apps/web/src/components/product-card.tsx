@@ -46,7 +46,7 @@ export function ProductCard({
             height={400}
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
+            className="h-full w-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
             onError={(e) => {
               e.currentTarget.onerror = null;
               e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z'/%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M16 10a4 4 0 0 1-8 0'/%3E%3C/svg%3E";
@@ -89,7 +89,7 @@ export function ProductCard({
             }
             toggleFavorite(product.id);
           }}
-          className={`absolute top-2.5 right-2.5 z-10 w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all cursor-pointer backdrop-blur-md shadow-2xs active:scale-90 touch-manipulation ${
+          className={`absolute top-2.5 right-2.5 z-10 w-9 h-9 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all cursor-pointer backdrop-blur-md shadow-sm active:scale-90 touch-manipulation ${
             favorited
               ? "bg-rose-500/15 border border-rose-500/30 text-rose-500 shadow-sm"
               : "bg-background/80 hover:bg-background border border-border/60 text-muted-foreground hover:text-rose-500 hover:scale-105"
@@ -144,7 +144,7 @@ export function ProductCard({
         {/* Interactive Action Button / Inline Stepper */}
         <div className="mt-3 pt-1">
           {quantityInCart > 0 ? (
-            <div className="flex items-center justify-between min-h-[44px] h-11 px-1.5 rounded-xl bg-primary/10 border border-primary/30 text-primary shadow-2xs">
+            <div className="flex items-center justify-between min-h-[44px] h-11 px-1.5 rounded-xl bg-primary/10 border border-primary/30 text-primary shadow-sm">
               <button
                 type="button"
                 onClick={() => {
@@ -204,8 +204,8 @@ export function ProductCard({
                 isOutOfStock
                   ? "bg-muted text-muted-foreground cursor-not-allowed"
                   : hasModifiers
-                  ? "bg-amber-500 text-white hover:bg-amber-600 shadow-2xs"
-                  : "bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground shadow-2xs"
+                  ? "bg-amber-500 text-white hover:bg-amber-600 shadow-sm"
+                  : "bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground shadow-sm"
               }`}
             >
               {isOutOfStock ? (
