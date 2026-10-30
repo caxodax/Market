@@ -93,6 +93,24 @@ async function runChecks() {
   assert.strictEqual(leakedProduct, undefined, "CRITICAL: Tenant B must NEVER see Tenant A products!");
   console.log("  ✔ Catalog Isolation: Tenant B cannot access Tenant A products");
 
+  // Category Creation, Retrieval & Multi-Tenant Isolation
+  console.log("🏷️  [Catalog] Verifying Category creation & multi-tenant isolation...");
+  const catPrintopink = await MarketOSRepository.createCategory("printopink", {
+    name: "Tarjetas de Presentación",
+  });
+  assert.ok(catPrintopink.id, "Category must have an ID");
+  assert.strictEqual(catPrintopink.tenant_id, "printopink");
+  assert.strictEqual(catPrintopink.name, "Tarjetas de Presentación");
+  assert.strictEqual(catPrintopink.slug, "tarjetas-de-presentacion");
+
+  const categoriesPrinto = await MarketOSRepository.getCategories("printopink");
+  assert.ok(categoriesPrinto.some((c) => c.id === catPrintopink.id), "Should find created category in Printopink");
+
+  const categoriesTenantB = await MarketOSRepository.getCategories(tenantB);
+  const leakedCategory = categoriesTenantB.find((c) => c.id === catPrintopink.id);
+  assert.strictEqual(leakedCategory, undefined, "CRITICAL: Tenant B must NEVER see Printopink categories!");
+  console.log("  ✔ Category Isolation: Tenant categories are strictly partitioned");
+
   // =========================================================================
   // 5. PLUGIN VISIBILITY & ISOLATION TESTS (Phase 4)
   // =========================================================================

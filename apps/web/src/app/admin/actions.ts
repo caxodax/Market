@@ -26,6 +26,7 @@ import { revalidatePath } from "next/cache";
 import { sendOrderStatusPushNotification } from "@/lib/pushNotifications";
 import {
   invalidateProductsCache,
+  invalidateCategoriesCache,
   invalidateSettingsCache,
   invalidateExchangeRateCache,
   invalidateDeliveryZonesCache,
@@ -348,6 +349,47 @@ export async function createProductAction(input: CreateProductInput) {
   }
 }
 
+export async function createCategoryAction(tenantId: string, name: string) {
+  try {
+    await assertAuthorizedTenantAdmin(tenantId);
+    const cleanName = name.trim();
+    if (!cleanName) {
+      return { success: false, error: "El nombre de la categoría es requerido." };
+    }
+
+    const category = await MarketOSRepository.createCategory(tenantId, { name: cleanName });
+    invalidateCategoriesCache(tenantId);
+    revalidatePath("/admin");
+    revalidatePath("/");
+
+    return { success: true, category };
+  } catch (error) {
+    console.error("Error creating category:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al crear la categoría",
+    };
+  }
+}
+
+export async function deleteCategoryAction(tenantId: string, categoryId: string) {
+  try {
+    await assertAuthorizedTenantAdmin(tenantId);
+    await MarketOSRepository.deleteCategory(tenantId, categoryId);
+    invalidateCategoriesCache(tenantId);
+    revalidatePath("/admin");
+    revalidatePath("/");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting category:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al eliminar la categoría",
+    };
+  }
+}
+
 export interface BulkProductImportItem {
   name: string;
   categoryName?: string;
@@ -393,6 +435,10 @@ export async function bulkImportProductsAction(
         let matchedCat = categories.find(
           (c) => c.name.trim().toLowerCase() === (item.categoryName || "").trim().toLowerCase()
         );
+        if (!matchedCat && item.categoryName?.trim()) {
+          matchedCat = await MarketOSRepository.createCategory(tenantId, { name: item.categoryName.trim() });
+          categories.push(matchedCat);
+        }
         const categoryId = matchedCat?.id || categories[0]?.id || "cat-1";
 
         await MarketOSRepository.createProduct({

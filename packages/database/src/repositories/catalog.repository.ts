@@ -145,16 +145,149 @@ export class CatalogRepository {
         .eq("is_active", true)
         .order("sort_order", { ascending: true });
 
-      if (!error && Array.isArray(data)) {
+      if (!error && Array.isArray(data) && data.length > 0) {
         return data as Category[];
       }
     }
 
     const isPrimaryTenant = tenantId === "shop-market-ca" || tenantId === "shop-market";
-    if (isLiveDatabaseConfigured() && !isPrimaryTenant) return [];
     return state.categories
       .filter((c) => (c.tenant_id === tenantId || (isPrimaryTenant && c.tenant_id === "shop-market-ca")) && c.is_active)
       .sort((a, b) => a.sort_order - b.sort_order);
+  }
+
+  /**
+   * Create a new Category for Tenant
+   */
+  static async createCategory(
+    tenantId: string,
+    data: { name: string; slug?: string; image_url?: string | null; sort_order?: number }
+  ): Promise<Category> {
+    const cleanName = data.name.trim();
+    if (!cleanName) {
+      throw new Error("El nombre de la categoría es requerido.");
+    }
+
+    const slug =
+      data.slug ||
+      cleanName
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+
+    const newId = `cat-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+    const sortOrder =
+      data.sort_order ??
+      (state.categories.filter((c) => c.tenant_id === tenantId).length + 1);
+
+    const newCategory: Category = {
+      id: newId,
+      tenant_id: tenantId,
+      name: cleanName,
+      slug: slug || `cat-${Date.now()}`,
+      image_url: data.image_url || null,
+      sort_order: sortOrder,
+      is_active: true,
+    };
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data: inserted, error } = await supabase
+          .from("categories")
+          .insert({
+            tenant_id: tenantId,
+            name: newCategory.name,
+            slug: newCategory.slug,
+            image_url: newCategory.image_url,
+            sort_order: newCategory.sort_order,
+            is_active: true,
+          })
+          .select()
+          .single();
+
+        if (!error && inserted) {
+          state.categories.push(inserted as Category);
+          return inserted as Category;
+        } else if (error) {
+          console.warn("[MarketOS] createCategory Supabase warning:", error.message || error);
+        }
+      } catch (e) {
+        console.warn("[MarketOS] createCategory exception:", e);
+      }
+    }
+
+    state.categories.push(newCategory);
+    return newCategory;
+  }
+
+  /**
+   * Update an existing Category
+   */
+  static async updateCategory(
+    tenantId: string,
+    categoryId: string,
+    data: Partial<Pick<Category, "name" | "slug" | "image_url" | "sort_order" | "is_active">>
+  ): Promise<Category | null> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data: updated, error } = await supabase
+          .from("categories")
+          .update(data)
+          .eq("tenant_id", tenantId)
+          .eq("id", categoryId)
+          .select()
+          .single();
+
+        if (!error && updated) {
+          const idx = state.categories.findIndex((c) => c.tenant_id === tenantId && c.id === categoryId);
+          if (idx !== -1) {
+            state.categories[idx] = { ...state.categories[idx], ...updated };
+          }
+          return updated as Category;
+        }
+      } catch (e) {
+        console.warn("[MarketOS] updateCategory exception:", e);
+      }
+    }
+
+    const idx = state.categories.findIndex((c) => c.tenant_id === tenantId && c.id === categoryId);
+    if (idx !== -1) {
+      state.categories[idx] = { ...state.categories[idx], ...data };
+      return state.categories[idx];
+    }
+    return null;
+  }
+
+  /**
+   * Delete or deactivate a Category
+   */
+  static async deleteCategory(tenantId: string, categoryId: string): Promise<boolean> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from("categories")
+          .update({ is_active: false })
+          .eq("tenant_id", tenantId)
+          .eq("id", categoryId);
+
+        if (error) {
+          console.warn("[MarketOS] deleteCategory Supabase warning:", error.message || error);
+        }
+      } catch (e) {
+        console.warn("[MarketOS] deleteCategory exception:", e);
+      }
+    }
+
+    const idx = state.categories.findIndex((c) => c.tenant_id === tenantId && c.id === categoryId);
+    if (idx !== -1) {
+      state.categories[idx].is_active = false;
+    }
+    return true;
   }
 
 /**

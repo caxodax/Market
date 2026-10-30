@@ -8,6 +8,7 @@ import {
   updateProductAction,
   deleteProductAction,
   uploadProductImageAction,
+  createCategoryAction,
 } from "../app/admin/actions";
 import {
   X,
@@ -20,6 +21,8 @@ import {
   Image as ImageIcon,
   DollarSign,
   Boxes,
+  Plus,
+  Check,
 } from "lucide-react";
 
 interface ProductModalProps {
@@ -31,6 +34,7 @@ interface ProductModalProps {
   onSaved: (product: Product & { stock: number }) => void;
   onDeleted?: (productId: string) => void;
   onQuotaExceeded?: (quotaType: "products") => void;
+  onCategoryCreated?: (category: Category) => void;
 }
 
 export function ProductModal({
@@ -42,13 +46,56 @@ export function ProductModal({
   onSaved,
   onDeleted,
   onQuotaExceeded,
+  onCategoryCreated,
 }: ProductModalProps) {
   const isEditing = Boolean(product);
+
+  const [localCategories, setLocalCategories] = useState<Category[]>(categories);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [creatingCat, setCreatingCat] = useState(false);
+  const [catError, setCatError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLocalCategories(categories);
+  }, [categories]);
 
   const [name, setName] = useState(product?.name || "");
   const [categoryId, setCategoryId] = useState(
     product?.category_id || categories[0]?.id || ""
   );
+
+  useEffect(() => {
+    if (!categoryId && localCategories.length > 0) {
+      setCategoryId(localCategories[0].id);
+    }
+  }, [localCategories, categoryId]);
+
+  const handleQuickCreateCategory = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = newCatName.trim();
+    if (!trimmed) return;
+
+    setCreatingCat(true);
+    setCatError(null);
+    try {
+      const res = await createCategoryAction(tenantId, trimmed);
+      if (res.success && res.category) {
+        const created = res.category;
+        setLocalCategories((prev) => [...prev, created]);
+        setCategoryId(created.id);
+        setNewCatName("");
+        setIsAddingCategory(false);
+        onCategoryCreated?.(created);
+      } else {
+        setCatError(res.error || "No se pudo crear la categoría");
+      }
+    } catch (err: any) {
+      setCatError(err?.message || "Error al registrar la categoría");
+    } finally {
+      setCreatingCat(false);
+    }
+  };
   const [priceUsd, setPriceUsd] = useState(
     product ? product.price_usd.toString() : ""
   );
@@ -356,20 +403,99 @@ export function ProductModal({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-foreground">
-                Categoría *
-              </label>
-              <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-foreground">
+                  Categoría *
+                </label>
+                {!isAddingCategory && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingCategory(true);
+                      setCatError(null);
+                    }}
+                    className="text-[11px] font-bold text-primary hover:text-primary/80 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>+ Nueva Categoría</span>
+                  </button>
+                )}
+              </div>
+
+              {isAddingCategory ? (
+                <div className="space-y-1.5 animate-in fade-in zoom-in-95">
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      placeholder="Ej. Tarjetas & Papelería"
+                      value={newCatName}
+                      onChange={(e) => setNewCatName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleQuickCreateCategory();
+                        }
+                      }}
+                      disabled={creatingCat}
+                      autoFocus
+                      className="flex-1 h-10 px-3 rounded-xl border border-primary/50 bg-background text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleQuickCreateCategory()}
+                      disabled={creatingCat || !newCatName.trim()}
+                      className="h-10 px-3 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-colors disabled:opacity-50 cursor-pointer inline-flex items-center gap-1 shrink-0"
+                    >
+                      {creatingCat ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Check className="w-3.5 h-3.5" />
+                      )}
+                      <span>Guardar</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingCategory(false);
+                        setNewCatName("");
+                        setCatError(null);
+                      }}
+                      disabled={creatingCat}
+                      className="h-10 px-2.5 rounded-xl border border-border hover:bg-muted text-muted-foreground text-xs transition-colors cursor-pointer shrink-0"
+                      title="Cancelar"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  {catError && (
+                    <p className="text-[10px] text-destructive font-medium">{catError}</p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <select
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                  >
+                    {localCategories.length === 0 && (
+                      <option value="" disabled>
+                        -- Sin categorías registradas --
+                      </option>
+                    )}
+                    {localCategories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                  {localCategories.length === 0 && (
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                      No hay categorías para este comercio. Haz clic en <strong>+ Nueva Categoría</strong> arriba para crear una.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

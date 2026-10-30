@@ -48,6 +48,9 @@ export class MarketOSRepository {
   static createStore = CatalogRepository.createStore;
   static updateStore = CatalogRepository.updateStore;
   static getCategories = CatalogRepository.getCategories;
+  static createCategory = CatalogRepository.createCategory;
+  static updateCategory = CatalogRepository.updateCategory;
+  static deleteCategory = CatalogRepository.deleteCategory;
   static getProducts = CatalogRepository.getProducts;
   static createProduct = CatalogRepository.createProduct;
   static updateProduct = CatalogRepository.updateProduct;

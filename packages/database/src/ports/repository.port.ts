@@ -200,6 +200,28 @@ export interface ICategoryRepository {
    * Listar categorías activas del Tenant, ordenadas por sort_order
    */
   getCategories(tenantId: string): Promise<Category[]>;
+
+  /**
+   * Crear una nueva categoría para el Tenant
+   */
+  createCategory(
+    tenantId: string,
+    data: { name: string; slug?: string; image_url?: string | null; sort_order?: number }
+  ): Promise<Category>;
+
+  /**
+   * Actualizar una categoría existente
+   */
+  updateCategory(
+    tenantId: string,
+    categoryId: string,
+    data: Partial<Pick<Category, "name" | "slug" | "image_url" | "sort_order" | "is_active">>
+  ): Promise<Category | null>;
+
+  /**
+   * Desactivar o eliminar una categoría
+   */
+  deleteCategory(tenantId: string, categoryId: string): Promise<boolean>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

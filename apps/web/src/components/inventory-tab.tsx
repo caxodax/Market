@@ -18,6 +18,7 @@ import {
   Zap,
   Image as ImageIcon,
   Tag,
+  FolderTree,
 } from "lucide-react";
 import type {
   Product,
@@ -29,6 +30,7 @@ import type {
 import { formatCurrency, calculateEffectiveExchangeRate } from "@marketos/utils";
 import { downloadProductImportTemplate } from "../lib/productExcel";
 import { ProductImportModal } from "./product-import-modal";
+import { CategoryManagerModal } from "./category-manager-modal";
 
 interface InventoryTabProps {
   tenantId: string;
@@ -43,6 +45,7 @@ interface InventoryTabProps {
   onNewProduct: () => void;
   onTriggerUpgrade: (type: "products") => void;
   onProductsImported?: (count: number) => void;
+  onCategoriesChanged?: (categories: Category[]) => void;
 }
 
 export function InventoryTab({
@@ -58,6 +61,7 @@ export function InventoryTab({
   onNewProduct,
   onTriggerUpgrade,
   onProductsImported,
+  onCategoriesChanged,
 }: InventoryTabProps) {
   const effectiveRateInfo = useMemo(() => {
     return calculateEffectiveExchangeRate(rate, currencySettings);
@@ -70,6 +74,7 @@ export function InventoryTab({
   const [pageSize, setPageSize] = useState<number>(25);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
   // ── SaaS Quota Checks ────────────────────────────────────────────────────────
   const maxProducts = planLimitsState?.plan.max_products || 60;
@@ -167,6 +172,17 @@ export function InventoryTab({
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500" />
             <span>Importar Excel</span>
+          </button>
+
+          {/* Manage Categories Button */}
+          <button
+            type="button"
+            onClick={() => setIsCategoryModalOpen(true)}
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-muted/40 hover:bg-muted text-xs font-semibold text-foreground transition-all cursor-pointer min-h-[44px] sm:min-h-0"
+            title="Gestionar y crear categorías del catálogo"
+          >
+            <FolderTree className="w-3.5 h-3.5 text-primary" />
+            <span>Categorías</span>
           </button>
 
           {/* New Product Button */}
@@ -701,6 +717,18 @@ export function InventoryTab({
         onQuotaExceeded={() => {
           setIsImportModalOpen(false);
           onTriggerUpgrade("products");
+        }}
+      />
+
+      {/* ── Category Manager Modal ────────────────────────────────────────────── */}
+      <CategoryManagerModal
+        tenantId={tenantId}
+        categories={categories}
+        products={products}
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        onCategoriesChanged={(updated) => {
+          onCategoriesChanged?.(updated);
         }}
       />
     </div>

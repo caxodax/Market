@@ -287,7 +287,7 @@ const STATUS_SPANISH_LABELS: Record<OrderStatus, string> = {
 export function AdminDashboard({
   settings,
   products: initialProducts,
-  categories = [],
+  categories: initialCategories = [],
   orders: initialOrders,
   payments: initialPayments,
   exchangeRate: initialRate,
@@ -336,6 +336,7 @@ export function AdminDashboard({
 
   const [settingsState, setSettingsState] = useState(settings);
   const [products, setProducts] = useState(initialProducts);
+  const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>(initialRawMaterials);
   const [recipes, setRecipes] = useState<ProductRecipe[]>(initialRecipes);
   const [orders, setOrders] = useState(initialOrders);
@@ -2714,6 +2715,7 @@ export function AdminDashboard({
             onProductsImported={() => {
               window.location.reload();
             }}
+            onCategoriesChanged={(updated) => setCategories(updated)}
           />
         )}
 
@@ -3377,6 +3379,7 @@ export function AdminDashboard({
         onSaved={handleProductSaved}
         onDeleted={handleProductDeleted}
         onQuotaExceeded={() => triggerUpgradeModal("products")}
+        onCategoryCreated={(newCat) => setCategories((prev) => [...prev, newCat])}
       />
 
       {/* Staff Invitation & Role Assignment Modal */}
