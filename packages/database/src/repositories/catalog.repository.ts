@@ -23,19 +23,22 @@ export class CatalogRepository {
   static async getStores(tenantId: string, includeInactive: boolean = false): Promise<Store[]> {
     const supabase = getSupabase();
     if (supabase) {
-      let query = supabase.from("stores").select("*").eq("tenant_id", tenantId);
-      if (!includeInactive) {
-        query = query.eq("is_active", true);
-      }
-      const { data, error } = await query.order("created_at", { ascending: true });
+      try {
+        let query = supabase.from("stores").select("*").eq("tenant_id", tenantId);
+        if (!includeInactive) {
+          query = query.eq("is_active", true);
+        }
+        const { data, error } = await query.order("created_at", { ascending: true });
 
-      if (!error && Array.isArray(data)) {
-        return data as Store[];
+        if (!error && Array.isArray(data) && data.length > 0) {
+          return data as Store[];
+        }
+      } catch (err) {
+        console.warn("[MarketOS] getStores Supabase lookup error:", err);
       }
     }
 
     const isPrimaryTenant = tenantId === "shop-market-ca" || tenantId === "shop-market";
-    if (isLiveDatabaseConfigured() && !isPrimaryTenant) return [];
     return state.stores.filter(
       (s) => (s.tenant_id === tenantId || (isPrimaryTenant && s.tenant_id === "shop-market-ca")) && (includeInactive || s.is_active)
     );

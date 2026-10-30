@@ -54,7 +54,10 @@ export async function generateMetadata({
   const params = await searchParams;
   const tenantSlugOrId = await resolveTenantIdentifier(params?.tenant);
 
-  const tenant = await getCachedTenant(tenantSlugOrId);
+  let tenant = await getCachedTenant(tenantSlugOrId);
+  if (!tenant) {
+    tenant = await MarketOSRepository.getTenant(tenantSlugOrId);
+  }
   if (!tenant) {
     return {
       title: "Comercio no encontrado | MarketOS",
@@ -99,7 +102,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const params = await searchParams;
   const tenantSlugOrId = await resolveTenantIdentifier(params?.tenant);
 
-  const tenant = await getCachedTenant(tenantSlugOrId);
+  let tenant = await getCachedTenant(tenantSlugOrId);
+  if (!tenant) {
+    tenant = await MarketOSRepository.getTenant(tenantSlugOrId);
+  }
   if (!tenant) {
     notFound();
   }

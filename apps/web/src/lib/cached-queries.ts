@@ -30,7 +30,7 @@ export const getCachedTenant = (slugOrId: string): Promise<Tenant | null> => {
     async () => MarketOSRepository.getTenant(slugOrId),
     [`tenant-lookup-${slugOrId.toLowerCase()}`],
     {
-      revalidate: 300,
+      revalidate: 60,
       tags: [`tenant-info-${slugOrId.toLowerCase()}`],
     }
   )();

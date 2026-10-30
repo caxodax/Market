@@ -53,33 +53,37 @@ export class TenantRepository {
     const cleanSearch = tenantIdOrSlugOrDomain.trim().toLowerCase();
     const supabase = getSupabase();
     if (supabase) {
-      const { data, error } = await supabase
-        .from("tenants")
-        .select("*")
-        .or(`id.eq.${cleanSearch},slug.eq.${cleanSearch}`)
-        .maybeSingle();
-
-      if (!error && data) {
-        return data as Tenant;
-      }
-
-      // Check tenant_settings for custom_domain lookup if not found by id or slug
-      const { data: settingsData } = await supabase
-        .from("tenant_settings")
-        .select("tenant_id")
-        .eq("custom_domain", cleanSearch)
-        .maybeSingle();
-
-      if (settingsData?.tenant_id) {
-        const { data: tenantByDomain } = await supabase
+      try {
+        const { data, error } = await supabase
           .from("tenants")
           .select("*")
-          .eq("id", settingsData.tenant_id)
+          .or(`id.eq.${cleanSearch},slug.eq.${cleanSearch}`)
           .maybeSingle();
 
-        if (tenantByDomain) {
-          return tenantByDomain as Tenant;
+        if (!error && data) {
+          return data as Tenant;
         }
+
+        // Check tenant_settings for custom_domain lookup if not found by id or slug
+        const { data: settingsData } = await supabase
+          .from("tenant_settings")
+          .select("tenant_id")
+          .eq("custom_domain", cleanSearch)
+          .maybeSingle();
+
+        if (settingsData?.tenant_id) {
+          const { data: tenantByDomain } = await supabase
+            .from("tenants")
+            .select("*")
+            .eq("id", settingsData.tenant_id)
+            .maybeSingle();
+
+          if (tenantByDomain) {
+            return tenantByDomain as Tenant;
+          }
+        }
+      } catch (err) {
+        console.warn("[MarketOS] getTenant Supabase lookup error:", err);
       }
     }
 
@@ -87,10 +91,9 @@ export class TenantRepository {
       (t) =>
         t.id.toLowerCase() === cleanSearch ||
         t.slug.toLowerCase() === cleanSearch ||
-        (t.custom_domain && t.custom_domain.toLowerCase() === cleanSearch)
+        (t.custom_domain && t.custom_domain.toLowerCase() === cleanSearch) ||
+        (cleanSearch === "shop-market" && (t.id === "shop-market-ca" || t.slug === "shop-market"))
     );
-    const isPrimaryTenant = cleanSearch === "shop-market-ca" || cleanSearch === "shop-market";
-    if (isLiveDatabaseConfigured() && !isPrimaryTenant) return null;
     return tenant || null;
   }
 
@@ -100,56 +103,60 @@ export class TenantRepository {
   static async getTenantSettings(tenantId: string): Promise<TenantSettings> {
     const supabase = getSupabase();
     if (supabase) {
-      const { data, error } = await supabase
-        .from("tenant_settings")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .maybeSingle();
+      try {
+        const { data, error } = await supabase
+          .from("tenant_settings")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
 
-      if (!error && data) {
-        let resolvedLogoUrl = data.logo_url;
-        if (!resolvedLogoUrl) {
-          const { data: tenantData } = await supabase
-            .from("tenants")
-            .select("logo_url")
-            .eq("id", tenantId)
-            .maybeSingle();
-          if (tenantData?.logo_url) {
-            resolvedLogoUrl = tenantData.logo_url;
+        if (!error && data) {
+          let resolvedLogoUrl = data.logo_url;
+          if (!resolvedLogoUrl) {
+            const { data: tenantData } = await supabase
+              .from("tenants")
+              .select("logo_url")
+              .eq("id", tenantId)
+              .maybeSingle();
+            if (tenantData?.logo_url) {
+              resolvedLogoUrl = tenantData.logo_url;
+            }
           }
-        }
 
-        return {
-          ...INITIAL_SETTINGS,
-          ...(data as TenantSettings),
-          logo_url: resolvedLogoUrl || null,
-          custom_domain: data.custom_domain || null,
-          payment_settings: {
-            ...INITIAL_SETTINGS.payment_settings,
-            ...(data.payment_settings || {}),
-          },
-          operational_settings: {
-            ...INITIAL_SETTINGS.operational_settings,
-            ...(data.operational_settings || {}),
-          },
-          billing_settings: {
-            ...INITIAL_SETTINGS.billing_settings,
-            ...(data.billing_settings || data.operational_settings?.billing_settings || {}),
-          },
-          currency_settings: {
-            base_currency:
-              data.currency_settings?.base_currency ||
-              data.operational_settings?.currency_settings?.base_currency ||
-              (data.default_currency === "EUR" ? "EUR" : "USD"),
-            rate_mode:
-              data.currency_settings?.rate_mode ||
-              data.operational_settings?.currency_settings?.rate_mode ||
-              "BCV_BASE",
-            custom_rate_value:
-              data.currency_settings?.custom_rate_value ||
-              data.operational_settings?.currency_settings?.custom_rate_value,
-          },
-        };
+          return {
+            ...INITIAL_SETTINGS,
+            ...(data as TenantSettings),
+            logo_url: resolvedLogoUrl || null,
+            custom_domain: data.custom_domain || null,
+            payment_settings: {
+              ...INITIAL_SETTINGS.payment_settings,
+              ...(data.payment_settings || {}),
+            },
+            operational_settings: {
+              ...INITIAL_SETTINGS.operational_settings,
+              ...(data.operational_settings || {}),
+            },
+            billing_settings: {
+              ...INITIAL_SETTINGS.billing_settings,
+              ...(data.billing_settings || data.operational_settings?.billing_settings || {}),
+            },
+            currency_settings: {
+              base_currency:
+                data.currency_settings?.base_currency ||
+                data.operational_settings?.currency_settings?.base_currency ||
+                (data.default_currency === "EUR" ? "EUR" : "USD"),
+              rate_mode:
+                data.currency_settings?.rate_mode ||
+                data.operational_settings?.currency_settings?.rate_mode ||
+                "BCV_BASE",
+              custom_rate_value:
+                data.currency_settings?.custom_rate_value ||
+                data.operational_settings?.currency_settings?.custom_rate_value,
+            },
+          };
+        }
+      } catch (err) {
+        console.warn("[MarketOS] getTenantSettings Supabase lookup error:", err);
       }
     }
 
