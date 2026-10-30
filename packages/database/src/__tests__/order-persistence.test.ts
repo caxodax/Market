@@ -111,6 +111,49 @@ async function runChecks() {
   assert.strictEqual(leakedCategory, undefined, "CRITICAL: Tenant B must NEVER see Printopink categories!");
   console.log("  ✔ Category Isolation: Tenant categories are strictly partitioned");
 
+  // Product Update & UUID Tolerance Tests (AgentShield + Ponytail)
+  console.log("🛠️  [Catalog] Verifying Product update resilience for non-UUID and UUID products...");
+  const updatedPrinto = await MarketOSRepository.updateProduct({
+    tenantId: "printopink",
+    productId: "prod-pp-1",
+    priceUsd: 9,
+    stock: 100,
+    name: "Tarjetas de Presentación (100 u.) Actualizadas",
+  });
+  assert.ok(updatedPrinto, "Should update non-UUID mock product successfully");
+  assert.strictEqual(updatedPrinto.price_usd, 9);
+  assert.strictEqual(updatedPrinto.stock, 100);
+  assert.strictEqual(updatedPrinto.name, "Tarjetas de Presentación (100 u.) Actualizadas");
+  console.log("  ✔ Non-UUID Product Update: Successfully updated prod-pp-1 without PostgreSQL UUID syntax errors");
+
+  // Create Product generates valid UUID
+  const createdProd = await MarketOSRepository.createProduct({
+    tenantId: "printopink",
+    name: "Tazas Personalizadas",
+    priceUsd: 5.5,
+    categoryId: catPrintopink.id,
+    initialStock: 30,
+  });
+  assert.ok(createdProd, "Should create product");
+  assert.match(
+    createdProd.id,
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    "Generated product ID must be a valid UUID"
+  );
+  console.log("  ✔ UUID Product Creation: Successfully generated product with valid UUID " + createdProd.id);
+
+  // Shop Market product update check
+  const shopMarketProds = await MarketOSRepository.getProducts("shop-market-ca");
+  assert.ok(shopMarketProds.length > 0, "Shop Market must have products");
+  const firstShopProd = shopMarketProds[0];
+  const updatedShop = await MarketOSRepository.updateProduct({
+    tenantId: "shop-market-ca",
+    productId: firstShopProd.id,
+    priceUsd: firstShopProd.price_usd + 0.1,
+  });
+  assert.ok(updatedShop, "Should update Shop Market product successfully");
+  console.log("  ✔ Shop Market Integrity: Product " + firstShopProd.id + " updated cleanly");
+
   // =========================================================================
   // 5. PLUGIN VISIBILITY & ISOLATION TESTS (Phase 4)
   // =========================================================================
