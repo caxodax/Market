@@ -50,9 +50,9 @@ export async function GET(request: Request) {
       description:
         settings.operational_settings?.announcement_banner ||
         `Catálogo digital y pedidos directos en ${businessName}`,
-      id: `marketos-tenant-${tenantSlug}`,
-      start_url: `/?tenant=${encodeURIComponent(tenantSlug)}&source=pwa`,
-      scope: `/?tenant=${encodeURIComponent(tenantSlug)}`,
+      id: `/t/${encodeURIComponent(tenantSlug)}`,
+      start_url: `/t/${encodeURIComponent(tenantSlug)}?source=pwa`,
+      scope: `/t/${encodeURIComponent(tenantSlug)}/`,
       display: "standalone",
       orientation: "portrait",
       background_color: "#FFFFFF",

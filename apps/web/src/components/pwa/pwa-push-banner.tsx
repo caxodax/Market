@@ -70,7 +70,8 @@ export function PwaPushBanner({
     const isCurrentTenantPwaSession =
       status.isStandalone &&
       typeof window !== "undefined" &&
-      (window.location.search.includes(`source=pwa`) ||
+      (window.location.pathname.startsWith(`/t/${tenantId}`) ||
+        window.location.search.includes(`source=pwa`) ||
         window.location.search.includes(`tenant=${tenantId}`) ||
         storedInstalled);
 
@@ -84,7 +85,13 @@ export function PwaPushBanner({
         setIsInstalled(false);
       }
     } else {
-      if (storedInstalled || (status.isStandalone && window.location.search.includes("source=pwa"))) {
+      if (
+        storedInstalled ||
+        (status.isStandalone &&
+          (window.location.pathname.startsWith(`/t/${tenantId}`) ||
+            (window.location.search.includes("source=pwa") &&
+              window.location.search.includes(`tenant=${tenantId}`))))
+      ) {
         setIsInstalled(true);
         try {
           localStorage.setItem(installStorageKey, "true");

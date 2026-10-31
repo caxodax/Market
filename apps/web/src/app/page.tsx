@@ -1,7 +1,7 @@
 import React from "react";
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   getCachedTenant,
   getCachedTenantSettings,
@@ -126,6 +126,11 @@ export async function generateMetadata({
 
 export default async function HomePage({ searchParams }: HomePageProps) {
   const params = await searchParams;
+  if (params?.tenant) {
+    const cleanTenant = params.tenant.trim().toLowerCase();
+    redirect(`/t/${encodeURIComponent(cleanTenant)}`);
+  }
+
   const tenantSlugOrId = await resolveTenantIdentifier(params?.tenant);
 
   let tenant = await getCachedTenant(tenantSlugOrId);
