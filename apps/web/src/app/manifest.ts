@@ -14,6 +14,17 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
       host.endsWith(".vercel.app") ||
       (Boolean(platformDomain) && host === platformDomain);
 
+    const referer = headersList.get("referer") || "";
+    if (referer) {
+      try {
+        const refUrl = new URL(referer);
+        const refTenant = refUrl.searchParams.get("tenant");
+        if (refTenant) {
+          tenantIdentifier = refTenant.trim().toLowerCase();
+        }
+      } catch {}
+    }
+
     if (!isPlatformDomain && host) {
       if (platformDomain && host.endsWith(`.${platformDomain}`)) {
         tenantIdentifier = host.replace(`.${platformDomain}`, "");
@@ -29,7 +40,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const activeTenantId = tenant?.id || tenantIdentifier;
   const settings = await MarketOSRepository.getTenantSettings(activeTenantId);
 
-  const iconUrl = settings.logo_url || "/brand/logo.png";
+  const iconUrl = settings.logo_url || "/icon-512.png";
   const iconType = iconUrl.endsWith(".svg")
     ? "image/svg+xml"
     : iconUrl.endsWith(".webp") || iconUrl.startsWith("data:image/webp")
@@ -44,19 +55,25 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     description:
       settings.operational_settings?.announcement_banner ||
       `Catálogo digital y pedidos directos en ${settings.business_name}`,
-    id: `/?tenant=${tenantSlug}`,
-    start_url: `/?tenant=${tenantSlug}&source=pwa`,
-    scope: "/",
+    id: `marketos-tenant-${tenantSlug}`,
+    start_url: `/?tenant=${encodeURIComponent(tenantSlug)}&source=pwa`,
+    scope: `/?tenant=${encodeURIComponent(tenantSlug)}`,
     display: "standalone",
     orientation: "portrait",
     background_color: "#FFFFFF",
     theme_color: settings.primary_color || "#DC2626",
     icons: [
       {
-        src: "/icon-192.png",
+        src: iconUrl,
         sizes: "192x192",
-        type: "image/png",
+        type: iconType,
         purpose: "any",
+      },
+      {
+        src: iconUrl,
+        sizes: "192x192",
+        type: iconType,
+        purpose: "maskable",
       },
       {
         src: "/icon-192.png",

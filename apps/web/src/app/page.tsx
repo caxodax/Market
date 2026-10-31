@@ -1,5 +1,5 @@
 import React from "react";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import {
@@ -48,6 +48,30 @@ async function resolveTenantIdentifier(explicitParam?: string): Promise<string> 
   return process.env.DEFAULT_TENANT_ID || "shop-market-ca";
 }
 
+export async function generateViewport({
+  searchParams,
+}: HomePageProps): Promise<Viewport> {
+  const params = await searchParams;
+  const tenantSlugOrId = await resolveTenantIdentifier(params?.tenant);
+
+  let tenant = await getCachedTenant(tenantSlugOrId);
+  if (!tenant) {
+    tenant = await MarketOSRepository.getTenant(tenantSlugOrId);
+  }
+  const activeTenantId = tenant?.id || tenantSlugOrId;
+  const settings = await getCachedTenantSettings(activeTenantId);
+
+  return {
+    themeColor: settings?.primary_color || "#DC2626",
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    viewportFit: "cover",
+    interactiveWidget: "resizes-content",
+  };
+}
+
 export async function generateMetadata({
   searchParams,
 }: HomePageProps): Promise<Metadata> {
@@ -66,6 +90,7 @@ export async function generateMetadata({
   }
 
   const activeTenantId = tenant.id;
+  const tenantSlug = tenant.slug || activeTenantId;
   const settings = await getCachedTenantSettings(activeTenantId);
 
   const title = `${settings.business_name} | Catálogo & Delivery`;
@@ -77,6 +102,7 @@ export async function generateMetadata({
   return {
     title,
     description,
+    manifest: `/api/manifest?tenant=${encodeURIComponent(tenantSlug)}`,
     icons: {
       icon: iconUrl,
       apple: iconUrl,

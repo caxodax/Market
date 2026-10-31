@@ -336,7 +336,13 @@ export function StoreSettingsTab({
   ];
 
   const [showHeroBanner, setShowHeroBanner] = useState(defaultOps.show_hero_banner ?? true);
-  const [heroTitle, setHeroTitle] = useState(defaultOps.hero_title || settings.business_name || "");
+  const isShopMarketTenant =
+    settings.tenant_id === "shop-market-ca" || settings.tenant_id === "shop-market";
+  const initialHeroTitle =
+    !isShopMarketTenant && defaultOps.hero_title === "Shop Market"
+      ? settings.business_name || ""
+      : defaultOps.hero_title || settings.business_name || "";
+  const [heroTitle, setHeroTitle] = useState(initialHeroTitle);
   const [heroDescription, setHeroDescription] = useState(defaultOps.hero_description || "");
   const [heroBadgeText, setHeroBadgeText] = useState(defaultOps.hero_badge_text || "");
   const [deliveryEnabled, setDeliveryEnabled] = useState(defaultOps.delivery_enabled ?? true);

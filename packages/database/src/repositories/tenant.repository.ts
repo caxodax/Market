@@ -135,6 +135,12 @@ export class TenantRepository {
             operational_settings: {
               ...INITIAL_SETTINGS.operational_settings,
               ...(data.operational_settings || {}),
+              hero_title:
+                tenantId !== "shop-market-ca" && tenantId !== "shop-market"
+                  ? (data.operational_settings?.hero_title === "Shop Market" || !data.operational_settings?.hero_title
+                      ? data.business_name || tenantId
+                      : data.operational_settings.hero_title)
+                  : data.operational_settings?.hero_title || INITIAL_SETTINGS.operational_settings?.hero_title,
             },
             billing_settings: {
               ...INITIAL_SETTINGS.billing_settings,

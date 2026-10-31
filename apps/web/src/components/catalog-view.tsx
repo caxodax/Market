@@ -913,7 +913,9 @@ export function CatalogView({
                         </div>
 
                         <h1 className="text-base sm:text-xl lg:text-2xl font-black text-foreground tracking-tight leading-tight">
-                          {opSettings?.hero_title || settings.business_name || "Catálogo Oficial"}
+                          {settings.tenant_id !== "shop-market-ca" && settings.tenant_id !== "shop-market" && opSettings?.hero_title === "Shop Market"
+                            ? settings.business_name || "Catálogo Oficial"
+                            : opSettings?.hero_title || settings.business_name || "Catálogo Oficial"}
                         </h1>
                         <p className="text-xs sm:text-sm text-muted-foreground font-medium leading-relaxed">
                           {opSettings?.hero_description ||

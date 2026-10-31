@@ -61,10 +61,21 @@ export function PwaPushBanner({
     setIsIos(status.isIos);
     setIsStandalone(status.isStandalone);
 
-    // 3. Comprobar estado de instalación
+    // 3. Comprobar estado de instalación aislado por tenant
     const installStorageKey = `marketos_pwa_installed_${tenantId}`;
+    const storedInstalled =
+      typeof window !== "undefined" &&
+      localStorage.getItem(installStorageKey) === "true";
+
+    const isCurrentTenantPwaSession =
+      status.isStandalone &&
+      typeof window !== "undefined" &&
+      (window.location.search.includes(`source=pwa`) ||
+        window.location.search.includes(`tenant=${tenantId}`) ||
+        storedInstalled);
+
     if (status.isIos) {
-      if (status.isStandalone) {
+      if (status.isStandalone && (storedInstalled || isCurrentTenantPwaSession)) {
         setIsInstalled(true);
         try {
           localStorage.setItem(installStorageKey, "true");
@@ -73,11 +84,13 @@ export function PwaPushBanner({
         setIsInstalled(false);
       }
     } else {
-      const storedInstalled =
-        typeof window !== "undefined" &&
-        localStorage.getItem(installStorageKey) === "true";
-      if (status.isStandalone || storedInstalled) {
+      if (storedInstalled || (status.isStandalone && window.location.search.includes("source=pwa"))) {
         setIsInstalled(true);
+        try {
+          localStorage.setItem(installStorageKey, "true");
+        } catch {}
+      } else {
+        setIsInstalled(false);
       }
     }
 
