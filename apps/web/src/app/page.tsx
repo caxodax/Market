@@ -143,6 +143,21 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   const activeTenantId = tenant.id;
 
+  // Redirigir la raíz del dominio plataforma a /t/[tenantSlug] para aislar scopes de PWA
+  const headersList = await headers();
+  const host = headersList.get("host")?.split(":")[0].toLowerCase() || "";
+  const platformDomain = (process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || "").toLowerCase();
+  const isPlatformDomain =
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host.endsWith(".vercel.app") ||
+    (Boolean(platformDomain) && host === platformDomain);
+
+  if (isPlatformDomain) {
+    const targetSlug = tenant.slug || tenant.id || "shop-market";
+    redirect(`/t/${encodeURIComponent(targetSlug)}`);
+  }
+
   // BLOQUEO INMEDIATO: Si la tienda ha sido suspendida por el Super Admin o está inactiva
   if (tenant.status === "suspended" || tenant.status === "inactive") {
     const settings = await getCachedTenantSettings(activeTenantId);

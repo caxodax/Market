@@ -155,26 +155,23 @@ export function PwaPushBanner({
       setIsDismissed(false);
     };
 
+    const handleTriggerInstall = () => {
+      setIsDismissed(false);
+      handleInstallClick();
+    };
+
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     window.addEventListener("appinstalled", handleAppInstalled);
     window.addEventListener("open-marketos-pwa-banner", handleOpenBanner);
+    window.addEventListener("marketos-trigger-install", handleTriggerInstall);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
       window.removeEventListener("appinstalled", handleAppInstalled);
       window.removeEventListener("open-marketos-pwa-banner", handleOpenBanner);
+      window.removeEventListener("marketos-trigger-install", handleTriggerInstall);
     };
-  }, [tenantId, storeName]);
-
-  // Si no está montado en cliente
-  if (!mounted) {
-    return null;
-  }
-
-  // Si ambos servicios ya están listos (instalada y notificaciones concedidas o deshabilitadas por plugin)
-  if (isInstalled && (pushGranted || !isPushEnabled)) {
-    return null;
-  }
+  }, [tenantId, storeName, deferredPrompt, isIos]);
 
   const markAsInstalled = () => {
     setIsInstalled(true);
@@ -211,6 +208,14 @@ export function PwaPushBanner({
       setShowAndroidGuide(true);
     }
   };
+
+  // Si no está montado en cliente
+  if (!mounted) {
+    return null;
+  }
+
+  const isBottomBarHidden =
+    (isInstalled && (pushGranted || !isPushEnabled)) || isDismissed;
 
   const handleEnablePush = async () => {
     const status = getDevicePwaStatus();
@@ -322,24 +327,26 @@ export function PwaPushBanner({
   const displayLogo = logoUrl || "/brand/logo.png";
   const bottomOffsetClass = totalItems > 0 ? "bottom-20 sm:bottom-4" : "bottom-4";
 
-  // Si el usuario descartó el banner principal, dejamos una píldora discreta no intrusiva
-  if (isDismissed) {
+  // Si la barra inferior está oculta, dejamos una píldora discreta no intrusiva y mantenemos los modales activos
+  if (isBottomBarHidden) {
     return (
       <>
-        <aside
-          aria-label="Abrir instalador de la app"
-          className={`fixed ${bottomOffsetClass} right-3 z-40 animate-in fade-in zoom-in-95`}
-        >
-          <button
-            type="button"
-            onClick={() => setIsDismissed(false)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-slate-950/90 text-white hover:bg-slate-900 border border-white/20 shadow-xl backdrop-blur-md text-xs font-bold transition-transform active:scale-95 cursor-pointer group"
-            title="Instalar App o Activar Alertas"
+        {!isInstalled && (
+          <aside
+            aria-label="Abrir instalador de la app"
+            className={`fixed ${bottomOffsetClass} right-3 z-40 animate-in fade-in zoom-in-95`}
           >
-            <Download className="w-3.5 h-3.5 text-primary group-hover:scale-110 transition-transform" />
-            <span>📲 Instalar App</span>
-          </button>
-        </aside>
+            <button
+              type="button"
+              onClick={handleInstallClick}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-slate-950/90 text-white hover:bg-slate-900 border border-white/20 shadow-xl backdrop-blur-md text-xs font-bold transition-transform active:scale-95 cursor-pointer group"
+              title="Instalar App o Activar Alertas"
+            >
+              <Download className="w-3.5 h-3.5 text-primary group-hover:scale-110 transition-transform" />
+              <span>📲 Instalar App</span>
+            </button>
+          </aside>
+        )}
 
         <IosInstallGuideModal
           isOpen={showIosGuide}

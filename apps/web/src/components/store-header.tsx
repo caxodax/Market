@@ -239,6 +239,7 @@ export function StoreHeader({
                     onClick={() => {
                       setIsMobileMenuOpen(false);
                       if (typeof window !== "undefined") {
+                        window.dispatchEvent(new CustomEvent("marketos-trigger-install"));
                         window.dispatchEvent(new Event("open-marketos-pwa-banner"));
                       }
                     }}
