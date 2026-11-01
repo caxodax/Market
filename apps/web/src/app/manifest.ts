@@ -21,6 +21,11 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
         const refTenant = refUrl.searchParams.get("tenant");
         if (refTenant) {
           tenantIdentifier = refTenant.trim().toLowerCase();
+        } else if (refUrl.pathname.startsWith("/t/")) {
+          const pathTenant = refUrl.pathname.split("/")[2]?.trim().toLowerCase();
+          if (pathTenant) {
+            tenantIdentifier = pathTenant;
+          }
         }
       } catch {}
     }
@@ -57,7 +62,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
       `Catálogo digital y pedidos directos en ${settings.business_name}`,
     id: `/t/${encodeURIComponent(tenantSlug)}`,
     start_url: `/t/${encodeURIComponent(tenantSlug)}?source=pwa`,
-    scope: `/t/${encodeURIComponent(tenantSlug)}/`,
+    scope: `/t/${encodeURIComponent(tenantSlug)}`,
     display: "standalone",
     orientation: "portrait",
     background_color: "#FFFFFF",

@@ -25,6 +25,9 @@ export async function GET(request: Request) {
         try {
           const refUrl = new URL(referer);
           tenantParam = refUrl.searchParams.get("tenant")?.trim().toLowerCase() || undefined;
+          if (!tenantParam && refUrl.pathname.startsWith("/t/")) {
+            tenantParam = refUrl.pathname.split("/")[2]?.trim().toLowerCase() || undefined;
+          }
         } catch {}
       }
     }
@@ -52,7 +55,7 @@ export async function GET(request: Request) {
         `Catálogo digital y pedidos directos en ${businessName}`,
       id: `/t/${encodeURIComponent(tenantSlug)}`,
       start_url: `/t/${encodeURIComponent(tenantSlug)}?source=pwa`,
-      scope: `/t/${encodeURIComponent(tenantSlug)}/`,
+      scope: `/t/${encodeURIComponent(tenantSlug)}`,
       display: "standalone",
       orientation: "portrait",
       background_color: "#FFFFFF",

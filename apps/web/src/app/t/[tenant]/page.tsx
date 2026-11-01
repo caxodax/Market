@@ -78,6 +78,11 @@ export async function generateMetadata({
     title,
     description,
     manifest: `/api/manifest?tenant=${encodeURIComponent(tenantSlug)}`,
+    appleWebApp: {
+      capable: true,
+      title: settings.business_name,
+      statusBarStyle: "default",
+    },
     icons: {
       icon: iconUrl,
       apple: iconUrl,
