@@ -102,7 +102,7 @@ export async function generateMetadata({
   return {
     title,
     description,
-    manifest: `/api/manifest?tenant=${encodeURIComponent(tenantSlug)}`,
+    manifest: `/api/manifest?tenant=${encodeURIComponent(tenantSlug)}&v=2`,
     appleWebApp: {
       capable: true,
       title: settings.business_name,
