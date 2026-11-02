@@ -115,29 +115,34 @@ export class OrderRepository {
                 throw new Error(`El producto "${dbProd.name}" no está disponible actualmente.`);
               }
 
-              // Overwrite with authentic server price and fiscal status from database
-              const basePrice = Number(dbProd.price_usd);
-              const modifiersDelta = item.selected_modifiers?.reduce((sum, m) => sum + (m.price_usd || 0), 0) || 0;
-              item.unitPriceUsd = Number((basePrice + modifiersDelta).toFixed(2));
+              const isCpqItem = item.selected_modifiers?.some((m) => m.group_id?.startsWith("cpq_"));
+              if (!isCpqItem) {
+                // Overwrite with authentic server price and fiscal status from database
+                const basePrice = Number(dbProd.price_usd);
+                const modifiersDelta = item.selected_modifiers?.reduce((sum, m) => sum + (m.price_usd || 0), 0) || 0;
+                item.unitPriceUsd = Number((basePrice + modifiersDelta).toFixed(2));
+              }
               item.is_tax_exempt = Boolean(dbProd.is_tax_exempt);
 
-              // Pre-order stock verification with resilient inventory row fallback
-              const invForStore = Array.isArray(dbProd.inventory)
-                ? dbProd.inventory.find((inv: any) => inv.store_id === validStoreId)
-                : null;
-              const memProdMatch = state.products.find(
-                (p) => p.id === dbProd.id || p.name === dbProd.name
-              );
-              const fallbackStock = memProdMatch?.stock !== undefined ? memProdMatch.stock : 20;
-              const currentStock =
-                invForStore?.quantity !== undefined && invForStore?.quantity !== null
-                  ? Number(invForStore.quantity)
-                  : fallbackStock;
-
-              if (currentStock < item.quantity) {
-                throw new Error(
-                  `Stock insuficiente para "${dbProd.name}". Disponibles: ${currentStock}, solicitados: ${item.quantity}.`
+              // Pre-order stock verification for retail goods (CPQ items are Make-to-Order on demand)
+              if (!isCpqItem) {
+                const invForStore = Array.isArray(dbProd.inventory)
+                  ? dbProd.inventory.find((inv: any) => inv.store_id === validStoreId)
+                  : null;
+                const memProdMatch = state.products.find(
+                  (p) => p.id === dbProd.id || p.name === dbProd.name
                 );
+                const fallbackStock = memProdMatch?.stock !== undefined ? memProdMatch.stock : 20;
+                const currentStock =
+                  invForStore?.quantity !== undefined && invForStore?.quantity !== null
+                    ? Number(invForStore.quantity)
+                    : fallbackStock;
+
+                if (currentStock < item.quantity) {
+                  throw new Error(
+                    `Stock insuficiente para "${dbProd.name}". Disponibles: ${currentStock}, solicitados: ${item.quantity}.`
+                  );
+                }
               }
             }
           }
@@ -457,6 +462,55 @@ export class OrderRepository {
     // 6. Insert Order into Supabase
     if (supabase) {
       try {
+        // Try atomic PostgreSQL RPC for instant single-roundtrip transactional order creation
+        try {
+          const { data: rpcRes, error: rpcErr } = await supabase.rpc("rpc_create_order_atomic", {
+            p_order_data: {
+              tenant_id: newOrder.tenant_id,
+              store_id: validStoreId,
+              customer_id: customerId,
+              order_number: newOrder.order_number,
+              status: newOrder.status,
+              delivery_type: newOrder.delivery_type,
+              delivery_zone_id: validDeliveryZoneId,
+              delivery_address: newOrder.delivery_address,
+              subtotal_usd: subtotalUsd,
+              delivery_fee_usd: newOrder.delivery_fee_usd,
+              coupon_id: validCouponId,
+              discount_usd: newOrder.discount_usd,
+              total_usd: newOrder.total_usd,
+              total_ves: newOrder.total_ves,
+              total_primary: newOrder.total_usd,
+              total_secondary: newOrder.total_ves,
+              exchange_rate_applied: newOrder.exchange_rate_applied,
+              tax_rate: ivaRate,
+              tax_amount_usd: ivaAmountUsd,
+              tax_amount_ves: ivaAmountVes,
+              exempt_amount_usd: subtotalExemptUsd,
+              taxable_amount_usd: subtotalTaxableUsd,
+              notes: combinedNotes || null,
+              cash_tendered_usd: newOrder.cash_tendered_usd,
+              change_required_usd: newOrder.change_required_usd,
+              items: validatedItems.map((item) => ({
+                product_id: item.productId,
+                product_name: item.productName,
+                quantity: item.quantity,
+                unit_price: item.unitPriceUsd,
+                total_price: Number((item.unitPriceUsd * item.quantity).toFixed(2)),
+                modifiers: item.selected_modifiers || [],
+              })),
+            },
+          });
+
+          if (!rpcErr && rpcRes && rpcRes.success && rpcRes.order) {
+            newOrder.id = rpcRes.order.id;
+            state.orders.unshift(newOrder);
+            return newOrder;
+          }
+        } catch (rpcCatch) {
+          console.warn("[MarketOS] rpc_create_order_atomic fallback:", rpcCatch);
+        }
+
         // Strictly safe columns matching Supabase orders table schema
         const orderInsertPayload: any = {
           tenant_id: newOrder.tenant_id,
@@ -473,6 +527,8 @@ export class OrderRepository {
           discount_usd: newOrder.discount_usd,
           total_usd: newOrder.total_usd,
           total_ves: newOrder.total_ves,
+          total_primary: newOrder.total_usd,
+          total_secondary: newOrder.total_ves,
           exchange_rate_applied: newOrder.exchange_rate_applied,
           notes: combinedNotes || null,
         };
@@ -567,8 +623,11 @@ export class OrderRepository {
             console.error("[MarketOS] Error inserting order_items in Supabase:", itemsInsertErr);
           }
 
-          // Decrement inventory stock & record inventory movements in Supabase
+          // Decrement inventory stock & record inventory movements in Supabase (skip MTO items)
           for (const it of validatedItems) {
+            const isCpq = it.selected_modifiers?.some((m: any) => m.group_id?.startsWith("cpq_"));
+            if (isCpq) continue;
+
             const targetProductId = isUuid(it.productId)
               ? it.productId
               : itemsPayload.find((p) => p.product_name.startsWith(it.productName))?.product_id;

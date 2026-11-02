@@ -361,4 +361,80 @@ export class InvoicingRepository {
       }
     }
   }
+
+  /**
+   * Atomic issuance of fiscal document + balanced double-entry NIIF journal entry via Postgres RPC
+   */
+  static async issueFiscalDocumentAtomic(
+    payload: {
+      tenant_id: string;
+      order_id?: string;
+      document_type: FiscalDocumentType;
+      customer_name: string;
+      customer_id_doc: string;
+      customer_address?: string;
+      customer_phone?: string;
+      emitter_business_name?: string;
+      emitter_id_doc?: string;
+      emitter_address?: string;
+      items: any[];
+      subtotal_exempt: number;
+      subtotal_taxable: number;
+      iva_rate_percent: number;
+      iva_amount: number;
+      igtf_rate_percent?: number;
+      igtf_amount?: number;
+      total_amount: number;
+      currency?: string;
+      exchange_rate?: number;
+      payment_method?: string;
+    }
+  ): Promise<{ success: boolean; document?: FiscalDocument; journal_entry_id?: string; error?: string }> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase.rpc("rpc_issue_fiscal_document", {
+          p_payload: payload,
+        });
+        if (!error && data && data.success) {
+          return data;
+        }
+        if (error) {
+          console.warn("[MarketOS Invoicing] rpc_issue_fiscal_document error:", error);
+          return { success: false, error: error.message };
+        }
+      } catch (err: any) {
+        console.warn("[MarketOS Invoicing] rpc_issue_fiscal_document exception:", err);
+        return { success: false, error: err?.message || "Error al emitir documento fiscal" };
+      }
+    }
+    return { success: false, error: "Servicio de base de datos no disponible" };
+  }
+
+  /**
+   * Retrieves aggregated SENIAT Sales Book (Libro de Ventas) directly from PostgreSQL RPC
+   */
+  static async getSalesBook(
+    tenantId: string,
+    yearMonth: string // 'YYYY-MM'
+  ): Promise<any[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase.rpc("rpc_get_sales_book", {
+          p_tenant_id: tenantId,
+          p_year_month: yearMonth,
+        });
+        if (!error && Array.isArray(data)) {
+          return data;
+        }
+        if (error) {
+          console.warn("[MarketOS Invoicing] rpc_get_sales_book error:", error);
+        }
+      } catch (err) {
+        console.warn("[MarketOS Invoicing] rpc_get_sales_book exception:", err);
+      }
+    }
+    return [];
+  }
 }

@@ -92,7 +92,7 @@ export function CartDrawer({
                 const unitPrice = item.unit_price_usd ?? item.product.price_usd;
                 const lineTotalUsd = unitPrice * item.quantity;
 
-                const isMaxStock = item.product.stock !== undefined && item.quantity >= item.product.stock;
+                const isMaxStock = !item.is_cpq && item.product.stock !== undefined && item.quantity >= item.product.stock;
 
                 return (
                   <div

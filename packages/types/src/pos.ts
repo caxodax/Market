@@ -32,9 +32,17 @@ export interface CashRegisterSession {
   opened_at: string;
   closed_at?: string | null;
   opening_balance: number;
+  opening_cash_primary?: number;
+  opening_cash_secondary?: number;
   closing_balance?: number | null;
+  closing_cash_primary?: number | null;
+  closing_cash_secondary?: number | null;
   expected_balance?: number | null;
+  expected_cash_primary?: number | null;
+  expected_cash_secondary?: number | null;
   difference?: number | null;
+  difference_primary?: number | null;
+  difference_secondary?: number | null;
   total_sales_usd: number;
   total_cash_in: number;
   total_cash_out: number;
@@ -45,6 +53,8 @@ export interface CashRegisterSession {
   created_at: string;
   updated_at: string;
 }
+
+export type PosShift = CashRegisterSession;
 
 export interface CashMovement {
   id: string;
@@ -62,6 +72,8 @@ export interface CashMovement {
 export interface OpenShiftPayload {
   register_id: string;
   opening_balance: number;
+  opening_cash_primary?: number;
+  opening_cash_secondary?: number;
   cashier_user_id: string;
   cashier_name: string;
 }
@@ -69,6 +81,8 @@ export interface OpenShiftPayload {
 export interface CloseShiftPayload {
   session_id: string;
   closing_balance: number;
+  closing_cash_primary?: number;
+  closing_cash_secondary?: number;
   close_type: CloseType;
   notes?: string;
 }

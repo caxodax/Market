@@ -1408,4 +1408,449 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- =====================================================================
+-- MIGRATION: 00029_schema_cleanup_and_bimonetary.sql
+-- Description: Unify profiles, decimal inventory, bimonetary dual pattern & customer unique phone
+-- =====================================================================
+
+-- 1. Unificación de perfiles y poda de tablas fantasma
+DROP TABLE IF EXISTS public.user_profiles CASCADE;
+DROP TABLE IF EXISTS public.mto_quote_requests CASCADE;
+DROP TABLE IF EXISTS public.mto_materials CASCADE;
+DROP TABLE IF EXISTS public.tenant_plan_limits CASCADE;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints 
+    WHERE constraint_name = 'profiles_id_fkey' AND table_name = 'profiles'
+  ) THEN
+    ALTER TABLE public.profiles
+      ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
+  END IF;
+EXCEPTION
+  WHEN OTHERS THEN NULL;
+END $$;
+
+-- 2. Soporte decimal para peso y granel en inventario
+ALTER TABLE public.inventory 
+  ALTER COLUMN quantity TYPE NUMERIC(12, 3),
+  ALTER COLUMN min_quantity TYPE NUMERIC(12, 3);
+
+ALTER TABLE public.inventory_movements 
+  ALTER COLUMN quantity_change TYPE NUMERIC(12, 3),
+  ALTER COLUMN previous_quantity TYPE NUMERIC(12, 3),
+  ALTER COLUMN new_quantity TYPE NUMERIC(12, 3);
+
+-- 3. Modelo Bimonetario Universal (primary / secondary)
+ALTER TABLE public.tenant_settings 
+  ADD COLUMN IF NOT EXISTS primary_currency TEXT NOT NULL DEFAULT 'USD',
+  ADD COLUMN IF NOT EXISTS secondary_currency TEXT DEFAULT 'VES';
+
+ALTER TABLE public.pos_shifts 
+  ADD COLUMN IF NOT EXISTS opening_cash_primary NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+  ADD COLUMN IF NOT EXISTS opening_cash_secondary NUMERIC(14, 2) NOT NULL DEFAULT 0.00,
+  ADD COLUMN IF NOT EXISTS closing_cash_primary NUMERIC(12, 2),
+  ADD COLUMN IF NOT EXISTS closing_cash_secondary NUMERIC(14, 2),
+  ADD COLUMN IF NOT EXISTS expected_cash_primary NUMERIC(12, 2),
+  ADD COLUMN IF NOT EXISTS expected_cash_secondary NUMERIC(14, 2),
+  ADD COLUMN IF NOT EXISTS difference_primary NUMERIC(12, 2),
+  ADD COLUMN IF NOT EXISTS difference_secondary NUMERIC(14, 2);
+
+ALTER TABLE public.orders 
+  ADD COLUMN IF NOT EXISTS total_primary NUMERIC(12, 2),
+  ADD COLUMN IF NOT EXISTS total_secondary NUMERIC(14, 2);
+
+-- 4. Índice único para evitar clientes invitados duplicados
+CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_tenant_phone 
+  ON public.customers (tenant_id, phone);
+
+-- =====================================================================
+-- MIGRATION: 00030_core_transactional_rpcs.sql
+-- Description: Atomic Stored Procedures (RPCs) for Supabase / PostgreSQL
+-- =====================================================================
+
+-- 1. ATOMIC ORDER CREATION & STOCK DEDUCTION (rpc_create_order_atomic)
+CREATE OR REPLACE FUNCTION public.rpc_create_order_atomic(
+  p_order_data JSONB
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_tenant_id TEXT;
+  v_store_id UUID;
+  v_customer_id UUID;
+  v_order_id UUID := gen_random_uuid();
+  v_order_number TEXT;
+  v_has_food_service BOOLEAN := FALSE;
+  v_item JSONB;
+  v_item_product_id UUID;
+  v_item_product_name TEXT;
+  v_item_quantity NUMERIC(12, 3);
+  v_item_unit_price NUMERIC(12, 2);
+  v_item_total_price NUMERIC(12, 2);
+  v_current_stock NUMERIC(12, 3);
+  v_coupon_id UUID;
+  v_recipe_record RECORD;
+  v_recipe_item JSONB;
+  v_mat_id UUID;
+  v_mat_qty NUMERIC(12, 3);
+  v_mat_stock NUMERIC(12, 3);
+  v_mat_name TEXT;
+BEGIN
+  v_tenant_id := p_order_data->>'tenant_id';
+  v_store_id := (p_order_data->>'store_id')::UUID;
+  v_customer_id := (p_order_data->>'customer_id')::UUID;
+  
+  IF v_tenant_id IS NULL OR v_store_id IS NULL OR v_customer_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Parametros tenant_id, store_id y customer_id son obligatorios');
+  END IF;
+
+  v_order_number := COALESCE(
+    p_order_data->>'order_number',
+    'ORD-' || LPAD(FLOOR(RANDOM() * 900000 + 100000)::TEXT, 6, '0')
+  );
+
+  SELECT COALESCE(is_active, FALSE) INTO v_has_food_service
+  FROM public.tenant_modules
+  WHERE tenant_id = v_tenant_id AND module_id = 'food_service';
+
+  IF p_order_data->>'coupon_id' IS NOT NULL AND p_order_data->>'coupon_id' != '' THEN
+    v_coupon_id := (p_order_data->>'coupon_id')::UUID;
+    
+    PERFORM 1 FROM public.coupons 
+    WHERE id = v_coupon_id 
+      AND tenant_id = v_tenant_id 
+      AND is_active = TRUE 
+      AND (expires_at IS NULL OR expires_at > NOW())
+      AND (usage_limit IS NULL OR usage_count < usage_limit)
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+      RETURN jsonb_build_object('success', false, 'error', 'El cupón de descuento no es válido o ha expirado');
+    END IF;
+
+    UPDATE public.coupons 
+    SET usage_count = usage_count + 1 
+    WHERE id = v_coupon_id;
+  END IF;
+
+  FOR v_item IN SELECT * FROM jsonb_array_elements(p_order_data->'items')
+  LOOP
+    v_item_product_id := (v_item->>'product_id')::UUID;
+    v_item_product_name := COALESCE(v_item->>'product_name', 'Producto');
+    v_item_quantity := COALESCE((v_item->>'quantity')::NUMERIC, 1.000);
+    v_item_unit_price := COALESCE((v_item->>'unit_price_usd')::NUMERIC, 0.00);
+    v_item_total_price := COALESCE((v_item->>'total_price_usd')::NUMERIC, v_item_unit_price * v_item_quantity);
+
+    IF v_has_food_service = TRUE THEN
+      SELECT * INTO v_recipe_record 
+      FROM public.product_recipes 
+      WHERE tenant_id = v_tenant_id AND product_id = v_item_product_id::TEXT;
+
+      IF FOUND AND v_recipe_record.items IS NOT NULL AND jsonb_array_length(v_recipe_record.items) > 0 THEN
+        FOR v_recipe_item IN SELECT * FROM jsonb_array_elements(v_recipe_record.items)
+        LOOP
+          v_mat_id := (v_recipe_item->>'raw_material_id')::UUID;
+          v_mat_qty := (v_recipe_item->>'quantity')::NUMERIC * v_item_quantity;
+
+          SELECT name, current_stock INTO v_mat_name, v_mat_stock
+          FROM public.raw_materials
+          WHERE id = v_mat_id AND tenant_id = v_tenant_id
+          FOR UPDATE;
+
+          IF v_mat_stock < v_mat_qty THEN
+            RAISE EXCEPTION 'Stock insuficiente en cocina para el insumo % (Disponible: %, Requerido: %)', 
+              v_mat_name, v_mat_stock, v_mat_qty;
+          END IF;
+
+          UPDATE public.raw_materials
+          SET current_stock = current_stock - v_mat_qty,
+              updated_at = NOW()
+          WHERE id = v_mat_id;
+        END LOOP;
+      END IF;
+    END IF;
+
+    SELECT quantity INTO v_current_stock 
+    FROM public.inventory 
+    WHERE tenant_id = v_tenant_id AND store_id = v_store_id AND product_id = v_item_product_id
+    FOR UPDATE;
+
+    IF FOUND THEN
+      IF v_current_stock < v_item_quantity THEN
+        RAISE EXCEPTION 'Stock insuficiente para el producto % (Disponible: %, Solicitado: %)', 
+          v_item_product_name, v_current_stock, v_item_quantity;
+      END IF;
+
+      UPDATE public.inventory 
+      SET quantity = quantity - v_item_quantity,
+          updated_at = NOW()
+      WHERE tenant_id = v_tenant_id AND store_id = v_store_id AND product_id = v_item_product_id;
+
+      INSERT INTO public.inventory_movements (
+        tenant_id, store_id, product_id, quantity_change, previous_quantity, new_quantity, reason
+      ) VALUES (
+        v_tenant_id, v_store_id, v_item_product_id, -v_item_quantity, v_current_stock, (v_current_stock - v_item_quantity), 'VENTA_ORDEN_' || v_order_number
+      );
+    END IF;
+
+    INSERT INTO public.order_items (
+      id, tenant_id, order_id, product_id, product_name, quantity, unit_price_usd, total_price_usd, created_at
+    ) VALUES (
+      gen_random_uuid(), v_tenant_id, v_order_id, v_item_product_id, v_item_product_name, v_item_quantity::INTEGER, v_item_unit_price, v_item_total_price, NOW()
+    );
+  END LOOP;
+
+  INSERT INTO public.orders (
+    id, tenant_id, store_id, customer_id, order_number, status, delivery_type,
+    delivery_address, total_usd, total_ves, total_primary, total_secondary,
+    exchange_rate_applied, notes, delivery_zone_id, delivery_fee_usd, coupon_id,
+    discount_usd, customer_id_number, created_at, updated_at
+  ) VALUES (
+    v_order_id,
+    v_tenant_id,
+    v_store_id,
+    v_customer_id,
+    v_order_number,
+    COALESCE(p_order_data->>'status', 'CREATED')::public.order_status,
+    COALESCE(p_order_data->>'delivery_type', 'PICKUP')::public.delivery_type,
+    p_order_data->>'delivery_address',
+    COALESCE((p_order_data->>'total_usd')::NUMERIC, 0.00),
+    COALESCE((p_order_data->>'total_ves')::NUMERIC, 0.00),
+    COALESCE((p_order_data->>'total_primary')::NUMERIC, (p_order_data->>'total_usd')::NUMERIC, 0.00),
+    COALESCE((p_order_data->>'total_secondary')::NUMERIC, (p_order_data->>'total_ves')::NUMERIC, 0.00),
+    COALESCE((p_order_data->>'exchange_rate_applied')::NUMERIC, 1.0000),
+    p_order_data->>'notes',
+    NULLIF(p_order_data->>'delivery_zone_id', '')::UUID,
+    COALESCE((p_order_data->>'delivery_fee_usd')::NUMERIC, 0.00),
+    v_coupon_id,
+    COALESCE((p_order_data->>'discount_usd')::NUMERIC, 0.00),
+    p_order_data->>'customer_id_number',
+    NOW(),
+    NOW()
+  );
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'order_id', v_order_id,
+    'order_number', v_order_number
+  );
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN jsonb_build_object('success', false, 'error', SQLERRM);
+END;
+$$;
+
+-- 2. EMISIÓN FISCAL ATÓMICA Y ASIENTO NIIF (rpc_issue_fiscal_document)
+CREATE OR REPLACE FUNCTION public.rpc_issue_fiscal_document(
+  p_payload JSONB
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_tenant_id TEXT;
+  v_doc_type TEXT;
+  v_next_seq INTEGER;
+  v_doc_number TEXT;
+  v_doc_id UUID := gen_random_uuid();
+  v_entry_id UUID := gen_random_uuid();
+  v_entry_number INTEGER := 1;
+  v_total_amount NUMERIC(12, 2);
+  v_subtotal_taxable NUMERIC(12, 2);
+  v_iva_amount NUMERIC(12, 2);
+  v_has_accounting BOOLEAN := FALSE;
+BEGIN
+  v_tenant_id := p_payload->>'tenant_id';
+  v_doc_type := COALESCE(p_payload->>'document_type', 'INVOICE');
+  v_total_amount := COALESCE((p_payload->>'total_amount')::NUMERIC, 0.00);
+  v_subtotal_taxable := COALESCE((p_payload->>'subtotal_taxable')::NUMERIC, 0.00);
+  v_iva_amount := COALESCE((p_payload->>'iva_amount')::NUMERIC, 0.00);
+
+  IF v_tenant_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'tenant_id es requerido');
+  END IF;
+
+  v_next_seq := public.get_next_fiscal_sequence(v_tenant_id, v_doc_type);
+  v_doc_number := 'FAC-' || LPAD(v_next_seq::TEXT, 8, '0');
+
+  INSERT INTO public.fiscal_documents (
+    id, tenant_id, order_id, document_type, document_number, control_number,
+    status, customer_name, customer_id_doc, customer_address, customer_phone,
+    emitter_business_name, emitter_id_doc, emitter_address, items,
+    subtotal_exempt, subtotal_taxable, iva_rate_percent, iva_amount,
+    igtf_rate_percent, igtf_amount, total_amount, total_ves, exchange_rate_applied,
+    currency, payment_condition, payment_status, amount_paid, created_at, updated_at
+  ) VALUES (
+    v_doc_id,
+    v_tenant_id,
+    NULLIF(p_payload->>'order_id', '')::UUID,
+    v_doc_type,
+    v_doc_number,
+    COALESCE(p_payload->>'control_number', 'CTRL-' || LPAD(v_next_seq::TEXT, 8, '0')),
+    'ISSUED',
+    COALESCE(p_payload->>'customer_name', 'Consumidor Final'),
+    COALESCE(p_payload->>'customer_id_doc', 'V-00000000'),
+    p_payload->>'customer_address',
+    p_payload->>'customer_phone',
+    COALESCE(p_payload->>'emitter_business_name', 'Comercio'),
+    COALESCE(p_payload->>'emitter_id_doc', 'J-000000000'),
+    COALESCE(p_payload->>'emitter_address', 'Venezuela'),
+    COALESCE(p_payload->'items', '[]'::jsonb),
+    COALESCE((p_payload->>'subtotal_exempt')::NUMERIC, 0.00),
+    v_subtotal_taxable,
+    COALESCE((p_payload->>'iva_rate_percent')::NUMERIC, 16.00),
+    v_iva_amount,
+    COALESCE((p_payload->>'igtf_rate_percent')::NUMERIC, 0.00),
+    COALESCE((p_payload->>'igtf_amount')::NUMERIC, 0.00),
+    v_total_amount,
+    (p_payload->>'total_ves')::NUMERIC,
+    (p_payload->>'exchange_rate_applied')::NUMERIC,
+    COALESCE(p_payload->>'currency', 'USD'),
+    COALESCE(p_payload->>'payment_condition', 'CASH'),
+    'PAID',
+    v_total_amount,
+    NOW(),
+    NOW()
+  );
+
+  SELECT COALESCE(is_active, FALSE) INTO v_has_accounting
+  FROM public.tenant_modules
+  WHERE tenant_id = v_tenant_id AND module_id = 'accounting';
+
+  IF v_has_accounting = TRUE THEN
+    SELECT COALESCE(MAX(entry_number), 0) + 1 INTO v_entry_number
+    FROM public.journal_entries
+    WHERE tenant_id = v_tenant_id;
+
+    INSERT INTO public.journal_entries (
+      id, tenant_id, entry_number, entry_date, concept, source_module,
+      source_document_id, source_document_number, total_debit, total_credit,
+      is_balanced, created_at, updated_at
+    ) VALUES (
+      v_entry_id, v_tenant_id, v_entry_number, CURRENT_DATE,
+      'Venta según Factura Fiscal ' || v_doc_number, 'INVOICING',
+      v_doc_id, v_doc_number, v_total_amount, v_total_amount, TRUE, NOW(), NOW()
+    );
+
+    INSERT INTO public.journal_entry_lines (
+      id, entry_id, tenant_id, account_code, account_name, description, debit, credit, line_order
+    ) VALUES (
+      gen_random_uuid(), v_entry_id, v_tenant_id, '1.1.01.01', 'Caja General / Banco', 'Cobro de factura ' || v_doc_number, v_total_amount, 0.00, 1
+    );
+
+    INSERT INTO public.journal_entry_lines (
+      id, entry_id, tenant_id, account_code, account_name, description, debit, credit, line_order
+    ) VALUES (
+      gen_random_uuid(), v_entry_id, v_tenant_id, '4.1.01.01', 'Ventas de Mercancía', 'Venta base factura ' || v_doc_number, 0.00, (v_total_amount - v_iva_amount), 2
+    );
+
+    IF v_iva_amount > 0 THEN
+      INSERT INTO public.journal_entry_lines (
+        id, entry_id, tenant_id, account_code, account_name, description, debit, credit, line_order
+      ) VALUES (
+        gen_random_uuid(), v_entry_id, v_tenant_id, '2.1.03.01', 'Débito Fiscal IVA 16%', 'IVA generado ' || v_doc_number, 0.00, v_iva_amount, 3
+      );
+    END IF;
+  END IF;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'document_id', v_doc_id,
+    'document_number', v_doc_number,
+    'control_number', 'CTRL-' || LPAD(v_next_seq::TEXT, 8, '0'),
+    'sequence', v_next_seq
+  );
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN jsonb_build_object('success', false, 'error', SQLERRM);
+END;
+$$;
+
+-- 3. CIERRE DE TURNO POS Y ARQUEO CIEGO (rpc_close_pos_shift)
+CREATE OR REPLACE FUNCTION public.rpc_close_pos_shift(
+  p_payload JSONB
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_shift_id UUID;
+  v_tenant_id TEXT;
+  v_close_type TEXT;
+  v_closing_primary NUMERIC(12, 2);
+  v_closing_secondary NUMERIC(14, 2);
+  v_shift RECORD;
+  v_cash_in NUMERIC(12, 2) := 0.00;
+  v_cash_out NUMERIC(12, 2) := 0.00;
+  v_expected_primary NUMERIC(12, 2) := 0.00;
+  v_diff_primary NUMERIC(12, 2) := 0.00;
+BEGIN
+  v_shift_id := (p_payload->>'shift_id')::UUID;
+  v_tenant_id := p_payload->>'tenant_id';
+  v_close_type := COALESCE(p_payload->>'close_type', 'X');
+  v_closing_primary := COALESCE((p_payload->>'closing_cash_primary')::NUMERIC, (p_payload->>'closing_balance')::NUMERIC, 0.00);
+  v_closing_secondary := COALESCE((p_payload->>'closing_cash_secondary')::NUMERIC, 0.00);
+
+  SELECT * INTO v_shift
+  FROM public.cash_shifts
+  WHERE id = v_shift_id AND tenant_id = v_tenant_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Turno no encontrado');
+  END IF;
+
+  SELECT 
+    COALESCE(SUM(CASE WHEN type = 'IN' THEN amount_usd ELSE 0 END), 0.00),
+    COALESCE(SUM(CASE WHEN type = 'OUT' THEN amount_usd ELSE 0 END), 0.00)
+  INTO v_cash_in, v_cash_out
+  FROM public.cash_movements
+  WHERE shift_id = v_shift_id;
+
+  v_expected_primary := COALESCE(v_shift.opening_cash_primary, v_shift.opening_balance, 0.00) + 
+                        COALESCE(v_shift.total_sales_usd, 0.00) + 
+                        v_cash_in - v_cash_out;
+  v_diff_primary := v_closing_primary - v_expected_primary;
+
+  UPDATE public.cash_shifts
+  SET closed_at = NOW(),
+      close_type = v_close_type,
+      closing_balance = v_closing_primary,
+      closing_cash_primary = v_closing_primary,
+      closing_cash_secondary = v_closing_secondary,
+      expected_balance = v_expected_primary,
+      expected_cash_primary = v_expected_primary,
+      difference = v_diff_primary,
+      difference_primary = v_diff_primary,
+      total_cash_in = v_cash_in,
+      total_cash_out = v_cash_out,
+      ticket_printed = TRUE
+  WHERE id = v_shift_id;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'shift_id', v_shift_id,
+    'close_type', v_close_type,
+    'closing_cash_primary', v_closing_primary,
+    'closing_cash_secondary', v_closing_secondary,
+    'expected_cash_primary', v_expected_primary,
+    'difference_primary', v_diff_primary
+  );
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN jsonb_build_object('success', false, 'error', SQLERRM);
+END;
+$$;
+
+
+
 

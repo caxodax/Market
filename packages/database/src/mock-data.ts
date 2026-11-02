@@ -29,6 +29,11 @@ import type {
   PurchaseInvoice,
   RetentionVoucher,
   Supplier,
+  CpqCostSettings,
+  CpqPricingMatrix,
+  CpqAttributeOption,
+  CpqVolumeTier,
+  CpqQuote,
 } from "@marketos/types";
 import { DEFAULT_PLUGIN_DEPENDENCY_RULES } from "@marketos/types";
 
@@ -1012,12 +1017,166 @@ export const INITIAL_TENANT_MODULES: TenantModule[] = [
     installed_at: new Date(nowMs - 20 * oneDay).toISOString(),
     updated_at: new Date(nowMs - 20 * oneDay).toISOString(),
   },
+  {
+    id: "mod-pp-cpq",
+    tenant_id: "printopink",
+    module_id: "mto_cpq",
+    is_active: true,
+    installed_at: new Date(nowMs - 20 * oneDay).toISOString(),
+    updated_at: new Date(nowMs - 20 * oneDay).toISOString(),
+  },
 ];
 
 export const INITIAL_RAW_MATERIALS: RawMaterial[] = [];
 export const INITIAL_RECIPES: ProductRecipe[] = [];
 export const INITIAL_MODIFIER_GROUPS: ProductModifierGroup[] = [];
 export const INITIAL_AUDIT_LOGS: AuditLog[] = [];
+
+export const INITIAL_CPQ_COST_SETTINGS: CpqCostSettings[] = [
+  {
+    id: "cpq-cost-pp-1",
+    tenant_id: "printopink",
+    default_margin_percentage: 45,
+    default_deposit_percentage: 50,
+    hourly_labor_rate: 15,
+    machine_cost_per_hour: 8,
+  },
+];
+
+export const INITIAL_CPQ_PRICING_MATRICES: CpqPricingMatrix[] = [
+  {
+    id: "cpq-mat-pp-banner",
+    tenant_id: "printopink",
+    name: "Gran Formato & Banner",
+    calculation_type: "AREA",
+    min_billable_unit: 1.0,
+    setup_fee: 2.0,
+    waste_factor: 0.05,
+    deposit_percentage: 50,
+    base_material_cost_per_unit: 5.0,
+    base_labor_minutes: 15,
+    is_active: true,
+  },
+  {
+    id: "cpq-mat-pp-cards",
+    tenant_id: "printopink",
+    name: "Papelería & Tarjetas",
+    calculation_type: "UNITARY_CUSTOM",
+    min_billable_unit: 1.0,
+    setup_fee: 1.5,
+    waste_factor: 0.03,
+    deposit_percentage: 50,
+    base_material_cost_per_unit: 4.0,
+    base_labor_minutes: 10,
+    is_active: true,
+  },
+];
+
+export const INITIAL_CPQ_ATTRIBUTE_OPTIONS: CpqAttributeOption[] = [
+  {
+    id: "cpq-opt-banner-13oz",
+    matrix_id: "cpq-mat-pp-banner",
+    attribute_name: "Material",
+    label: "Lona Banner 13oz Brillante",
+    material_cost: 0,
+    labor_minutes: 0,
+    is_default: true,
+  },
+  {
+    id: "cpq-opt-banner-mate",
+    matrix_id: "cpq-mat-pp-banner",
+    attribute_name: "Material",
+    label: "Lona Banner 13oz Mate",
+    material_cost: 1.5,
+    labor_minutes: 0,
+    is_default: false,
+  },
+  {
+    id: "cpq-opt-vinil-gloss",
+    matrix_id: "cpq-mat-pp-banner",
+    attribute_name: "Material",
+    label: "Vinil Adhesivo Gloss",
+    material_cost: 2.5,
+    labor_minutes: 5,
+    is_default: false,
+  },
+  {
+    id: "cpq-opt-ojetes",
+    matrix_id: "cpq-mat-pp-banner",
+    attribute_name: "Acabado",
+    label: "Ojetes Metálicos en Esquinas",
+    material_cost: 1.0,
+    labor_minutes: 5,
+    is_default: true,
+  },
+  {
+    id: "cpq-opt-bolsillos",
+    matrix_id: "cpq-mat-pp-banner",
+    attribute_name: "Acabado",
+    label: "Bolsillo Superior e Inferior para Tubo",
+    material_cost: 2.0,
+    labor_minutes: 10,
+    is_default: false,
+  },
+  {
+    id: "cpq-opt-cards-glase300",
+    matrix_id: "cpq-mat-pp-cards",
+    attribute_name: "Material",
+    label: "Glasé 300g Full Color",
+    material_cost: 0,
+    labor_minutes: 0,
+    is_default: true,
+  },
+  {
+    id: "cpq-opt-cards-mate",
+    matrix_id: "cpq-mat-pp-cards",
+    attribute_name: "Laminado",
+    label: "Laminado Mate Térmico",
+    material_cost: 2.0,
+    labor_minutes: 5,
+    is_default: true,
+  },
+  {
+    id: "cpq-opt-cards-uv",
+    matrix_id: "cpq-mat-pp-cards",
+    attribute_name: "Laminado",
+    label: "Laminado Mate + Brillo UV Sectorizado",
+    material_cost: 5.0,
+    labor_minutes: 15,
+    is_default: false,
+  },
+];
+
+export const INITIAL_CPQ_VOLUME_TIERS: CpqVolumeTier[] = [
+  {
+    id: "tier-banner-1",
+    matrix_id: "cpq-mat-pp-banner",
+    min_quantity: 3,
+    max_quantity: 5,
+    discount_percentage: 10,
+  },
+  {
+    id: "tier-banner-2",
+    matrix_id: "cpq-mat-pp-banner",
+    min_quantity: 6,
+    max_quantity: null,
+    discount_percentage: 20,
+  },
+  {
+    id: "tier-cards-1",
+    matrix_id: "cpq-mat-pp-cards",
+    min_quantity: 3,
+    max_quantity: 5,
+    discount_percentage: 15,
+  },
+  {
+    id: "tier-cards-2",
+    matrix_id: "cpq-mat-pp-cards",
+    min_quantity: 6,
+    max_quantity: null,
+    discount_percentage: 25,
+  },
+];
 
 /**
  * Detects if a real Supabase database is connected or running in production.
@@ -1067,6 +1226,11 @@ export const state = {
   purchaseInvoices: [] as PurchaseInvoice[],
   retentionVouchers: [] as RetentionVoucher[],
   suppliers: [] as Supplier[],
+  cpqCostSettings: INITIAL_CPQ_COST_SETTINGS,
+  cpqPricingMatrices: INITIAL_CPQ_PRICING_MATRICES,
+  cpqAttributeOptions: INITIAL_CPQ_ATTRIBUTE_OPTIONS,
+  cpqVolumeTiers: INITIAL_CPQ_VOLUME_TIERS,
+  cpqQuotes: [] as CpqQuote[],
   platformSettings: {
     id: "default",
     platform_name: "MarketOS",

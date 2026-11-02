@@ -7,5 +7,4 @@ export * from "./components/admin-cost-margin-inspector";
 export * from "./components/production-work-order-view";
 export * from "./components/milestone-payment-tracker";
 export * from "./components/mto-cpq-admin-panel";
-
-
+export * from "./components/cpq-modal";

@@ -145,6 +145,36 @@ export default async function TenantPage({ params }: TenantPageProps) {
     getCachedCoupons(activeTenantId),
   ]);
 
+  const isCpqActive = activeModuleIds.includes("mto_cpq");
+  const [cpqMatrices, cpqCostSettings] = isCpqActive
+    ? await Promise.all([
+        MarketOSRepository.getCpqPricingMatrices(activeTenantId),
+        MarketOSRepository.getTenantCpqSettings(activeTenantId),
+      ])
+    : [[], null];
+
+  const cpqAttributeOptions =
+    isCpqActive && cpqMatrices.length > 0
+      ? (
+          await Promise.all(
+            cpqMatrices.map((m) =>
+              MarketOSRepository.getCpqMatrixAttributeOptions(m.id)
+            )
+          )
+        ).flat()
+      : [];
+
+  const cpqVolumeTiers =
+    isCpqActive && cpqMatrices.length > 0
+      ? (
+          await Promise.all(
+            cpqMatrices.map((m) =>
+              MarketOSRepository.getCpqVolumeTiers(m.id)
+            )
+          )
+        ).flat()
+      : [];
+
   return (
     <>
       <AnalyticsTracker tenantId={activeTenantId} />
@@ -158,6 +188,10 @@ export default async function TenantPage({ params }: TenantPageProps) {
         activeModuleIds={activeModuleIds}
         modifierGroups={modifierGroups}
         coupons={coupons}
+        cpqMatrices={cpqMatrices}
+        cpqCostSettings={cpqCostSettings}
+        cpqAttributeOptions={cpqAttributeOptions}
+        cpqVolumeTiers={cpqVolumeTiers}
       />
     </>
   );

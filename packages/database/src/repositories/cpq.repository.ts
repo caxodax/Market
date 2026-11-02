@@ -2,6 +2,7 @@ import type {
   CpqCostSettings,
   CpqPricingMatrix,
   CpqAttributeOption,
+  CpqVolumeTier,
   CpqQuote,
   CpqQuoteItem,
   CpqOrderMilestone,
@@ -15,24 +16,35 @@ import { OrderRepository } from "./order.repository.ts";
 
 export class CpqRepository {
 
-static async getTenantCpqSettings(tenantId: string): Promise<CpqCostSettings | null> {
+  static async getTenantCpqSettings(tenantId: string): Promise<CpqCostSettings | null> {
     const supabase = getSupabase();
-    if (!supabase) return null;
-    try {
-      const { data, error } = await supabase
-        .from("cpq_cost_settings")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .maybeSingle();
-      if (error) throw error;
-      return (data as CpqCostSettings) || null;
-    } catch (e) {
-      console.warn("[MarketOS] getTenantCpqSettings error:", e);
-      return null;
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("cpq_cost_settings")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
+        if (!error && data) return data as CpqCostSettings;
+      } catch (e) {
+        console.warn("[MarketOS] getTenantCpqSettings error:", e);
+      }
     }
+
+    if (isLiveDatabaseConfigured()) return null;
+    return (
+      (state.cpqCostSettings || []).find((s) => s.tenant_id === tenantId) || {
+        id: "default-cpq-cost",
+        tenant_id: tenantId,
+        default_margin_percentage: 40,
+        default_deposit_percentage: 50,
+        hourly_labor_rate: 15,
+        machine_cost_per_hour: 8,
+      }
+    );
   }
 
-static async saveTenantCpqSettings(
+  static async saveTenantCpqSettings(
     tenantId: string,
     settings: Partial<CpqCostSettings>
   ): Promise<CpqCostSettings | null> {
@@ -60,31 +72,33 @@ static async saveTenantCpqSettings(
     }
   }
 
-static async getCpqPricingMatrices(
+  static async getCpqPricingMatrices(
     tenantId: string,
     productId?: string
   ): Promise<CpqPricingMatrix[]> {
     const supabase = getSupabase();
-    if (!supabase) return [];
-    try {
-      let query = supabase
-        .from("cpq_pricing_matrices")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .order("name", { ascending: true });
-      if (productId) {
-        query = query.eq("product_id", productId);
+    if (supabase) {
+      try {
+        let query = supabase
+          .from("cpq_pricing_matrices")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .order("name", { ascending: true });
+        if (productId) {
+          query = query.eq("product_id", productId);
+        }
+        const { data, error } = await query;
+        if (!error && data) return data as CpqPricingMatrix[];
+      } catch (e) {
+        console.warn("[MarketOS] getCpqPricingMatrices error:", e);
       }
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data as CpqPricingMatrix[]) || [];
-    } catch (e) {
-      console.warn("[MarketOS] getCpqPricingMatrices error:", e);
-      return [];
     }
+
+    if (isLiveDatabaseConfigured()) return [];
+    return (state.cpqPricingMatrices || []).filter((m) => m.tenant_id === tenantId);
   }
 
-static async saveCpqPricingMatrix(
+  static async saveCpqPricingMatrix(
     matrix: Partial<CpqPricingMatrix> & { tenant_id: string; name: string }
   ): Promise<CpqPricingMatrix | null> {
     const supabase = getSupabase();
@@ -118,23 +132,44 @@ static async saveCpqPricingMatrix(
     }
   }
 
-static async getCpqMatrixAttributeOptions(
+  static async getCpqMatrixAttributeOptions(
     matrixId: string
   ): Promise<CpqAttributeOption[]> {
     const supabase = getSupabase();
-    if (!supabase) return [];
-    try {
-      const { data, error } = await supabase
-        .from("cpq_attribute_options")
-        .select("*")
-        .eq("pricing_matrix_id", matrixId)
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return (data as CpqAttributeOption[]) || [];
-    } catch (e) {
-      console.warn("[MarketOS] getCpqMatrixAttributeOptions error:", e);
-      return [];
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("cpq_attribute_options")
+          .select("*")
+          .eq("matrix_id", matrixId)
+          .order("created_at", { ascending: true });
+        if (!error && data) return data as CpqAttributeOption[];
+      } catch (e) {
+        console.warn("[MarketOS] getCpqMatrixAttributeOptions error:", e);
+      }
     }
+
+    if (isLiveDatabaseConfigured()) return [];
+    return (state.cpqAttributeOptions || []).filter((o) => o.matrix_id === matrixId);
+  }
+
+  static async getCpqVolumeTiers(matrixId: string): Promise<CpqVolumeTier[]> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("cpq_volume_tiers")
+          .select("*")
+          .eq("matrix_id", matrixId)
+          .order("min_quantity", { ascending: true });
+        if (!error && data) return data as CpqVolumeTier[];
+      } catch (e) {
+        console.warn("[MarketOS] getCpqVolumeTiers error:", e);
+      }
+    }
+
+    if (isLiveDatabaseConfigured()) return [];
+    return (state.cpqVolumeTiers || []).filter((t) => t.matrix_id === matrixId);
   }
 
 static async createCpqQuote(input: {

@@ -162,6 +162,8 @@ export interface TenantSettings {
   };
   supported_currencies: CurrencyCode[];
   default_currency: CurrencyCode;
+  primary_currency?: string;
+  secondary_currency?: string | null;
   payment_settings?: PaymentAccountSettings;
   operational_settings?: StoreOperationalSettings;
   billing_settings?: TenantBillingSettings;
@@ -510,6 +512,8 @@ export interface Order {
   driver_id?: string | null;
   total_usd: number;
   total_ves: number;
+  total_primary?: number;
+  total_secondary?: number;
   exchange_rate_applied: number;
   notes?: string | null;
   created_at: string;

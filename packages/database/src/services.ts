@@ -11,6 +11,8 @@ import {
   ProfileRepository,
   FoodServiceRepository,
   CpqRepository,
+  InvoicingRepository,
+  PosRepository,
 } from "./repositories/index.ts";
 
 /**
@@ -109,6 +111,7 @@ export class MarketOSRepository {
   static getCpqPricingMatrices = CpqRepository.getCpqPricingMatrices;
   static saveCpqPricingMatrix = CpqRepository.saveCpqPricingMatrix;
   static getCpqMatrixAttributeOptions = CpqRepository.getCpqMatrixAttributeOptions;
+  static getCpqVolumeTiers = CpqRepository.getCpqVolumeTiers;
   static createCpqQuote = CpqRepository.createCpqQuote;
   static getCpqQuotes = CpqRepository.getCpqQuotes;
   static convertQuoteToOrder = CpqRepository.convertQuoteToOrder;
@@ -139,6 +142,21 @@ export class MarketOSRepository {
   static updateCoupon = CouponRepository.updateCoupon;
   static toggleCoupon = CouponRepository.toggleCoupon;
   static deleteCoupon = CouponRepository.deleteCoupon;
+
+  // --- Invoicing & SENIAT Fiscal ---
+  static getFiscalDocuments = InvoicingRepository.getFiscalDocuments;
+  static getFiscalDocumentById = InvoicingRepository.getFiscalDocumentById;
+  static getFiscalDocumentByNumber = InvoicingRepository.getFiscalDocumentByNumber;
+  static getNextFiscalSequence = InvoicingRepository.getNextFiscalSequence;
+  static saveFiscalDocument = InvoicingRepository.saveFiscalDocument;
+  static issueFiscalDocumentAtomic = InvoicingRepository.issueFiscalDocumentAtomic;
+  static getSalesBook = InvoicingRepository.getSalesBook;
+
+  // --- POS Shifts ---
+  static openPosShift = PosRepository.openShift;
+  static getActivePosShift = PosRepository.getActiveShift;
+  static closePosShiftAtomic = PosRepository.closeShiftAtomic;
+  static getPosShiftHistory = PosRepository.getShiftHistory;
 
   // --- Audit ---
   static recordAuditLog = AuditRepository.recordAuditLog;

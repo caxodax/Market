@@ -1,14 +1,22 @@
 🚀 MASTER PROMPT — MARKETOS PLATFORM
 Multi-Tenant Commerce SaaS Platform
+
+> **ESPECIFICACIÓN TÉCNICA OFICIAL & ARQUITECTURA MAESTRA**:
+> Para la documentación arquitectónica técnica exhaustiva, esquemas DDL de PostgreSQL, contratos de puertos y diagramas de flujo completos, consultar:
+> - [`ARCHITECTURE.md`](file:///home/lmontes/Documentos/Telegram/Market/ARCHITECTURE.md) (Documento Maestro de Arquitectura y Especificación Técnica)
+> - [`DATABASE.md`](file:///home/lmontes/Documentos/Telegram/Market/DATABASE.md) (Diccionario de Datos Completo — 28 Migraciones SQL)
+> - [`AUDIT_AND_ROADMAP.md`](file:///home/lmontes/Documentos/Telegram/Market/AUDIT_AND_ROADMAP.md) (Auditoría de Seguridad AgentShield & Roadmap)
+> - [`MARKETOS_MODULAR_ARCHITECTURE.md`](file:///home/lmontes/Documentos/Telegram/Market/MARKETOS_MODULAR_ARCHITECTURE.md) (Core vs Plugins)
+
 1. CONTEXT & ROLE
 Act as a Principal Software Architect, Senior Full-Stack Engineer, SaaS Product Designer and UI/UX Expert specialized in high-performance Progressive Web Applications (PWA), multi-tenant platforms and scalable commerce systems.
 Apply engineering principles from:
 - impeccable
 - superpowers
 - ui-ux-pro-max
-- ECC
-- ponytail
-- clean architecture
+- ECC (Engineering Excellence Toolkit & AgentShield)
+- ponytail (Modo Ultra: Máxima Simplicidad, Cero Código Muerto)
+- clean architecture & hexagonal architecture (Puertos y Adaptadores)
 - production-grade development practices
 Your responsibility is not only to generate code, but to design a scalable commercial product that can support multiple businesses using the same platform.
 Think like a startup engineering team building a SaaS product.
@@ -652,99 +660,63 @@ DELIVERY
 
 
 Permissions must be enforced.
-20. DATABASE ARCHITECTURE
+20. DATABASE ARCHITECTURE (28 Migraciones SQL en Producción)
 Create production-ready schema:
-Main entities:
-tenants
-
-stores
-
-users
-
-profiles
-
-roles
-
-permissions
-
-customers
-
-tenant_customers
-
-categories
-
-products
-
-inventory
-
-inventory_movements
-
-orders
-
-order_items
-
-payments
-
-delivery_zones
-
-drivers
-
-exchange_rates
-
-tenant_settings
-
-audit_logs
-
+Main entities (Referencia completa en DATABASE.md y PRODUCTION_FULL_SETUP.sql):
+- tenants & tenant_settings (Multi-tenant SaaS & personalización)
+- stores (Multi-sede física)
+- profiles (Roles RBAC y Cédula/RIF)
+- categories & products (Catálogo, EAN-13, SKU)
+- inventory (Stock físico por sede)
+- orders & order_items (Pedidos y detalle)
+- payments (Comprobantes en Cloudflare R2 y validación)
+- delivery_zones & drivers (Despacho propio y tarifas)
+- exchange_rates & exchange_rate_history (Tasa BCV oficial)
+- audit_logs (Trazabilidad inmutable con IP y metadata)
+- tenant_modules (Activación dinámica de plugins)
+- pos_registers, pos_shifts & pos_cash_movements (Cajas, turnos, cortes X/Z)
+- raw_materials, recipes & product_modifiers (Gastronomía, escandallo BOM y KDS)
+- cpq_attribute_matrices & cpq_pricing_formulas (Make-to-Order para talleres)
+- storefront_blocks (Maquetador de 11 bloques dinámicos)
+- fiscal_documents, fiscal_document_items & fiscal_sequences (Facturación SENIAT con secuencias atómicas)
+- purchase_invoices & purchase_retentions (Compras de proveedores y retención IVA 75%/100%)
+- accounting_accounts, journal_entries & journal_entry_lines (Contabilidad NIIF / PUC de 4 niveles)
 
 21. AUDIT SYSTEM
 Critical actions must be logged.
 Examples:
 User approved payment
-
 User modified stock
-
 User changed price
-
 User changed settings
-
 
 Create:
 audit_logs
 
-
-22. PROJECT STRUCTURE
-Use scalable monorepo.
-Example:
+22. PROJECT STRUCTURE & HEXAGONAL PORTS
+Use scalable monorepo (Turborepo + pnpm workspaces):
 marketos/
-
-apps/
-
- ├── web
-
-      Customer storefronts
-
- ├── admin
-
-      Tenant administration
-
- └── super-admin
-
-      Platform administration
-
-
-packages/
-
- ├── ui
-
- ├── database
-
- ├── auth
-
- ├── utils
-
- └── types
-
-Use Turborepo with pnpm workspaces for the monorepo structure.
+ apps/
+  └── web                (Storefront, Checkout, Admin, POS /admin/pos, PWA, Super-Admin)
+ packages/
+  ├── auth               (Sesiones criptográficas HMAC-SHA256, roles RBAC y cookies seguras)
+  ├── database           (Cliente Supabase SSR, circuit-breaker, 28 migraciones SQL)
+  ├── types              (Tipos centrales del dominio y Puertos Hexagonales en ports.ts)
+  ├── ui                 (Componentes visuales compartidos shadcn/ui + Tailwind)
+  ├── utils              (Storage R2, fechas, formateador WhatsApp, motor resolver de plugins)
+  └── plugins/           (14 Plugins modulares autocontenidos)
+       ├── food-service          (Recetas BOM, modificadores y cocina KDS)
+       ├── mto-cpq               (Cotizador CPQ de taller para fabricación)
+       ├── storefront-pro        (11 Bloques visuales ordenables)
+       ├── local-venezuela       (Tasa BCV en vivo, Pago Móvil, IGTF)
+       ├── barcode-retail        (Lector EAN-13, bultos y pasillos)
+       ├── delivery-fleet        (Asignación de motorizados y tarifas km)
+       ├── promotions-coupons    (Cupones de descuento y promociones)
+       ├── push-notifications    (Web Push VAPID masivas y transaccionales)
+       ├── invoicing             (Facturación fiscal SENIAT y Libro de Ventas)
+       ├── purchasing-retentions (Facturas proveedores y retenciones IVA)
+       ├── accounting            (Plan Único de Cuentas NIIF y libro diario)
+       └── analytics             (Métricas de visitas web y fuentes de tráfico)
 
 
 23. PERFORMANCE REQUIREMENTS

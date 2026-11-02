@@ -9,6 +9,7 @@ export interface CartItem {
   quantity: number;
   selected_modifiers?: SelectedModifier[];
   unit_price_usd?: number;
+  is_cpq?: boolean;
 }
 
 interface CartContextType {
@@ -18,7 +19,8 @@ interface CartContextType {
     quantity?: number,
     openDrawer?: boolean,
     selected_modifiers?: SelectedModifier[],
-    unit_price_usd?: number
+    unit_price_usd?: number,
+    is_cpq?: boolean
   ) => void;
   removeItem: (productIdOrLineId: string) => void;
   updateQuantity: (productIdOrLineId: string, quantity: number) => void;
@@ -78,6 +80,12 @@ export function CartProvider({ children, tenantId, catalogProducts }: CartProvid
     setItems((prev) => {
       let changed = false;
       const next = prev.map((item) => {
+        // Ponytail Guard: Custom CPQ configured items calculate price dynamically and are Make-to-Order.
+        // Never clobber their custom calculated price or cap them against fixed shelf stock.
+        if (item.is_cpq || item.selected_modifiers?.some((m) => m.group_id?.startsWith("cpq_"))) {
+          return item;
+        }
+
         const live = productMap.get(item.product.id);
         if (!live) return item;
 
@@ -118,7 +126,8 @@ export function CartProvider({ children, tenantId, catalogProducts }: CartProvid
     quantity = 1,
     openDrawer = false,
     selected_modifiers?: SelectedModifier[],
-    unit_price_usd?: number
+    unit_price_usd?: number,
+    is_cpq?: boolean
   ) => {
     const finalUnitPrice = unit_price_usd ?? product.price_usd;
     setItems((prev) => {
@@ -134,8 +143,8 @@ export function CartProvider({ children, tenantId, catalogProducts }: CartProvid
             : !modSig)
       );
       if (existing) {
-        // Enforce stock ceiling if available
-        const maxStock = product.stock ?? 9999;
+        // Enforce stock ceiling if available (not for CPQ make-to-order)
+        const maxStock = is_cpq ? 9999 : (product.stock ?? 9999);
         const nextQuantity = Math.min(existing.quantity + quantity, maxStock);
         return prev.map((item) =>
           item === existing
@@ -148,9 +157,13 @@ export function CartProvider({ children, tenantId, catalogProducts }: CartProvid
         {
           id: `${product.id}-${Date.now()}`,
           product,
-          quantity: product.stock !== undefined && product.stock > 0 ? Math.min(quantity, product.stock) : quantity,
+          quantity:
+            !is_cpq && product.stock !== undefined && product.stock > 0
+              ? Math.min(quantity, product.stock)
+              : quantity,
           selected_modifiers,
           unit_price_usd: finalUnitPrice,
+          is_cpq: Boolean(is_cpq || selected_modifiers?.some((m) => m.group_id?.startsWith("cpq_"))),
         },
       ];
     });

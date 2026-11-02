@@ -12,8 +12,10 @@ interface ProductCardProps {
   exchangeRate: number;
   baseCurrency?: "USD" | "EUR";
   hasModifiers?: boolean;
+  hasCpq?: boolean;
   showVesPrice?: boolean;
   onOpenModifiers?: (product: Product) => void;
+  onOpenCpq?: (product: Product & { stock: number }) => void;
 }
 
 export function ProductCard({
@@ -21,8 +23,10 @@ export function ProductCard({
   exchangeRate,
   baseCurrency = "USD",
   hasModifiers = false,
+  hasCpq = false,
   showVesPrice = false,
   onOpenModifiers,
+  onOpenCpq,
 }: ProductCardProps) {
   const { items, addItem, updateQuantity } = useCart();
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -61,7 +65,11 @@ export function ProductCard({
 
         {/* Stock & Cart Badges */}
         <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 items-start">
-          {isOutOfStock ? (
+          {hasCpq ? (
+            <span className="rounded-full bg-indigo-600/90 text-white px-2 py-0.5 text-[10px] font-bold shadow-xs">
+              Bajo Pedido
+            </span>
+          ) : isOutOfStock ? (
             <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold text-destructive-foreground shadow-xs">
               Agotado
             </span>
@@ -170,12 +178,14 @@ export function ProductCard({
 
               <button
                 type="button"
-                disabled={quantityInCart >= product.stock}
+                disabled={!hasCpq && quantityInCart >= product.stock}
                 onClick={() => {
                   if (typeof window !== "undefined" && "vibrate" in navigator) {
                     try { navigator.vibrate(12); } catch {}
                   }
-                  if (hasModifiers && onOpenModifiers) {
+                  if (hasCpq && onOpenCpq) {
+                    onOpenCpq(product);
+                  } else if (hasModifiers && onOpenModifiers) {
                     onOpenModifiers(product);
                   } else {
                     addItem(product, 1, false);
@@ -193,23 +203,32 @@ export function ProductCard({
                 if (typeof window !== "undefined" && "vibrate" in navigator) {
                   try { navigator.vibrate(15); } catch {}
                 }
-                if (hasModifiers && onOpenModifiers) {
+                if (hasCpq && onOpenCpq) {
+                  onOpenCpq(product);
+                } else if (hasModifiers && onOpenModifiers) {
                   onOpenModifiers(product);
                 } else {
                   addItem(product, 1, false);
                 }
               }}
-              disabled={isOutOfStock}
+              disabled={!hasCpq && isOutOfStock}
               className={`w-full min-h-[44px] h-11 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer touch-manipulation ${
-                isOutOfStock
+                !hasCpq && isOutOfStock
                   ? "bg-muted text-muted-foreground cursor-not-allowed"
+                  : hasCpq
+                  ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
                   : hasModifiers
                   ? "bg-amber-500 text-white hover:bg-amber-600 shadow-sm"
                   : "bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground shadow-sm"
               }`}
             >
-              {isOutOfStock ? (
+              {!hasCpq && isOutOfStock ? (
                 <span>Sin stock</span>
+              ) : hasCpq ? (
+                <>
+                  <Sparkles className="w-4 h-4 stroke-[2.5]" />
+                  <span>Personalizar / Cotizar</span>
+                </>
               ) : hasModifiers ? (
                 <>
                   <Sparkles className="w-4 h-4 stroke-[2.5]" />

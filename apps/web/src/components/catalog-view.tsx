@@ -15,6 +15,10 @@ import {
   StoreTrustBadgeItem,
   StoreFaqItem,
   Coupon,
+  CpqPricingMatrix,
+  CpqCostSettings,
+  CpqAttributeOption,
+  CpqVolumeTier,
 } from "@marketos/types";
 import {
   formatCurrency,
@@ -31,6 +35,7 @@ import { CustomerOrderTicketModal } from "./customer-order-ticket-modal";
 import { useFavorites } from "../context/favorites-context";
 import { StorefrontProRenderer, createDefaultStorefrontConfig, normalizeStorefrontConfig } from "@marketos/plugin-storefront-pro";
 import { ModifierModal } from "@marketos/plugin-food-service";
+import { CpqModal } from "@marketos/plugin-mto-cpq";
 import {
   Search,
   SlidersHorizontal,
@@ -73,6 +78,10 @@ interface CatalogViewProps {
   activeModuleIds?: TenantModuleId[];
   modifierGroups?: ProductModifierGroup[];
   coupons?: Coupon[];
+  cpqMatrices?: CpqPricingMatrix[];
+  cpqCostSettings?: CpqCostSettings | null;
+  cpqAttributeOptions?: CpqAttributeOption[];
+  cpqVolumeTiers?: CpqVolumeTier[];
 }
 
 function getTrustBadgeIconComponent(icon: string) {
@@ -110,6 +119,10 @@ export function CatalogView({
   activeModuleIds = [],
   modifierGroups = [],
   coupons = [],
+  cpqMatrices = [],
+  cpqCostSettings = null,
+  cpqAttributeOptions = [],
+  cpqVolumeTiers = [],
 }: CatalogViewProps) {
   const { items, totalItems, totalUsd, setIsOpen, addItem, removeItem, updateQuantity } = useCart();
   const { favorites, favoritesCount } = useFavorites();
@@ -122,7 +135,11 @@ export function CatalogView({
   // Food Service Plugin: Modifier Customizer Modal State
   const [customizingProduct, setCustomizingProduct] = useState<Product | null>(null);
 
+  // MTO / CPQ Plugin: Custom Product Configurator Modal State (Sublimation & Workshop)
+  const [cpqProduct, setCpqProduct] = useState<(Product & { stock: number }) | null>(null);
+
   const isFoodServiceActive = activeModuleIds.includes("food_service");
+  const isCpqActive = activeModuleIds.includes("mto_cpq");
   const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
   const isCouponsActive = activeModuleIds.includes("promotions_coupons");
   const isStorefrontProActive = activeModuleIds.includes("storefront_pro");
@@ -1087,6 +1104,12 @@ export function CatalogView({
                     {paginatedProducts.map((product) => {
                       const mods = getProductModifierGroups(product);
                       const hasModifiers = mods.length > 0;
+                      const hasCpq = Boolean(
+                        isCpqActive &&
+                        (product.tenant_id === "printopink" ||
+                          product.category_id?.includes("pp") ||
+                          Boolean(cpqMatrices?.some((m) => m.name.toLowerCase().includes(product.name.toLowerCase()) || m.tenant_id === product.tenant_id)))
+                      );
                       return (
                         <ProductCard
                           key={product.id}
@@ -1095,7 +1118,9 @@ export function CatalogView({
                           baseCurrency={effectiveRateInfo.baseCurrency}
                           showVesPrice={isVenezuelaActive}
                           hasModifiers={hasModifiers}
+                          hasCpq={hasCpq}
                           onOpenModifiers={(prod) => setCustomizingProduct(prod)}
+                          onOpenCpq={(prod) => setCpqProduct(prod)}
                         />
                       );
                     })}
@@ -1547,6 +1572,55 @@ export function CatalogView({
           onConfirmAddToCart={(prod: Product, qty: number, selectedModifiers: SelectedModifier[], unitPrice: number) => {
             addItem(prod, qty, true, selectedModifiers, unitPrice);
             setCustomizingProduct(null);
+          }}
+        />
+      )}
+
+      {/* MTO / CPQ Plugin: Interactive Dimension & Material Configurator Modal */}
+      {cpqProduct && (
+        <CpqModal
+          isOpen={Boolean(cpqProduct)}
+          onClose={() => setCpqProduct(null)}
+          product={cpqProduct}
+          matrix={
+            cpqMatrices?.find((m) =>
+              m.name.toLowerCase().includes(cpqProduct.name.toLowerCase()) ||
+              (cpqProduct.name.toLowerCase().includes("banner") && m.calculation_type === "AREA") ||
+              (cpqProduct.name.toLowerCase().includes("tarjeta") && m.calculation_type === "UNITARY_CUSTOM")
+            ) ||
+            cpqMatrices?.[0] || {
+              id: "cpq-mat-default",
+              tenant_id: settings.tenant_id,
+              name: cpqProduct.name,
+              calculation_type: "AREA",
+              min_billable_unit: 1.0,
+              setup_fee: 2.0,
+              waste_factor: 0.05,
+              deposit_percentage: 50,
+            }
+          }
+          costSettings={
+            cpqCostSettings || {
+              id: "cpq-cost-default",
+              tenant_id: settings.tenant_id,
+              default_margin_percentage: 45,
+              default_deposit_percentage: 50,
+              hourly_labor_rate: 15,
+              machine_cost_per_hour: 8,
+            }
+          }
+          availableOptions={
+            cpqAttributeOptions?.filter((o) =>
+              cpqMatrices?.some((m) => m.id === o.matrix_id)
+            ) || []
+          }
+          volumeTiers={cpqVolumeTiers || []}
+          businessName={settings.business_name}
+          businessPhone={settings.whatsapp_number}
+          formatCurrency={(val) => formatCurrency(val, effectiveRateInfo.baseCurrency)}
+          onConfirmAddToCart={(prod, qty, selectedMods, unitPrice) => {
+            addItem(prod, qty, true, selectedMods, unitPrice, true);
+            setCpqProduct(null);
           }}
         />
       )}

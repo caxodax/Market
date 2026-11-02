@@ -32,6 +32,10 @@ interface StorefrontPageProps {
   activeModuleIds?: import("@marketos/types").TenantModuleId[];
   modifierGroups?: import("@marketos/types").ProductModifierGroup[];
   coupons?: Coupon[];
+  cpqMatrices?: import("@marketos/types").CpqPricingMatrix[];
+  cpqCostSettings?: import("@marketos/types").CpqCostSettings | null;
+  cpqAttributeOptions?: import("@marketos/types").CpqAttributeOption[];
+  cpqVolumeTiers?: import("@marketos/types").CpqVolumeTier[];
 }
 
 function hexToHslString(hex: string): string {
@@ -107,6 +111,10 @@ export function StorefrontPage({
   activeModuleIds = [],
   modifierGroups = [],
   coupons = [],
+  cpqMatrices = [],
+  cpqCostSettings = null,
+  cpqAttributeOptions = [],
+  cpqVolumeTiers = [],
 }: StorefrontPageProps) {
   // Ponytail Ultra: Auto-refresh store data & BCV rate on focus and every 60s without full reload
   useAutoRefresh(60000);
@@ -203,6 +211,10 @@ export function StorefrontPage({
             activeModuleIds={activeModuleIds}
             modifierGroups={modifierGroups}
             coupons={coupons}
+            cpqMatrices={cpqMatrices}
+            cpqCostSettings={cpqCostSettings}
+            cpqAttributeOptions={cpqAttributeOptions}
+            cpqVolumeTiers={cpqVolumeTiers}
           />
 
         {/* Storefront Footer */}
