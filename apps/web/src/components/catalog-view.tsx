@@ -1104,12 +1104,38 @@ export function CatalogView({
                     {paginatedProducts.map((product) => {
                       const mods = getProductModifierGroups(product);
                       const hasModifiers = mods.length > 0;
-                      const hasCpq = Boolean(
-                        isCpqActive &&
-                        (product.tenant_id === "printopink" ||
-                          product.category_id?.includes("pp") ||
-                          Boolean(cpqMatrices?.some((m) => m.name.toLowerCase().includes(product.name.toLowerCase()) || m.tenant_id === product.tenant_id)))
+
+                      const productCategory = categories.find((c) => c.id === product.category_id);
+                      const catName = (productCategory?.name || "").toLowerCase();
+                      const prodName = product.name.toLowerCase();
+
+                      // Ponytail / ECC: Gran Formato & Make-to-Order require dimensional CPQ calculation.
+                      // Standard retail products (escaneos, fotocopias, impresiones, tarjetas) use direct add-to-cart or modifiers.
+                      const isLargeFormatOrDimensional =
+                        catName.includes("gran formato") ||
+                        catName.includes("vinil") ||
+                        catName.includes("letrero") ||
+                        catName.includes("lona") ||
+                        catName.includes("banner") ||
+                        prodName.includes("pendon") ||
+                        prodName.includes("pendón") ||
+                        prodName.includes("banner") ||
+                        prodName.includes("lona") ||
+                        prodName.includes("microperforado");
+
+                      const matchesSpecificMatrix = Boolean(
+                        cpqMatrices &&
+                          cpqMatrices.length > 0 &&
+                          cpqMatrices.some(
+                            (m) =>
+                              m.is_active &&
+                              (m.name.toLowerCase().includes(prodName) ||
+                                prodName.includes(m.name.toLowerCase()) ||
+                                (catName && m.name.toLowerCase().includes(catName)))
+                          )
                       );
+
+                      const hasCpq = Boolean(isCpqActive && (matchesSpecificMatrix || isLargeFormatOrDimensional));
                       return (
                         <ProductCard
                           key={product.id}
@@ -1585,8 +1611,8 @@ export function CatalogView({
           matrix={
             cpqMatrices?.find((m) =>
               m.name.toLowerCase().includes(cpqProduct.name.toLowerCase()) ||
-              (cpqProduct.name.toLowerCase().includes("banner") && m.calculation_type === "AREA") ||
-              (cpqProduct.name.toLowerCase().includes("tarjeta") && m.calculation_type === "UNITARY_CUSTOM")
+              ((cpqProduct.name.toLowerCase().includes("banner") || cpqProduct.name.toLowerCase().includes("pendon") || cpqProduct.name.toLowerCase().includes("pendón")) && m.calculation_type === "AREA") ||
+              (cpqProduct.name.toLowerCase().includes("vinil") && (m.calculation_type === "AREA" || m.calculation_type === "LINEAR"))
             ) ||
             cpqMatrices?.[0] || {
               id: "cpq-mat-default",

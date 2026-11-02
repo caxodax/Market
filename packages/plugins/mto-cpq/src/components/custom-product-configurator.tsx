@@ -330,12 +330,14 @@ export function CustomProductConfigurator({
       )}
 
       {/* 2D Interactive Dimension Visualizer */}
-      <div className="pt-2">
-        <DimensionVisualizer
-          dimensions={dimensions}
-          calculationType={matrix.calculation_type}
-        />
-      </div>
+      {(matrix.calculation_type === "AREA" || matrix.calculation_type === "LINEAR" || matrix.calculation_type === "VOLUME") && (
+        <div className="pt-2">
+          <DimensionVisualizer
+            dimensions={dimensions}
+            calculationType={matrix.calculation_type}
+          />
+        </div>
+      )}
 
 
       {/* Attribute Options Selectors */}
