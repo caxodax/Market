@@ -136,6 +136,9 @@ export async function adjustStockAction(
     );
     invalidateProductsCache(tenantId);
     revalidatePath("/admin");
+    revalidatePath("/");
+    revalidatePath(`/t/${tenantId}`);
+    revalidatePath("/t/[tenant]", "page");
     return { success: true, newStock };
   } catch (error) {
     console.error("Error adjusting stock:", error);
@@ -322,6 +325,8 @@ export async function createProductAction(input: CreateProductInput) {
     invalidateProductsCache(input.tenantId);
     revalidatePath("/admin");
     revalidatePath("/");
+    revalidatePath(`/t/${input.tenantId}`);
+    revalidatePath("/t/[tenant]", "page");
     return { success: true, product };
   } catch (error) {
     console.error("Error creating product:", error);
@@ -361,6 +366,8 @@ export async function createCategoryAction(tenantId: string, name: string) {
     invalidateCategoriesCache(tenantId);
     revalidatePath("/admin");
     revalidatePath("/");
+    revalidatePath(`/t/${tenantId}`);
+    revalidatePath("/t/[tenant]", "page");
 
     return { success: true, category };
   } catch (error) {
@@ -379,6 +386,8 @@ export async function deleteCategoryAction(tenantId: string, categoryId: string)
     invalidateCategoriesCache(tenantId);
     revalidatePath("/admin");
     revalidatePath("/");
+    revalidatePath(`/t/${tenantId}`);
+    revalidatePath("/t/[tenant]", "page");
 
     return { success: true };
   } catch (error) {
@@ -465,6 +474,8 @@ export async function bulkImportProductsAction(
     invalidateProductsCache(tenantId);
     revalidatePath("/admin");
     revalidatePath("/");
+    revalidatePath(`/t/${tenantId}`);
+    revalidatePath("/t/[tenant]", "page");
 
     return {
       success: true,
@@ -501,6 +512,8 @@ export async function updateProductAction(input: UpdateProductInput) {
     invalidateProductsCache(input.tenantId);
     revalidatePath("/admin");
     revalidatePath("/");
+    revalidatePath(`/t/${input.tenantId}`);
+    revalidatePath("/t/[tenant]", "page");
     return { success: true, product };
   } catch (error) {
     console.error("Error updating product:", error);
@@ -525,6 +538,8 @@ export async function deleteProductAction(tenantId: string, productId: string) {
     invalidateProductsCache(tenantId);
     revalidatePath("/admin");
     revalidatePath("/");
+    revalidatePath(`/t/${tenantId}`);
+    revalidatePath("/t/[tenant]", "page");
     return { success: ok };
   } catch (error) {
     console.error("Error deleting product:", error);

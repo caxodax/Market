@@ -436,7 +436,7 @@ export class CatalogRepository {
           }
         }
 
-        if (!error && Array.isArray(data) && data.length > 0) {
+        if (!error && Array.isArray(data)) {
           return data.map((item: any) => {
             const totalStock = Array.isArray(item.inventory)
               ? item.inventory.reduce((sum: number, inv: any) => sum + (inv.quantity || 0), 0)

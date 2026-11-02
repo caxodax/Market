@@ -1,4 +1,4 @@
-import { unstable_cache, revalidateTag } from "next/cache";
+import { unstable_cache, revalidateTag, revalidatePath } from "next/cache";
 import { MarketOSRepository } from "@marketos/database";
 import type {
   Tenant,
@@ -64,14 +64,14 @@ export const getCachedCategories = (tenantId: string): Promise<Category[]> => {
     },
     [`tenant-categories-${tenantId}`],
     {
-      revalidate: 300,
+      revalidate: 60,
       tags: [`tenant-categories-${tenantId}`],
     }
   )();
 };
 
 /**
- * Obtener Productos del Catálogo con caché de 2 minutos y guardia de alta disponibilidad
+ * Obtener Productos del Catálogo con caché de 30 segundos y guardia de alta disponibilidad
  */
 export const getCachedProducts = (
   tenantId: string,
@@ -89,7 +89,7 @@ export const getCachedProducts = (
     },
     [cacheKey],
     {
-      revalidate: 120,
+      revalidate: 30,
       tags: [`tenant-products-${tenantId}`],
     }
   )();
@@ -171,44 +171,76 @@ export const getCachedTenantActiveModuleIds = (tenantId: string): Promise<Tenant
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-export function invalidateProductsCache(tenantId: string) {
+function safeRevalidateTag(tag: string) {
   try {
-    revalidateTag(`tenant-products-${tenantId}`, { expire: 0 });
+    (revalidateTag as any)(tag, "max");
+  } catch {
+    try {
+      (revalidateTag as any)(tag);
+    } catch {
+      // Ignored in non-request contexts
+    }
+  }
+}
+
+export function invalidateProductsCache(tenantId: string) {
+  safeRevalidateTag(`tenant-products-${tenantId}`);
+  try {
+    revalidatePath("/admin");
+    revalidatePath("/");
+    revalidatePath(`/t/${tenantId}`);
+    revalidatePath("/t/[tenant]", "page");
   } catch (e) {
-    // Ignored in non-server action contexts
+    // Ignored
   }
 }
 
 export function invalidateCategoriesCache(tenantId: string) {
+  safeRevalidateTag(`tenant-categories-${tenantId}`);
   try {
-    revalidateTag(`tenant-categories-${tenantId}`, { expire: 0 });
+    revalidatePath("/admin");
+    revalidatePath("/");
+    revalidatePath(`/t/${tenantId}`);
+    revalidatePath("/t/[tenant]", "page");
   } catch (e) {
     // Ignored
   }
 }
 
 export function invalidateSettingsCache(tenantId: string) {
+  safeRevalidateTag(`tenant-settings-${tenantId}`);
+  safeRevalidateTag(`tenant-info-${tenantId.toLowerCase()}`);
+  safeRevalidateTag(`tenant-modules-${tenantId}`);
+  safeRevalidateTag(`tenant-rate-${tenantId}`);
   try {
-    revalidateTag(`tenant-settings-${tenantId}`, { expire: 0 });
-    revalidateTag(`tenant-info-${tenantId.toLowerCase()}`, { expire: 0 });
-    revalidateTag(`tenant-modules-${tenantId}`, { expire: 0 });
-    revalidateTag(`tenant-rate-${tenantId}`, { expire: 0 });
+    revalidatePath("/admin", "layout");
+    revalidatePath("/", "layout");
+    revalidatePath(`/t/${tenantId}`, "layout");
+    revalidatePath("/t/[tenant]", "layout");
   } catch (e) {
     // Ignored
   }
 }
 
 export function invalidateExchangeRateCache(tenantId: string) {
+  safeRevalidateTag(`tenant-rate-${tenantId}`);
   try {
-    revalidateTag(`tenant-rate-${tenantId}`, { expire: 0 });
+    revalidatePath("/admin");
+    revalidatePath("/");
+    revalidatePath(`/t/${tenantId}`);
+    revalidatePath("/t/[tenant]", "page");
   } catch (e) {
     // Ignored
   }
 }
 
 export function invalidateDeliveryZonesCache(tenantId: string) {
+  safeRevalidateTag(`tenant-delivery-zones-${tenantId}`);
   try {
-    revalidateTag(`tenant-delivery-zones-${tenantId}`, { expire: 0 });
+    revalidatePath("/admin");
+    revalidatePath("/");
+    revalidatePath(`/t/${tenantId}`);
+    revalidatePath("/t/[tenant]", "page");
   } catch (e) {
     // Ignored
   }
@@ -218,22 +250,29 @@ export function invalidateDeliveryZonesCache(tenantId: string) {
  * Invalidar toda la caché relacionada con un Tenant (estado, suscripción, settings, productos)
  */
 export function invalidateTenantCache(tenantIdOrSlug: string, optionalSlug?: string) {
+  const key = tenantIdOrSlug.toLowerCase();
+  safeRevalidateTag(`tenant-info-${key}`);
+  safeRevalidateTag(`tenant-settings-${tenantIdOrSlug}`);
+  safeRevalidateTag(`tenant-products-${tenantIdOrSlug}`);
+  safeRevalidateTag(`tenant-categories-${tenantIdOrSlug}`);
+  safeRevalidateTag(`tenant-stores-${tenantIdOrSlug}`);
+  safeRevalidateTag(`tenant-modules-${tenantIdOrSlug}`);
+  safeRevalidateTag(`tenant-coupons-${tenantIdOrSlug}`);
+  if (optionalSlug && optionalSlug.toLowerCase() !== key) {
+    safeRevalidateTag(`tenant-info-${optionalSlug.toLowerCase()}`);
+    safeRevalidateTag(`tenant-settings-${optionalSlug}`);
+    safeRevalidateTag(`tenant-modules-${optionalSlug}`);
+  }
   try {
-    const key = tenantIdOrSlug.toLowerCase();
-    revalidateTag(`tenant-info-${key}`, { expire: 0 });
-    revalidateTag(`tenant-settings-${tenantIdOrSlug}`, { expire: 0 });
-    revalidateTag(`tenant-products-${tenantIdOrSlug}`, { expire: 0 });
-    revalidateTag(`tenant-categories-${tenantIdOrSlug}`, { expire: 0 });
-    revalidateTag(`tenant-stores-${tenantIdOrSlug}`, { expire: 0 });
-    revalidateTag(`tenant-modules-${tenantIdOrSlug}`, { expire: 0 });
-    revalidateTag(`tenant-coupons-${tenantIdOrSlug}`, { expire: 0 });
-    if (optionalSlug && optionalSlug.toLowerCase() !== key) {
-      revalidateTag(`tenant-info-${optionalSlug.toLowerCase()}`, { expire: 0 });
-      revalidateTag(`tenant-settings-${optionalSlug}`, { expire: 0 });
-      revalidateTag(`tenant-modules-${optionalSlug}`, { expire: 0 });
+    revalidatePath("/admin", "layout");
+    revalidatePath("/", "layout");
+    revalidatePath(`/t/${tenantIdOrSlug}`, "layout");
+    if (optionalSlug) {
+      revalidatePath(`/t/${optionalSlug}`, "layout");
     }
+    revalidatePath("/t/[tenant]", "layout");
   } catch (e) {
-    // Ignored in non-server action contexts
+    // Ignored
   }
 }
 
