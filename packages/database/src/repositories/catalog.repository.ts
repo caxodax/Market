@@ -30,12 +30,18 @@ export class CatalogRepository {
         }
         const { data, error } = await query.order("created_at", { ascending: true });
 
-        if (!error && Array.isArray(data) && data.length > 0) {
+        if (error) throw error;
+        if (Array.isArray(data)) {
           return data as Store[];
         }
       } catch (err) {
         console.warn("[MarketOS] getStores Supabase lookup error:", err);
+        if (isLiveDatabaseConfigured()) {
+          throw err;
+        }
       }
+    } else if (isLiveDatabaseConfigured()) {
+      throw new Error("Supabase client is not available in live database mode");
     }
 
     const isPrimaryTenant = tenantId === "shop-market-ca" || tenantId === "shop-market";
@@ -144,44 +150,42 @@ export class CatalogRepository {
     const queryTenantId = isPrimaryTenant ? "shop-market-ca" : tenantId;
 
     if (supabase) {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("*")
-        .eq("tenant_id", queryTenantId)
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true });
+      try {
+        const { data, error } = await supabase
+          .from("categories")
+          .select("*")
+          .eq("tenant_id", queryTenantId)
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true });
 
-      if (!error && Array.isArray(data) && data.length > 0) {
-        const existingIds = new Set(data.map((c: any) => c.id));
-        const existingSlugs = new Set(data.map((c: any) => (c.slug || "").toLowerCase().trim()));
-        const existingNames = new Set(data.map((c: any) => (c.name || "").toLowerCase().trim()));
+        if (error) throw error;
 
-        // In-memory fallback ONLY for runtime created items (e.g. during tests without DB insert permission)
-        // Never include hardcoded mock seeds (starts with "cat-") when database categories exist.
-        const inMemExtra = state.categories.filter((c) => {
-          if (c.tenant_id !== tenantId && !(isPrimaryTenant && c.tenant_id === "shop-market-ca")) return false;
-          if (!c.is_active) return false;
-          if (c.id.startsWith("cat-")) return false;
-          if (existingIds.has(c.id)) return false;
-          if (existingSlugs.has((c.slug || "").toLowerCase().trim())) return false;
-          if (existingNames.has((c.name || "").toLowerCase().trim())) return false;
-          return true;
-        });
+        if (Array.isArray(data)) {
+          if (data.length > 0) {
+            const seenKeys = new Set<string>();
+            const uniqueCategories: Category[] = [];
+            for (const cat of data) {
+              const key = (cat.slug || cat.name || "").toLowerCase().trim();
+              if (!seenKeys.has(key)) {
+                seenKeys.add(key);
+                uniqueCategories.push(cat);
+              }
+            }
+            return uniqueCategories;
+          }
 
-        const combined = [...data, ...inMemExtra] as Category[];
-
-        // Strict deduplication safeguard: ensure unique slug & name
-        const seenKeys = new Set<string>();
-        const uniqueCategories: Category[] = [];
-        for (const cat of combined) {
-          const key = (cat.slug || cat.name || "").toLowerCase().trim();
-          if (!seenKeys.has(key)) {
-            seenKeys.add(key);
-            uniqueCategories.push(cat);
+          if (isLiveDatabaseConfigured()) {
+            return [];
           }
         }
-        return uniqueCategories;
+      } catch (err) {
+        console.warn("[MarketOS] getCategories Supabase error:", err);
+        if (isLiveDatabaseConfigured()) {
+          throw err;
+        }
       }
+    } else if (isLiveDatabaseConfigured()) {
+      throw new Error("Supabase client is not available in live database mode");
     }
 
     const fallbackList = state.categories
@@ -462,15 +466,19 @@ export class CatalogRepository {
         }
 
         if (error) {
-          console.warn("[MarketOS] getProducts Supabase warning:", error);
+          throw error;
         }
       } catch (e) {
         console.warn("[MarketOS] getProducts exception:", e);
+        if (isLiveDatabaseConfigured()) {
+          throw e;
+        }
       }
+    } else if (isLiveDatabaseConfigured()) {
+      throw new Error("Supabase client is not available in live database mode");
     }
 
-    // High availability fallback: If DB query timed out or had a transient glitch,
-    // retrieve in-memory state so storefront catalog never flashes empty.
+    // High availability fallback: only for local dev / offline tests without DB
     const filtered = state.products.filter((p) => {
       const matchesTenant =
         p.tenant_id === tenantId ||

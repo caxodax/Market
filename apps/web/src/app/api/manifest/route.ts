@@ -13,6 +13,19 @@ export const dynamic = "force-dynamic";
  * Android, iOS y Desktop sin colisionar con otras tiendas de la plataforma.
  * ═══════════════════════════════════════════════════════════════════════
  */
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders,
+  });
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -98,6 +111,7 @@ export async function GET(request: Request) {
       headers: {
         "Content-Type": "application/manifest+json",
         "Cache-Control": "no-cache, no-store, must-revalidate",
+        ...corsHeaders,
       },
     });
   } catch (error) {
@@ -114,7 +128,10 @@ export async function GET(request: Request) {
         theme_color: "#DC2626",
       },
       {
-        headers: { "Content-Type": "application/manifest+json" },
+        headers: {
+          "Content-Type": "application/manifest+json",
+          ...corsHeaders,
+        },
       }
     );
   }

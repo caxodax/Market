@@ -12,6 +12,9 @@ import {
   getCachedDeliveryZones,
   getCachedTenantActiveModuleIds,
   getCachedCoupons,
+  getCachedProductModifierGroups,
+  getCachedCpqPricingMatrices,
+  getCachedCpqCostSettings,
 } from "../lib/cached-queries";
 import { MarketOSRepository } from "@marketos/database";
 import { StorefrontPage } from "../components/storefront-page";
@@ -188,15 +191,15 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     getCachedExchangeRate(activeTenantId),
     getCachedDeliveryZones(activeTenantId),
     getCachedTenantActiveModuleIds(activeTenantId),
-    MarketOSRepository.getProductModifierGroups(activeTenantId),
+    getCachedProductModifierGroups(activeTenantId),
     getCachedCoupons(activeTenantId),
   ]);
 
   const isCpqActive = activeModuleIds.includes("mto_cpq");
   const [cpqMatrices, cpqCostSettings] = isCpqActive
     ? await Promise.all([
-        MarketOSRepository.getCpqPricingMatrices(activeTenantId),
-        MarketOSRepository.getTenantCpqSettings(activeTenantId),
+        getCachedCpqPricingMatrices(activeTenantId),
+        getCachedCpqCostSettings(activeTenantId),
       ])
     : [[], null];
 

@@ -82,7 +82,12 @@ export class ExchangeRateRepository {
         }
       } catch (err) {
         console.warn("[MarketOS] Exchange rate fetch error, using resilient fallback:", err);
+        if (isLiveDatabaseConfigured()) {
+          throw err;
+        }
       }
+    } else if (isLiveDatabaseConfigured()) {
+      throw new Error("Supabase client is not available in live database mode");
     }
 
     const fallback = state.rates.find((r) => r.tenant_id === tenantId) || {

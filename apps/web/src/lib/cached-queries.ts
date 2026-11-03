@@ -10,6 +10,9 @@ import type {
   DeliveryZone,
   TenantModuleId,
   Coupon,
+  ProductModifierGroup,
+  CpqPricingMatrix,
+  CpqCostSettings,
 } from "@marketos/types";
 
 /**
@@ -161,6 +164,48 @@ export const getCachedTenantActiveModuleIds = (tenantId: string): Promise<Tenant
     {
       revalidate: 60,
       tags: [`tenant-modules-${tenantId}`],
+    }
+  )();
+};
+
+/**
+ * Obtener Grupos de Modificadores de Producto con caché de 60 segundos
+ */
+export const getCachedProductModifierGroups = (tenantId: string): Promise<ProductModifierGroup[]> => {
+  return unstable_cache(
+    async () => MarketOSRepository.getProductModifierGroups(tenantId),
+    [`tenant-modifiers-${tenantId}`],
+    {
+      revalidate: 60,
+      tags: [`tenant-modifiers-${tenantId}`],
+    }
+  )();
+};
+
+/**
+ * Obtener Matrices CPQ del Tenant con caché de 60 segundos
+ */
+export const getCachedCpqPricingMatrices = (tenantId: string): Promise<CpqPricingMatrix[]> => {
+  return unstable_cache(
+    async () => MarketOSRepository.getCpqPricingMatrices(tenantId),
+    [`tenant-cpq-matrices-${tenantId}`],
+    {
+      revalidate: 60,
+      tags: [`tenant-cpq-matrices-${tenantId}`],
+    }
+  )();
+};
+
+/**
+ * Obtener Configuración de Costos CPQ del Tenant con caché de 60 segundos
+ */
+export const getCachedCpqCostSettings = (tenantId: string): Promise<CpqCostSettings | null> => {
+  return unstable_cache(
+    async () => MarketOSRepository.getTenantCpqSettings(tenantId),
+    [`tenant-cpq-costs-${tenantId}`],
+    {
+      revalidate: 60,
+      tags: [`tenant-cpq-costs-${tenantId}`],
     }
   )();
 };

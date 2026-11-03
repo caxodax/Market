@@ -1,4 +1,3 @@
-import { isSupabaseOffline } from "../circuit-breaker.ts";
 import { createServerComponentClient } from "../server.ts";
 
 export function isUuid(value: unknown): boolean {
@@ -20,10 +19,6 @@ export function generateUuid(): string {
 export { isLiveDatabaseConfigured } from "../mock-data.ts";
 
 export function getSupabase() {
-  if (isSupabaseOffline()) {
-    return null;
-  }
-
   try {
     return createServerComponentClient();
   } catch (e) {
@@ -31,4 +26,5 @@ export function getSupabase() {
   }
   return null;
 }
+
 

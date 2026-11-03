@@ -10,7 +10,7 @@
   },
   "scripts": {
     "check-types": "tsc --noEmit",
-    "test": "node --experimental-strip-types src/__tests__/order-persistence.test.ts"
+    "test": "node --env-file-if-exists=../../.env.local --experimental-strip-types src/__tests__/order-persistence.test.ts"
   },
   "dependencies": {
     "@marketos/types": "workspace:*",

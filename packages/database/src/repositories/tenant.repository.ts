@@ -60,31 +60,25 @@ export class TenantRepository {
           .or(`id.eq.${cleanSearch},slug.eq.${cleanSearch}`)
           .maybeSingle();
 
-        if (!error && data) {
+        if (error) {
+          throw error;
+        }
+
+        if (data) {
           return data as Tenant;
         }
 
-        // Check tenant_settings for custom_domain lookup if not found by id or slug
-        const { data: settingsData } = await supabase
-          .from("tenant_settings")
-          .select("tenant_id")
-          .eq("custom_domain", cleanSearch)
-          .maybeSingle();
-
-        if (settingsData?.tenant_id) {
-          const { data: tenantByDomain } = await supabase
-            .from("tenants")
-            .select("*")
-            .eq("id", settingsData.tenant_id)
-            .maybeSingle();
-
-          if (tenantByDomain) {
-            return tenantByDomain as Tenant;
-          }
+        if (isLiveDatabaseConfigured()) {
+          return null;
         }
       } catch (err) {
         console.warn("[MarketOS] getTenant Supabase lookup error:", err);
+        if (isLiveDatabaseConfigured()) {
+          throw err;
+        }
       }
+    } else if (isLiveDatabaseConfigured()) {
+      throw new Error("Supabase client is not available in live database mode");
     }
 
     const tenant = state.tenants.find(
@@ -110,7 +104,11 @@ export class TenantRepository {
           .eq("tenant_id", tenantId)
           .maybeSingle();
 
-        if (!error && data) {
+        if (error) {
+          throw error;
+        }
+
+        if (data) {
           let resolvedLogoUrl = data.logo_url;
           if (!resolvedLogoUrl) {
             const { data: tenantData } = await supabase
@@ -160,10 +158,17 @@ export class TenantRepository {
                 data.operational_settings?.currency_settings?.custom_rate_value,
             },
           };
+        } else if (isLiveDatabaseConfigured()) {
+          throw new Error(`Settings not found in database for tenant: ${tenantId}`);
         }
       } catch (err) {
         console.warn("[MarketOS] getTenantSettings Supabase lookup error:", err);
+        if (isLiveDatabaseConfigured()) {
+          throw err;
+        }
       }
+    } else if (isLiveDatabaseConfigured()) {
+      throw new Error("Supabase client is not available in live database mode");
     }
 
     const settings = state.settings.find((s) => s.tenant_id === tenantId);
@@ -1601,15 +1606,21 @@ export class TenantRepository {
           .select("*")
           .eq("tenant_id", tenantId);
 
-        if (!error && data && data.length > 0) {
-          return data as TenantModule[];
+        if (error) {
+          throw error;
         }
-        if (!error && Array.isArray(data) && isLiveDatabaseConfigured()) {
-          return [];
+
+        if (Array.isArray(data)) {
+          return data as TenantModule[];
         }
       } catch (err) {
         console.warn("[MarketOS] Could not fetch tenant modules from Supabase:", err);
+        if (isLiveDatabaseConfigured()) {
+          throw err;
+        }
       }
+    } else if (isLiveDatabaseConfigured()) {
+      throw new Error("Supabase client is not available in live database mode");
     }
 
     return (state.tenantModules || []).filter((m) => m.tenant_id === tenantId);

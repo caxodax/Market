@@ -1,5 +1,4 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { isSupabaseOffline, markSupabaseOffline, resetSupabaseCircuit } from "./circuit-breaker.ts";
 
 export const DEFAULT_SUPABASE_URL = "https://xiklunkmdpqzlhmrfkql.supabase.co";
 export const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_TFxsLCzYcvAAXM3yf65CuA_excYmDR7";
@@ -30,25 +29,14 @@ export function createServerComponentClient(cookieStore?: {
   return createServerClient(supabaseUrl, supabaseKey, {
     global: {
       fetch: async (input, init) => {
-        if (isSupabaseOffline()) {
-          throw new Error("Supabase is temporarily offline (Circuit Breaker active)");
-        }
-
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 20000);
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
 
         try {
-          const res = await fetch(input, {
+          return await fetch(input, {
             ...init,
             signal: init?.signal || controller.signal,
           });
-          if (res.ok) {
-            resetSupabaseCircuit();
-          }
-          return res;
-        } catch (err: any) {
-          markSupabaseOffline(err);
-          throw err;
         } finally {
           clearTimeout(timeoutId);
         }
