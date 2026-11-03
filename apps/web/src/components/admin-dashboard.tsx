@@ -25,6 +25,7 @@ import {
   TenantModuleId,
   RawMaterial,
   ProductRecipe,
+  ProductModifierGroup,
   FiscalDocument,
   CreateFiscalDocumentInput,
   PurchaseInvoice,
@@ -59,6 +60,9 @@ import {
   getRawMaterialsAction,
   getProductRecipesAction,
   getAuditLogsAction,
+  getProductModifierGroupsAction,
+  saveProductModifierGroupAction,
+  deleteProductModifierGroupAction,
 } from "../app/admin/actions";
 import {
   issueFiscalDocumentAction,
@@ -123,6 +127,10 @@ const RawMaterialsAdmin = dynamic(
 );
 const RecipeManagerAdmin = dynamic(
   () => import("@marketos/plugin-food-service").then((m) => m.RecipeManagerAdmin),
+  { loading: TabLoading }
+);
+const ModifiersAdmin = dynamic(
+  () => import("@marketos/plugin-food-service").then((m) => m.ModifiersAdmin),
   { loading: TabLoading }
 );
 const MtoCpqAdminPanel = dynamic(
@@ -259,6 +267,7 @@ interface AdminDashboardProps {
   activeModuleIds?: TenantModuleId[];
   initialRawMaterials?: RawMaterial[];
   initialRecipes?: ProductRecipe[];
+  initialModifierGroups?: ProductModifierGroup[];
   initialFiscalDocuments?: FiscalDocument[];
   initialPurchaseInvoices?: PurchaseInvoice[];
   initialRetentionVouchers?: RetentionVoucher[];
@@ -306,6 +315,7 @@ export function AdminDashboard({
   activeModuleIds = [],
   initialRawMaterials = [],
   initialRecipes = [],
+  initialModifierGroups = [],
   initialFiscalDocuments = [],
   initialPurchaseInvoices = [],
   initialRetentionVouchers = [],
@@ -326,6 +336,7 @@ export function AdminDashboard({
     | "STORES"
     | "RAW_MATERIALS"
     | "RECIPES"
+    | "MODIFIERS"
     | "PLUGINS"
     | "STOREFRONT_STUDIO"
     | "MTO_CPQ"
@@ -339,6 +350,7 @@ export function AdminDashboard({
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>(initialRawMaterials);
   const [recipes, setRecipes] = useState<ProductRecipe[]>(initialRecipes);
+  const [modifierGroups, setModifierGroups] = useState<ProductModifierGroup[]>(initialModifierGroups);
   const [orders, setOrders] = useState(initialOrders);
   const [payments, setPayments] = useState(initialPayments);
   const [rate, setRate] = useState(initialRate);
@@ -380,6 +392,9 @@ export function AdminDashboard({
         } else if (activeTab === "RECIPES" && recipes.length === 0) {
           const res = await getProductRecipesAction(tenantId);
           if (isMounted && res.success && res.recipes) setRecipes(res.recipes);
+        } else if (activeTab === "MODIFIERS" && modifierGroups.length === 0) {
+          const res = await getProductModifierGroupsAction(tenantId);
+          if (isMounted && res.success && res.modifierGroups) setModifierGroups(res.modifierGroups);
         } else if (activeTab === "INVOICING" && fiscalDocuments.length === 0) {
           const docs = await getFiscalDocumentsAction(tenantId);
           if (isMounted && Array.isArray(docs)) setFiscalDocuments(docs);
@@ -1089,6 +1104,66 @@ export function AdminDashboard({
     }
   };
 
+  const handleSaveModifierGroup = async (group: ProductModifierGroup) => {
+    try {
+      const res = await saveProductModifierGroupAction(group);
+      if (res.success && res.modifierGroup) {
+        setModifierGroups((prev) => {
+          const idx = prev.findIndex((g) => g.id === res.modifierGroup!.id);
+          if (idx !== -1) {
+            const next = [...prev];
+            next[idx] = res.modifierGroup!;
+            return next;
+          }
+          return [...prev, res.modifierGroup!];
+        });
+        showToast({
+          type: "success",
+          title: "Modificador Guardado",
+          message: "Grupo de extras, ingredientes y combos actualizado exitosamente.",
+        });
+      } else {
+        showToast({
+          type: "error",
+          title: "Error al guardar modificador",
+          message: res.error || "No se pudo guardar el grupo de modificadores.",
+        });
+      }
+    } catch (err: any) {
+      showToast({
+        type: "error",
+        title: "Error",
+        message: err.message || "Error inesperado al guardar modificador.",
+      });
+    }
+  };
+
+  const handleDeleteModifierGroup = async (groupId: string) => {
+    try {
+      const res = await deleteProductModifierGroupAction(settingsState.tenant_id, groupId);
+      if (res.success) {
+        setModifierGroups((prev) => prev.filter((g) => g.id !== groupId));
+        showToast({
+          type: "success",
+          title: "Modificador Eliminado",
+          message: "El grupo de modificadores ha sido eliminado.",
+        });
+      } else {
+        showToast({
+          type: "error",
+          title: "Error al eliminar",
+          message: res.error || "No se pudo eliminar el grupo de modificadores.",
+        });
+      }
+    } catch (err: any) {
+      showToast({
+        type: "error",
+        title: "Error",
+        message: err.message || "Error inesperado al eliminar modificador.",
+      });
+    }
+  };
+
   const pendingPaymentsCount = payments.filter((p) => p.status === "PENDING").length;
 
   type ModuleCategory = "OPERATIONS" | "CATALOG" | "FINANCE" | "MANAGEMENT";
@@ -1109,6 +1184,7 @@ export function AdminDashboard({
       | "STORES"
       | "RAW_MATERIALS"
       | "RECIPES"
+      | "MODIFIERS"
       | "PLUGINS"
       | "STOREFRONT_STUDIO"
       | "MTO_CPQ"
@@ -1208,6 +1284,17 @@ export function AdminDashboard({
             badge: "BOM",
             badgeClassName:
               "bg-orange-500/10 text-orange-600 border border-orange-500/20 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+          },
+          {
+            id: "MODIFIERS" as const,
+            category: "CATALOG" as const,
+            label: `Modificadores & Combos (${modifierGroups.length})`,
+            shortLabel: `Combos & Extras (${modifierGroups.length})`,
+            description: "Salsas, extras, ingredientes y up-selling",
+            icon: <Sparkles className="w-4 h-4 shrink-0" />,
+            badge: "Up-Selling",
+            badgeClassName:
+              "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
           },
         ]
       : []),
@@ -1428,6 +1515,7 @@ export function AdminDashboard({
     INVENTORY: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_INVENTORY"],
     RAW_MATERIALS: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_INVENTORY"],
     RECIPES: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_INVENTORY"],
+    MODIFIERS: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_INVENTORY"],
     MTO_CPQ: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_INVENTORY"],
     COUPONS: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER"],
 
@@ -2741,6 +2829,19 @@ export function AdminDashboard({
           />
         )}
 
+        {/* PLUGIN FOOD SERVICE: MODIFIERS, EXTRAS & UP-SELLING COMBOS */}
+        {activeTab === "MODIFIERS" && (
+          <ModifiersAdmin
+            tenantId={settings.tenant_id}
+            products={products}
+            categories={categories}
+            rawMaterials={rawMaterials}
+            modifierGroups={modifierGroups}
+            onSaveGroup={handleSaveModifierGroup}
+            onDeleteGroup={handleDeleteModifierGroup}
+          />
+        )}
+
         {/* PLUGIN MTO & CPQ: WORKSHOP & CUSTOM FABRICATION */}
         {activeTab === "MTO_CPQ" && (
           <MtoCpqAdminPanel
@@ -3282,13 +3383,23 @@ export function AdminDashboard({
                             Ir a Tasas & BCV →
                           </button>
                         ) : plugin.id === "food_service" ? (
-                          <button
-                            type="button"
-                            onClick={() => setActiveTab("RAW_MATERIALS")}
-                            className="text-xs font-bold text-amber-600 hover:underline cursor-pointer"
-                          >
-                            Ir a Insumos →
-                          </button>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab("MODIFIERS")}
+                              className="text-xs font-bold text-emerald-600 hover:underline cursor-pointer"
+                            >
+                              Combos & Extras →
+                            </button>
+                            <span className="text-muted-foreground text-xs">•</span>
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab("RAW_MATERIALS")}
+                              className="text-xs font-bold text-amber-600 hover:underline cursor-pointer"
+                            >
+                              Insumos →
+                            </button>
+                          </div>
                         ) : plugin.id === "mto_cpq" ? (
                           <button
                             type="button"

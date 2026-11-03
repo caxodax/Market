@@ -249,6 +249,7 @@ export class FoodServiceRepository {
         const { data, error } = await query;
         if (!error && data) {
           return (data as ProductModifierGroup[]).filter((g) => {
+            if (!productId && !categoryId) return true;
             if (g.product_id && productId && g.product_id === productId) return true;
             if (g.category_id && categoryId && g.category_id === categoryId) return true;
             if (!g.product_id && !g.category_id) return true;
@@ -264,6 +265,7 @@ export class FoodServiceRepository {
     return (state.modifierGroups || [])
       .filter((g) => g.tenant_id === tenantId && g.is_active)
       .filter((g) => {
+        if (!productId && !categoryId) return true;
         if (g.product_id && productId && g.product_id === productId) return true;
         if (g.category_id && categoryId && g.category_id === categoryId) return true;
         if (!g.product_id && !g.category_id) return true;
@@ -303,6 +305,35 @@ export class FoodServiceRepository {
       state.modifierGroups.push(group);
     }
     return group;
+  }
+
+  /**
+   * Delete a product modifier group
+   */
+  static async deleteProductModifierGroup(
+    tenantId: string,
+    id: string
+  ): Promise<boolean> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from("product_modifier_groups")
+          .delete()
+          .eq("id", id)
+          .eq("tenant_id", tenantId);
+        if (!error) return true;
+      } catch (err) {
+        console.warn("[MarketOS] Could not delete modifier group from Supabase:", err);
+      }
+    }
+
+    if (state.modifierGroups) {
+      state.modifierGroups = state.modifierGroups.filter(
+        (g) => !(g.id === id && g.tenant_id === tenantId)
+      );
+    }
+    return true;
   }
 
 /**

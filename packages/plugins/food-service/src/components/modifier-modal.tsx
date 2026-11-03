@@ -170,6 +170,11 @@ export function ModifierModal({
                           Obligatorio
                         </span>
                       )}
+                      {group.badge && (
+                        <span className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-1.5 py-0.2 rounded font-bold">
+                          {group.badge}
+                        </span>
+                      )}
                     </h4>
                     {group.description && (
                       <p className="text-[11px] text-muted-foreground">{group.description}</p>
@@ -212,7 +217,14 @@ export function ModifierModal({
                           >
                             {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                           </div>
-                          <span className="text-xs truncate">{option.name}</span>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-xs truncate">{option.name}</span>
+                            {option.badge && (
+                              <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
+                                {option.badge}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         {option.price_adjustment_usd > 0 && (
                           <span className="text-[11px] font-black shrink-0 text-amber-600 dark:text-amber-400">

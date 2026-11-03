@@ -102,6 +102,7 @@ export class MarketOSRepository {
   static saveProductRecipe = FoodServiceRepository.saveProductRecipe;
   static getProductModifierGroups = FoodServiceRepository.getProductModifierGroups;
   static saveProductModifierGroup = FoodServiceRepository.saveProductModifierGroup;
+  static deleteProductModifierGroup = FoodServiceRepository.deleteProductModifierGroup;
   static deductRecipeInventoryForOrder = FoodServiceRepository.deductRecipeInventoryForOrder;
   static restoreRecipeInventoryForOrder = FoodServiceRepository.restoreRecipeInventoryForOrder;
 

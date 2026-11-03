@@ -114,6 +114,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     coupons,
     rawMaterials,
     existingRecipes,
+    existingModifierGroups,
     fiscalDocuments,
     purchaseInvoices,
     retentionVouchers,
@@ -143,6 +144,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       : Promise.resolve([]),
     activeTab === "RECIPES"
       ? MarketOSRepository.getProductRecipes(targetTenantId)
+      : Promise.resolve([]),
+    activeTab === "MODIFIERS"
+      ? MarketOSRepository.getProductModifierGroups(targetTenantId)
       : Promise.resolve([]),
     activeTab === "INVOICING" || activeTab === "ACCOUNTING"
       ? InvoicingRepository.getFiscalDocuments(targetTenantId)
@@ -201,6 +205,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         activeModuleIds={activeModuleIds}
         initialRawMaterials={rawMaterials}
         initialRecipes={existingRecipes}
+        initialModifierGroups={existingModifierGroups}
         initialFiscalDocuments={fiscalDocuments}
         initialPurchaseInvoices={purchaseInvoices}
         initialRetentionVouchers={retentionVouchers}

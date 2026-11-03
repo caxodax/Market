@@ -5,7 +5,7 @@ import { Product } from "@marketos/types";
 import { formatCurrency, convertUsdToVes } from "@marketos/utils";
 import { useCart } from "../context/cart-context";
 import { useFavorites } from "../context/favorites-context";
-import { Plus, Minus, ShoppingCart, Heart, Sparkles } from "lucide-react";
+import { Plus, Minus, ShoppingCart, Heart, Sparkles, Eye } from "lucide-react";
 
 interface ProductCardProps {
   product: Product & { stock: number };
@@ -16,6 +16,7 @@ interface ProductCardProps {
   showVesPrice?: boolean;
   onOpenModifiers?: (product: Product) => void;
   onOpenCpq?: (product: Product & { stock: number }) => void;
+  onOpenQuickView?: (product: Product & { stock: number }) => void;
 }
 
 export function ProductCard({
@@ -27,6 +28,7 @@ export function ProductCard({
   showVesPrice = false,
   onOpenModifiers,
   onOpenCpq,
+  onOpenQuickView,
 }: ProductCardProps) {
   const { items, addItem, updateQuantity } = useCart();
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -39,7 +41,18 @@ export function ProductCard({
   const isOutOfStock = product.stock <= 0;
 
   return (
-    <div className="group relative flex flex-col rounded-2xl border border-border bg-card overflow-hidden shadow-xs hover:shadow-md transition-all duration-200">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpenQuickView?.(product)}
+      onKeyDown={(e) => {
+        if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onOpenQuickView?.(product);
+        }
+      }}
+      className="group relative flex flex-col rounded-2xl border border-border bg-card overflow-hidden shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary text-left"
+    >
       {/* Product Image */}
       <div className="relative aspect-square w-full overflow-hidden bg-muted/30">
         {product.image_url ? (
@@ -62,6 +75,14 @@ export function ProductCard({
             <ShoppingCart className="w-12 h-12 stroke-[1.2]" />
           </div>
         )}
+
+        {/* Desktop Quick View Hover Overlay */}
+        <div className="hidden sm:flex absolute inset-0 items-center justify-center bg-black/15 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+          <span className="px-3 py-1.5 rounded-full bg-background/90 text-foreground text-[11px] font-bold shadow-md backdrop-blur-xs flex items-center gap-1.5">
+            <Eye className="w-3.5 h-3.5" />
+            Vista rápida
+          </span>
+        </div>
 
         {/* Stock & Cart Badges */}
         <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 items-start">
@@ -123,7 +144,7 @@ export function ProductCard({
           </span>
         )}
 
-        <h3 className="mt-1 text-xs sm:text-sm font-bold text-foreground line-clamp-2 leading-snug">
+        <h3 className="mt-1 text-xs sm:text-sm font-bold text-foreground line-clamp-2 leading-snug group-hover:text-primary transition-colors">
           {product.name}
         </h3>
 
@@ -155,7 +176,8 @@ export function ProductCard({
             <div className="flex items-center justify-between min-h-[44px] h-11 px-1.5 rounded-xl bg-primary/10 border border-primary/30 text-primary shadow-sm">
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (typeof window !== "undefined" && "vibrate" in navigator) {
                     try { navigator.vibrate(10); } catch {}
                   }
@@ -179,7 +201,8 @@ export function ProductCard({
               <button
                 type="button"
                 disabled={!hasCpq && quantityInCart >= product.stock}
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (typeof window !== "undefined" && "vibrate" in navigator) {
                     try { navigator.vibrate(12); } catch {}
                   }
@@ -199,7 +222,8 @@ export function ProductCard({
             </div>
           ) : (
             <button
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 if (typeof window !== "undefined" && "vibrate" in navigator) {
                   try { navigator.vibrate(15); } catch {}
                 }

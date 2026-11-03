@@ -27,6 +27,7 @@ import {
 } from "@marketos/utils";
 import { useCart } from "../context/cart-context";
 import { ProductCard } from "./product-card";
+import { ProductQuickViewModal } from "./product-quickview-modal";
 import { CartDrawer } from "./cart-drawer";
 import { CheckoutDialog } from "./checkout-dialog";
 import { OrderSuccessModal } from "./order-success-modal";
@@ -138,6 +139,9 @@ export function CatalogView({
   // MTO / CPQ Plugin: Custom Product Configurator Modal State (Sublimation & Workshop)
   const [cpqProduct, setCpqProduct] = useState<(Product & { stock: number }) | null>(null);
 
+  // Core: Product Quick View / Zoom Modal State
+  const [quickViewProduct, setQuickViewProduct] = useState<(Product & { stock: number }) | null>(null);
+
   const isFoodServiceActive = activeModuleIds.includes("food_service");
   const isCpqActive = activeModuleIds.includes("mto_cpq");
   const isVenezuelaActive = activeModuleIds.includes("local_venezuela");
@@ -209,6 +213,41 @@ export function CatalogView({
       if (!g.product_id && !g.category_id) return true;
       return false;
     });
+  };
+
+  const isProductCpq = (prod: Product): boolean => {
+    if (!isCpqActive) return false;
+    const cat = categories.find((c) => c.id === prod.category_id);
+    const catName = (cat?.name || "").toLowerCase();
+    const prodName = prod.name.toLowerCase();
+
+    // Gran Formato & Make-to-Order require dimensional CPQ calculation.
+    // Standard retail products (escaneos, fotocopias, impresiones, tarjetas) use direct add-to-cart or modifiers.
+    const isLargeFormatOrDimensional =
+      catName.includes("gran formato") ||
+      catName.includes("vinil") ||
+      catName.includes("letrero") ||
+      catName.includes("lona") ||
+      catName.includes("banner") ||
+      prodName.includes("pendon") ||
+      prodName.includes("pendón") ||
+      prodName.includes("banner") ||
+      prodName.includes("lona") ||
+      prodName.includes("microperforado");
+
+    const matchesSpecificMatrix = Boolean(
+      cpqMatrices &&
+        cpqMatrices.length > 0 &&
+        cpqMatrices.some(
+          (m) =>
+            m.is_active &&
+            (m.name.toLowerCase().includes(prodName) ||
+              prodName.includes(m.name.toLowerCase()) ||
+              (catName && m.name.toLowerCase().includes(catName)))
+        )
+    );
+
+    return isLargeFormatOrDimensional || matchesSpecificMatrix;
   };
 
   // Multi-Category Filter State
@@ -1104,38 +1143,7 @@ export function CatalogView({
                     {paginatedProducts.map((product) => {
                       const mods = getProductModifierGroups(product);
                       const hasModifiers = mods.length > 0;
-
-                      const productCategory = categories.find((c) => c.id === product.category_id);
-                      const catName = (productCategory?.name || "").toLowerCase();
-                      const prodName = product.name.toLowerCase();
-
-                      // Ponytail / ECC: Gran Formato & Make-to-Order require dimensional CPQ calculation.
-                      // Standard retail products (escaneos, fotocopias, impresiones, tarjetas) use direct add-to-cart or modifiers.
-                      const isLargeFormatOrDimensional =
-                        catName.includes("gran formato") ||
-                        catName.includes("vinil") ||
-                        catName.includes("letrero") ||
-                        catName.includes("lona") ||
-                        catName.includes("banner") ||
-                        prodName.includes("pendon") ||
-                        prodName.includes("pendón") ||
-                        prodName.includes("banner") ||
-                        prodName.includes("lona") ||
-                        prodName.includes("microperforado");
-
-                      const matchesSpecificMatrix = Boolean(
-                        cpqMatrices &&
-                          cpqMatrices.length > 0 &&
-                          cpqMatrices.some(
-                            (m) =>
-                              m.is_active &&
-                              (m.name.toLowerCase().includes(prodName) ||
-                                prodName.includes(m.name.toLowerCase()) ||
-                                (catName && m.name.toLowerCase().includes(catName)))
-                          )
-                      );
-
-                      const hasCpq = Boolean(isCpqActive && (matchesSpecificMatrix || isLargeFormatOrDimensional));
+                      const hasCpq = isProductCpq(product);
                       return (
                         <ProductCard
                           key={product.id}
@@ -1147,6 +1155,7 @@ export function CatalogView({
                           hasCpq={hasCpq}
                           onOpenModifiers={(prod) => setCustomizingProduct(prod)}
                           onOpenCpq={(prod) => setCpqProduct(prod)}
+                          onOpenQuickView={(prod) => setQuickViewProduct(prod)}
                         />
                       );
                     })}
@@ -1647,6 +1656,29 @@ export function CatalogView({
           onConfirmAddToCart={(prod, qty, selectedMods, unitPrice) => {
             addItem(prod, qty, true, selectedMods, unitPrice, true);
             setCpqProduct(null);
+          }}
+        />
+      )}
+
+      {/* Core: Interactive Product Quick View / Zoom Modal */}
+      {quickViewProduct && (
+        <ProductQuickViewModal
+          isOpen={Boolean(quickViewProduct)}
+          onClose={() => setQuickViewProduct(null)}
+          product={quickViewProduct}
+          exchangeRate={effectiveRateInfo.effectiveRate}
+          baseCurrency={effectiveRateInfo.baseCurrency}
+          showVesPrice={isVenezuelaActive}
+          categoryName={categories.find((c) => c.id === quickViewProduct.category_id)?.name}
+          hasModifiers={getProductModifierGroups(quickViewProduct).length > 0}
+          hasCpq={isProductCpq(quickViewProduct)}
+          onOpenModifiers={(prod) => {
+            setQuickViewProduct(null);
+            setCustomizingProduct(prod);
+          }}
+          onOpenCpq={(prod) => {
+            setQuickViewProduct(null);
+            setCpqProduct(prod);
           }}
         />
       )}

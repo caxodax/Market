@@ -107,10 +107,12 @@ export interface ProductModifierOption {
   raw_material_unit?: RawMaterialUnit;
   is_default?: boolean;
   is_available?: boolean;
+  is_upsell?: boolean; // Identifica opciones de up-selling / combos
+  badge?: string | null; // Ej. "COMBO", "POPULAR", "PROMO"
 }
 
 /**
- * Grupo de Modificadores (ej. "Elige tus Salsas", "Toppings Adicionales")
+ * Grupo de Modificadores (ej. "Elige tus Salsas", "Toppings Adicionales", "Hazlo Combo")
  */
 export interface ProductModifierGroup {
   id: string;
@@ -125,6 +127,7 @@ export interface ProductModifierGroup {
   options: ProductModifierOption[];
   sort_order: number;
   is_active: boolean;
+  badge?: string | null;
 }
 
 /**

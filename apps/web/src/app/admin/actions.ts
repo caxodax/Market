@@ -1210,6 +1210,47 @@ export async function saveProductRecipeAction(recipe: import("@marketos/types").
   }
 }
 
+export async function getProductModifierGroupsAction(tenantId: string) {
+  try {
+    await assertAuthorizedTenantAdmin(tenantId);
+    const modifierGroups = await MarketOSRepository.getProductModifierGroups(tenantId);
+    return { success: true, modifierGroups };
+  } catch (error) {
+    console.error("Error fetching modifier groups:", error);
+    return { success: false, error: "Error al obtener modificadores y combos" };
+  }
+}
+
+export async function saveProductModifierGroupAction(group: import("@marketos/types").ProductModifierGroup) {
+  try {
+    await assertAuthorizedTenantAdmin(group.tenant_id);
+    const saved = await MarketOSRepository.saveProductModifierGroup(group);
+    revalidatePath("/admin");
+    return { success: true, modifierGroup: saved };
+  } catch (error) {
+    console.error("Error saving modifier group:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al guardar el grupo de modificadores",
+    };
+  }
+}
+
+export async function deleteProductModifierGroupAction(tenantId: string, id: string) {
+  try {
+    await assertAuthorizedTenantAdmin(tenantId);
+    const deleted = await MarketOSRepository.deleteProductModifierGroup(tenantId, id);
+    revalidatePath("/admin");
+    return { success: deleted };
+  } catch (error) {
+    console.error("Error deleting modifier group:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al eliminar grupo de modificadores",
+    };
+  }
+}
+
 /**
  * On-demand Admin Tab Getters (Lazy Loading for Performance & Minimal TTFB)
  */
