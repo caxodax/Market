@@ -908,6 +908,7 @@ export interface InviteStaffInput {
   fullName: string;
   role: UserRole;
   phone?: string;
+  password?: string;
 }
 
 export interface CreatePlatformUserInput {

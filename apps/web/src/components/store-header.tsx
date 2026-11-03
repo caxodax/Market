@@ -11,7 +11,6 @@ import {
   MapPin,
   TrendingUp,
   Package,
-  Award,
   ChevronDown,
   ShieldCheck,
   Heart,
@@ -173,17 +172,6 @@ export function StoreHeader({
             <span>Admin</span>
           </Link>
 
-          {/* Mis Puntos (desktop only) */}
-          {onOpenAccount && (
-            <button
-              onClick={onOpenAccount}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border text-foreground hover:bg-muted text-xs font-semibold transition-colors cursor-pointer"
-              title="Consultar puntos de fidelidad y compras"
-            >
-              <Award className="w-3.5 h-3.5 text-amber-500" />
-              <span>Mis Puntos</span>
-            </button>
-          )}
 
           {/* Rastrear Pedido (desktop only) */}
           {onOpenTracker && (
@@ -229,18 +217,7 @@ export function StoreHeader({
                       <span>Rastrear Pedido</span>
                     </button>
                   )}
-                  {onOpenAccount && (
-                    <button
-                      onClick={() => {
-                        setIsMobileMenuOpen(false);
-                        onOpenAccount();
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-foreground hover:bg-muted font-semibold transition-colors text-left cursor-pointer"
-                    >
-                      <Award className="w-4 h-4 text-amber-500" />
-                      <span>Mis Puntos y Compras</span>
-                    </button>
-                  )}
+
                   <button
                     onClick={() => {
                       setIsMobileMenuOpen(false);

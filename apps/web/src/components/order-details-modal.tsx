@@ -39,7 +39,6 @@ import {
   Hash,
 } from "lucide-react";
 import { registerPhysicalFiscalInvoiceAction } from "../app/actions";
-import { FintechPaymentModal } from "./fintech-payment-modal";
 
 interface OrderDetailsModalProps {
   order: Order | null;
@@ -126,7 +125,6 @@ export function OrderDetailsModal({
   const [selectedDriverId, setSelectedDriverId] = useState<string>(
     order?.driver_id || (drivers[0]?.id ?? "")
   );
-  const [isFintechModalOpen, setIsFintechModalOpen] = useState(false);
 
   if (!isOpen || !order) return null;
 
@@ -817,7 +815,7 @@ export function OrderDetailsModal({
         {/* Acciones de Operación y Transición de Estados */}
         <div className="pt-2 border-t border-border space-y-2.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            {/* Contactar por WhatsApp & Cobro Fintech */}
+            {/* Contactar por WhatsApp */}
             <div className="flex flex-wrap items-center gap-2">
               <a
                 href={whatsappLink}
@@ -828,15 +826,6 @@ export function OrderDetailsModal({
                 <MessageCircle className="w-4 h-4" />
                 <span>Enviar Estado por WhatsApp</span>
               </a>
-
-              <button
-                type="button"
-                onClick={() => setIsFintechModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 text-xs font-bold border border-primary/20 transition-all cursor-pointer shadow-xs active:scale-95"
-              >
-                <CreditCard className="w-4 h-4" />
-                <span>Cobro Digital / Cashea</span>
-              </button>
             </div>
 
             {/* Botones de flujo operativo */}
@@ -994,16 +983,6 @@ export function OrderDetailsModal({
         </div>
       )}
 
-      {/* Modal de Cobro Fintech / Cashea */}
-      {isFintechModalOpen && (
-        <FintechPaymentModal
-          isOpen={isFintechModalOpen}
-          onClose={() => setIsFintechModalOpen(false)}
-          order={order}
-          tenantId={order.tenant_id}
-          tenantName={settings.business_name || "Comercio"}
-        />
-      )}
     </>
   );
 }

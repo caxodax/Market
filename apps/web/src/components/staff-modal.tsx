@@ -12,6 +12,9 @@ import {
   Mail,
   User,
   Phone,
+  Key,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 interface StaffModalProps {
@@ -63,16 +66,33 @@ export function StaffModal({
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<UserRole>("TENANT_CASHIER");
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
+  const generateRandomPassword = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%";
+    let gen = "";
+    for (let i = 0; i < 10; i++) {
+      gen += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setPassword(gen);
+    setShowPassword(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim() || !email.trim()) {
       setErrorMsg("El nombre y correo electrónico son obligatorios");
+      return;
+    }
+
+    if (password && password.length < 6) {
+      setErrorMsg("La contraseña debe tener al menos 6 caracteres");
       return;
     }
 
@@ -86,6 +106,7 @@ export function StaffModal({
         email,
         phone: phone || undefined,
         role,
+        password: password.trim() || undefined,
       });
 
       if (!res.success || !res.profile) {
@@ -168,6 +189,45 @@ export function StaffModal({
                 className="w-full h-10 pl-8 pr-3 rounded-xl border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono"
               />
             </div>
+          </div>
+
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-foreground">
+                Contraseña de Acceso *
+              </label>
+              <button
+                type="button"
+                onClick={generateRandomPassword}
+                className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <Key className="w-3 h-3" />
+                <span>Generar Clave Segura</span>
+              </button>
+            </div>
+            <div className="relative">
+              <Key className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-3" />
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Mínimo 6 caracteres (ej. Colaborador2026*)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={6}
+                required
+                className="w-full h-10 pl-8 pr-10 rounded-xl border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                title={showPassword ? "Ocultar" : "Mostrar"}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              El colaborador usará este correo y contraseña para iniciar sesión en la tienda.
+            </p>
           </div>
 
           <div className="space-y-1">

@@ -2350,6 +2350,9 @@ export function SuperAdminDashboard({
                   >
                     <option value="Minimarket">Minimarket</option>
                     <option value="Bodegón">Bodegón</option>
+                    <option value="Restaurant">Restaurant</option>
+                    <option value="Sublimación">Sublimación</option>
+                    <option value="Tienda Virtual">Tienda Virtual</option>
                     <option value="Panadería">Panadería / Pastelería</option>
                     <option value="Farmacia">Farmacia</option>
                     <option value="Licorería">Licorería</option>

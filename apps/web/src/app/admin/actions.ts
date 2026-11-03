@@ -625,7 +625,7 @@ export async function revokeStaffMemberAction(
   try {
     const actor = await assertCanManageStaff(tenantId);
     const target = await MarketOSRepository.getUserProfile(profileId);
-    if (!target || target.tenant_id !== tenantId) {
+    if (!target || (target.tenant_id && target.tenant_id !== tenantId)) {
       throw new Error("El colaborador no pertenece a este comercio.");
     }
     if (target.role === "TENANT_OWNER") {
@@ -640,12 +640,51 @@ export async function revokeStaffMemberAction(
     }
     const deleted = await MarketOSRepository.deleteUserProfile(profileId);
     revalidatePath("/admin");
-    return { success: deleted };
+    return {
+      success: deleted,
+      error: deleted ? undefined : "No se pudo eliminar el registro en base de datos.",
+    };
   } catch (error) {
     console.error("Error revoking staff member:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Error al revocar acceso del colaborador",
+    };
+  }
+}
+
+export async function resetStaffPasswordAction(
+  tenantId: string,
+  profileId: string,
+  newPassword: string
+) {
+  try {
+    const actor = await assertCanManageStaff(tenantId);
+    if (!newPassword || newPassword.trim().length < 6) {
+      throw new Error("La contraseña debe tener al menos 6 caracteres.");
+    }
+    const target = await MarketOSRepository.getUserProfile(profileId);
+    if (!target || (target.tenant_id && target.tenant_id !== tenantId)) {
+      throw new Error("El colaborador no pertenece a este comercio.");
+    }
+    if (
+      target.role === "TENANT_OWNER" &&
+      actor.role !== "TENANT_OWNER" &&
+      actor.role !== "PLATFORM_SUPER_ADMIN"
+    ) {
+      throw new Error("Solo el Dueño del Comercio o Super Admin puede cambiar la clave del Dueño.");
+    }
+    const updated = await MarketOSRepository.resetStaffPassword(tenantId, profileId, newPassword.trim());
+    if (!updated) {
+      throw new Error("No se pudo actualizar la contraseña en el servicio de autenticación.");
+    }
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    console.error("Error resetting staff password:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al resetear contraseña",
     };
   }
 }

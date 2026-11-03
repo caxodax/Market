@@ -142,12 +142,27 @@ export class ProfileRepository {
    * Delete or revoke access for a user profile
    */
   static async deleteUserProfile(userId: string): Promise<boolean> {
+    let supabaseDeleted = false;
     const supabase = getSupabase();
     if (supabase) {
       try {
-        await supabase.from("profiles").delete().eq("id", userId);
+        const { error } = await supabase.from("profiles").delete().eq("id", userId);
+        if (error) {
+          console.error("[Supabase] Delete user profile error:", error);
+          if (isLiveDatabaseConfigured()) return false;
+        } else {
+          supabaseDeleted = true;
+        }
+
+        // Try deleting auth user if exists in Supabase Auth
+        try {
+          await supabase.auth.admin.deleteUser(userId);
+        } catch {
+          // Ignored if user only existed in profiles or wasn't an auth user
+        }
       } catch (e) {
         console.warn("[Supabase] Delete user profile error:", e);
+        if (isLiveDatabaseConfigured()) return false;
       }
     }
 
@@ -160,6 +175,10 @@ export class ProfileRepository {
       entity: "profiles",
       entityId: userId,
     });
+
+    if (isLiveDatabaseConfigured()) {
+      return supabaseDeleted;
+    }
 
     return state.profiles.length < initialLength;
   }
@@ -190,13 +209,118 @@ export class ProfileRepository {
   }
 
 /**
-   * Invite or assign a new staff member to a tenant
+   * Invite or assign a new staff member to a tenant (including Supabase Auth password creation)
    */
   static async inviteStaffMember(input: InviteStaffInput): Promise<UserProfile> {
+    const cleanEmail = input.email.toLowerCase().trim();
+    let authUserId: string | null = null;
+    const supabase = getSupabase();
+
+    if (supabase) {
+      // 1. If password provided, create or update user in Supabase Auth
+      if (input.password) {
+        try {
+          const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
+            email: cleanEmail,
+            password: input.password,
+            email_confirm: true,
+            user_metadata: {
+              full_name: input.fullName,
+              tenant_id: input.tenantId,
+              role: input.role,
+            },
+          });
+
+          if (authUser?.user?.id) {
+            authUserId = authUser.user.id;
+          } else if (authErr) {
+            console.warn("[Supabase] admin.createUser notice:", authErr.message);
+            // If user already exists in auth, try updating password and metadata
+            try {
+              const { data: listData } = await supabase.auth.admin.listUsers();
+              const existingUser = listData?.users?.find(
+                (u) => u.email?.toLowerCase() === cleanEmail
+              );
+              if (existingUser) {
+                authUserId = existingUser.id;
+                await supabase.auth.admin.updateUserById(existingUser.id, {
+                  password: input.password,
+                  user_metadata: {
+                    full_name: input.fullName,
+                    tenant_id: input.tenantId,
+                    role: input.role,
+                  },
+                });
+              }
+            } catch (listErr) {
+              console.warn("[Supabase] listUsers lookup failed:", listErr);
+            }
+          }
+        } catch (authException) {
+          console.warn("[Supabase] Auth createUser exception:", authException);
+        }
+      }
+
+      // 2. Insert or upsert into public.profiles
+      try {
+        const profilePayload: any = {
+          tenant_id: input.tenantId,
+          email: cleanEmail,
+          full_name: input.fullName,
+          phone: input.phone || null,
+          role: input.role,
+          updated_at: new Date().toISOString(),
+        };
+
+        if (authUserId) {
+          profilePayload.id = authUserId;
+        }
+
+        const { data, error } = await supabase
+          .from("profiles")
+          .upsert(profilePayload, { onConflict: "email" })
+          .select("*")
+          .maybeSingle();
+
+        if (!error && data) {
+          const persistedProfile = data as UserProfile;
+          // Synchronize in-memory state
+          state.profiles = state.profiles.filter(
+            (p) => p.email !== cleanEmail && p.id !== persistedProfile.id
+          );
+          state.profiles.push(persistedProfile);
+
+          await AuditRepository.recordAuditLog({
+            tenantId: input.tenantId,
+            action: "STAFF_INVITED",
+            entity: "profiles",
+            entityId: persistedProfile.id,
+            newData: {
+              email: persistedProfile.email,
+              role: persistedProfile.role,
+              name: persistedProfile.full_name,
+            },
+          });
+
+          return persistedProfile;
+        } else if (error) {
+          console.error("[Supabase] Insert/upsert profile error:", error);
+          if (isLiveDatabaseConfigured()) {
+            throw new Error(`Error en base de datos al asignar colaborador: ${error.message}`);
+          }
+        }
+      } catch (e) {
+        console.warn("[Supabase] Insert staff member fallback:", e);
+        if (isLiveDatabaseConfigured()) {
+          throw e;
+        }
+      }
+    }
+
     const newProfile: UserProfile = {
-      id: `usr-${Date.now()}`,
+      id: authUserId || `usr-${Date.now()}`,
       tenant_id: input.tenantId,
-      email: input.email.toLowerCase().trim(),
+      email: cleanEmail,
       full_name: input.fullName,
       phone: input.phone || null,
       avatar_url: null,
@@ -204,27 +328,6 @@ export class ProfileRepository {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-
-    const supabase = getSupabase();
-    if (supabase) {
-      try {
-        const { data } = await supabase
-          .from("profiles")
-          .insert({
-            tenant_id: input.tenantId,
-            email: newProfile.email,
-            full_name: newProfile.full_name,
-            phone: newProfile.phone,
-            role: newProfile.role,
-          })
-          .select("id")
-          .maybeSingle();
-
-        if (data) newProfile.id = data.id;
-      } catch (e) {
-        console.warn("[Supabase] Insert staff member fallback:", e);
-      }
-    }
 
     state.profiles.push(newProfile);
 
@@ -237,6 +340,93 @@ export class ProfileRepository {
     });
 
     return newProfile;
+  }
+
+  /**
+   * Reset or update password for a staff member / user profile
+   */
+  static async resetStaffPassword(
+    tenantId: string,
+    profileId: string,
+    newPassword: string
+  ): Promise<boolean> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data: profile, error: profErr } = await supabase
+          .from("profiles")
+          .select("id, email, tenant_id")
+          .eq("id", profileId)
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
+
+        if (profErr || !profile) {
+          console.warn("[Supabase] Reset password: profile not found in tenant:", profErr);
+          if (isLiveDatabaseConfigured()) return false;
+        }
+
+        // Try updating by profileId (if auth user id == profile id)
+        const { error: authErr } = await supabase.auth.admin.updateUserById(profileId, {
+          password: newPassword,
+        });
+
+        if (!authErr) {
+          await AuditRepository.recordAuditLog({
+            tenantId,
+            action: "PASSWORD_RESET",
+            entity: "profiles",
+            entityId: profileId,
+          });
+          return true;
+        }
+
+        // If not found by ID directly, try finding by email
+        if (profile?.email) {
+          const { data: listData } = await supabase.auth.admin.listUsers();
+          const targetAuthUser = listData?.users?.find(
+            (u) => u.email?.toLowerCase() === profile.email.toLowerCase()
+          );
+          if (targetAuthUser) {
+            const { error: updateErr } = await supabase.auth.admin.updateUserById(targetAuthUser.id, {
+              password: newPassword,
+            });
+            if (!updateErr) {
+              await AuditRepository.recordAuditLog({
+                tenantId,
+                action: "PASSWORD_RESET",
+                entity: "profiles",
+                entityId: profileId,
+              });
+              return true;
+            }
+          } else {
+            // User doesn't exist in auth.users yet, create auth user for them!
+            const { error: createErr } = await supabase.auth.admin.createUser({
+              email: profile.email,
+              password: newPassword,
+              email_confirm: true,
+              user_metadata: {
+                tenant_id: tenantId,
+              },
+            });
+            if (!createErr) {
+              await AuditRepository.recordAuditLog({
+                tenantId,
+                action: "PASSWORD_RESET",
+                entity: "profiles",
+                entityId: profileId,
+              });
+              return true;
+            }
+          }
+        }
+        return false;
+      } catch (e) {
+        console.error("[Supabase] Reset password exception:", e);
+        return false;
+      }
+    }
+    return true;
   }
 
 /**

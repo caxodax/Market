@@ -44,6 +44,7 @@ import {
   updateOrderStatusAction,
   updateStaffRoleAction,
   revokeStaffMemberAction,
+  resetStaffPasswordAction,
   getLatestOrdersAction,
   getLatestPaymentsAction,
   createStoreAction,
@@ -243,6 +244,8 @@ import {
   ReceiptText,
   ShoppingBag,
   BookOpen,
+  Key,
+  EyeOff,
 } from "lucide-react";
 
 interface AdminDashboardProps {
@@ -679,6 +682,54 @@ export function AdminDashboard({
       });
     } finally {
       setRevokingStaffId(null);
+    }
+  };
+
+  const [passwordModalStaff, setPasswordModalStaff] = useState<UserProfile | null>(null);
+  const [newStaffPassword, setNewStaffPassword] = useState("");
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordModalStaff || !newStaffPassword.trim()) return;
+    if (newStaffPassword.trim().length < 6) {
+      showToast({
+        type: "error",
+        title: "Contraseña muy corta",
+        message: "La contraseña debe tener al menos 6 caracteres.",
+      });
+      return;
+    }
+    setIsResettingPassword(true);
+    try {
+      const res = await resetStaffPasswordAction(
+        settings.tenant_id,
+        passwordModalStaff.id,
+        newStaffPassword.trim()
+      );
+      if (res.success) {
+        showToast({
+          type: "success",
+          title: "Contraseña Actualizada",
+          message: `Se ha actualizado la contraseña para ${passwordModalStaff.full_name}.`,
+        });
+        setPasswordModalStaff(null);
+        setNewStaffPassword("");
+      } else {
+        showToast({
+          type: "error",
+          title: "Error al cambiar contraseña",
+          message: res.error || "No se pudo actualizar la contraseña.",
+        });
+      }
+    } catch (err: any) {
+      showToast({
+        type: "error",
+        title: "Error inesperado",
+        message: err.message || "Error al procesar el cambio de contraseña.",
+      });
+    } finally {
+      setIsResettingPassword(false);
     }
   };
 
@@ -3111,13 +3162,43 @@ export function AdminDashboard({
                         <p className="text-[11px] text-muted-foreground/80">
                           {roleInfo.desc}
                         </p>
+
+                        {/* Visible module permissions */}
+                        <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                          <span className="text-[10px] font-semibold text-muted-foreground">Permisos:</span>
+                          {member.role === "TENANT_OWNER" || member.role === "PLATFORM_SUPER_ADMIN" ? (
+                            <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 font-bold border border-emerald-500/20">
+                              Control Total Irrestricto (100% de Módulos)
+                            </span>
+                          ) : member.role === "TENANT_MANAGER" ? (
+                            <span className="text-[10px] px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 font-bold border border-blue-500/20">
+                              Gestión Operativa (Pedidos, Catálogo, Despacho, Finanzas)
+                            </span>
+                          ) : member.role === "TENANT_CASHIER" ? (
+                            <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 font-bold border border-amber-500/20">
+                              4 Módulos: Validación Pagos, Pedidos, Tasas BCV, Facturación
+                            </span>
+                          ) : member.role === "TENANT_INVENTORY" ? (
+                            <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 font-bold border border-purple-500/20">
+                              5 Módulos: Catálogo, Stock, Materias Primas, Recetas, Modificadores
+                            </span>
+                          ) : member.role === "TENANT_DELIVERY" ? (
+                            <span className="text-[10px] px-2 py-0.5 rounded-md bg-orange-500/10 text-orange-600 font-bold border border-orange-500/20">
+                              2 Módulos: Rutas de Despacho y Pedidos
+                            </span>
+                          ) : (
+                            <span className="text-[10px] px-2 py-0.5 rounded-md bg-muted text-muted-foreground font-medium">
+                              Acceso Limitado
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-border">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap pt-3 md:pt-0 border-t md:border-t-0 border-border">
+                      <div className="flex items-center gap-1.5">
                         <label className="text-[11px] text-muted-foreground font-semibold">
-                          Cambiar Rol:
+                          Rol:
                         </label>
                         <select
                           value={member.role}
@@ -3132,7 +3213,7 @@ export function AdminDashboard({
                           onChange={(e) =>
                             handleRoleChange(member.id, e.target.value as UserRole)
                           }
-                          className="bg-muted border border-border text-foreground text-xs rounded-xl px-3 py-1.5 font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50 cursor-pointer"
+                          className="bg-muted border border-border text-foreground text-xs rounded-xl px-2.5 py-1.5 font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50 cursor-pointer"
                         >
                           {(currentUser?.role === "PLATFORM_SUPER_ADMIN" ||
                             currentUser?.role === "TENANT_OWNER") && (
@@ -3145,6 +3226,21 @@ export function AdminDashboard({
                         </select>
                       </div>
 
+                      {/* Cambiar Clave Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPasswordModalStaff(member);
+                          setNewStaffPassword("");
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl text-primary hover:bg-primary/10 border border-border hover:border-primary/20 transition-all cursor-pointer"
+                        title="Asignar o cambiar contraseña de acceso"
+                      >
+                        <Key className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Clave</span>
+                      </button>
+
+                      {/* Revocar Button */}
                       {member.id !== currentUser?.id && member.role !== "TENANT_OWNER" && (
                         <button
                           type="button"
@@ -3512,6 +3608,76 @@ export function AdminDashboard({
         onStaffAdded={handleStaffAdded}
         callerRole={currentUser?.role}
       />
+
+      {/* Password Reset Modal */}
+      {passwordModalStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="relative w-full max-w-sm rounded-2xl border border-border bg-card shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                  <Key className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-foreground">
+                    Cambiar Contraseña
+                  </h3>
+                  <p className="text-[10px] text-muted-foreground truncate max-w-[200px]">
+                    {passwordModalStaff.full_name} ({passwordModalStaff.email})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPasswordModalStaff(null)}
+                className="p-1 rounded-lg text-muted-foreground hover:bg-muted cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleResetPassword} className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold text-foreground">
+                  Nueva Contraseña *
+                </label>
+                <input
+                  type="password"
+                  placeholder="Mínimo 6 caracteres"
+                  value={newStaffPassword}
+                  onChange={(e) => setNewStaffPassword(e.target.value)}
+                  minLength={6}
+                  required
+                  autoFocus
+                  className="w-full h-10 px-3 rounded-xl border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Esta clave reemplazará inmediatamente la contraseña actual del colaborador.
+                </p>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setPasswordModalStaff(null)}
+                  disabled={isResettingPassword}
+                  className="px-3 py-1.5 rounded-xl border border-border text-foreground hover:bg-muted text-xs font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isResettingPassword || newStaffPassword.trim().length < 6}
+                  className="px-4 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  {isResettingPassword && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>Guardar Clave</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Order Details & Operational Modal */}
       <OrderDetailsModal

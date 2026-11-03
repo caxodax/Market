@@ -598,6 +598,15 @@ export interface IUserRepository {
    * Eliminar o revocar acceso de un usuario
    */
   deleteUserProfile(userId: string): Promise<boolean>;
+
+  /**
+   * Actualizar o resetear contraseña de un colaborador
+   */
+  resetStaffPassword(
+    tenantId: string,
+    profileId: string,
+    newPassword: string
+  ): Promise<boolean>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
