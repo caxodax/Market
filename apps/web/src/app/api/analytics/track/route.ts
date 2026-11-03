@@ -55,7 +55,9 @@ export async function POST(req: Request) {
     });
 
     if (error) {
-      console.warn("[Analytics API] Supabase insert warning:", error.message);
+      if (!error.message.includes("Could not find the table") && !error.message.includes("does not exist")) {
+        console.warn("[Analytics API] Supabase insert warning:", error.message);
+      }
       // Still return 200/success:false so frontend beacon does not throw
       return NextResponse.json({ success: false, warning: error.message }, { status: 200 });
     }

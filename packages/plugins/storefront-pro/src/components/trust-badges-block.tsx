@@ -44,16 +44,16 @@ export function TrustBadgesBlock({ config }: TrustBadgesBlockProps) {
           return (
             <div
               key={badge.id}
-              className="p-3 sm:p-4 rounded-2xl border border-border bg-card text-card-foreground shadow-sm flex items-center gap-3 transition-colors hover:border-primary/40"
+              className="p-3.5 sm:p-4 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group flex items-center gap-3.5 hover:border-primary/40"
             >
-              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                <IconComp className="w-5 h-5" />
+              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                <IconComp className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
-              <div className="min-w-0">
-                <h4 className="text-xs sm:text-sm font-extrabold text-foreground truncate">
+              <div className="min-w-0 flex-1">
+                <h4 className="text-xs sm:text-sm font-black text-foreground truncate">
                   {badge.title}
                 </h4>
-                <p className="text-[11px] text-muted-foreground line-clamp-1 font-medium">
+                <p className="text-[11px] sm:text-xs text-muted-foreground line-clamp-1 font-semibold mt-0.5">
                   {badge.description}
                 </p>
               </div>

@@ -34,6 +34,7 @@ export function PwaPushBanner({
   logoUrl,
   isPushEnabled = true,
 }: PwaPushBannerProps) {
+  const { totalItems } = useCart();
   const [mounted, setMounted] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
@@ -323,7 +324,6 @@ export function PwaPushBanner({
     }
   };
 
-  const { totalItems } = useCart();
   const displayLogo = logoUrl || "/brand/logo.png";
   const bottomOffsetClass = totalItems > 0 ? "bottom-20 sm:bottom-4" : "bottom-4";
 

@@ -126,31 +126,37 @@ export function StoreHeader({
       </div>
 
       {/* Main Nav */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
-        {/* Brand identity - Prioritized space in mobile without wrapping or cut-offs */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4">
+        {/* Brand identity - High visual impact & presence */}
+        <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
           {settings.logo_url && !logoError ? (
             <img
               src={settings.logo_url}
               alt={settings.business_name}
-              width={40}
-              height={40}
+              width={56}
+              height={56}
               loading="eager"
               decoding="sync"
               onError={() => setLogoError(true)}
-              className="h-9 w-9 sm:h-10 sm:w-10 object-contain rounded-xl bg-card border border-border p-0.5 shadow-xs shrink-0"
+              className="h-11 w-11 sm:h-13 sm:w-13 md:h-14 md:w-14 object-contain rounded-2xl bg-card border border-border/80 p-1 shadow-sm shrink-0 transition-transform hover:scale-105"
             />
           ) : (
-            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-black text-base sm:text-xl shadow-sm tracking-tighter shrink-0">
+            <div className="h-11 w-11 sm:h-13 sm:w-13 md:h-14 md:w-14 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground font-black text-lg sm:text-2xl shadow-sm tracking-tighter shrink-0">
               {settings.business_name ? settings.business_name.substring(0, 2).toUpperCase() : "SM"}
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <h1 className="font-black text-sm sm:text-base md:text-xl tracking-tight leading-tight text-foreground truncate block">
-              {settings.business_name}
-            </h1>
-            <p className="text-[10px] sm:text-xs text-muted-foreground font-medium truncate block">
-              {selectedStore?.name || settings.category || "Tienda Oficial"}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h1 className="font-black text-base sm:text-lg md:text-2xl tracking-tight leading-none text-foreground truncate block">
+                {settings.business_name}
+              </h1>
+              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] md:text-[11px] font-black uppercase tracking-wider">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Oficial
+              </span>
+            </div>
+            <p className="text-[11px] sm:text-xs text-muted-foreground font-semibold truncate block mt-0.5 sm:mt-1">
+              {selectedStore?.name ? `Sede ${selectedStore.name}` : settings.category || "Catálogo Digital & Despacho Directo"}
             </p>
           </div>
         </div>

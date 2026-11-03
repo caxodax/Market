@@ -63,6 +63,7 @@ import {
   MessageCircle,
   Zap,
   Store as StoreIcon,
+  TrendingUp,
 } from "lucide-react";
 
 interface CatalogViewProps {
@@ -88,22 +89,72 @@ interface CatalogViewProps {
 function getTrustBadgeIconComponent(icon: string) {
   switch (icon) {
     case "bcv":
-      return <Zap className="w-4 h-4" />;
+      return <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" />;
     case "truck":
-      return <Truck className="w-4 h-4" />;
+      return <Truck className="w-5 h-5 sm:w-6 sm:h-6" />;
     case "payment":
-      return <CreditCard className="w-4 h-4" />;
+      return <CreditCard className="w-5 h-5 sm:w-6 sm:h-6" />;
     case "quality":
-      return <ShieldCheck className="w-4 h-4" />;
+      return <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />;
     case "shield":
-      return <ShieldCheck className="w-4 h-4" />;
+      return <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />;
     case "clock":
-      return <Clock className="w-4 h-4" />;
+      return <Clock className="w-5 h-5 sm:w-6 sm:h-6" />;
     case "star":
-      return <Sparkles className="w-4 h-4" />;
+      return <Sparkles className="w-5 h-5 sm:w-6 sm:h-6" />;
     default:
-      return <ShieldCheck className="w-4 h-4" />;
+      return <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />;
   }
+}
+
+function getTrustBadgeVisuals(badge: StoreTrustBadgeItem, effectiveRate?: number) {
+  const id = (badge.id || "").toLowerCase();
+  const title = (badge.title || "").toLowerCase();
+  const icon = (badge.icon || "").toLowerCase();
+
+  if (icon === "bcv" || title.includes("bcv") || title.includes("tasa") || id.includes("bcv")) {
+    return {
+      icon: <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" />,
+      containerClass: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 group-hover:bg-emerald-500/25",
+      cardClass: "hover:border-emerald-500/40",
+      badgeValue: effectiveRate ? `Bs. ${effectiveRate.toFixed(2)}` : null,
+      badgeColor: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+    };
+  }
+  if (icon === "truck" || title.includes("delivery") || title.includes("envío") || title.includes("envio") || id.includes("delivery")) {
+    return {
+      icon: <Truck className="w-5 h-5 sm:w-6 sm:h-6" />,
+      containerClass: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25 group-hover:bg-blue-500/20",
+      cardClass: "hover:border-blue-500/40",
+      badgeValue: "Express",
+      badgeColor: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20",
+    };
+  }
+  if (icon === "payment" || title.includes("pago") || id.includes("payment")) {
+    return {
+      icon: <CreditCard className="w-5 h-5 sm:w-6 sm:h-6" />,
+      containerClass: "bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/25 group-hover:bg-purple-500/20",
+      cardClass: "hover:border-purple-500/40",
+      badgeValue: "Multi-Moneda",
+      badgeColor: "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20",
+    };
+  }
+  if (icon === "quality" || icon === "shield" || title.includes("frescura") || title.includes("garant") || title.includes("calidad")) {
+    return {
+      icon: <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />,
+      containerClass: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25 group-hover:bg-amber-500/25",
+      cardClass: "hover:border-amber-500/40",
+      badgeValue: "100% Real",
+      badgeColor: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20",
+    };
+  }
+  return {
+    icon: getTrustBadgeIconComponent(badge.icon),
+    containerClass: "bg-primary/15 text-primary border border-primary/25 group-hover:bg-primary/25",
+    cardClass: "hover:border-primary/40",
+    badgeValue: null,
+    badgeColor: "bg-primary/15 text-primary border-primary/20",
+  };
 }
 
 export function CatalogView({
@@ -845,7 +896,11 @@ export function CatalogView({
           </aside>
 
           {/* Center Column: Search, Banner, Catalog & Pagination */}
-          <main className="col-span-12 lg:col-span-6 xl:col-span-7 min-w-0">
+          <main
+            className={`col-span-12 ${
+              items.length > 0 ? "lg:col-span-6 xl:col-span-7" : "lg:col-span-9 xl:col-span-10"
+            } min-w-0 transition-all duration-300`}
+          >
             {/* Desktop Search Bar (Hidden on mobile because mobile uses the sticky bar) */}
             <div className="hidden lg:block mb-4 space-y-2">
               <div className="relative">
@@ -928,128 +983,65 @@ export function CatalogView({
               )}
             </div>
 
-            {/* Core Base Warm Hero Capsule & Native Trust Strip (When Storefront Pro is not active) */}
-            {!isStorefrontProActive && (opSettings?.show_hero_banner !== false || opSettings?.show_trust_strip !== false) && (
-              <div className="mb-4 sm:mb-6 space-y-3">
-                {/* Modern Brand Hero Capsule (Zero Hardcoding) */}
-                {opSettings?.show_hero_banner !== false && (
-                  <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-primary/15 via-background to-amber-500/10 border border-primary/20 relative overflow-hidden shadow-xs">
-                    {/* Subtle warm decorative glow */}
-                    <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+            {/* Active Coupon Chips Banner (Compact & Clean when available) */}
+            {isCouponsActive && opSettings?.show_coupon_badges !== false && coupons && coupons.filter((c) => c.is_active).length > 0 && (
+              <div className="mb-3 flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5 text-xs">
+                <span className="font-bold text-foreground text-[11px] shrink-0">Cupones activos:</span>
+                {coupons
+                  .filter((c) => c.is_active)
+                  .slice(0, 4)
+                  .map((coupon) => (
+                    <button
+                      key={coupon.id || coupon.code}
+                      type="button"
+                      onClick={() => {
+                        if (typeof navigator !== "undefined") navigator.clipboard?.writeText(coupon.code);
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-card border border-primary/30 text-primary font-mono text-[11px] font-black hover:bg-primary/5 active:scale-95 transition-all cursor-pointer shadow-xs shrink-0"
+                      title={`Toca para copiar cupón ${coupon.code}`}
+                    >
+                      <Tag className="w-3 h-3" />
+                      <span>
+                        {coupon.code} ({coupon.discount_type === "FIXED_USD" ? `$${coupon.discount_value} OFF` : `${coupon.discount_value}% OFF`})
+                      </span>
+                    </button>
+                  ))}
+              </div>
+            )}
 
-                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div className="space-y-2 max-w-xl">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black tracking-wide uppercase ${
-                              isStoreOpen
-                                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                                : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                            }`}
-                          >
-                            <span
-                              className={`w-2 h-2 rounded-full ${
-                                isStoreOpen ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
-                              }`}
-                            />
-                            <span>
-                              {!isStoreOpen
-                                ? (opSettings?.closed_message ? "Cerrado temporalmente" : "Cerrado hoy • Pedidos diferidos")
-                                : (opSettings?.hero_badge_text ||
-                                    (isDeliveryEnabled
-                                      ? "Abierto hoy • Delivery disponible"
-                                      : "Abierto hoy • Retiro en Sede"))}
-                            </span>
-                          </span>
-
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] sm:text-[11px] font-black uppercase">
-                            <Sparkles className="w-3 h-3" />
-                            <span>Catálogo Oficial</span>
-                          </span>
-                        </div>
-
-                        <h1 className="text-base sm:text-xl lg:text-2xl font-black text-foreground tracking-tight leading-tight">
-                          {settings.tenant_id !== "shop-market-ca" && settings.tenant_id !== "shop-market" && opSettings?.hero_title === "Shop Market"
-                            ? settings.business_name || "Catálogo Oficial"
-                            : opSettings?.hero_title || settings.business_name || "Catálogo Oficial"}
-                        </h1>
-                        <p className="text-xs sm:text-sm text-muted-foreground font-medium leading-relaxed">
-                          {opSettings?.hero_description ||
-                            (isDeliveryEnabled
-                              ? "Precios oficiales en Bolívares y Dólares al cambio del día. Productos frescos, variedad garantizada y despacho directo a tu dirección."
-                              : "Precios oficiales en Bolívares y Dólares al cambio del día. Calidad garantizada y retiro directo en sede comercial.")}
-                        </p>
-
-                        {/* Interactive Discount Coupon Chips (ONLY when module is active, enabled & coupons exist) */}
-                        {isCouponsActive && opSettings?.show_coupon_badges !== false && coupons && coupons.filter((c) => c.is_active).length > 0 && (
-                          <div className="pt-1 flex items-center gap-1.5 flex-wrap text-xs">
-                            <span className="font-bold text-foreground text-[11px]">Cupones activos:</span>
-                            {coupons
-                              .filter((c) => c.is_active)
-                              .slice(0, 3)
-                              .map((coupon) => (
-                                <button
-                                  key={coupon.id || coupon.code}
-                                  type="button"
-                                  onClick={() => {
-                                    if (typeof navigator !== "undefined") navigator.clipboard?.writeText(coupon.code);
-                                  }}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-card border border-primary/30 text-primary font-mono text-[11px] font-black hover:bg-primary/5 active:scale-95 transition-all cursor-pointer shadow-xs"
-                                  title={`Toca para copiar cupón ${coupon.code}`}
-                                >
-                                  <Tag className="w-3 h-3" />
-                                  <span>
-                                    {coupon.code} ({coupon.discount_type === "FIXED_USD" ? `$${coupon.discount_value} OFF` : `${coupon.discount_value}% OFF`})
-                                  </span>
-                                </button>
-                              ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Sede & Delivery Badge */}
-                      <div className="shrink-0 flex md:flex-col items-center md:items-end gap-2">
-                        <div className="flex items-center gap-2.5 bg-card/90 backdrop-blur-sm px-3.5 py-2.5 rounded-2xl border border-border shadow-xs">
-                          <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                            {isDeliveryEnabled ? <Truck className="w-4.5 h-4.5" /> : <StoreIcon className="w-4.5 h-4.5" />}
-                          </div>
-                          <div className="text-left md:text-right">
-                            <p className="text-xs font-black text-foreground leading-tight">
-                              {stores[0]?.name || settings.business_name || "Sede Principal"}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground font-semibold">
-                              {isDeliveryEnabled
-                                ? (deliveryZones && deliveryZones.length > 0
-                                    ? `${deliveryZones.length} zonas de reparto activas`
-                                    : "Despacho express a domicilio")
-                                : (isPickupEnabled ? "Retiro en sede disponible" : "Atención directa en tienda")}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Native Trust & Benefits Strip (Configurable via operational_settings.trust_badges) */}
-                {opSettings?.show_trust_strip !== false && (
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-                    {trustBadgesToRender.map((badge, idx) => (
+            {/* Native Trust & Benefits Strip (Bento Value Pillars - Swipeable on mobile, Grid on desktop) */}
+            {!isStorefrontProActive && opSettings?.show_trust_strip !== false && (
+              <div className="mb-4 sm:mb-6">
+                <div className="flex overflow-x-auto no-scrollbar sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5 pb-1 sm:pb-0 snap-x">
+                  {trustBadgesToRender.map((badge, idx) => {
+                    const visual = getTrustBadgeVisuals(badge, effectiveRateInfo?.effectiveRate);
+                    return (
                       <div
                         key={badge.id || idx}
-                        className="p-2.5 sm:p-3 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-xs flex items-center gap-2.5"
+                        className={`min-w-[240px] sm:min-w-0 shrink-0 snap-start p-3 sm:p-3.5 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group flex items-center gap-3 relative overflow-hidden ${visual.cardClass}`}
                       >
-                        <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                          {getTrustBadgeIconComponent(badge.icon)}
+                        <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs transition-transform duration-200 group-hover:scale-105 ${visual.containerClass}`}>
+                          {visual.icon}
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-black text-foreground truncate">{badge.title}</p>
-                          <p className="text-[10px] text-muted-foreground truncate font-medium">{badge.subtitle}</p>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="text-xs sm:text-sm font-black text-foreground tracking-tight truncate">
+                              {badge.title}
+                            </p>
+                            {visual.badgeValue && (
+                              <span className={`text-[10px] sm:text-[11px] font-mono font-bold px-1.5 py-0.5 rounded-md border ${visual.badgeColor}`}>
+                                {visual.badgeValue}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] sm:text-xs text-muted-foreground font-semibold truncate mt-0.5">
+                            {badge.subtitle}
+                          </p>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    );
+                  })}
+                </div>
               </div>
             )}
 
@@ -1139,7 +1131,13 @@ export function CatalogView({
                 )
               ) : (
                 <>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2.5 sm:gap-4">
+                  <div
+                    className={`grid gap-2.5 sm:gap-4 ${
+                      items.length > 0
+                        ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
+                        : "grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+                    }`}
+                  >
                     {paginatedProducts.map((product) => {
                       const mods = getProductModifierGroups(product);
                       const hasModifiers = mods.length > 0;
@@ -1248,11 +1246,12 @@ export function CatalogView({
             </div>
           </main>
 
-          {/* Right Column: Sticky Side Cart (Desktop Only) */}
-          <aside
-            id="desktop-side-cart"
-            className="hidden lg:flex lg:col-span-3 xl:col-span-3 sticky top-[100px] max-h-[calc(100vh-7.5rem)] rounded-2xl border border-border bg-card shadow-xs flex-col overflow-hidden transition-all duration-300"
-          >
+          {/* Right Column: Sticky Side Cart (Desktop Only - Appears when customer adds items) */}
+          {items.length > 0 && (
+            <aside
+              id="desktop-side-cart"
+              className="hidden lg:flex lg:col-span-3 xl:col-span-3 sticky top-[100px] max-h-[calc(100vh-7.5rem)] rounded-2xl border border-border bg-card shadow-xs flex-col overflow-hidden transition-all duration-300 animate-in fade-in slide-in-from-right-4"
+            >
             {/* Header */}
             <div className="flex items-center justify-between p-3.5 border-b border-border bg-muted/20">
               <div className="flex items-center gap-2">
@@ -1443,6 +1442,7 @@ export function CatalogView({
               </div>
             )}
           </aside>
+          )}
         </div>
       </div>
 
