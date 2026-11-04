@@ -99,6 +99,7 @@ export interface StoreOperationalSettings {
   trust_badges?: StoreTrustBadgeItem[];
   show_faq_section?: boolean;
   faq_items?: StoreFaqItem[];
+  staff_permissions?: Record<string, string[]>; // map profileId or email -> allowed module IDs
 }
 
 export type FiscalBillingMode = "TICKET_ONLY" | "DIGITAL_INVOICE" | "MANUAL_INVOICE";
@@ -238,6 +239,209 @@ export type UserRole =
   | "TENANT_DELIVERY"
   | "CUSTOMER";
 
+export interface StaffModulePermissionDefinition {
+  id: string;
+  label: string;
+  category: "OPERATIONS" | "CATALOG" | "FINANCE" | "MANAGEMENT";
+  categoryLabel: string;
+  description: string;
+}
+
+export const STAFF_PERMISSIBLE_MODULES: StaffModulePermissionDefinition[] = [
+  // 1. Operaciones
+  {
+    id: "PAYMENTS",
+    label: "Validación de Pagos",
+    category: "OPERATIONS",
+    categoryLabel: "Operaciones",
+    description: "Comprobantes de Pago Móvil, Zelle y transferencias",
+  },
+  {
+    id: "ORDERS",
+    label: "Gestión de Pedidos",
+    category: "OPERATIONS",
+    categoryLabel: "Operaciones",
+    description: "Estados, rutas de despacho y contacto WhatsApp",
+  },
+  {
+    id: "DELIVERY",
+    label: "Delivery y Despacho",
+    category: "OPERATIONS",
+    categoryLabel: "Operaciones",
+    description: "Zonas de cobertura, tarifas y motorizados",
+  },
+
+  // 2. Catálogo & Marketing
+  {
+    id: "INVENTORY",
+    label: "Inventario de Productos",
+    category: "CATALOG",
+    categoryLabel: "Catálogo",
+    description: "Productos, precios, categorías y existencias",
+  },
+  {
+    id: "RAW_MATERIALS",
+    label: "Insumos de Cocina",
+    category: "CATALOG",
+    categoryLabel: "Catálogo",
+    description: "Carnes, panes, salsas y materia prima",
+  },
+  {
+    id: "RECIPES",
+    label: "Recetas & Escandallo",
+    category: "CATALOG",
+    categoryLabel: "Catálogo",
+    description: "Fichas técnicas, costo unitario y margen bruto",
+  },
+  {
+    id: "MODIFIERS",
+    label: "Modificadores & Combos",
+    category: "CATALOG",
+    categoryLabel: "Catálogo",
+    description: "Salsas, extras, ingredientes y up-selling",
+  },
+  {
+    id: "MTO_CPQ",
+    label: "Cotizador Taller MTO",
+    category: "CATALOG",
+    categoryLabel: "Catálogo",
+    description: "Matrices por m²/lineal y costeo CPQ",
+  },
+  {
+    id: "COUPONS",
+    label: "Cupones de Descuento",
+    category: "CATALOG",
+    categoryLabel: "Catálogo",
+    description: "Descuentos en $ o % y promociones",
+  },
+  {
+    id: "PUSH",
+    label: "Notificaciones Push",
+    category: "CATALOG",
+    categoryLabel: "Catálogo",
+    description: "Difusiones Web Push a clientes móviles",
+  },
+  {
+    id: "STOREFRONT_STUDIO",
+    label: "Vitrina Visual Pro",
+    category: "CATALOG",
+    categoryLabel: "Catálogo",
+    description: "Banners, sliders y maquetador de vitrina",
+  },
+
+  // 3. Finanzas
+  {
+    id: "REPORTS",
+    label: "Reportes & Ventas",
+    category: "FINANCE",
+    categoryLabel: "Finanzas",
+    description: "Ingresos en $ y Bs, métodos y top ventas",
+  },
+  {
+    id: "RATES",
+    label: "Tasas y Divisas (BCV)",
+    category: "FINANCE",
+    categoryLabel: "Finanzas",
+    description: "Monitor oficial BCV e histórico de tasas",
+  },
+  {
+    id: "INVOICING",
+    label: "Facturación & Guías",
+    category: "FINANCE",
+    categoryLabel: "Finanzas",
+    description: "Facturas fiscales, notas y guías de despacho",
+  },
+  {
+    id: "PURCHASING",
+    label: "Compras & Proveedores",
+    category: "FINANCE",
+    categoryLabel: "Finanzas",
+    description: "Facturas de proveedores y retención SPE",
+  },
+  {
+    id: "ACCOUNTING",
+    label: "Contabilidad & Libros",
+    category: "FINANCE",
+    categoryLabel: "Finanzas",
+    description: "Plan de cuentas NIIF y balance de sumas",
+  },
+
+  // 4. Administración
+  {
+    id: "STORES",
+    label: "Sucursales",
+    category: "MANAGEMENT",
+    categoryLabel: "Administración",
+    description: "Sedes físicas y puntos de despacho",
+  },
+  {
+    id: "STAFF",
+    label: "Equipo y Roles",
+    category: "MANAGEMENT",
+    categoryLabel: "Administración",
+    description: "Colaboradores y permisos de acceso",
+  },
+  {
+    id: "AUDIT",
+    label: "Auditoría & Logs",
+    category: "MANAGEMENT",
+    categoryLabel: "Administración",
+    description: "Registro cronológico inmutable de acciones",
+  },
+  {
+    id: "SETTINGS",
+    label: "Configuración & Marca",
+    category: "MANAGEMENT",
+    categoryLabel: "Administración",
+    description: "Datos fiscales, pagos, redes y apariencia",
+  },
+  {
+    id: "PLUGINS",
+    label: "Módulos & Plugins",
+    category: "MANAGEMENT",
+    categoryLabel: "Administración",
+    description: "Extensiones y capacidades activas",
+  },
+];
+
+export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, string[]> = {
+  PLATFORM_SUPER_ADMIN: STAFF_PERMISSIBLE_MODULES.map((m) => m.id),
+  TENANT_OWNER: STAFF_PERMISSIBLE_MODULES.map((m) => m.id),
+  TENANT_MANAGER: [
+    "PAYMENTS",
+    "ORDERS",
+    "DELIVERY",
+    "INVENTORY",
+    "RAW_MATERIALS",
+    "RECIPES",
+    "MODIFIERS",
+    "MTO_CPQ",
+    "COUPONS",
+    "PUSH",
+    "STOREFRONT_STUDIO",
+    "REPORTS",
+    "RATES",
+    "INVOICING",
+    "PURCHASING",
+    "ACCOUNTING",
+    "STORES",
+    "STAFF",
+    "AUDIT",
+  ],
+  TENANT_CASHIER: ["PAYMENTS", "ORDERS", "RATES", "INVOICING"],
+  TENANT_INVENTORY: [
+    "ORDERS",
+    "INVENTORY",
+    "RAW_MATERIALS",
+    "RECIPES",
+    "MODIFIERS",
+    "MTO_CPQ",
+    "PURCHASING",
+  ],
+  TENANT_DELIVERY: ["ORDERS", "DELIVERY"],
+  CUSTOMER: [],
+};
+
 export interface ImpersonationSession {
   originalSuperAdmin: {
     id: string;
@@ -259,6 +463,7 @@ export interface UserProfile {
   phone: string | null;
   avatar_url: string | null;
   role: UserRole;
+  custom_permissions?: string[] | null;
   created_at: string;
   updated_at: string;
   impersonation?: ImpersonationSession | null;
@@ -441,6 +646,7 @@ export interface Product {
   image_url: string | null;
   price_usd: number;
   is_active: boolean;
+  is_test?: boolean; // 🧪 Marca de producto Sandbox / Modo Prueba
   is_tax_exempt?: boolean; // Exento de IVA (Art. 18 Ley del IVA - Alimentos básicos / Medicinas)
   external_product_id?: string | null;
   created_at: string;
@@ -516,6 +722,7 @@ export interface Order {
   total_secondary?: number;
   exchange_rate_applied: number;
   notes?: string | null;
+  is_test?: boolean; // 🧪 Marca de orden Sandbox / Modo Prueba
   created_at: string;
   updated_at: string;
   // Enriched fields for operational visibility and reports
@@ -875,6 +1082,7 @@ export interface CreateProductInput {
   imageUrl?: string;
   initialStock?: number;
   isTaxExempt?: boolean; // Exento de IVA (Art. 18 Ley del IVA)
+  isTest?: boolean; // 🧪 Si true, producto visible únicamente en local (Sandbox)
   storeId?: string;
   actorId?: string | null;
   actorName?: string | null;
@@ -909,6 +1117,7 @@ export interface InviteStaffInput {
   role: UserRole;
   phone?: string;
   password?: string;
+  customPermissions?: string[];
 }
 
 export interface CreatePlatformUserInput {

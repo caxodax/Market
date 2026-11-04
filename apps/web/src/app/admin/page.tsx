@@ -104,6 +104,20 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     MarketOSRepository.getCategories(targetTenantId),
   ]);
 
+  // Synchronize live granular permissions without requiring re-login
+  if (
+    currentUser &&
+    currentUser.role !== "PLATFORM_SUPER_ADMIN" &&
+    currentUser.role !== "TENANT_OWNER" &&
+    settings?.operational_settings?.staff_permissions
+  ) {
+    const permissionsMap = settings.operational_settings.staff_permissions;
+    const perms = permissionsMap[currentUser.id] || permissionsMap[currentUser.email.toLowerCase()];
+    if (perms) {
+      currentUser.custom_permissions = perms;
+    }
+  }
+
   // Secondary tab data: fetched on server ONLY if explicitly requested by URL ?tab=..., otherwise deferred
   const [
     deliveryZones,

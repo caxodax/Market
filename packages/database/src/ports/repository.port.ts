@@ -113,6 +113,7 @@ export interface CreateOrderInput {
   cashTenderedUsd?: number;
   changeRequiredUsd?: number;
   idempotencyKey?: string;
+  isTest?: boolean; // 🧪 Si true, orden Sandbox visible únicamente en local
 }
 
 export interface SubmitPaymentInput {
@@ -606,6 +607,15 @@ export interface IUserRepository {
     tenantId: string,
     profileId: string,
     newPassword: string
+  ): Promise<boolean>;
+
+  /**
+   * Actualizar permisos granulares de módulos de un colaborador
+   */
+  updateStaffPermissions(
+    tenantId: string,
+    profileId: string,
+    permissions: string[]
   ): Promise<boolean>;
 }
 

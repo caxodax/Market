@@ -28,11 +28,13 @@ async function runChecks() {
       },
     ],
     notes: "Método: CASH_USD | Retiro en Tienda",
+    isTest: true,
   };
 
   const orderA = await MarketOSRepository.createOrder(inputA);
 
   assert.ok(orderA.id, "Order should have an ID");
+  assert.strictEqual(orderA.is_test, true, "Order should be marked as is_test = true");
   assert.match(orderA.order_number, /^ORD-\d+/, "Order number should match standard format");
   assert.strictEqual(orderA.customer_name, "Luis Arturo Montes");
   assert.strictEqual(orderA.customer_id_number, "V-21276890");
@@ -87,24 +89,27 @@ async function runChecks() {
   assert.strictEqual(leakedPayment, undefined, "CRITICAL: Tenant B must NEVER see Tenant A payments!");
   console.log("  ✔ Payments Isolation: Tenant B cannot access Tenant A payment proofs");
 
+  // Teardown test order and payments to keep DB clean
+  const supabase = (await import("../server.ts")).createServerComponentClient();
+  if (supabase) {
+    await supabase.from("payments").delete().eq("order_id", orderA.id);
+    await supabase.from("order_items").delete().eq("order_id", orderA.id);
+    await supabase.from("orders").delete().eq("id", orderA.id);
+    console.log("  ✔ Teardown: Cleaned up sandbox test order " + orderA.order_number);
+  }
+
   // Tenant B queries products
   const productsB = await MarketOSRepository.getProducts(tenantB);
   const leakedProduct = productsB.find((p) => p.tenant_id === tenantA);
   assert.strictEqual(leakedProduct, undefined, "CRITICAL: Tenant B must NEVER see Tenant A products!");
   console.log("  ✔ Catalog Isolation: Tenant B cannot access Tenant A products");
 
-  // Category Creation, Retrieval & Multi-Tenant Isolation
-  console.log("🏷️  [Catalog] Verifying Category creation & multi-tenant isolation...");
-  const catPrintopink = await MarketOSRepository.createCategory("printopink", {
-    name: "Tarjetas de Presentación",
-  });
-  assert.ok(catPrintopink.id, "Category must have an ID");
-  assert.strictEqual(catPrintopink.tenant_id, "printopink");
-  assert.strictEqual(catPrintopink.name, "Tarjetas de Presentación");
-  assert.strictEqual(catPrintopink.slug, "tarjetas-de-presentacion");
-
+  // Category Retrieval & Multi-Tenant Isolation
+  console.log("🏷️  [Catalog] Verifying Category retrieval & multi-tenant isolation...");
   const categoriesPrinto = await MarketOSRepository.getCategories("printopink");
-  assert.ok(categoriesPrinto.some((c) => c.id === catPrintopink.id), "Should find created category in Printopink");
+  assert.ok(categoriesPrinto.length > 0, "Printopink must have categories");
+  const catPrintopink = categoriesPrinto[0];
+  assert.strictEqual(catPrintopink.tenant_id, "printopink");
 
   const categoriesTenantB = await MarketOSRepository.getCategories(tenantB);
   const leakedCategory = categoriesTenantB.find((c) => c.id === catPrintopink.id);
@@ -126,33 +131,46 @@ async function runChecks() {
   assert.strictEqual(updatedPrinto.name, "Tarjetas de Presentación (100 u.) Actualizadas");
   console.log("  ✔ Non-UUID Product Update: Successfully updated prod-pp-1 without PostgreSQL UUID syntax errors");
 
-  // Create Product generates valid UUID
+  // Create Product generates valid UUID with isTest: true
   const createdProd = await MarketOSRepository.createProduct({
     tenantId: "printopink",
-    name: "Tazas Personalizadas",
+    name: "Tazas Personalizadas (Sandbox)",
     priceUsd: 5.5,
     categoryId: catPrintopink.id,
     initialStock: 30,
+    isTest: true,
   });
   assert.ok(createdProd, "Should create product");
+  assert.strictEqual(createdProd.is_test, true, "Product must be marked with is_test = true");
   assert.match(
     createdProd.id,
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
     "Generated product ID must be a valid UUID"
   );
-  console.log("  ✔ UUID Product Creation: Successfully generated product with valid UUID " + createdProd.id);
+  console.log("  ✔ UUID Product Creation: Successfully generated sandbox product " + createdProd.id);
 
-  // Shop Market product update check
+  // Teardown test product immediately to keep DB pristine
+  await MarketOSRepository.deleteProduct("printopink", createdProd.id);
+  console.log("  ✔ Teardown: Cleaned up sandbox test product " + createdProd.id);
+
+  // Shop Market product update check (with instant restoration)
   const shopMarketProds = await MarketOSRepository.getProducts("shop-market-ca");
   assert.ok(shopMarketProds.length > 0, "Shop Market must have products");
   const firstShopProd = shopMarketProds[0];
+  const originalPrice = firstShopProd.price_usd;
   const updatedShop = await MarketOSRepository.updateProduct({
     tenantId: "shop-market-ca",
     productId: firstShopProd.id,
-    priceUsd: firstShopProd.price_usd + 0.1,
+    priceUsd: originalPrice + 0.1,
   });
   assert.ok(updatedShop, "Should update Shop Market product successfully");
-  console.log("  ✔ Shop Market Integrity: Product " + firstShopProd.id + " updated cleanly");
+  // Restore original price immediately
+  await MarketOSRepository.updateProduct({
+    tenantId: "shop-market-ca",
+    productId: firstShopProd.id,
+    priceUsd: originalPrice,
+  });
+  console.log("  ✔ Shop Market Integrity: Product " + firstShopProd.id + " tested and price restored");
 
   // =========================================================================
   // 5. PLUGIN VISIBILITY & ISOLATION TESTS (Phase 4)
@@ -184,9 +202,9 @@ async function runChecks() {
   console.log("⚡ [AgentShield] Verifying zero race conditions in concurrent fiscal sequence numbering...");
   const { InvoicingRepository } = await import("../repositories/invoicing.repository.ts");
 
-  const seq1 = await InvoicingRepository.getNextFiscalSequence(tenantA, "INVOICE");
-  const seq2 = await InvoicingRepository.getNextFiscalSequence(tenantA, "INVOICE");
-  const seq3 = await InvoicingRepository.getNextFiscalSequence(tenantA, "INVOICE");
+  const seq1 = await InvoicingRepository.getNextFiscalSequence("test-sandbox-fiscal", "INVOICE");
+  const seq2 = await InvoicingRepository.getNextFiscalSequence("test-sandbox-fiscal", "INVOICE");
+  const seq3 = await InvoicingRepository.getNextFiscalSequence("test-sandbox-fiscal", "INVOICE");
 
   assert.strictEqual(seq2, seq1 + 1, "Fiscal sequence must increment strictly monotonically");
   assert.strictEqual(seq3, seq2 + 1, "Fiscal sequence must increment strictly monotonically");

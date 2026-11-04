@@ -167,6 +167,9 @@ const ProductModal = dynamic(
 const StaffModal = dynamic(
   () => import("./staff-modal").then((m) => m.StaffModal)
 );
+const StaffPermissionsModal = dynamic(
+  () => import("./staff-permissions-modal").then((m) => m.StaffPermissionsModal)
+);
 const OrderDetailsModal = dynamic(
   () => import("./order-details-modal").then((m) => m.OrderDetailsModal)
 );
@@ -203,6 +206,7 @@ import {
   Volume2,
   VolumeX,
   MessageCircle,
+  Shield,
   ShieldCheck,
   ShieldAlert,
   Users,
@@ -686,6 +690,7 @@ export function AdminDashboard({
   };
 
   const [passwordModalStaff, setPasswordModalStaff] = useState<UserProfile | null>(null);
+  const [permissionsModalStaff, setPermissionsModalStaff] = useState<UserProfile | null>(null);
   const [newStaffPassword, setNewStaffPassword] = useState("");
   const [isResettingPassword, setIsResettingPassword] = useState(false);
 
@@ -1593,6 +1598,10 @@ export function AdminDashboard({
 
   const modulesList: ModuleItem[] = rawModulesList.filter((m) => {
     if (isSuperAdminOrImpersonating) return true;
+    // Granular module access: if custom_permissions are defined for this collaborator
+    if (currentUser?.custom_permissions && currentUser.custom_permissions.length > 0) {
+      return currentUser.custom_permissions.includes(m.id);
+    }
     const allowed = MODULE_ROLE_PERMISSIONS[m.id];
     return !allowed || allowed.includes(userRole);
   });
@@ -3166,7 +3175,12 @@ export function AdminDashboard({
                         {/* Visible module permissions */}
                         <div className="flex items-center gap-1.5 flex-wrap pt-1">
                           <span className="text-[10px] font-semibold text-muted-foreground">Permisos:</span>
-                          {member.role === "TENANT_OWNER" || member.role === "PLATFORM_SUPER_ADMIN" ? (
+                          {member.custom_permissions && member.custom_permissions.length > 0 ? (
+                            <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20 flex items-center gap-1">
+                              <Shield className="w-3 h-3" />
+                              <span>Personalizado ({member.custom_permissions.length} módulos habilitados)</span>
+                            </span>
+                          ) : member.role === "TENANT_OWNER" || member.role === "PLATFORM_SUPER_ADMIN" ? (
                             <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 font-bold border border-emerald-500/20">
                               Control Total Irrestricto (100% de Módulos)
                             </span>
@@ -3238,6 +3252,17 @@ export function AdminDashboard({
                       >
                         <Key className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">Clave</span>
+                      </button>
+
+                      {/* Permisos Granulares Button */}
+                      <button
+                        type="button"
+                        onClick={() => setPermissionsModalStaff(member)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 border border-border hover:border-emerald-500/20 transition-all cursor-pointer"
+                        title="Personalizar accesos y módulos de este colaborador"
+                      >
+                        <Shield className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Permisos</span>
                       </button>
 
                       {/* Revocar Button */}
@@ -3607,6 +3632,30 @@ export function AdminDashboard({
         onClose={() => setIsStaffModalOpen(false)}
         onStaffAdded={handleStaffAdded}
         callerRole={currentUser?.role}
+      />
+
+      {/* Staff Permissions Granular Modal */}
+      <StaffPermissionsModal
+        tenantId={settings.tenant_id}
+        isOpen={Boolean(permissionsModalStaff)}
+        onClose={() => setPermissionsModalStaff(null)}
+        staffMember={permissionsModalStaff}
+        callerRole={currentUser?.role}
+        onPermissionsUpdated={(profileId, newPermissions) => {
+          setStaff((prev) =>
+            prev.map((s) =>
+              s.id === profileId ? { ...s, custom_permissions: newPermissions } : s
+            )
+          );
+          if (currentUser && currentUser.id === profileId) {
+            currentUser.custom_permissions = newPermissions;
+          }
+          showToast({
+            type: "success",
+            title: "Permisos Actualizados",
+            message: "Los permisos de acceso al panel fueron actualizados exitosamente.",
+          });
+        }}
       />
 
       {/* Password Reset Modal */}

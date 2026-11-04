@@ -55,6 +55,11 @@ export function ProductCard({
     >
       {/* Product Image */}
       <div className="relative aspect-square w-full overflow-hidden bg-muted/30">
+        {product.is_test && (
+          <span className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500 text-white shadow-xs tracking-wider">
+            🧪 SANDBOX
+          </span>
+        )}
         {product.image_url ? (
           <img
             src={product.image_url}
@@ -78,8 +83,8 @@ export function ProductCard({
 
         {/* Desktop Quick View Hover Overlay */}
         <div className="hidden sm:flex absolute inset-0 items-center justify-center bg-black/15 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-          <span className="px-3 py-1.5 rounded-full bg-background/90 text-foreground text-[11px] font-bold shadow-md backdrop-blur-xs flex items-center gap-1.5">
-            <Eye className="w-3.5 h-3.5" />
+          <span className="px-3.5 py-1.5 rounded-full bg-background/90 text-foreground text-xs font-bold shadow-md backdrop-blur-xs flex items-center gap-1.5">
+            <Eye className="w-4 h-4" />
             Vista rápida
           </span>
         </div>
@@ -87,21 +92,21 @@ export function ProductCard({
         {/* Stock & Cart Badges */}
         <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 items-start">
           {hasCpq ? (
-            <span className="rounded-full bg-indigo-600/90 text-white px-2 py-0.5 text-[10px] font-bold shadow-xs">
+            <span className="rounded-full bg-indigo-600/90 text-white px-2.5 py-0.5 text-xs font-bold shadow-xs">
               Bajo Pedido
             </span>
           ) : isOutOfStock ? (
-            <span className="rounded-full bg-destructive px-2 py-0.5 text-[10px] font-bold text-destructive-foreground shadow-xs">
+            <span className="rounded-full bg-destructive px-2.5 py-0.5 text-xs font-bold text-destructive-foreground shadow-xs">
               Agotado
             </span>
           ) : product.stock <= 5 ? (
-            <span className="rounded-full bg-amber-500 text-white px-2 py-0.5 text-[10px] font-bold shadow-xs">
+            <span className="rounded-full bg-amber-500 text-white px-2.5 py-0.5 text-xs font-bold shadow-xs">
               Últimas {product.stock} unid
             </span>
           ) : null}
 
           {quantityInCart > 0 && (
-            <span className="rounded-full bg-primary text-primary-foreground px-2 py-0.5 text-[10px] font-bold shadow-xs animate-in zoom-in-75 duration-150">
+            <span className="rounded-full bg-primary text-primary-foreground px-2.5 py-0.5 text-xs font-bold shadow-xs animate-in zoom-in-75 duration-150">
               {quantityInCart} en carrito
             </span>
           )}
@@ -139,28 +144,28 @@ export function ProductCard({
       {/* Content */}
       <div className="flex flex-1 flex-col p-3.5 sm:p-4">
         {product.sku && (
-          <span className="text-[10px] uppercase font-mono font-medium tracking-wider text-muted-foreground">
+          <span className="text-xs uppercase font-mono font-semibold tracking-wider text-neutral-600 dark:text-neutral-400">
             {product.sku}
           </span>
         )}
 
-        <h3 className="mt-1 text-xs sm:text-sm font-bold text-foreground line-clamp-2 leading-snug group-hover:text-primary transition-colors">
+        <h3 className="mt-1 text-sm sm:text-base font-bold text-foreground line-clamp-2 leading-snug group-hover:text-primary transition-colors">
           {product.name}
         </h3>
 
         {/* Price block - High contrast WCAG AA Dual Currency */}
         <div className="mt-auto pt-3 flex flex-col">
           <div className="flex items-baseline gap-1.5">
-            <span className="text-base sm:text-lg font-black text-primary tracking-tight">
+            <span className="text-lg sm:text-xl font-black text-primary tracking-tight">
               {formatCurrency(product.price_usd, baseCurrency)}
             </span>
-            <span className="text-[11px] text-muted-foreground font-semibold">
+            <span className="text-xs text-muted-foreground font-bold">
               {baseCurrency}
             </span>
           </div>
 
           {showVesPrice && (
-            <span className="text-xs font-semibold text-foreground/80">
+            <span className="text-xs sm:text-sm font-bold text-neutral-800 dark:text-neutral-200 font-mono">
               Bs.{" "}
               {priceVes.toLocaleString("es-VE", {
                 minimumFractionDigits: 2,
@@ -173,7 +178,7 @@ export function ProductCard({
         {/* Interactive Action Button / Inline Stepper */}
         <div className="mt-3 pt-1">
           {quantityInCart > 0 ? (
-            <div className="flex items-center justify-between min-h-[44px] h-11 px-1.5 rounded-xl bg-primary/10 border border-primary/30 text-primary shadow-sm">
+            <div className="flex items-center justify-between min-h-[44px] h-11 px-2 rounded-xl bg-primary/10 border border-primary/30 text-primary shadow-sm">
               <button
                 type="button"
                 onClick={(e) => {
@@ -190,10 +195,10 @@ export function ProductCard({
               </button>
 
               <div className="flex items-center gap-1">
-                <span className="font-black text-xs font-mono text-primary">
+                <span className="font-black text-sm font-mono text-primary">
                   {quantityInCart}
                 </span>
-                <span className="text-[10px] font-medium opacity-80 hidden sm:inline">
+                <span className="text-xs font-semibold opacity-80 hidden sm:inline">
                   unid
                 </span>
               </div>
@@ -236,7 +241,7 @@ export function ProductCard({
                 }
               }}
               disabled={!hasCpq && isOutOfStock}
-              className={`w-full min-h-[44px] h-11 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer touch-manipulation ${
+              className={`w-full min-h-[44px] h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer touch-manipulation ${
                 !hasCpq && isOutOfStock
                   ? "bg-muted text-muted-foreground cursor-not-allowed"
                   : hasCpq

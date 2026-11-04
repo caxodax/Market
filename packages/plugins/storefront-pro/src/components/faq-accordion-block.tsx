@@ -13,32 +13,32 @@ export function FaqAccordionBlock({ config }: FaqAccordionBlockProps) {
   if (items.length === 0) return null;
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 my-4 sm:my-6 space-y-3">
-      <div className="flex items-center gap-1.5">
-        <HelpCircle className="w-4 h-4 text-primary" />
+    <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 my-6 sm:my-8 space-y-4">
+      <div className="flex items-center gap-2">
+        <HelpCircle className="w-5 h-5 text-primary shrink-0" />
         <div>
-          <h3 className="text-sm sm:text-base font-extrabold text-foreground">
+          <h3 className="text-base sm:text-xl font-black text-black dark:text-white tracking-tight">
             {config.title || "Preguntas Frecuentes"}
           </h3>
           {config.subtitle && (
-            <p className="text-[11px] sm:text-xs text-muted-foreground font-medium">
+            <p className="text-xs sm:text-sm text-neutral-800 dark:text-neutral-200 font-medium">
               {config.subtitle}
             </p>
           )}
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         {items.map((item) => (
           <details
             key={item.id}
-            className="group rounded-2xl border border-border bg-card text-card-foreground shadow-sm overflow-hidden transition-all [&[open]]:border-primary/40 [&[open]]:shadow-xs"
+            className="group rounded-2xl border border-border/80 bg-card text-card-foreground shadow-xs overflow-hidden transition-all [&[open]]:border-primary/50 [&[open]]:shadow-sm"
           >
-            <summary className="flex items-center justify-between p-3.5 sm:p-4 text-xs sm:text-sm font-bold text-foreground cursor-pointer select-none hover:bg-muted/40 transition-colors list-none [&::-webkit-details-marker]:hidden">
-              <span className="pr-4">{item.question}</span>
-              <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200 group-open:rotate-180 group-open:text-primary" />
+            <summary className="flex items-center justify-between p-4 sm:p-5 text-sm sm:text-base font-bold text-black dark:text-white cursor-pointer select-none hover:bg-muted/40 transition-colors list-none [&::-webkit-details-marker]:hidden gap-3">
+              <span className="pr-2 leading-snug">{item.question}</span>
+              <ChevronDown className="w-4.5 h-4.5 text-neutral-600 dark:text-neutral-400 shrink-0 transition-transform duration-200 group-open:rotate-180 group-open:text-primary" />
             </summary>
-            <div className="px-3.5 sm:px-4 pb-3.5 sm:pb-4 pt-1 text-xs sm:text-sm text-muted-foreground leading-relaxed border-t border-border/40">
+            <div className="px-4 sm:px-5 pb-4 sm:pb-5 pt-2 text-sm sm:text-base text-black dark:text-neutral-100 font-normal leading-relaxed border-t border-border/50">
               {item.answer}
             </div>
           </details>

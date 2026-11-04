@@ -183,10 +183,35 @@ export class ProfileRepository {
     return state.profiles.length < initialLength;
   }
 
-/**
+  /**
+   * Helper to fetch tenant staff permissions map from operational_settings
+   */
+  static async getTenantStaffPermissionsMap(tenantId: string): Promise<Record<string, string[]>> {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data } = await supabase
+          .from("tenant_settings")
+          .select("operational_settings")
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
+
+        if (data?.operational_settings?.staff_permissions) {
+          return data.operational_settings.staff_permissions as Record<string, string[]>;
+        }
+      } catch (e) {
+        console.warn("[ProfileRepository] Error getting staff permissions map:", e);
+      }
+    }
+    const memSettings = state.settings.find((s) => s.tenant_id === tenantId);
+    return memSettings?.operational_settings?.staff_permissions || {};
+  }
+
+  /**
    * Get all staff members and employees for a tenant
    */
   static async getTenantStaff(tenantId: string): Promise<UserProfile[]> {
+    const permissionsMap = await this.getTenantStaffPermissionsMap(tenantId);
     const supabase = getSupabase();
     if (supabase) {
       try {
@@ -197,7 +222,14 @@ export class ProfileRepository {
           .order("created_at", { ascending: true });
 
         if (!error && Array.isArray(data)) {
-          return data as UserProfile[];
+          return (data as UserProfile[]).map((p) => ({
+            ...p,
+            custom_permissions:
+              permissionsMap[p.id] ||
+              permissionsMap[p.email.toLowerCase()] ||
+              p.custom_permissions ||
+              null,
+          }));
         }
       } catch (e) {
         console.warn("[Supabase] Get tenant staff error:", e);
@@ -205,10 +237,19 @@ export class ProfileRepository {
     }
 
     if (isLiveDatabaseConfigured()) return [];
-    return state.profiles.filter((p) => p.tenant_id === tenantId);
+    return state.profiles
+      .filter((p) => p.tenant_id === tenantId)
+      .map((p) => ({
+        ...p,
+        custom_permissions:
+          permissionsMap[p.id] ||
+          permissionsMap[p.email.toLowerCase()] ||
+          p.custom_permissions ||
+          null,
+      }));
   }
 
-/**
+  /**
    * Invite or assign a new staff member to a tenant (including Supabase Auth password creation)
    */
   static async inviteStaffMember(input: InviteStaffInput): Promise<UserProfile> {
@@ -228,6 +269,7 @@ export class ProfileRepository {
               full_name: input.fullName,
               tenant_id: input.tenantId,
               role: input.role,
+              custom_permissions: input.customPermissions || [],
             },
           });
 
@@ -249,6 +291,7 @@ export class ProfileRepository {
                     full_name: input.fullName,
                     tenant_id: input.tenantId,
                     role: input.role,
+                    custom_permissions: input.customPermissions || [],
                   },
                 });
               }
@@ -284,6 +327,15 @@ export class ProfileRepository {
 
         if (!error && data) {
           const persistedProfile = data as UserProfile;
+          if (input.customPermissions && input.customPermissions.length > 0) {
+            await this.updateStaffPermissions(
+              input.tenantId,
+              persistedProfile.id,
+              input.customPermissions
+            );
+            persistedProfile.custom_permissions = input.customPermissions;
+          }
+
           // Synchronize in-memory state
           state.profiles = state.profiles.filter(
             (p) => p.email !== cleanEmail && p.id !== persistedProfile.id
@@ -325,9 +377,22 @@ export class ProfileRepository {
       phone: input.phone || null,
       avatar_url: null,
       role: input.role,
+      custom_permissions: input.customPermissions || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
+
+    if (input.customPermissions && input.customPermissions.length > 0) {
+      const memSettings = state.settings.find((s) => s.tenant_id === input.tenantId);
+      if (memSettings) {
+        if (!memSettings.operational_settings) memSettings.operational_settings = {};
+        if (!memSettings.operational_settings.staff_permissions) {
+          memSettings.operational_settings.staff_permissions = {};
+        }
+        memSettings.operational_settings.staff_permissions[newProfile.id] = input.customPermissions;
+        memSettings.operational_settings.staff_permissions[newProfile.email] = input.customPermissions;
+      }
+    }
 
     state.profiles.push(newProfile);
 
@@ -429,7 +494,125 @@ export class ProfileRepository {
     return true;
   }
 
-/**
+  /**
+   * Actualizar permisos granulares de módulos de un colaborador
+   */
+  static async updateStaffPermissions(
+    tenantId: string,
+    profileId: string,
+    permissions: string[]
+  ): Promise<boolean> {
+    const supabase = getSupabase();
+    let email: string | null = null;
+
+    if (supabase) {
+      try {
+        // 1. Get profile email
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("id, email")
+          .eq("id", profileId)
+          .maybeSingle();
+        if (prof?.email) email = prof.email.toLowerCase().trim();
+
+        // 2. Fetch current tenant operational_settings
+        const { data: settingsData } = await supabase
+          .from("tenant_settings")
+          .select("operational_settings")
+          .eq("tenant_id", tenantId)
+          .maybeSingle();
+
+        const currentOperational = (settingsData?.operational_settings || {}) as any;
+        const currentStaffPerms = { ...(currentOperational.staff_permissions || {}) };
+
+        currentStaffPerms[profileId] = permissions;
+        if (email) {
+          currentStaffPerms[email] = permissions;
+        }
+
+        const updatedOperational = {
+          ...currentOperational,
+          staff_permissions: currentStaffPerms,
+        };
+
+        const { error: updateErr } = await supabase
+          .from("tenant_settings")
+          .update({
+            operational_settings: updatedOperational,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("tenant_id", tenantId);
+
+        if (updateErr) {
+          console.warn(
+            "[ProfileRepository] Failed to update staff_permissions in tenant_settings:",
+            updateErr.message
+          );
+        }
+
+        // 3. Also update Supabase Auth user_metadata if user exists
+        try {
+          await supabase.auth.admin.updateUserById(profileId, {
+            user_metadata: {
+              custom_permissions: permissions,
+            },
+          });
+        } catch {
+          // If profileId is not the auth ID directly, find by email
+          if (email) {
+            try {
+              const { data: listData } = await supabase.auth.admin.listUsers();
+              const existingUser = listData?.users?.find(
+                (u) => u.email?.toLowerCase() === email
+              );
+              if (existingUser) {
+                await supabase.auth.admin.updateUserById(existingUser.id, {
+                  user_metadata: {
+                    ...existingUser.user_metadata,
+                    custom_permissions: permissions,
+                  },
+                });
+              }
+            } catch (authErr) {
+              console.warn("[ProfileRepository] Supabase Auth update metadata notice:", authErr);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("[ProfileRepository] updateStaffPermissions exception:", e);
+      }
+    }
+
+    // Synchronize in-memory state
+    const memSettings = state.settings.find((s) => s.tenant_id === tenantId);
+    if (memSettings) {
+      if (!memSettings.operational_settings) memSettings.operational_settings = {};
+      if (!memSettings.operational_settings.staff_permissions) {
+        memSettings.operational_settings.staff_permissions = {};
+      }
+      memSettings.operational_settings.staff_permissions[profileId] = permissions;
+      if (email) {
+        memSettings.operational_settings.staff_permissions[email] = permissions;
+      }
+    }
+
+    const p = state.profiles.find((pr) => pr.id === profileId && pr.tenant_id === tenantId);
+    if (p) {
+      p.custom_permissions = permissions;
+    }
+
+    await AuditRepository.recordAuditLog({
+      tenantId,
+      action: "STAFF_PERMISSIONS_UPDATED",
+      entity: "profiles",
+      entityId: profileId,
+      newData: { permissions },
+    });
+
+    return true;
+  }
+
+  /**
    * Update a staff member's role
    */
   static async updateStaffRole(
@@ -471,7 +654,7 @@ export class ProfileRepository {
     return null;
   }
 
-/**
+  /**
    * Get user profile by ID or Email
    */
   static async getUserProfile(userIdOrEmail: string): Promise<UserProfile | null> {
@@ -484,7 +667,18 @@ export class ProfileRepository {
           .or(`id.eq.${userIdOrEmail},email.eq.${userIdOrEmail.toLowerCase().trim()}`)
           .maybeSingle();
 
-        if (data) return data as UserProfile;
+        if (data) {
+          const profile = data as UserProfile;
+          if (profile.tenant_id) {
+            const permissionsMap = await this.getTenantStaffPermissionsMap(profile.tenant_id);
+            profile.custom_permissions =
+              permissionsMap[profile.id] ||
+              permissionsMap[profile.email.toLowerCase()] ||
+              profile.custom_permissions ||
+              null;
+          }
+          return profile;
+        }
       } catch (e) {
         console.warn("[Supabase] Get user profile error:", e);
       }
@@ -495,7 +689,18 @@ export class ProfileRepository {
         p.id === userIdOrEmail ||
         p.email.toLowerCase() === userIdOrEmail.toLowerCase().trim()
     );
-    return mem || null;
+    if (mem) {
+      if (mem.tenant_id) {
+        const permissionsMap = await this.getTenantStaffPermissionsMap(mem.tenant_id);
+        mem.custom_permissions =
+          permissionsMap[mem.id] ||
+          permissionsMap[mem.email.toLowerCase()] ||
+          mem.custom_permissions ||
+          null;
+      }
+      return mem;
+    }
+    return null;
   }
 
 /**

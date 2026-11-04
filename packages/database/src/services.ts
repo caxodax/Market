@@ -85,6 +85,7 @@ export class MarketOSRepository {
   static getTenantStaff = ProfileRepository.getTenantStaff;
   static inviteStaffMember = ProfileRepository.inviteStaffMember;
   static resetStaffPassword = ProfileRepository.resetStaffPassword;
+  static updateStaffPermissions = ProfileRepository.updateStaffPermissions;
   static updateStaffRole = ProfileRepository.updateStaffRole;
   static getUserProfile = ProfileRepository.getUserProfile;
   static savePushSubscription = ProfileRepository.savePushSubscription;

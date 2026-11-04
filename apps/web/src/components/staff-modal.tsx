@@ -1,11 +1,17 @@
 "use client";
 
 import React, { useState } from "react";
-import { UserProfile, UserRole } from "@marketos/types";
+import {
+  UserProfile,
+  UserRole,
+  STAFF_PERMISSIBLE_MODULES,
+  DEFAULT_ROLE_PERMISSIONS,
+} from "@marketos/types";
 import { inviteStaffMemberAction } from "../app/admin/actions";
 import {
   X,
   UserPlus,
+  Shield,
   ShieldCheck,
   CheckCircle2,
   Loader2,
@@ -15,6 +21,8 @@ import {
   Key,
   Eye,
   EyeOff,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 interface StaffModalProps {
@@ -69,10 +77,19 @@ export function StaffModal({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<UserRole>("TENANT_CASHIER");
+  const [customPermissions, setCustomPermissions] = useState<string[]>(
+    DEFAULT_ROLE_PERMISSIONS["TENANT_CASHIER"] || []
+  );
+  const [showPermissionsSection, setShowPermissionsSection] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const handleRoleChange = (newRole: UserRole) => {
+    setRole(newRole);
+    setCustomPermissions(DEFAULT_ROLE_PERMISSIONS[newRole] || []);
+  };
 
   const generateRandomPassword = () => {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%";
@@ -107,6 +124,7 @@ export function StaffModal({
         phone: phone || undefined,
         role,
         password: password.trim() || undefined,
+        customPermissions,
       });
 
       if (!res.success || !res.profile) {
@@ -123,10 +141,10 @@ export function StaffModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm">
-      <div className="relative w-full max-w-md rounded-2xl border border-border bg-card shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-sm">
+      <div className="relative w-full max-w-lg max-h-[92vh] flex flex-col rounded-2xl border border-border bg-card shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="p-4 border-b border-border flex items-center justify-between bg-muted/30">
+        <div className="p-4 border-b border-border flex items-center justify-between bg-muted/30 shrink-0">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-xl bg-primary/10 text-primary">
               <UserPlus className="w-5 h-5" />
@@ -252,8 +270,8 @@ export function StaffModal({
             </label>
             <select
               value={role}
-              onChange={(e) => setRole(e.target.value as UserRole)}
-              className="w-full h-10 px-3 rounded-xl border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              onChange={(e) => handleRoleChange(e.target.value as UserRole)}
+              className="w-full h-10 px-3 rounded-xl border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
             >
               <option value="TENANT_CASHIER">Cajero / Operador de Ventas</option>
               <option value="TENANT_MANAGER">Encargado de Sucursal</option>
@@ -266,6 +284,97 @@ export function StaffModal({
             <p className="text-[10px] text-muted-foreground pt-0.5">
               {ROLE_LABELS[role]?.desc}
             </p>
+          </div>
+
+          {/* Granular Module Permissions Accordion */}
+          <div className="pt-2 border-t border-border space-y-2">
+            <button
+              type="button"
+              onClick={() => setShowPermissionsSection(!showPermissionsSection)}
+              className="w-full flex items-center justify-between p-2.5 rounded-xl bg-muted/40 hover:bg-muted border border-border text-xs font-bold text-foreground transition-all cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-emerald-500" />
+                <span>Permisos de Módulos (Sidebar)</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                  {customPermissions.length} activos
+                </span>
+              </div>
+              {showPermissionsSection ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              )}
+            </button>
+
+            {showPermissionsSection && (
+              <div className="p-3 rounded-xl border border-border bg-muted/20 space-y-3 animate-in fade-in">
+                <div className="flex items-center justify-between flex-wrap gap-2 text-[11px]">
+                  <span className="text-muted-foreground text-[10px]">
+                    Elige los módulos a los que tendrá acceso:
+                  </span>
+                  <div className="flex items-center gap-1.5 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCustomPermissions(STAFF_PERMISSIBLE_MODULES.map((m) => m.id))
+                      }
+                      className="font-bold text-foreground hover:underline cursor-pointer"
+                    >
+                      Todos
+                    </button>
+                    <span className="text-muted-foreground">•</span>
+                    <button
+                      type="button"
+                      onClick={() => setCustomPermissions([])}
+                      className="font-bold text-muted-foreground hover:underline cursor-pointer"
+                    >
+                      Ninguno
+                    </button>
+                    <span className="text-muted-foreground">•</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCustomPermissions(DEFAULT_ROLE_PERMISSIONS[role] || [])
+                      }
+                      className="font-bold text-primary hover:underline cursor-pointer"
+                    >
+                      Restablecer
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
+                  {STAFF_PERMISSIBLE_MODULES.map((m) => {
+                    const checked = customPermissions.includes(m.id);
+                    return (
+                      <label
+                        key={m.id}
+                        className={`flex items-center gap-2 p-1.5 rounded-lg border text-xs cursor-pointer select-none transition-all ${
+                          checked
+                            ? "bg-emerald-500/10 border-emerald-500/30 text-foreground"
+                            : "bg-background border-border text-muted-foreground hover:border-border/80"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() =>
+                            setCustomPermissions((prev) =>
+                              prev.includes(m.id)
+                                ? prev.filter((id) => id !== m.id)
+                                : [...prev, m.id]
+                            )
+                          }
+                          className="h-3.5 w-3.5 rounded border-border text-emerald-600 focus:ring-emerald-500 accent-emerald-600"
+                        />
+                        <span className="truncate text-[11px] font-medium">{m.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer Actions */}

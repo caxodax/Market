@@ -689,6 +689,36 @@ export async function resetStaffPasswordAction(
   }
 }
 
+export async function updateStaffPermissionsAction(
+  tenantId: string,
+  profileId: string,
+  permissions: string[]
+) {
+  try {
+    const actor = await assertCanManageStaff(tenantId);
+    const target = await MarketOSRepository.getUserProfile(profileId);
+    if (!target || (target.tenant_id && target.tenant_id !== tenantId)) {
+      throw new Error("El colaborador no pertenece a este comercio.");
+    }
+    if (
+      target.role === "TENANT_OWNER" &&
+      actor.role !== "TENANT_OWNER" &&
+      actor.role !== "PLATFORM_SUPER_ADMIN"
+    ) {
+      throw new Error("Solo el Dueño del Comercio puede modificar permisos del Dueño.");
+    }
+    const updated = await MarketOSRepository.updateStaffPermissions(tenantId, profileId, permissions);
+    revalidatePath("/admin");
+    return { success: updated };
+  } catch (error) {
+    console.error("Error updating staff permissions:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al actualizar permisos del colaborador",
+    };
+  }
+}
+
 /**
  * Save manual contingency exchange rate (USD, EUR, USDT)
  */

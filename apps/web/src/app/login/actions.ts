@@ -203,6 +203,7 @@ export async function loginUserAction(email: string, password?: string) {
       fullName: profile.full_name,
       role: profile.role,
       tenantId: profile.tenant_id || TENANT_ID,
+      custom_permissions: profile.custom_permissions || null,
       loggedInAt: new Date().toISOString(),
     };
 
@@ -300,6 +301,7 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
       fullName: string;
       role: UserRole;
       tenantId: string;
+      custom_permissions?: string[] | null;
       loggedInAt: string;
     }>(sessionCookie);
 
@@ -320,6 +322,7 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
       phone: null,
       avatar_url: null,
       role: parsed.role,
+      custom_permissions: parsed.custom_permissions || null,
       created_at: parsed.loggedInAt,
       updated_at: parsed.loggedInAt,
       impersonation,

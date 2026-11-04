@@ -137,6 +137,7 @@ export function StorefrontPage({
   const [selectedDistanceKm, setSelectedDistanceKm] = useState<number | null>(null);
   const [isBranchSelectorOpen, setIsBranchSelectorOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const primaryHsl = settings.primary_color ? hexToHslString(settings.primary_color) : null;
   const secondaryHsl = settings.secondary_color ? hexToHslString(settings.secondary_color) : null;
@@ -163,7 +164,7 @@ export function StorefrontPage({
             `,
           }}
         />
-        <div className="min-h-screen bg-background text-foreground flex flex-col w-full max-w-full overflow-x-hidden">
+        <div className="min-h-screen bg-background text-foreground flex flex-col w-full max-w-full overflow-x-clip">
           {/* Storefront Pro: Top Marquee if active */}
           {isStorefrontProActive && storefrontConfig && (
             <StorefrontTopMarquee
@@ -194,6 +195,8 @@ export function StorefrontPage({
             onOpenTracker={() => setIsTrackerOpen(true)}
             onOpenAccount={() => setIsAccountOpen(true)}
             onOpenFavorites={() => setActiveCategory("favorites")}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
           />
 
           {/* Dynamic Catalog with Search, Category Filter, Promo banner, Cart and Delivery Zones */}
@@ -215,6 +218,8 @@ export function StorefrontPage({
             cpqCostSettings={cpqCostSettings}
             cpqAttributeOptions={cpqAttributeOptions}
             cpqVolumeTiers={cpqVolumeTiers}
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
           />
 
         {/* Storefront Footer */}

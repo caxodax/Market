@@ -1450,9 +1450,11 @@ export class TenantRepository {
       OrderRepository.getTenantOrders(tenantId),
     ]);
 
-    const productsCount = products.length;
+    const realProducts = products.filter((p) => !p.is_test);
+    const realOrders = orders.filter((o) => !o.is_test);
+    const productsCount = realProducts.length;
     const storesCount = stores.length;
-    const ordersCount = orders.length;
+    const ordersCount = realOrders.length;
 
     const canAddProduct = productsCount < plan.max_products;
     const canAddStore = storesCount < plan.max_stores;
