@@ -701,7 +701,11 @@ export class ProfileRepository {
 
         if (data) {
           const profile = data as UserProfile;
-          if (profile.tenant_id) {
+          if (
+            profile.tenant_id &&
+            profile.role !== "TENANT_OWNER" &&
+            profile.role !== "PLATFORM_SUPER_ADMIN"
+          ) {
             const permissionsMap = await ProfileRepository.getTenantStaffPermissionsMap(profile.tenant_id);
             profile.custom_permissions =
               permissionsMap[profile.id] ||
@@ -722,7 +726,11 @@ export class ProfileRepository {
         p.email.toLowerCase() === userIdOrEmail.toLowerCase().trim()
     );
     if (mem) {
-      if (mem.tenant_id) {
+      if (
+        mem.tenant_id &&
+        mem.role !== "TENANT_OWNER" &&
+        mem.role !== "PLATFORM_SUPER_ADMIN"
+      ) {
         const permissionsMap = await ProfileRepository.getTenantStaffPermissionsMap(mem.tenant_id);
         mem.custom_permissions =
           permissionsMap[mem.id] ||

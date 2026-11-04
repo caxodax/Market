@@ -1595,18 +1595,20 @@ export function AdminDashboard({
   const userRole: UserRole = currentUser?.role || "TENANT_OWNER";
   const isSuperAdminOrImpersonating =
     userRole === "PLATFORM_SUPER_ADMIN" || Boolean(currentUser?.impersonation);
+  const isOwner = userRole === "TENANT_OWNER";
 
   const modulesList: ModuleItem[] = rawModulesList.filter((m) => {
-    if (isSuperAdminOrImpersonating) return true;
+    if (isSuperAdminOrImpersonating || isOwner) return true;
     // Granular module access: if custom_permissions are defined for this collaborator
     if (currentUser?.custom_permissions && currentUser.custom_permissions.length > 0) {
-      return currentUser.custom_permissions.includes(m.id);
+      const permsUpper = currentUser.custom_permissions.map((p) => p.toUpperCase());
+      return permsUpper.includes(m.id.toUpperCase());
     }
     const allowed = MODULE_ROLE_PERMISSIONS[m.id];
     return !allowed || allowed.includes(userRole);
   });
 
-  const currentModule = modulesList.find((m) => m.id === activeTab) || modulesList[0];
+  const currentModule = modulesList.find((m) => m.id === activeTab) || modulesList[0] || rawModulesList[0];
 
   // Auto-correct activeTab if current tab is not permitted or enabled for this role/tenant
   useEffect(() => {
@@ -1942,20 +1944,22 @@ export function AdminDashboard({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground hidden sm:inline">
-                    {moduleCategories.find((c) => c.id === currentModule.category)?.title || "Dashboard"} /
+                    {moduleCategories.find((c) => c.id === currentModule?.category)?.title || "Dashboard"} /
                   </span>
                   <h1 className="font-extrabold text-sm sm:text-base tracking-tight text-foreground truncate flex items-center gap-2">
-                    <span>{currentModule.label}</span>
-                    {currentModule.badge && (
+                    <span>{currentModule?.label || "Módulo"}</span>
+                    {currentModule?.badge && (
                       <span className={currentModule.badgeClassName}>
                         {currentModule.badge}
                       </span>
                     )}
                   </h1>
                 </div>
-                <p className="text-[11px] text-muted-foreground truncate hidden md:block">
-                  {currentModule.description}
-                </p>
+                {currentModule?.description && (
+                  <p className="text-[11px] text-muted-foreground truncate hidden md:block">
+                    {currentModule.description}
+                  </p>
+                )}
               </div>
             </div>
 

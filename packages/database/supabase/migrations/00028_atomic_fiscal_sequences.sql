@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS public.tenant_fiscal_sequences (
 -- RLS para secuencias fiscales
 ALTER TABLE public.tenant_fiscal_sequences ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Tenant isolation for tenant_fiscal_sequences" ON public.tenant_fiscal_sequences;
 CREATE POLICY "Tenant isolation for tenant_fiscal_sequences"
   ON public.tenant_fiscal_sequences
   FOR ALL
