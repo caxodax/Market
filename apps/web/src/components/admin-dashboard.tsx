@@ -2143,7 +2143,7 @@ export function AdminDashboard({
                   <span className="text-xs font-mono text-purple-300">({settingsState.tenant_id})</span>
                   <span className="text-xs text-muted-foreground">•</span>
                   <span className="text-xs text-purple-200 font-normal truncate">
-                    Auditado bajo Super Admin: <strong className="text-white">{currentUser.impersonation.originalSuperAdmin.fullName}</strong> ({currentUser.impersonation.originalSuperAdmin.email})
+                    Auditado bajo Super Admin: <strong className="text-white">{currentUser.impersonation?.originalSuperAdmin?.fullName || "Super Admin"}</strong> ({currentUser.impersonation?.originalSuperAdmin?.email || ""})
                   </span>
                 </div>
               </div>

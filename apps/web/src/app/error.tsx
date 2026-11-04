@@ -30,9 +30,17 @@ export default function GlobalError({
           Algo no salió como esperábamos
         </h1>
 
-        <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mb-6">
+        <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mb-4">
           Ocurrió un error inesperado al procesar la solicitud. Tus datos y carrito se mantienen a salvo en este dispositivo.
         </p>
+
+        {error && (
+          <div className="mb-6 p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-left text-xs font-mono text-rose-600 dark:text-rose-400 max-h-48 overflow-auto">
+            <p className="font-bold">{error.name || "Error"}: {error.message || "Error sin mensaje"}</p>
+            {error.digest && <p className="text-[10px] text-muted-foreground mt-1">Digest: {error.digest}</p>}
+            {error.stack && <pre className="text-[10px] whitespace-pre-wrap mt-2 text-muted-foreground opacity-80">{error.stack}</pre>}
+          </div>
+        )}
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5">
           <button

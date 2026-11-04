@@ -402,12 +402,13 @@ export function SuperAdminDashboard({
     }
   };
 
-  const filteredProfiles = profiles.filter((p) => {
+  const filteredProfiles = (profiles || []).filter((p) => {
+    const query = userSearchQuery.toLowerCase().trim();
     const matchesSearch =
-      !userSearchQuery.trim() ||
-      p.full_name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-      p.email.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-      (p.phone && p.phone.toLowerCase().includes(userSearchQuery.toLowerCase()));
+      !query ||
+      (p.full_name || "").toLowerCase().includes(query) ||
+      (p.email || "").toLowerCase().includes(query) ||
+      (p.phone && p.phone.toLowerCase().includes(query));
 
     const matchesTenant =
       userTenantFilter === "ALL"
@@ -1029,19 +1030,19 @@ export function SuperAdminDashboard({
                   </span>
                 </p>
                 <p className="text-sm font-black text-purple-200 mt-0.5">
-                  {currentUser.impersonation.targetTenantName}
+                  {currentUser.impersonation?.targetTenantName || "Comercio"}
                   <span className="text-xs font-mono font-normal text-purple-300 ml-2">
-                    (/{currentUser.impersonation.targetTenantSlug})
+                    (/{currentUser.impersonation?.targetTenantSlug || ""})
                   </span>
                 </p>
                 <p className="text-[11px] text-purple-300/80">
-                  Operador: {currentUser.impersonation.originalSuperAdmin.fullName} ({currentUser.impersonation.originalSuperAdmin.email})
+                  Operador: {currentUser.impersonation?.originalSuperAdmin?.fullName || currentUser.full_name || "Super Admin"} ({currentUser.impersonation?.originalSuperAdmin?.email || currentUser.email})
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <a
-                href={`/admin?tenant=${currentUser.impersonation.targetTenantId}`}
+                href={`/admin?tenant=${currentUser.impersonation?.targetTenantId || ""}`}
                 className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-sm transition-colors"
               >
                 Ingresar al Panel
@@ -2115,8 +2116,9 @@ export function SuperAdminDashboard({
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-3">
                               <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center font-black text-xs text-primary shrink-0">
-                                {user.full_name
+                                {(user.full_name || user.email || "U")
                                   .split(" ")
+                                  .filter(Boolean)
                                   .map((n) => n[0])
                                   .slice(0, 2)
                                   .join("")

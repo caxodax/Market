@@ -1043,3 +1043,24 @@ EXCEPTION
         RAISE NOTICE 'Notice: profiles_email_key already exists or could not be added: %', SQLERRM;
 END $$;
 
+-- ------------------------------------------------------------------------------
+-- 32. FIX PROFILES RLS RECURSION (from 00032)
+-- Removes recursive subquery in "Tenant owners and managers can manage staff"
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.current_user_role()
+RETURNS TEXT AS $$
+  SELECT COALESCE(
+    (auth.jwt() -> 'app_metadata' ->> 'role')::TEXT,
+    (auth.jwt() -> 'user_metadata' ->> 'role')::TEXT
+  );
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+DROP POLICY IF EXISTS "Tenant owners and managers can manage staff" ON public.profiles;
+
+CREATE POLICY "Tenant owners and managers can manage staff"
+ON public.profiles FOR ALL
+USING (
+    (tenant_id = public.current_user_tenant_id() AND public.current_user_role() IN ('TENANT_OWNER', 'TENANT_MANAGER', 'PLATFORM_SUPER_ADMIN'))
+    OR public.is_super_admin()
+);
+

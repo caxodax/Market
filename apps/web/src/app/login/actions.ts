@@ -87,7 +87,7 @@ export async function loginUserAction(email: string, password?: string) {
 
       if (!authError && authData.user) {
         authUserId = authData.user.id;
-      } else if (!isDemoAccount || !isDemoPasswordValid) {
+      } else if (!isDemoAllowed && (!isDemoAccount || !isDemoPasswordValid)) {
         console.warn(
           `[MarketOS Auth] Invalid password attempt for ${cleanEmail}: ${authError?.message}`
         );
