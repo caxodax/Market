@@ -77,6 +77,10 @@ import {
   Check,
   AlertTriangle,
   BarChart3,
+  Eye,
+  EyeOff,
+  Lock,
+  User,
 } from "lucide-react";
 import { logoutUserAction } from "../app/login/actions";
 import { ExchangeRateManager } from "./exchange-rate-manager";
@@ -492,6 +496,9 @@ export function SuperAdminDashboard({
   const [bizSlug, setBizSlug] = useState("");
   const [bizCategory, setBizCategory] = useState("Minimarket");
   const [bizEmail, setBizEmail] = useState("");
+  const [ownerName, setOwnerName] = useState("");
+  const [ownerPassword, setOwnerPassword] = useState("");
+  const [showOwnerPassword, setShowOwnerPassword] = useState(false);
   const [bizPhone, setBizPhone] = useState("+58 414-");
   const [bizWhatsapp, setBizWhatsapp] = useState("58414");
   const [bizAddress, setBizAddress] = useState("");
@@ -499,6 +506,18 @@ export function SuperAdminDashboard({
   const [bizColor, setBizColor] = useState("#DC2626");
   const [storeName, setStoreName] = useState("Sede Principal");
   const [storeCode, setStoreCode] = useState("MAIN-01");
+
+  // Generate secure password for tenant owner
+  const generateSecurePassword = () => {
+    const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let pass = "";
+    for (let i = 0; i < 10; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const cleanPrefix = bizSlug ? bizSlug.split("-")[0] : "Market";
+    const capitalized = cleanPrefix.charAt(0).toUpperCase() + cleanPrefix.slice(1);
+    setOwnerPassword(`${capitalized}#2026.${pass.slice(0, 4)}`);
+  };
 
   // Handle business name input and auto-slug
   const handleNameChange = (val: string) => {
@@ -520,6 +539,8 @@ export function SuperAdminDashboard({
         slug: bizSlug.trim() || slugify(bizName),
         category: bizCategory,
         ownerEmail: bizEmail.trim(),
+        ownerName: ownerName.trim() || undefined,
+        ownerPassword: ownerPassword.trim() || undefined,
         phone: bizPhone.trim(),
         whatsapp: bizWhatsapp.trim(),
         address: bizAddress.trim(),
@@ -550,6 +571,9 @@ export function SuperAdminDashboard({
       setBizName("");
       setBizSlug("");
       setBizEmail("");
+      setOwnerName("");
+      setOwnerPassword("");
+      setShowOwnerPassword(false);
       setBizAddress("");
     } catch (err: any) {
       setActionError(err.message || "Error al incorporar el nuevo negocio");
@@ -2410,6 +2434,80 @@ export function SuperAdminDashboard({
                     onChange={(e) => setBizEmail(e.target.value)}
                     className="w-full h-10 px-3 rounded-xl border border-input bg-background focus:ring-2 focus:ring-primary"
                   />
+                </div>
+              </div>
+
+              {/* Owner Account & Credentials Card */}
+              <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                      <Crown className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-foreground text-xs leading-none">
+                        Credenciales del Dueño del Comercio
+                      </h4>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        Tendrá rol Dueño (Admin) y los 21 módulos activos por defecto
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={generateSecurePassword}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold text-primary bg-primary/5 hover:bg-primary/15 transition-colors"
+                  >
+                    <Key className="w-3 h-3" />
+                    Generar Clave
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-foreground">
+                      Nombre del Dueño / Responsable
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Ej. Estafania Avendaño"
+                        value={ownerName}
+                        onChange={(e) => setOwnerName(e.target.value)}
+                        className="w-full h-10 pl-8 pr-3 rounded-xl border border-input bg-background focus:ring-2 focus:ring-primary text-xs"
+                      />
+                      <User className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-3.5 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-semibold text-foreground">
+                      Contraseña de Acceso *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showOwnerPassword ? "text" : "password"}
+                        required
+                        placeholder="••••••••••••"
+                        value={ownerPassword}
+                        onChange={(e) => setOwnerPassword(e.target.value)}
+                        className="w-full h-10 pl-8 pr-9 rounded-xl border border-input bg-background font-mono focus:ring-2 focus:ring-primary text-xs"
+                      />
+                      <Lock className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-3.5 pointer-events-none" />
+                      <button
+                        type="button"
+                        onClick={() => setShowOwnerPassword(!showOwnerPassword)}
+                        className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground p-1 rounded-md"
+                        title={showOwnerPassword ? "Ocultar contraseña" : "Ver contraseña"}
+                      >
+                        {showOwnerPassword ? (
+                          <EyeOff className="w-3.5 h-3.5" />
+                        ) : (
+                          <Eye className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 

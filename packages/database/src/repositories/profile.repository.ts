@@ -211,7 +211,7 @@ export class ProfileRepository {
    * Get all staff members and employees for a tenant
    */
   static async getTenantStaff(tenantId: string): Promise<UserProfile[]> {
-    const permissionsMap = await this.getTenantStaffPermissionsMap(tenantId);
+    const permissionsMap = await ProfileRepository.getTenantStaffPermissionsMap(tenantId);
     const supabase = getSupabase();
     if (supabase) {
       try {
@@ -304,8 +304,19 @@ export class ProfileRepository {
         }
       }
 
-      // 2. Insert or upsert into public.profiles
+      // 2. Insert or update in public.profiles
       try {
+        let existingProfileId: string | null = authUserId;
+        const { data: existingProf } = await supabase
+          .from("profiles")
+          .select("id, email, tenant_id")
+          .or(`email.ilike.${cleanEmail}${authUserId ? `,id.eq.${authUserId}` : ""}`)
+          .maybeSingle();
+
+        if (existingProf?.id) {
+          existingProfileId = existingProf.id;
+        }
+
         const profilePayload: any = {
           tenant_id: input.tenantId,
           email: cleanEmail,
@@ -315,20 +326,41 @@ export class ProfileRepository {
           updated_at: new Date().toISOString(),
         };
 
-        if (authUserId) {
-          profilePayload.id = authUserId;
+        if (existingProfileId) {
+          profilePayload.id = existingProfileId;
         }
 
-        const { data, error } = await supabase
-          .from("profiles")
-          .upsert(profilePayload, { onConflict: "email" })
-          .select("*")
-          .maybeSingle();
+        let data: any = null;
+        let error: any = null;
+
+        if (existingProf?.id) {
+          // If profile exists, update cleanly by primary key
+          const updateRes = await supabase
+            .from("profiles")
+            .update(profilePayload)
+            .eq("id", existingProf.id)
+            .select("*")
+            .maybeSingle();
+          data = updateRes.data;
+          error = updateRes.error;
+        } else {
+          // New profile: ensure id is set and upsert on primary key
+          if (!profilePayload.id) {
+            profilePayload.id = generateUuid();
+          }
+          const insertRes = await supabase
+            .from("profiles")
+            .upsert(profilePayload, { onConflict: "id" })
+            .select("*")
+            .maybeSingle();
+          data = insertRes.data;
+          error = insertRes.error;
+        }
 
         if (!error && data) {
           const persistedProfile = data as UserProfile;
           if (input.customPermissions && input.customPermissions.length > 0) {
-            await this.updateStaffPermissions(
+            await ProfileRepository.updateStaffPermissions(
               input.tenantId,
               persistedProfile.id,
               input.customPermissions
@@ -670,7 +702,7 @@ export class ProfileRepository {
         if (data) {
           const profile = data as UserProfile;
           if (profile.tenant_id) {
-            const permissionsMap = await this.getTenantStaffPermissionsMap(profile.tenant_id);
+            const permissionsMap = await ProfileRepository.getTenantStaffPermissionsMap(profile.tenant_id);
             profile.custom_permissions =
               permissionsMap[profile.id] ||
               permissionsMap[profile.email.toLowerCase()] ||
@@ -691,7 +723,7 @@ export class ProfileRepository {
     );
     if (mem) {
       if (mem.tenant_id) {
-        const permissionsMap = await this.getTenantStaffPermissionsMap(mem.tenant_id);
+        const permissionsMap = await ProfileRepository.getTenantStaffPermissionsMap(mem.tenant_id);
         mem.custom_permissions =
           permissionsMap[mem.id] ||
           permissionsMap[mem.email.toLowerCase()] ||
@@ -902,8 +934,8 @@ export class ProfileRepository {
    * Get push statistics for a tenant
    */
   static async getPushStats(tenantId: string): Promise<PushStats> {
-    const subscriptions = await this.getPushSubscriptions(tenantId);
-    const logs = await this.getPushNotificationLogs(tenantId);
+    const subscriptions = await ProfileRepository.getPushSubscriptions(tenantId);
+    const logs = await ProfileRepository.getPushNotificationLogs(tenantId);
 
     const totalSent = logs.reduce((acc, l) => acc + l.sent_count, 0);
     const lastSentAt = logs.length > 0 ? logs[0].created_at : null;

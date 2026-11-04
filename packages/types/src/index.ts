@@ -949,6 +949,8 @@ export interface OnboardTenantInput {
   slug: string;
   category: string;
   ownerEmail: string;
+  ownerName?: string;
+  ownerPassword?: string;
   phone: string;
   whatsapp: string;
   address: string;

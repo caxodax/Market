@@ -49,6 +49,7 @@ export async function onboardTenantAction(input: OnboardTenantInput) {
       newData: { name: tenant.name, slug: tenant.slug },
     });
     revalidatePath("/platform");
+    revalidatePath("/admin");
     return { success: true, tenant };
   } catch (error) {
     console.error("Error onboarding tenant:", error);

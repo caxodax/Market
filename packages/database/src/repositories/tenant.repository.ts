@@ -27,6 +27,7 @@ import type {
   PaymentMethodType,
   Store,
 } from "@marketos/types";
+import { DEFAULT_ROLE_PERMISSIONS } from "@marketos/types";
 import { state, INITIAL_SETTINGS, INITIAL_TENANT } from "../mock-data.ts";
 import {
   scanR2PlatformStorage,
@@ -42,6 +43,7 @@ import { AuditRepository } from "./audit.repository.ts";
 import { ExchangeRateRepository } from "./exchange-rate.repository.ts";
 import { CatalogRepository } from "./catalog.repository.ts";
 import { OrderRepository } from "./order.repository.ts";
+import { ProfileRepository } from "./profile.repository.ts";
 
 export class TenantRepository {
 
@@ -1144,6 +1146,23 @@ export class TenantRepository {
     state.settings.push(newSettings);
     state.stores.push(newStore);
     state.subscriptions.push(newSubscription);
+
+    // Auto-provision initial Tenant Owner with full RBAC permissions
+    try {
+      const ownerFullName = input.ownerName?.trim() || `Dueño ${input.name}`;
+      const ownerPassword = input.ownerPassword?.trim() || "market123.";
+      await ProfileRepository.inviteStaffMember({
+        tenantId,
+        email: input.ownerEmail.toLowerCase().trim(),
+        fullName: ownerFullName,
+        role: "TENANT_OWNER",
+        phone: input.phone,
+        password: ownerPassword,
+        customPermissions: DEFAULT_ROLE_PERMISSIONS.TENANT_OWNER,
+      });
+    } catch (ownerErr) {
+      console.warn("[TenantRepository] Auto-provision owner notice:", ownerErr);
+    }
 
     const plans = await this.getSubscriptionPlans();
     const plan = plans.find((p) => p.id === input.planId) || plans[0];

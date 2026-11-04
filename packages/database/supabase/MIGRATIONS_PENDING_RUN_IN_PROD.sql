@@ -1022,3 +1022,24 @@ AS $$
     AND status = 'ISSUED'
   ORDER BY created_at ASC;
 $$;
+
+-- ------------------------------------------------------------------------------
+-- 31. PROFILES EMAIL UNIQUE CONSTRAINT (from 00031)
+-- ------------------------------------------------------------------------------
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.table_constraints 
+        WHERE table_schema = 'public' 
+          AND table_name = 'profiles' 
+          AND constraint_name = 'profiles_email_key'
+    ) THEN
+        ALTER TABLE public.profiles
+            ADD CONSTRAINT profiles_email_key UNIQUE (email);
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Notice: profiles_email_key already exists or could not be added: %', SQLERRM;
+END $$;
+
