@@ -646,7 +646,6 @@ export interface Product {
   image_url: string | null;
   price_usd: number;
   is_active: boolean;
-  is_test?: boolean; // 🧪 Marca de producto Sandbox / Modo Prueba
   is_tax_exempt?: boolean; // Exento de IVA (Art. 18 Ley del IVA - Alimentos básicos / Medicinas)
   external_product_id?: string | null;
   created_at: string;
@@ -722,7 +721,6 @@ export interface Order {
   total_secondary?: number;
   exchange_rate_applied: number;
   notes?: string | null;
-  is_test?: boolean; // 🧪 Marca de orden Sandbox / Modo Prueba
   created_at: string;
   updated_at: string;
   // Enriched fields for operational visibility and reports
@@ -1082,7 +1080,6 @@ export interface CreateProductInput {
   imageUrl?: string;
   initialStock?: number;
   isTaxExempt?: boolean; // Exento de IVA (Art. 18 Ley del IVA)
-  isTest?: boolean; // 🧪 Si true, producto visible únicamente en local (Sandbox)
   storeId?: string;
   actorId?: string | null;
   actorName?: string | null;

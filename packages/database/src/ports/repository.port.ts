@@ -113,7 +113,6 @@ export interface CreateOrderInput {
   cashTenderedUsd?: number;
   changeRequiredUsd?: number;
   idempotencyKey?: string;
-  isTest?: boolean; // 🧪 Si true, orden Sandbox visible únicamente en local
 }
 
 export interface SubmitPaymentInput {

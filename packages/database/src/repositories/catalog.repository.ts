@@ -395,16 +395,11 @@ export class CatalogRepository {
     const supabase = getSupabase();
     if (supabase) {
       try {
-        const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
         let q = supabase
           .from("products")
           .select("*, inventory(quantity)")
           .eq("tenant_id", tenantId)
           .eq("is_active", true);
-
-        if (isProduction) {
-          q = q.eq("is_test", false);
-        }
 
         if (categoryId) {
           q = q.eq("category_id", categoryId);
@@ -432,10 +427,6 @@ export class CatalogRepository {
             .select("*")
             .eq("tenant_id", tenantId)
             .eq("is_active", true);
-
-          if (isProduction) {
-            simpleQ = simpleQ.eq("is_test", false);
-          }
 
           if (categoryId) simpleQ = simpleQ.eq("category_id", categoryId);
           if (query) simpleQ = simpleQ.ilike("name", `%${query}%`);
@@ -467,7 +458,6 @@ export class CatalogRepository {
               image_url: item.image_url,
               price_usd: Number(item.price_usd),
               is_active: item.is_active,
-              is_test: Boolean(item.is_test),
               stock: totalStock,
               created_at: item.created_at,
               updated_at: item.updated_at,
@@ -489,14 +479,12 @@ export class CatalogRepository {
     }
 
     // High availability fallback: only for local dev / offline tests without DB
-    const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
     const filtered = state.products.filter((p) => {
       const matchesTenant =
         p.tenant_id === tenantId ||
         (tenantId === "shop-market" && p.tenant_id === "shop-market-ca") ||
         (tenantId === "shop-market-ca" && p.tenant_id === "shop-market");
       if (!matchesTenant || !p.is_active) return false;
-      if (isProduction && p.is_test) return false;
       if (categoryId && p.category_id !== categoryId) return false;
       if (query && !p.name.toLowerCase().includes(query.toLowerCase()))
         return false;
@@ -534,9 +522,6 @@ export class CatalogRepository {
     const initialStock = input.initialStock !== undefined ? input.initialStock : 20;
     const generatedId = generateUuid();
 
-    const isTestEnv = process.env.NODE_ENV === "test" || process.env.IS_TEST_ENV === "true";
-    const isTestProduct = Boolean(input.isTest ?? isTestEnv ?? false);
-
     let createdProduct: Product & { stock: number } = {
       id: generatedId,
       tenant_id: input.tenantId,
@@ -549,7 +534,6 @@ export class CatalogRepository {
       image_url: input.imageUrl || null,
       price_usd: input.priceUsd,
       is_active: true,
-      is_test: isTestProduct,
       is_tax_exempt: Boolean(input.isTaxExempt),
       stock: initialStock,
       created_at: new Date().toISOString(),
@@ -573,7 +557,6 @@ export class CatalogRepository {
             image_url: input.imageUrl || null,
             price_usd: input.priceUsd,
             is_active: true,
-            is_test: isTestProduct,
           };
 
           const { data: prodData, error } = await supabase
@@ -903,33 +886,19 @@ export class CatalogRepository {
 
     if (supabase && isUuid(productId)) {
       try {
-        const { data: existing } = await supabase
+        const { data, error } = await supabase
           .from("products")
-          .select("name, is_test")
+          .update({ is_active: false, updated_at: new Date().toISOString() })
           .eq("id", productId)
+          .eq("tenant_id", tenantId)
+          .select("name")
           .maybeSingle();
 
-        if (existing?.is_test) {
-          await supabase.from("inventory_movements").delete().eq("product_id", productId);
-          await supabase.from("inventory").delete().eq("product_id", productId);
-          await supabase.from("products").delete().eq("id", productId);
+        if (!error && data) {
           deletedSuccessfully = true;
-          deletedProductName = existing.name;
-        } else {
-          const { data, error } = await supabase
-            .from("products")
-            .update({ is_active: false, updated_at: new Date().toISOString() })
-            .eq("id", productId)
-            .eq("tenant_id", tenantId)
-            .select("name")
-            .maybeSingle();
-
-          if (!error && data) {
-            deletedSuccessfully = true;
-            deletedProductName = data.name;
-          } else if (error) {
-            console.warn("[Supabase] Delete product warning:", error.message || error);
-          }
+          deletedProductName = data.name;
+        } else if (error) {
+          console.warn("[Supabase] Delete product warning:", error.message || error);
         }
       } catch (e) {
         console.warn("[Supabase] Delete product exception:", e);

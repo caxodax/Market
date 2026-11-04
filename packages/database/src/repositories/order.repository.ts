@@ -57,7 +57,6 @@ export interface CreateOrderInput {
   cashTenderedUsd?: number;
   changeRequiredUsd?: number;
   idempotencyKey?: string;
-  isTest?: boolean; // 🧪 Si true, orden Sandbox visible únicamente en local
 }
 
 export interface SubmitPaymentInput {
@@ -412,9 +411,6 @@ export class OrderRepository {
     }
     const combinedNotes = [input.notes, ...extraCashNotes].filter(Boolean).join(" | ") || null;
 
-    const isTestEnv = process.env.NODE_ENV === "test" || process.env.IS_TEST_ENV === "true";
-    const isTestOrder = Boolean(input.isTest ?? isTestEnv ?? false);
-
     const newOrder: Order = {
       id: generateUuid(),
       tenant_id: input.tenantId,
@@ -443,7 +439,6 @@ export class OrderRepository {
       notes: combinedNotes,
       cash_tendered_usd: input.cashTenderedUsd ?? null,
       change_required_usd: input.changeRequiredUsd ?? null,
-      is_test: isTestOrder,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       customer_name: input.customerName,
@@ -536,7 +531,6 @@ export class OrderRepository {
           total_secondary: newOrder.total_ves,
           exchange_rate_applied: newOrder.exchange_rate_applied,
           notes: combinedNotes || null,
-          is_test: isTestOrder,
         };
 
         let { data: insertedOrder, error: orderInsertErr } = await supabase
@@ -560,7 +554,6 @@ export class OrderRepository {
             total_ves: newOrder.total_ves,
             exchange_rate_applied: newOrder.exchange_rate_applied,
             notes: combinedNotes || null,
-            is_test: isTestOrder,
           };
           const retryRes = await supabase
             .from("orders")
@@ -903,16 +896,11 @@ export class OrderRepository {
     const supabase = getSupabase();
     if (supabase) {
       try {
-        const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
         let query = supabase
           .from("orders")
           .select("*")
           .or(`tenant_id.eq.${actualTenantId},tenant_id.eq.${tenantId}`)
           .order("created_at", { ascending: false });
-
-        if (isProduction) {
-          query = query.eq("is_test", false);
-        }
 
         if (limit && limit > 0) {
           if (offset && offset > 0) {
@@ -997,7 +985,6 @@ export class OrderRepository {
               delivery_latitude: deliveryLat,
               delivery_longitude: deliveryLng,
               delivery_maps_url: deliveryMapsUrl,
-              is_test: Boolean(o.is_test),
             } as Order;
           });
         }
@@ -1008,9 +995,8 @@ export class OrderRepository {
 
     // In-memory fallback enriched with payments and stores
     if (isLiveDatabaseConfigured()) return [];
-    const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
     const filtered = state.orders
-      .filter((o) => (o.tenant_id === actualTenantId || o.tenant_id === tenantId) && (!isProduction || !o.is_test))
+      .filter((o) => o.tenant_id === actualTenantId || o.tenant_id === tenantId)
       .map((o) => {
         const pay = state.payments.find((p) => p.order_id === o.id);
         const cust = state.customers.find((c) => c.id === o.customer_id);
@@ -1054,7 +1040,6 @@ export class OrderRepository {
     const { startUtc, endUtc } = getCaracasRangeBounds(range);
 
     const filteredOrders = orders.filter((o) => {
-      if (o.is_test) return false;
       if (filter?.storeId && o.store_id !== filter.storeId) return false;
       if (startUtc) {
         const orderDate = new Date(o.created_at);

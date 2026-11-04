@@ -55,11 +55,6 @@ export function ProductCard({
     >
       {/* Product Image */}
       <div className="relative aspect-square w-full overflow-hidden bg-muted/30">
-        {product.is_test && (
-          <span className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500 text-white shadow-xs tracking-wider">
-            🧪 SANDBOX
-          </span>
-        )}
         {product.image_url ? (
           <img
             src={product.image_url}
