@@ -58,7 +58,7 @@ export function StoreHeader({
   }, [exchangeRate, settings.currency_settings]);
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border bg-background/95 backdrop-blur-md shadow-2xs transition-colors">
+    <header className="sticky top-0 z-40 w-full border-b border-border bg-background shadow-md transition-colors">
       {/* Announcement Banner */}
       {settings.operational_settings?.show_announcement_banner !== false &&
         Boolean(settings.operational_settings?.announcement_banner?.trim()) && (
@@ -198,7 +198,7 @@ export function StoreHeader({
           {/* Admin link (desktop only) */}
           <Link
             href="/login"
-            className="hidden md:inline-flex items-center gap-1.5 h-10 px-3.5 rounded-xl border border-border text-foreground hover:bg-muted text-xs sm:text-sm font-bold transition-colors"
+            className="hidden md:inline-flex items-center gap-1.5 h-10 px-3.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground text-xs sm:text-sm font-bold transition-all shadow-2xs hover:shadow-xs active:scale-95"
             title="Acceso administrativo de tienda y personal"
           >
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
@@ -209,7 +209,7 @@ export function StoreHeader({
           {onOpenTracker && (
             <button
               onClick={onOpenTracker}
-              className="hidden sm:inline-flex items-center gap-1.5 h-10 px-3.5 rounded-xl border border-border text-foreground hover:bg-muted text-xs sm:text-sm font-bold transition-colors cursor-pointer"
+              className="hidden sm:inline-flex items-center gap-1.5 h-10 px-3.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95"
               title="Rastrear pedido en tiempo real"
             >
               <Package className="w-4 h-4 text-primary" />
@@ -222,7 +222,7 @@ export function StoreHeader({
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95"
               title="Más opciones (Rastreo, Puntos, Admin)"
               aria-label="Más opciones"
             >
@@ -280,10 +280,10 @@ export function StoreHeader({
           {onOpenFavorites && (
             <button
               onClick={onOpenFavorites}
-              className={`min-h-[44px] min-w-[44px] sm:min-w-0 px-2 sm:px-3 py-1.5 flex items-center justify-center gap-2 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer active:scale-95 ${
+              className={`min-h-[44px] min-w-[44px] sm:min-w-0 px-2 sm:px-3 py-1.5 flex items-center justify-center gap-2 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer active:scale-95 shadow-2xs hover:shadow-xs ${
                 favoritesCount > 0
-                  ? "border-rose-500/30 text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20"
-                  : "border-border text-foreground hover:bg-muted"
+                  ? "border-rose-500/40 text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-950/60"
+                  : "border-border text-foreground bg-card hover:bg-muted"
               }`}
               title={favoritesCount > 0 ? `${favoritesCount} productos favoritos` : "Mis productos favoritos"}
               aria-label={favoritesCount > 0 ? `${favoritesCount} productos favoritos` : "Mis favoritos"}

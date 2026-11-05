@@ -43,7 +43,7 @@ Clasificación de productos del catálogo.
 
 ### `products`
 Fichas de productos vendibles en storefront y POS.
-- **Campos**: `id` (UUID, PK), `tenant_id` (TEXT -> `tenants.id`), `category_id` (UUID -> `categories.id`), `name` (TEXT), `slug` (TEXT), `description` (TEXT), `price` (NUMERIC(12,2) en USD), `cost_price` (NUMERIC(12,2)), `barcode` (TEXT, índice EAN-13), `sku` (TEXT), `image_url` (TEXT), `is_active` (BOOLEAN), `is_featured` (BOOLEAN), `track_inventory` (BOOLEAN), `metadata` (JSONB).
+- **Campos**: `id` (UUID, PK), `tenant_id` (TEXT -> `tenants.id`), `category_id` (UUID -> `categories.id`), `name` (TEXT), `slug` (TEXT), `description` (TEXT), `price_usd` (NUMERIC(12,2) en divisa base), `cost_price` (NUMERIC(12,2), costo contable), `barcode` (TEXT, índice EAN-13), `sku` (TEXT), `image_url` (TEXT), `is_active` (BOOLEAN), `is_test` (BOOLEAN, Sandbox/Local), `is_tax_exempt` (BOOLEAN), `external_product_id` (TEXT), `metadata` (JSONB).
 
 ### `inventory`
 Existencias en tiempo real por producto y sede física (soporta peso y fracciones).
@@ -57,7 +57,7 @@ Existencias en tiempo real por producto y sede física (soporta peso y fraccione
 
 ### `orders`
 Cabecera de pedidos generados en vitrina web o en mostrador con arquitectura bimonetaria nativa.
-- **Campos**: `id` (UUID, PK), `tenant_id` (TEXT -> `tenants.id`), `store_id` (UUID -> `stores.id`), `order_number` (TEXT, e.g. `'ORD-1042'`), `customer_name` (TEXT), `customer_phone` (TEXT), `customer_id_number` (TEXT), `customer_address` (TEXT), `delivery_type` (TEXT: `'pickup' | 'delivery'`), `delivery_zone_id` (UUID -> `delivery_zones.id`), `delivery_fee` (NUMERIC(12,2)), `subtotal` (NUMERIC(12,2)), `discount_amount` (NUMERIC(12,2)), `tax_amount` (NUMERIC(12,2)), `total` (NUMERIC(12,2)), `total_primary` (NUMERIC(12,2)), `total_secondary` (NUMERIC(12,2)), `currency` (TEXT), `currency_rate` (NUMERIC(14,4)), `exchange_rate` (NUMERIC(14,4)), `status` (TEXT: `'CREATED' | 'PAYMENT_PENDING' | 'PAYMENT_APPROVED' | 'PREPARING' | 'READY' | 'DELIVERING' | 'COMPLETED' | 'CANCELLED'`), `driver_id` (UUID -> `drivers.id`), `notes` (TEXT).
+- **Campos**: `id` (UUID, PK), `tenant_id` (TEXT -> `tenants.id`), `store_id` (UUID -> `stores.id`), `order_number` (TEXT, e.g. `'ORD-1042'`), `customer_name` (TEXT), `customer_phone` (TEXT), `customer_id_number` (TEXT), `customer_address` (TEXT), `delivery_type` (TEXT: `'pickup' | 'delivery'`), `delivery_zone_id` (UUID -> `delivery_zones.id`), `delivery_fee_usd` (NUMERIC(12,2)), `total_usd` (NUMERIC(12,2)), `total_ves` (NUMERIC(14,2)), `total_primary` (NUMERIC(12,2)), `total_secondary` (NUMERIC(14,2)), `exchange_rate_applied` (NUMERIC(14,4)), `is_test` (BOOLEAN, Sandbox/Local), `status` (TEXT: `'CREATED' | 'PAYMENT_PENDING' | 'PAYMENT_APPROVED' | 'PREPARING' | 'READY' | 'DELIVERING' | 'COMPLETED' | 'CANCELLED'`), `driver_id` (UUID -> `drivers.id`), `notes` (TEXT).
 
 ### `order_items`
 Renglones de detalle de cada pedido.
@@ -119,15 +119,22 @@ Activación dinámica de plugins por comercio.
 - **`accounting_accounts`**: Plan Único de Cuentas (PUC) de 4 niveles.
 - **`journal_entries` & `journal_entry_lines`**: Asientos contables por partida doble.
 
+### Taller de Sublimación, DTF & Artes Gráficas (`craft_workshop`) — Migración 00033
+- **`craft_materials`**: Catálogo maestro de insumos por bulto/paquete (`pack_quantity`, `pack_price_base`, `unit_cost_base` GENERATED STORED).
+- **`craft_recipes`**: Fichas de escandallo con costos directos, merma técnica (`waste_percentage`), mano de obra (`labor_cost_base`), margen (`margin_percentage`) y precios al detal y mayor.
+- **`craft_recipe_items`**: Renglones relacionales de insumos utilizados en cada receta con snapshot de costos y `cost_used_base` GENERATED STORED.
+- **`craft_quotes`**: Presupuestos para clientes y WhatsApp con cálculo automático del 50% de anticipo (`deposit_required_base`).
+
 ---
 
-## 6. Procedimientos Almacenados y RPCs Transaccionales (Migración 00030)
+## 6. Procedimientos Almacenados y RPCs Transaccionales
 
 PostgreSQL gestiona de manera autónoma las operaciones críticas que requieren consistencia ACID y alta velocidad de ejecución:
 
 | Procedimiento Almacenado | Argumentos | Responsabilidad y Garantía ACID |
 | :--- | :--- | :--- |
-| **`rpc_create_order_atomic`** | `p_order_data JSONB` | Crea pedido, valida cupón de descuento con `FOR UPDATE`, detecta si el comercio es `food_service` (descarga recetas en gramos de `raw_materials`) o `retail` (descarga unidades/kilos de `inventory`), registra kardex en `inventory_movements` y confirma pedido. Realiza `ROLLBACK` total automático ante cualquier falta de stock. |
+| **`rpc_create_order_atomic`** | `p_order_data JSONB` | Crea pedido, valida cupón de descuento con `FOR UPDATE`, detecta si el comercio es `food_service` (descarga recetas en gramos de `raw_materials`), `craft_workshop` (descarga insumos de `craft_materials`) o `retail` (descarga unidades/kilos de `inventory`), registra kardex en `inventory_movements` y confirma pedido. Realiza `ROLLBACK` total automático ante cualquier falta de stock. |
+| **`rpc_recalculate_craft_recipes`** | `p_tenant_id TEXT, p_sync_storefront BOOLEAN` | Actualiza en bloque (< 5 ms) todos los snapshots de costos de recetas en `craft_recipe_items` y recalcula costos directos y precios de venta en `craft_recipes`. Si se activa `p_sync_storefront`, actualiza `price_usd` y `cost_price` en la tabla `products`. |
 | **`rpc_issue_fiscal_document`** | `p_payload JSONB` | Adquiere bloqueo exclusivo con `FOR UPDATE` sobre `fiscal_sequences`, asigna el siguiente número consecutivo SENIAT, crea el documento en `fiscal_documents` y genera el asiento contable por partida doble balanceado ($\sum \text{Débito} = \sum \text{Crédito}$) en `journal_entries` / `journal_entry_lines`. |
 | **`rpc_close_pos_shift`** | `p_payload JSONB` | Ejecuta el arqueo ciego de caja en PostgreSQL: suma todos los pagos en efectivo recibidos durante el turno en moneda principal y secundaria, calcula sobrantes o faltantes (`difference_primary`, `difference_secondary`) y sella el turno en `pos_shifts`. |
 | **`rpc_get_sales_book`** | `p_tenant_id TEXT, p_year_month TEXT` | Agrega y formatea en milisegundos todo el Libro de Ventas mensual con base imponible, alícuotas IVA, exenciones, IGTF y retenciones para declaración tributaria ante el SENIAT. |

@@ -8,3 +8,9 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Ensure horizontal overflow is clipped without establishing a scroll container, allowing position: sticky to work */
+html,
+body {
+  overflow-x: clip;
+}

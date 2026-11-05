@@ -438,7 +438,7 @@ export function CatalogView({
       }`}
     >
       {/* Search and Category Combobox Bar - Sticky under StoreHeader (Mobile/Tablet Only) */}
-      <div className={`bg-background/95 backdrop-blur border-b border-border sticky ${onSearchQueryChange ? "top-[138px] sm:top-[148px]" : "top-[92px] sm:top-[102px]"} z-20 shadow-xs lg:hidden transition-all`}>
+      <div className={`bg-background border-b border-border sticky ${onSearchQueryChange ? "top-[138px] sm:top-[148px]" : "top-[92px] sm:top-[102px]"} z-20 shadow-xs lg:hidden transition-all`}>
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-2.5 space-y-2">
           {/* STEP 1: CATEGORÍAS (Explicitly ABOVE the search bar for both Mobile and Desktop) */}
           <div className="relative">

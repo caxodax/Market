@@ -1619,7 +1619,7 @@ export function AdminDashboard({
   }, [activeModuleIds, activeTab, modulesList]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex w-full max-w-full overflow-x-hidden">
+    <div className="min-h-screen bg-background text-foreground flex w-full max-w-full overflow-x-clip">
       {/* 1. DESKTOP LEFT SIDEBAR */}
       <aside
         className={`hidden lg:flex flex-col border-r border-border bg-card/75 backdrop-blur sticky top-0 h-screen shrink-0 transition-all duration-300 z-30 select-none ${
@@ -1928,7 +1928,7 @@ export function AdminDashboard({
       {/* 3. RIGHT MAIN CONTENT COLUMN */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen bg-background">
         {/* Top Header */}
-        <header className="border-b border-border bg-card/60 backdrop-blur sticky top-0 z-20 w-full">
+        <header className="border-b border-border bg-card sticky top-0 z-20 w-full shadow-xs">
           <div className="px-3 sm:px-6 h-16 flex items-center justify-between gap-2">
             {/* Left: Mobile hamburger + Active module title */}
             <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
@@ -2125,7 +2125,7 @@ export function AdminDashboard({
         </header>
 
         {/* Main Body */}
-        <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 flex-1 w-full space-y-5 overflow-x-hidden">
+        <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 flex-1 w-full space-y-5 overflow-x-clip">
         {/* PLATFORM SUPPORT IMPERSONATION BANNER ("LOGIN AS") */}
         {currentUser?.impersonation ? (
           <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-950 border border-purple-500/50 text-white shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300">

@@ -39,8 +39,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es" className="overflow-x-hidden">
-      <body className="min-h-screen bg-background text-foreground antialiased overflow-x-hidden w-full max-w-full">
+    <html lang="es" className="overflow-x-clip">
+      <body className="min-h-screen bg-background text-foreground antialiased overflow-x-clip w-full max-w-full">
         {children}
         <PwaUpdateManager />
       </body>

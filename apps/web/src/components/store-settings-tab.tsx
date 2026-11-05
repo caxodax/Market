@@ -608,7 +608,7 @@ export function StoreSettingsTab({
   };
 
   return (
-    <div className="space-y-5 animate-in fade-in w-full max-w-full overflow-x-hidden">
+    <div className="space-y-5 animate-in fade-in w-full max-w-full overflow-x-clip">
       {/* Top Header & Save Button Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl bg-card border border-border shadow-xs">
         <div>

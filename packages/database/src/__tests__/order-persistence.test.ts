@@ -199,7 +199,7 @@ async function runChecks() {
       await supabase.from("categories").delete().eq("id", catTest.id);
     }
     if (orderA?.id) {
-      await supabase.from("order_payments").delete().eq("order_id", orderA.id);
+      await supabase.from("payments").delete().eq("order_id", orderA.id);
       await supabase.from("order_items").delete().eq("order_id", orderA.id);
       await supabase.from("orders").delete().eq("id", orderA.id);
     }

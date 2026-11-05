@@ -14,6 +14,7 @@ export * from "./purchasing.ts";
 export * from "./analytics.ts";
 export * from "./accounting.ts";
 export * from "./commissions-fintech.ts";
+export * from "./craft.ts";
 
 import type { SelectedModifier } from "./food-service.ts";
 
