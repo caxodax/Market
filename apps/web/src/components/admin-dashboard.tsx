@@ -138,6 +138,10 @@ const MtoCpqAdminPanel = dynamic(
   () => import("@marketos/plugin-mto-cpq").then((m) => m.MtoCpqAdminPanel),
   { loading: TabLoading }
 );
+const CraftWorkshopAdminPanel = dynamic(
+  () => import("./craft-workshop-admin").then((m) => m.CraftWorkshopAdmin),
+  { loading: TabLoading }
+);
 const InvoicingManagerAdmin = dynamic(
   () => import("@marketos/plugin-invoicing").then((m) => m.InvoicingManagerAdmin),
   { loading: TabLoading }
@@ -231,6 +235,7 @@ import {
   X,
   Smartphone,
   Layers,
+  Printer,
   Building2,
   Phone,
   Menu,
@@ -347,6 +352,7 @@ export function AdminDashboard({
     | "PLUGINS"
     | "STOREFRONT_STUDIO"
     | "MTO_CPQ"
+    | "CRAFT_WORKSHOP"
     | "INVOICING"
     | "PURCHASING"
     | "ACCOUNTING"
@@ -1244,6 +1250,7 @@ export function AdminDashboard({
       | "PLUGINS"
       | "STOREFRONT_STUDIO"
       | "MTO_CPQ"
+      | "CRAFT_WORKSHOP"
       | "INVOICING"
       | "PURCHASING"
       | "ACCOUNTING";
@@ -1407,6 +1414,20 @@ export function AdminDashboard({
             icon: <Layers className="w-4 h-4 shrink-0" />,
             badge: "Taller Activo",
             badgeClassName: "bg-indigo-500/10 text-indigo-600 border border-indigo-500/20 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+          },
+        ]
+      : []),
+    ...(activeModuleIds.includes("craft_workshop")
+      ? [
+          {
+            id: "CRAFT_WORKSHOP" as const,
+            category: "CATALOG" as const,
+            label: "Taller Sublimación & DTF",
+            shortLabel: "Taller Gráfico",
+            description: "Costeo por técnica, insumos por bulto y cotizador WhatsApp",
+            icon: <Printer className="w-4 h-4 shrink-0" />,
+            badge: "Taller",
+            badgeClassName: "bg-fuchsia-500/10 text-fuchsia-600 border border-fuchsia-500/20 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
           },
         ]
       : []),
@@ -1643,14 +1664,14 @@ export function AdminDashboard({
                   </div>
                 )}
                 <div className="min-w-0">
-                  <div className="font-extrabold text-sm tracking-tight text-foreground truncate">
+                  <div className="font-black text-base tracking-tight text-foreground truncate">
                     {settingsState.business_name}
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-[9px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-1.5 py-0.2 rounded-full shrink-0">
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded-full shrink-0">
                       Tenant
                     </span>
-                    <span className="text-[10px] text-muted-foreground truncate">
+                    <span className="text-xs font-mono font-medium text-foreground/80 truncate">
                       {settingsState.tenant_id}
                     </span>
                   </div>
@@ -1658,21 +1679,21 @@ export function AdminDashboard({
                     <button
                       type="button"
                       onClick={() => triggerUpgradeModal("general")}
-                      className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-xs ${
+                      className={`inline-flex items-center gap-1.5 text-xs font-extrabold px-2.5 py-1 rounded-lg border transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-2xs ${
                         planLimitsState?.plan.id === "ENTERPRISE"
-                          ? "bg-purple-500/10 text-purple-600 border-purple-500/30"
+                          ? "bg-purple-500/10 text-purple-600 border-purple-500/30 dark:text-purple-400"
                           : planLimitsState?.plan.id === "GROWTH"
-                          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
-                          : "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30 dark:text-emerald-400"
+                          : "bg-amber-500/10 text-amber-600 border-amber-500/30 dark:text-amber-400"
                       }`}
                       title="Plan SaaS Activo - Clic para ver cuotas y planes"
                     >
                       {planLimitsState?.plan.id === "ENTERPRISE" ? (
-                        <Crown className="w-3 h-3 text-purple-500" />
+                        <Crown className="w-3.5 h-3.5 text-purple-500" />
                       ) : planLimitsState?.plan.id === "GROWTH" ? (
-                        <Sparkles className="w-3 h-3 text-emerald-500" />
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
                       ) : (
-                        <Zap className="w-3 h-3 text-amber-500" />
+                        <Zap className="w-3.5 h-3.5 text-amber-500" />
                       )}
                       <span>{planLimitsState?.plan.name || "Plan Starter"}</span>
                     </button>
@@ -1721,7 +1742,7 @@ export function AdminDashboard({
             return (
               <div key={cat.id} className="space-y-1">
                 {!isSidebarCollapsed ? (
-                  <div className="px-2.5 pt-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground/70">
+                  <div className="px-3 pt-1.5 pb-0.5 text-xs font-black uppercase tracking-wider text-muted-foreground/90">
                     {cat.title}
                   </div>
                 ) : (
@@ -1739,20 +1760,20 @@ export function AdminDashboard({
                         className={`w-full flex items-center rounded-xl transition-all cursor-pointer ${
                           isSidebarCollapsed
                             ? "justify-center p-2.5 relative"
-                            : "justify-between px-3 py-2 text-left"
+                            : "justify-between px-3.5 py-2.5 text-left"
                         } ${
                           isActive
-                            ? "bg-primary text-primary-foreground font-bold shadow-xs"
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                            ? "bg-primary text-primary-foreground font-black shadow-xs"
+                            : "text-foreground/80 hover:text-foreground hover:bg-muted font-bold"
                         }`}
                       >
-                        <div className={`flex items-center min-w-0 ${isSidebarCollapsed ? "" : "gap-2.5"}`}>
+                        <div className={`flex items-center min-w-0 ${isSidebarCollapsed ? "" : "gap-3"}`}>
                           <span className={isActive ? "text-primary-foreground" : "text-muted-foreground"}>
                             {mod.icon}
                           </span>
                           {!isSidebarCollapsed && (
                             <div className="min-w-0">
-                              <div className="text-xs font-bold truncate leading-tight">
+                              <div className="text-sm font-extrabold truncate leading-tight">
                                 {mod.shortLabel}
                               </div>
                             </div>
@@ -1762,7 +1783,7 @@ export function AdminDashboard({
                         {!isSidebarCollapsed ? (
                           mod.badge && (
                             <span
-                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ml-1.5 ${
+                              className={`text-xs font-black px-2 py-0.5 rounded-full shrink-0 ml-1.5 ${
                                 isActive ? "bg-white text-primary" : mod.badgeClassName
                               }`}
                             >
@@ -1828,10 +1849,10 @@ export function AdminDashboard({
                   </div>
                 )}
                 <div className="min-w-0">
-                  <div className="font-extrabold text-xs text-foreground truncate">
+                  <div className="font-black text-base text-foreground truncate">
                     {settingsState.business_name}
                   </div>
-                  <div className="text-[10px] text-muted-foreground truncate">
+                  <div className="text-xs font-semibold text-muted-foreground truncate">
                     Módulos Administrativos
                   </div>
                 </div>
@@ -1839,7 +1860,7 @@ export function AdminDashboard({
               <button
                 type="button"
                 onClick={() => setIsMobileNavOpen(false)}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                className="p-2 rounded-xl border border-border text-foreground hover:bg-muted transition-colors cursor-pointer"
                 title="Cerrar menú"
               >
                 <X className="w-5 h-5" />
@@ -1847,16 +1868,16 @@ export function AdminDashboard({
             </div>
 
             {/* Drawer Modules */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-4">
+            <div className="flex-1 overflow-y-auto p-3.5 space-y-4">
               {moduleCategories.map((cat) => {
                 const catModules = modulesList.filter((m) => m.category === cat.id);
                 if (catModules.length === 0) return null;
                 return (
                   <div key={cat.id} className="space-y-1">
-                    <div className="px-2 pt-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                    <div className="px-2.5 pt-1.5 pb-0.5 text-xs font-black uppercase tracking-wider text-muted-foreground/90">
                       {cat.title}
                     </div>
-                    <div className="space-y-0.5">
+                    <div className="space-y-1">
                       {catModules.map((mod) => {
                         const isActive = activeTab === mod.id;
                         return (
@@ -1867,10 +1888,10 @@ export function AdminDashboard({
                               setActiveTab(mod.id);
                               setIsMobileNavOpen(false);
                             }}
-                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer ${
+                            className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-left transition-all cursor-pointer ${
                               isActive
-                                ? "bg-primary text-primary-foreground font-bold shadow-xs"
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                ? "bg-primary text-primary-foreground font-black shadow-xs"
+                                : "text-foreground/80 hover:text-foreground hover:bg-muted font-bold"
                             }`}
                           >
                             <div className="flex items-center gap-3 min-w-0">
@@ -1878,12 +1899,12 @@ export function AdminDashboard({
                                 {mod.icon}
                               </span>
                               <div className="min-w-0">
-                                <div className="text-xs font-bold truncate leading-tight">
+                                <div className="text-sm font-extrabold truncate leading-tight">
                                   {mod.label}
                                 </div>
                                 <div
-                                  className={`text-[10px] truncate ${
-                                    isActive ? "text-primary-foreground/80" : "text-muted-foreground"
+                                  className={`text-xs truncate ${
+                                    isActive ? "text-primary-foreground/90 font-medium" : "text-muted-foreground font-normal"
                                   }`}
                                 >
                                   {mod.description}
@@ -1892,7 +1913,7 @@ export function AdminDashboard({
                             </div>
                             {mod.badge && (
                               <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ml-2 ${
+                                className={`text-xs font-black px-2 py-0.5 rounded-full shrink-0 ml-2 ${
                                   isActive ? "bg-white text-primary" : mod.badgeClassName
                                 }`}
                               >
@@ -1909,16 +1930,16 @@ export function AdminDashboard({
             </div>
 
             {/* Drawer Footer */}
-            <div className="p-3 border-t border-border bg-muted/20">
+            <div className="p-3.5 border-t border-border bg-card">
               <a
                 href={`/?tenant=${settingsState.tenant_id}`}
                 target="_blank"
                 rel="noreferrer"
-                className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl bg-card border border-border text-xs font-bold text-foreground hover:bg-muted transition-colors"
+                className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-card border border-border text-sm font-bold text-foreground hover:bg-muted transition-colors shadow-2xs"
               >
-                <Smartphone className="w-4 h-4 text-primary" />
+                <Smartphone className="w-4.5 h-4.5 text-primary" />
                 <span>Ver Tienda PWA</span>
-                <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
               </a>
             </div>
           </aside>
@@ -1943,10 +1964,10 @@ export function AdminDashboard({
 
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground hidden sm:inline">
+                  <span className="text-xs font-black uppercase tracking-wider text-muted-foreground hidden sm:inline">
                     {moduleCategories.find((c) => c.id === currentModule?.category)?.title || "Dashboard"} /
                   </span>
-                  <h1 className="font-extrabold text-sm sm:text-base tracking-tight text-foreground truncate flex items-center gap-2">
+                  <h1 className="font-black text-base sm:text-xl md:text-2xl tracking-tight text-foreground truncate flex items-center gap-2">
                     <span>{currentModule?.label || "Módulo"}</span>
                     {currentModule?.badge && (
                       <span className={currentModule.badgeClassName}>
@@ -1956,7 +1977,7 @@ export function AdminDashboard({
                   </h1>
                 </div>
                 {currentModule?.description && (
-                  <p className="text-[11px] text-muted-foreground truncate hidden md:block">
+                  <p className="text-xs sm:text-sm font-medium text-foreground/80 truncate hidden md:block">
                     {currentModule.description}
                   </p>
                 )}
@@ -1969,7 +1990,7 @@ export function AdminDashboard({
               <button
                 type="button"
                 onClick={() => triggerUpgradeModal("general")}
-                className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-xs ${
+                className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs sm:text-sm font-extrabold transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-2xs ${
                   planLimitsState?.plan.id === "ENTERPRISE"
                     ? "bg-purple-500/10 text-purple-600 border-purple-500/30 dark:text-purple-400"
                     : planLimitsState?.plan.id === "GROWTH"
@@ -1979,11 +2000,11 @@ export function AdminDashboard({
                 title="Límites y Cuotas de tu Plan SaaS - Clic para ver opciones"
               >
                 {planLimitsState?.plan.id === "ENTERPRISE" ? (
-                  <Crown className="w-3.5 h-3.5 text-purple-500" />
+                  <Crown className="w-4 h-4 text-purple-500" />
                 ) : planLimitsState?.plan.id === "GROWTH" ? (
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                  <Sparkles className="w-4 h-4 text-emerald-500" />
                 ) : (
-                  <Zap className="w-3.5 h-3.5 text-amber-500" />
+                  <Zap className="w-4 h-4 text-amber-500" />
                 )}
                 <span>{planLimitsState?.plan.name || "Plan Starter"}</span>
               </button>
@@ -1991,10 +2012,10 @@ export function AdminDashboard({
               {activeModuleIds.includes("local_venezuela") && (
                 <button
                   onClick={() => setActiveTab("RATES")}
-                  className="hidden md:flex items-center gap-1.5 text-xs bg-muted/60 hover:bg-muted border border-border px-2.5 py-1.5 rounded-xl font-mono transition-colors cursor-pointer"
+                  className="hidden md:flex items-center gap-1.5 text-xs sm:text-sm bg-muted/60 hover:bg-muted border border-border px-3 py-2 rounded-xl font-mono font-bold transition-colors cursor-pointer"
                   title="Clic para ver monitor de tasas e histórico"
                 >
-                  <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                  <TrendingUp className="w-4 h-4 text-emerald-500" />
                   <span>BCV:</span>
                   <strong className="text-foreground">
                     Bs. {rate.value.toFixed(2)}
@@ -2008,7 +2029,7 @@ export function AdminDashboard({
                   setSoundEnabled(next);
                   if (next) playChime();
                 }}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs sm:text-sm font-bold transition-colors ${
                   soundEnabled
                     ? "bg-primary/10 border-primary/30 text-primary"
                     : "bg-muted border-border text-muted-foreground"
@@ -2017,12 +2038,12 @@ export function AdminDashboard({
               >
                 {soundEnabled ? (
                   <>
-                    <Volume2 className="w-3.5 h-3.5 text-primary" />
+                    <Volume2 className="w-4 h-4 text-primary" />
                     <span className="hidden xl:inline">Sonido</span>
                   </>
                 ) : (
                   <>
-                    <VolumeX className="w-3.5 h-3.5" />
+                    <VolumeX className="w-4 h-4" />
                     <span className="hidden xl:inline">Silenciado</span>
                   </>
                 )}
@@ -2032,11 +2053,11 @@ export function AdminDashboard({
                 <button
                   onClick={handleSyncBcv}
                   disabled={syncingBcv}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-secondary text-secondary-foreground text-xs font-semibold hover:bg-secondary/80 transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-secondary text-secondary-foreground text-xs sm:text-sm font-bold hover:bg-secondary/80 transition-colors disabled:opacity-50"
                   title="Sincronizar tasa oficial del BCV desde la API a la base de datos"
                 >
                   <RefreshCw
-                    className={`w-3.5 h-3.5 ${syncingBcv ? "animate-spin" : ""}`}
+                    className={`w-4 h-4 ${syncingBcv ? "animate-spin" : ""}`}
                   />
                   <span className="hidden xl:inline">
                     {syncingBcv ? "Sincronizando..." : "Sincronizar BCV"}
@@ -2047,11 +2068,11 @@ export function AdminDashboard({
               <button
                 onClick={handleRefreshOrdersAndPayments}
                 disabled={refreshingOrders}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-card border border-border text-foreground text-xs font-semibold hover:bg-muted transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-card border border-border text-foreground text-xs sm:text-sm font-bold hover:bg-muted transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
                 title="Refrescar pedidos y pagos más recientes"
               >
                 <RefreshCw
-                  className={`w-3.5 h-3.5 text-primary ${
+                  className={`w-4 h-4 text-primary ${
                     refreshingOrders ? "animate-spin" : ""
                   }`}
                 />
@@ -2091,25 +2112,25 @@ export function AdminDashboard({
               {currentUser && (
                 <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-border">
                   <div className="hidden 2xl:flex flex-col text-right">
-                    <span className="text-xs font-bold text-foreground truncate max-w-[120px]">
+                    <span className="text-sm font-black text-foreground truncate max-w-[140px]">
                       {currentUser.full_name}
                     </span>
                     {currentUser.impersonation ? (
-                      <span className="text-[10px] text-purple-400 font-extrabold flex items-center justify-end gap-1">
+                      <span className="text-xs text-purple-400 font-black flex items-center justify-end gap-1">
                         <span>🎭 Modo Soporte</span>
                       </span>
                     ) : (
-                      <span className="text-[10px] text-muted-foreground font-mono">
+                      <span className="text-xs text-foreground/80 font-mono font-bold">
                         {ROLE_LABELS[currentUser.role]?.label || currentUser.role}
                       </span>
                     )}
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive text-xs font-semibold hover:bg-destructive/20 transition-all cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive text-xs sm:text-sm font-bold hover:bg-destructive/20 transition-all cursor-pointer"
                     title="Cerrar sesión"
                   >
-                    <LogOut className="w-3.5 h-3.5" />
+                    <LogOut className="w-4 h-4" />
                     <span className="hidden sm:inline">Salir</span>
                   </button>
                 </div>
@@ -2356,33 +2377,33 @@ export function AdminDashboard({
         {/* TAB 1: PAYMENTS VALIDATION */}
         {activeTab === "PAYMENTS" && (
           <div className="space-y-4 animate-in fade-in">
-            <h2 className="text-sm font-bold text-foreground">
+            <h2 className="text-lg sm:text-2xl font-black text-foreground tracking-tight">
               Cola de Comprobantes de Pago
             </h2>
 
             {payments.length === 0 ? (
-              <div className="p-8 text-center rounded-2xl border border-dashed border-border bg-card">
-                <p className="text-xs text-muted-foreground">
+              <div className="p-10 text-center rounded-2xl border border-dashed border-border bg-card">
+                <p className="text-sm font-semibold text-muted-foreground">
                   No hay comprobantes de pago registrados aún.
                 </p>
               </div>
             ) : (
-              <div className="grid gap-3">
+              <div className="grid gap-3.5">
                 {payments.map((payment) => {
                   const relatedOrder = orders.find((o) => o.id === payment.order_id);
 
                   return (
                     <div
                       key={payment.id}
-                      className="p-4 rounded-2xl border border-border bg-card flex flex-col md:flex-row md:items-center justify-between gap-4"
+                      className="p-5 rounded-2xl border border-border bg-card flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs hover:border-primary/30 transition-all"
                     >
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-black text-foreground">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <span className="font-mono text-sm sm:text-base font-black text-foreground">
                             {relatedOrder?.order_number || payment.order_id}
                           </span>
                           <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            className={`text-xs font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${
                               payment.status === "APPROVED"
                                 ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
                                 : payment.status === "REJECTED"
@@ -2394,23 +2415,26 @@ export function AdminDashboard({
                           </span>
                         </div>
 
-                        <div className="text-xs text-muted-foreground space-y-0.5">
-                          <p>
-                            <strong>Método:</strong> {payment.method} • {payment.bank_name}
+                        <div className="text-sm text-foreground/90 space-y-1.5">
+                          <p className="flex items-center gap-1.5 flex-wrap">
+                            <strong className="text-foreground font-black">Método:</strong>{" "}
+                            <span className="font-semibold">{payment.method} • {payment.bank_name}</span>
                           </p>
-                          <p>
-                            <strong>Referencia:</strong>{" "}
-                            <span className="font-mono font-bold text-foreground">
+                          <p className="flex items-center gap-2 flex-wrap">
+                            <strong className="text-foreground font-black">Referencia:</strong>{" "}
+                            <span className="font-mono font-black text-sm text-primary px-2.5 py-0.5 rounded-lg bg-primary/10 border border-primary/20">
                               {payment.reference_number}
                             </span>
                           </p>
-                          <p>
-                            <strong>Monto Reportado:</strong>{" "}
-                            {payment.currency === "USD"
-                              ? formatCurrency(payment.amount, "USD")
-                              : payment.currency === "VES"
-                              ? `Bs. ${payment.amount.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`
-                              : formatCurrency(payment.amount, payment.currency as any)}
+                          <p className="flex items-center gap-2 flex-wrap pt-0.5">
+                            <strong className="text-foreground font-black">Monto Reportado:</strong>{" "}
+                            <span className="font-mono font-black text-base sm:text-lg text-foreground">
+                              {payment.currency === "USD"
+                                ? formatCurrency(payment.amount, "USD")
+                                : payment.currency === "VES"
+                                ? `Bs. ${payment.amount.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`
+                                : formatCurrency(payment.amount, payment.currency as any)}
+                            </span>
                           </p>
                         </div>
 
@@ -2420,9 +2444,9 @@ export function AdminDashboard({
                               href={payment.proof_image_url}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-primary hover:underline"
                             >
-                              <ExternalLink className="w-3 h-3" />
+                              <ExternalLink className="w-3.5 h-3.5" />
                               <span>Ver captura en Cloudflare R2</span>
                             </a>
                           </div>
@@ -2434,9 +2458,9 @@ export function AdminDashboard({
                           <button
                             type="button"
                             onClick={() => setSelectedOrderForModal(relatedOrder)}
-                            className="px-3 py-1.5 rounded-xl border border-border bg-muted/60 hover:bg-muted text-foreground text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                            className="px-3.5 py-2 rounded-xl border border-border bg-muted/60 hover:bg-muted text-foreground text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
                           >
-                            <Eye className="w-3.5 h-3.5 text-primary" />
+                            <Eye className="w-4 h-4 text-primary" />
                             <span>Ver Pedido</span>
                           </button>
                         )}
@@ -2446,7 +2470,7 @@ export function AdminDashboard({
                             <button
                               disabled={processingId === payment.id}
                               onClick={() => handleReview(payment.id, "REJECTED")}
-                              className="px-3 py-1.5 rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/10 text-xs font-bold transition-colors disabled:opacity-50 cursor-pointer"
+                              className="px-3.5 py-2 rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/10 text-xs sm:text-sm font-bold transition-all disabled:opacity-50 cursor-pointer shadow-2xs active:scale-95"
                             >
                               Rechazar
                             </button>
@@ -2454,12 +2478,12 @@ export function AdminDashboard({
                             <button
                               disabled={processingId === payment.id}
                               onClick={() => handleReview(payment.id, "APPROVED")}
-                              className="px-4 py-1.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                              className="px-4 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 text-xs sm:text-sm font-bold transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer shadow-xs active:scale-95"
                             >
                               {processingId === payment.id ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <Loader2 className="w-4 h-4 animate-spin" />
                               ) : (
-                                <CheckCircle className="w-3.5 h-3.5" />
+                                <CheckCircle className="w-4 h-4" />
                               )}
                               <span>Aprobar Pago</span>
                             </button>
@@ -2479,10 +2503,10 @@ export function AdminDashboard({
           <div className="space-y-4 animate-in fade-in">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-sm font-bold text-foreground">
+                <h2 className="text-lg sm:text-2xl font-black text-foreground tracking-tight">
                   Despacho y Seguimiento de Pedidos
                 </h2>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-xs sm:text-sm font-medium text-foreground/80">
                   Gestiona el estado, comprobantes y entregas de tus clientes en tiempo real
                 </p>
               </div>
@@ -2491,15 +2515,15 @@ export function AdminDashboard({
                 type="button"
                 onClick={handleRefreshOrdersAndPayments}
                 disabled={refreshingOrders}
-                className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card hover:bg-muted text-xs font-semibold text-foreground transition-colors cursor-pointer disabled:opacity-50"
+                className="self-start sm:self-auto inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-border bg-card hover:bg-muted text-xs sm:text-sm font-bold text-foreground transition-all cursor-pointer disabled:opacity-50 shadow-2xs active:scale-95"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${refreshingOrders ? "animate-spin" : ""}`} />
+                <RefreshCw className={`w-4 h-4 ${refreshingOrders ? "animate-spin" : ""}`} />
                 <span>Actualizar</span>
               </button>
             </div>
 
             {/* Search & Filter Bar */}
-            <div className="p-3.5 rounded-2xl border border-border bg-card space-y-3">
+            <div className="p-4 rounded-2xl border border-border bg-card space-y-3.5 shadow-xs">
               <div className="relative">
                 <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
@@ -2507,13 +2531,13 @@ export function AdminDashboard({
                   placeholder="Buscar por cliente (ej. Luis Montes), teléfono (04128505629), orden (ORD-...) o producto..."
                   value={orderSearchQuery}
                   onChange={(e) => setOrderSearchQuery(e.target.value)}
-                  className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full h-12 pl-10 pr-20 rounded-xl border border-border bg-background text-sm sm:text-base font-medium text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary shadow-2xs"
                 />
                 {orderSearchQuery && (
                   <button
                     type="button"
                     onClick={() => setOrderSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 px-2.5 py-1 text-xs font-bold rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer transition-colors"
                   >
                     Limpiar
                   </button>
@@ -2521,7 +2545,7 @@ export function AdminDashboard({
               </div>
 
               {/* Status Pills */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs sm:text-sm">
                 {[
                   { id: "ALL", label: `Todos (${orders.length})` },
                   { id: "PAYMENT_PENDING", label: `Pendientes (${orders.filter(o => o.status === "PAYMENT_PENDING").length})` },
@@ -2536,10 +2560,10 @@ export function AdminDashboard({
                     key={pill.id}
                     type="button"
                     onClick={() => setOrderStatusFilter(pill.id)}
-                    className={`px-2.5 py-1 rounded-lg font-medium whitespace-nowrap transition-colors cursor-pointer text-[11px] ${
+                    className={`px-3 py-1.5 rounded-xl font-extrabold whitespace-nowrap transition-all cursor-pointer text-xs sm:text-sm ${
                       orderStatusFilter === pill.id
-                        ? "bg-primary text-primary-foreground font-bold"
-                        : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                   >
                     {pill.label}
@@ -2550,14 +2574,14 @@ export function AdminDashboard({
               {/* Branch Filter if stores exist */}
               {stores.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60">
-                  <div className="flex items-center gap-1.5 text-muted-foreground text-[11px] font-semibold">
-                    <Building2 className="w-3.5 h-3.5 text-primary" />
+                  <div className="flex items-center gap-2 text-foreground/80 text-xs sm:text-sm font-bold">
+                    <Building2 className="w-4 h-4 text-primary" />
                     <span>Sucursal:</span>
                   </div>
                   <select
                     value={storeFilter}
                     onChange={(e) => setStoreFilter(e.target.value)}
-                    className="h-8 px-2.5 rounded-lg border border-border bg-background text-[11px] font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                    className="h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer shadow-2xs"
                   >
                     <option value="ALL">Todas las sucursales ({orders.length} pedidos)</option>
                     {stores.map((s) => (
@@ -2570,7 +2594,7 @@ export function AdminDashboard({
                     <button
                       type="button"
                       onClick={() => setStoreFilter("ALL")}
-                      className="text-[11px] text-primary hover:underline font-bold"
+                      className="text-xs sm:text-sm text-primary hover:underline font-extrabold cursor-pointer"
                     >
                       Ver todas
                     </button>
@@ -2581,7 +2605,7 @@ export function AdminDashboard({
 
             {filteredOrders.length === 0 ? (
               <div className="p-8 text-center rounded-2xl border border-dashed border-border bg-card space-y-2">
-                <p className="text-xs font-semibold text-foreground">
+                <p className="text-sm font-bold text-foreground">
                   {orders.length === 0
                     ? "No hay pedidos registrados aún."
                     : "No se encontraron pedidos que coincidan con la búsqueda o filtro."}
@@ -2593,7 +2617,7 @@ export function AdminDashboard({
                       setOrderSearchQuery("");
                       setOrderStatusFilter("ALL");
                     }}
-                    className="text-xs text-primary underline"
+                    className="text-xs sm:text-sm font-bold text-primary underline cursor-pointer"
                   >
                     Restablecer filtros
                   </button>
@@ -2601,31 +2625,31 @@ export function AdminDashboard({
               </div>
             ) : (
               <>
-                <div className="grid gap-3">
+                <div className="grid gap-3.5">
                 {paginatedOrders.map((order) => {
                   const driver = drivers.find((d) => d.id === order.driver_id) || drivers[0];
 
                   return (
                     <div
                       key={order.id}
-                      className="p-4 rounded-2xl border border-border bg-card space-y-3 hover:border-primary/30 transition-all shadow-xs"
+                      className="p-4 sm:p-5 rounded-2xl border border-border bg-card space-y-3.5 hover:border-primary/40 transition-all shadow-xs"
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-border pb-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-mono font-black text-sm text-foreground">
+                          <span className="font-mono font-black text-base sm:text-lg text-foreground">
                             {order.order_number}
                           </span>
-                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                          <span className="text-xs font-black uppercase tracking-wide px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
                             {order.status}
                           </span>
-                          <span className="text-xs text-muted-foreground font-medium">
+                          <span className="text-xs sm:text-sm font-bold text-foreground/90 bg-muted/60 px-2.5 py-1 rounded-lg border border-border/60">
                             {order.delivery_type === "DELIVERY"
                               ? "🛵 Delivery"
                               : "🏬 Retiro Tienda"}
                           </span>
                           {order.payment_status && (
                             <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              className={`text-xs font-black uppercase tracking-wide px-2.5 py-1 rounded-full border ${
                                 order.payment_status === "APPROVED"
                                   ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
                                   : order.payment_status === "REJECTED"
@@ -2639,11 +2663,11 @@ export function AdminDashboard({
                         </div>
 
                         <div className="text-right">
-                          <span className="text-sm font-black text-primary">
+                          <span className="text-base sm:text-xl font-black text-primary font-mono">
                             {formatCurrency(order.total_usd, "USD")}
                           </span>
                           {activeModuleIds.includes("local_venezuela") && (
-                            <span className="block text-[11px] text-muted-foreground font-mono">
+                            <span className="block text-xs sm:text-sm font-bold font-mono text-foreground/80">
                               Bs. {order.total_ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
                             </span>
                           )}
@@ -2651,12 +2675,12 @@ export function AdminDashboard({
                       </div>
 
                       {/* Customer info & Delivery Address */}
-                      <div className="grid sm:grid-cols-2 gap-2 text-xs">
+                      <div className="grid sm:grid-cols-2 gap-2 text-xs sm:text-sm">
                         {(order.customer_name || order.customer_phone || order.customer_id_number) && (
-                          <div className="flex items-center gap-1.5 text-foreground font-medium flex-wrap">
-                            <UserCheck className="w-3.5 h-3.5 text-primary shrink-0" />
+                          <div className="flex items-center gap-2 text-foreground font-semibold flex-wrap">
+                            <UserCheck className="w-4 h-4 text-primary shrink-0" />
                             <span>
-                              <strong>Cliente:</strong> {order.customer_name || "Cliente"}
+                              <strong className="font-bold text-foreground">Cliente:</strong> {order.customer_name || "Cliente"}
                               {order.customer_id_number ? ` • CI: ${order.customer_id_number}` : ""}
                               {order.customer_phone ? ` (${order.customer_phone})` : ""}
                             </span>
@@ -2664,8 +2688,8 @@ export function AdminDashboard({
                         )}
 
                         {order.delivery_address && (
-                          <div className="flex items-center gap-1.5 text-muted-foreground">
-                            <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
+                          <div className="flex items-center gap-2 text-foreground/85 font-medium">
+                            <MapPin className="w-4 h-4 text-primary shrink-0" />
                             <span className="truncate">{order.delivery_address}</span>
                           </div>
                         )}
@@ -2673,33 +2697,33 @@ export function AdminDashboard({
 
                       {/* Purchased Items summary preview */}
                       {order.items && order.items.length > 0 && (
-                        <div className="bg-muted/40 p-2.5 rounded-xl border border-border/60 text-xs space-y-1">
+                        <div className="bg-muted/40 p-3 rounded-xl border border-border/70 text-xs sm:text-sm space-y-1.5">
                           <div className="flex items-center justify-between text-muted-foreground">
-                            <span className="font-bold text-[10px] uppercase tracking-wider">
+                            <span className="font-black text-xs uppercase tracking-wider text-muted-foreground/90">
                               Artículos Comprados ({order.items.reduce((s, it) => s + it.quantity, 0)} unid.):
                             </span>
                           </div>
-                          <p className="text-foreground text-xs leading-relaxed line-clamp-2">
+                          <p className="text-foreground text-xs sm:text-sm font-medium leading-relaxed line-clamp-2">
                             {order.items.map((it) => `${it.quantity}x ${it.product_name}`).join(" • ")}
                           </p>
                         </div>
                       )}
 
                       {/* State transition workflow & action buttons */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border/50">
-                        <div className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Truck className="w-3.5 h-3.5 text-primary" />
-                          <span>Repartidor: <strong>{driver ? driver.name : "Por asignar"}</strong></span>
+                      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1.5 border-t border-border/50">
+                        <div className="text-xs sm:text-sm text-foreground/80 flex items-center gap-2 font-medium">
+                          <Truck className="w-4 h-4 text-primary" />
+                          <span>Repartidor: <strong className="font-bold text-foreground">{driver ? driver.name : "Por asignar"}</strong></span>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-1.5">
+                        <div className="flex flex-wrap items-center gap-2">
                           {/* Ver Detalle Completo Button */}
                           <button
                             type="button"
                             onClick={() => setSelectedOrderForModal(order)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 text-xs font-bold border border-primary/20 transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 text-xs sm:text-sm font-bold border border-primary/20 transition-all cursor-pointer shadow-2xs active:scale-95"
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <Eye className="w-4 h-4" />
                             <span>Ver Detalle</span>
                           </button>
 
@@ -2711,10 +2735,10 @@ export function AdminDashboard({
                                 setInvoicingOrderTarget(order);
                                 setIsQuickInvoiceModalOpen(true);
                               }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 text-xs font-bold border border-blue-500/20 transition-colors cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 text-xs sm:text-sm font-bold border border-blue-500/20 transition-all cursor-pointer shadow-2xs active:scale-95"
                               title="Emitir Factura o Guía de Despacho para este pedido"
                             >
-                              <ReceiptText className="w-3.5 h-3.5" />
+                              <ReceiptText className="w-4 h-4" />
                               <span>Facturar / Guía</span>
                             </button>
                           )}
@@ -2732,17 +2756,17 @@ export function AdminDashboard({
                             })}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-xs font-bold border border-emerald-500/20 transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-xs sm:text-sm font-bold border border-emerald-500/20 transition-all cursor-pointer shadow-2xs active:scale-95"
                             title="Abrir WhatsApp para enviar estado al cliente"
                           >
-                            <MessageCircle className="w-3.5 h-3.5" />
+                            <MessageCircle className="w-4 h-4" />
                             <span>WhatsApp</span>
                           </a>
 
                           {order.status === "PREPARING" && (
                             <button
                               onClick={() => handleUpdateOrderStatus(order.id, "READY")}
-                              className="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 cursor-pointer"
+                              className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs sm:text-sm font-bold hover:bg-indigo-700 transition-all cursor-pointer shadow-xs active:scale-95"
                             >
                               Marcar Listo
                             </button>
@@ -2751,7 +2775,7 @@ export function AdminDashboard({
                           {order.status === "READY" && (
                             <button
                               onClick={() => handleUpdateOrderStatus(order.id, "DELIVERING", driver?.id)}
-                              className="px-3 py-1.5 rounded-xl bg-orange-600 text-white text-xs font-bold hover:bg-orange-700 cursor-pointer"
+                              className="px-4 py-2 rounded-xl bg-orange-600 text-white text-xs sm:text-sm font-bold hover:bg-orange-700 transition-all cursor-pointer shadow-xs active:scale-95"
                             >
                               Enviar a Ruta
                             </button>
@@ -2760,7 +2784,7 @@ export function AdminDashboard({
                           {order.status === "DELIVERING" && (
                             <button
                               onClick={() => handleUpdateOrderStatus(order.id, "COMPLETED")}
-                              className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 cursor-pointer"
+                              className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs sm:text-sm font-bold hover:bg-emerald-700 transition-all cursor-pointer shadow-xs active:scale-95"
                             >
                               Confirmar Entrega
                             </button>
@@ -2773,14 +2797,14 @@ export function AdminDashboard({
               </div>
 
               {totalOrderPages > 1 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-border text-xs text-muted-foreground">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-border text-xs sm:text-sm text-foreground/80 font-medium">
                   <div className="flex items-center gap-2">
                     <span>
                       Mostrando {(activeOrderPage - 1) * orderPageSize + 1} a{" "}
                       {Math.min(activeOrderPage * orderPageSize, totalOrderItems)} de {totalOrderItems} pedidos
                     </span>
                     <span className="text-muted-foreground/40">•</span>
-                    <label className="flex items-center gap-1.5 font-medium">
+                    <label className="flex items-center gap-1.5 font-bold">
                       <span>Por pág:</span>
                       <select
                         value={orderPageSize}
@@ -2788,7 +2812,7 @@ export function AdminDashboard({
                           setOrderPageSize(Number(e.target.value));
                           setOrderPage(1);
                         }}
-                        className="px-2 py-1 rounded-lg border border-border bg-card text-foreground font-bold cursor-pointer text-xs"
+                        className="px-2.5 py-1 rounded-lg border border-border bg-card text-foreground font-black cursor-pointer text-xs sm:text-sm"
                       >
                         <option value={10}>10</option>
                         <option value={25}>25</option>
@@ -2803,7 +2827,7 @@ export function AdminDashboard({
                       type="button"
                       onClick={() => setOrderPage((p) => Math.max(1, p - 1))}
                       disabled={activeOrderPage <= 1}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-border bg-background hover:bg-muted font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      className="inline-flex items-center gap-1 px-3.5 py-2 rounded-xl border border-border bg-background hover:bg-muted font-bold text-xs sm:text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs active:scale-95"
                       aria-label="Página anterior de pedidos"
                     >
                       <ChevronLeft className="w-3.5 h-3.5" />
@@ -2914,6 +2938,17 @@ export function AdminDashboard({
             businessPhone={settingsState.whatsapp_number || settingsState.phone}
             orders={orders}
             formatCurrency={(val) => `$${val.toFixed(2)}`}
+          />
+        )}
+
+        {/* PLUGIN CRAFT WORKSHOP: SUBLIMACIÓN, DTF, VINIL & PAPELERÍA */}
+        {activeTab === "CRAFT_WORKSHOP" && (
+          <CraftWorkshopAdminPanel
+            tenantId={settings.tenant_id}
+            exchangeRate={rate?.value || 1}
+            currencySymbol="$"
+            businessName={settingsState.business_name}
+            businessPhone={settingsState.whatsapp_number || settingsState.phone}
           />
         )}
 
@@ -3533,6 +3568,14 @@ export function AdminDashboard({
                           >
                             Ir a Taller MTO →
                           </button>
+                        ) : plugin.id === "craft_workshop" ? (
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("CRAFT_WORKSHOP")}
+                            className="text-xs font-bold text-fuchsia-600 hover:underline cursor-pointer"
+                          >
+                            Ir a Taller Gráfico →
+                          </button>
                         ) : plugin.id === "pos_registers" ? (
                           <Link
                             href="/admin/pos"
@@ -3837,6 +3880,7 @@ export function AdminDashboard({
             else if (pluginId === "food_service") setActiveTab("RAW_MATERIALS");
             else if (pluginId === "storefront_pro") setActiveTab("STOREFRONT_STUDIO");
             else if (pluginId === "mto_cpq") setActiveTab("MTO_CPQ");
+            else if (pluginId === "craft_workshop") setActiveTab("CRAFT_WORKSHOP");
             else if (pluginId === "pos_registers") window.location.href = "/admin/pos";
             else setActiveTab("PLUGINS");
 

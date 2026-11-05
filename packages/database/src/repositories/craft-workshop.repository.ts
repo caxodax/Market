@@ -133,6 +133,10 @@ export class CraftWorkshopRepository {
 
       await AuditRepository.recordAuditLog({
         tenantId: input.tenantId,
+        actorId: input.actor?.id,
+        actorName: input.actor?.name,
+        actorEmail: input.actor?.email,
+        actorRole: input.actor?.role,
         action: "PRODUCT_CREATED",
         entity: "craft_materials",
         entityId: data.id,
@@ -190,6 +194,18 @@ export class CraftWorkshopRepository {
         return null;
       }
 
+      await AuditRepository.recordAuditLog({
+        tenantId: input.tenantId,
+        actorId: input.actor?.id,
+        actorName: input.actor?.name,
+        actorEmail: input.actor?.email,
+        actorRole: input.actor?.role,
+        action: "PRODUCT_UPDATED",
+        entity: "craft_materials",
+        entityId: data.id,
+        newData: data as Record<string, unknown>,
+      });
+
       return {
         ...data,
         pack_quantity: Number(data.pack_quantity),
@@ -207,7 +223,11 @@ export class CraftWorkshopRepository {
   /**
    * Eliminación lógica (is_active: false) de un insumo
    */
-  static async deleteMaterial(tenantId: string, materialId: string): Promise<boolean> {
+  static async deleteMaterial(
+    tenantId: string,
+    materialId: string,
+    actor?: import("@marketos/types").AuditActor
+  ): Promise<boolean> {
     const supabase = getSupabase();
     if (!supabase) return false;
 
@@ -217,6 +237,19 @@ export class CraftWorkshopRepository {
         .update({ is_active: false, updated_at: new Date().toISOString() })
         .eq("tenant_id", tenantId)
         .eq("id", materialId);
+
+      if (!error && actor) {
+        await AuditRepository.recordAuditLog({
+          tenantId,
+          actorId: actor.id,
+          actorName: actor.name,
+          actorEmail: actor.email,
+          actorRole: actor.role,
+          action: "PRODUCT_DELETED",
+          entity: "craft_materials",
+          entityId: materialId,
+        });
+      }
 
       return !error;
     } catch {
@@ -428,7 +461,7 @@ export class CraftWorkshopRepository {
         }
       }
 
-      return await this.getRecipeById(input.tenantId, recipeId);
+      return await CraftWorkshopRepository.getRecipeById(input.tenantId, recipeId);
     } catch (err) {
       console.error("[CraftWorkshopRepository] createRecipe exception:", err);
       return null;
@@ -515,7 +548,7 @@ export class CraftWorkshopRepository {
         .eq("tenant_id", input.tenantId)
         .eq("id", input.recipeId);
 
-      return await this.getRecipeById(input.tenantId, input.recipeId);
+      return await CraftWorkshopRepository.getRecipeById(input.tenantId, input.recipeId);
     } catch (err) {
       console.error("[CraftWorkshopRepository] updateRecipe exception:", err);
       return null;
@@ -641,7 +674,7 @@ export class CraftWorkshopRepository {
     if (!supabase) return null;
 
     try {
-      const quoteNum = input.quoteNumber || (await this.generateQuoteNumber(input.tenantId));
+      const quoteNum = input.quoteNumber || (await CraftWorkshopRepository.generateQuoteNumber(input.tenantId));
       const shippingCost = input.shippingCostBase || 0;
       const rate = input.exchangeRateApplied && input.exchangeRateApplied > 0 ? input.exchangeRateApplied : 1;
       const depositPct = input.depositPercentage !== undefined ? input.depositPercentage : 50.0;

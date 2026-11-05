@@ -13,6 +13,7 @@ import {
   CpqRepository,
   InvoicingRepository,
   PosRepository,
+  CraftWorkshopRepository,
 } from "./repositories/index.ts";
 
 /**
@@ -166,4 +167,21 @@ export class MarketOSRepository {
   static recordAuditLog = AuditRepository.recordAuditLog;
   static getAuditLogs = AuditRepository.getAuditLogs;
   static getGlobalAuditLogs = AuditRepository.getGlobalAuditLogs;
+
+  // --- Craft Workshop (Sublimación, DTF, Vinil & Papelería) ---
+  static getCraftMaterials = CraftWorkshopRepository.getMaterials;
+  static getCraftMaterialById = CraftWorkshopRepository.getMaterialById;
+  static createCraftMaterial = CraftWorkshopRepository.createMaterial;
+  static updateCraftMaterial = CraftWorkshopRepository.updateMaterial;
+  static deleteCraftMaterial = CraftWorkshopRepository.deleteMaterial;
+  static getCraftRecipes = CraftWorkshopRepository.getRecipes;
+  static getCraftRecipeById = CraftWorkshopRepository.getRecipeById;
+  static createCraftRecipe = CraftWorkshopRepository.createRecipe;
+  static updateCraftRecipe = CraftWorkshopRepository.updateRecipe;
+  static deleteCraftRecipe = CraftWorkshopRepository.deleteRecipe;
+  static recalculateCraftRecipes = CraftWorkshopRepository.recalculateRecipes;
+  static getCraftQuotes = CraftWorkshopRepository.getQuotes;
+  static createCraftQuote = CraftWorkshopRepository.createQuote;
+  static updateCraftQuoteStatus = CraftWorkshopRepository.updateQuoteStatus;
 }
+

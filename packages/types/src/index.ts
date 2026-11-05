@@ -1078,6 +1078,7 @@ export interface CreateProductInput {
   name: string;
   description?: string;
   priceUsd: number;
+  costPrice?: number;
   sku?: string;
   barcode?: string;
   imageUrl?: string;
@@ -1097,6 +1098,7 @@ export interface UpdateProductInput {
   categoryId?: string;
   description?: string;
   priceUsd?: number;
+  costPrice?: number;
   sku?: string;
   barcode?: string;
   imageUrl?: string;

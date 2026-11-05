@@ -24,6 +24,7 @@
     "@marketos/plugin-analytics": "workspace:*",
     "@marketos/plugin-accounting": "workspace:*",
     "@marketos/plugin-push-notifications": "workspace:*",
+    "@marketos/plugin-craft-workshop": "workspace:*",
 
     "@marketos/types": "workspace:*",
     "@marketos/ui": "workspace:*",

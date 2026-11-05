@@ -51,6 +51,7 @@ export interface CreateCraftMaterialInput {
   unitMeasure?: CraftMaterialUnit;
   stockPacks?: number;
   minStockPacks?: number;
+  actor?: import("./index.ts").AuditActor;
 }
 
 export interface UpdateCraftMaterialInput {
@@ -65,6 +66,7 @@ export interface UpdateCraftMaterialInput {
   stockPacks?: number;
   minStockPacks?: number;
   isActive?: boolean;
+  actor?: import("./index.ts").AuditActor;
 }
 
 export type CraftPricingFormula = "MARGIN" | "MARKUP";

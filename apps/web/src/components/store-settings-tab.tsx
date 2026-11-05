@@ -610,17 +610,17 @@ export function StoreSettingsTab({
   return (
     <div className="space-y-5 animate-in fade-in w-full max-w-full overflow-x-clip">
       {/* Top Header & Save Button Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl bg-card border border-border shadow-xs">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 sm:p-6 rounded-2xl bg-card border border-border shadow-xs">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-black text-foreground tracking-tight">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h2 className="text-lg sm:text-2xl font-black text-foreground tracking-tight">
               Ajustes de Tienda & Personalización
             </h2>
-            <span className="text-[10px] font-bold bg-primary/10 text-primary px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+            <span className="text-xs font-black bg-primary/10 text-primary px-3 py-1 rounded-full uppercase tracking-wider border border-primary/20">
               100% Autogestionable
             </span>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="text-xs sm:text-sm font-medium text-foreground/80 mt-1">
             Configura tu dirección, cuentas receptoras, métodos de pago activos, colores y logo sin tocar código.
           </p>
         </div>
@@ -628,7 +628,7 @@ export function StoreSettingsTab({
         <button
           onClick={handleSaveAll}
           disabled={isSaving}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold shadow-md hover:bg-primary/90 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs sm:text-sm font-black shadow-md hover:bg-primary/90 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
         >
           {isSaving ? (
             <>
@@ -646,7 +646,7 @@ export function StoreSettingsTab({
 
       {statusMessage && (
         <div
-          className={`p-4 rounded-xl text-xs font-semibold flex items-center gap-2.5 ${
+          className={`p-4 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2.5 ${
             statusMessage.type === "success"
               ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
               : "bg-destructive/10 border border-destructive/30 text-destructive"
@@ -666,7 +666,7 @@ export function StoreSettingsTab({
         <button
           type="button"
           onClick={() => setActiveSubTab("GENERAL")}
-          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+          className={`p-3 sm:p-3.5 rounded-xl border text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs ${
             activeSubTab === "GENERAL"
               ? "bg-primary text-primary-foreground border-primary shadow-xs"
               : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted"
@@ -680,7 +680,7 @@ export function StoreSettingsTab({
           <button
             type="button"
             onClick={() => setActiveSubTab("CURRENCY")}
-            className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            className={`p-3 sm:p-3.5 rounded-xl border text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs ${
               activeSubTab === "CURRENCY"
                 ? "bg-primary text-primary-foreground border-primary shadow-xs"
                 : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted"
@@ -689,7 +689,7 @@ export function StoreSettingsTab({
             <Banknote className="w-4 h-4" />
             <span>Moneda & BCV</span>
             <span
-              className={`text-[9px] px-1.5 py-0.5 rounded-full font-black ${
+              className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
                 activeSubTab === "CURRENCY"
                   ? "bg-primary-foreground/20 text-primary-foreground"
                   : "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
@@ -703,7 +703,7 @@ export function StoreSettingsTab({
         <button
           type="button"
           onClick={() => setActiveSubTab("DOMAINS")}
-          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+          className={`p-3 sm:p-3.5 rounded-xl border text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs ${
             activeSubTab === "DOMAINS"
               ? "bg-primary text-primary-foreground border-primary shadow-xs"
               : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted"
@@ -716,7 +716,7 @@ export function StoreSettingsTab({
         <button
           type="button"
           onClick={() => setActiveSubTab("PAYMENTS")}
-          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+          className={`p-3 sm:p-3.5 rounded-xl border text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs ${
             activeSubTab === "PAYMENTS"
               ? "bg-primary text-primary-foreground border-primary shadow-xs"
               : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted"
@@ -729,7 +729,7 @@ export function StoreSettingsTab({
         <button
           type="button"
           onClick={() => setActiveSubTab("BRANDING")}
-          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+          className={`p-3 sm:p-3.5 rounded-xl border text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs ${
             activeSubTab === "BRANDING"
               ? "bg-primary text-primary-foreground border-primary shadow-xs"
               : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted"
@@ -742,7 +742,7 @@ export function StoreSettingsTab({
         <button
           type="button"
           onClick={() => setActiveSubTab("OPERATIONS")}
-          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+          className={`p-3 sm:p-3.5 rounded-xl border text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs ${
             activeSubTab === "OPERATIONS"
               ? "bg-primary text-primary-foreground border-primary shadow-xs"
               : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted"
@@ -756,7 +756,7 @@ export function StoreSettingsTab({
           <button
             type="button"
             onClick={() => setActiveSubTab("FISCAL")}
-            className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            className={`p-3 sm:p-3.5 rounded-xl border text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs ${
               activeSubTab === "FISCAL"
                 ? "bg-primary text-primary-foreground border-primary shadow-xs"
                 : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted"
@@ -765,7 +765,7 @@ export function StoreSettingsTab({
             <Receipt className="w-4 h-4" />
             <span>SENIAT & Fiscal</span>
             <span
-              className={`text-[9px] px-1.5 py-0.5 rounded-full font-extrabold ${
+              className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
                 fiscalBillingEnabled
                   ? "bg-emerald-500 text-white"
                   : "bg-muted text-muted-foreground border border-border"
@@ -780,15 +780,15 @@ export function StoreSettingsTab({
       {/* SUBTAB 1: GENERAL & ADDRESS */}
       {activeSubTab === "GENERAL" && (
         <div className="space-y-6">
-          <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
-            <div className="flex items-center gap-2 text-foreground font-bold text-sm">
-              <Store className="w-4 h-4 text-primary" />
+          <div className="p-5 sm:p-6 rounded-2xl bg-card border border-border shadow-xs space-y-4">
+            <div className="flex items-center gap-2 text-foreground font-black text-sm sm:text-base">
+              <Store className="w-5 h-5 text-primary" />
               <span>Información Comercial Principal</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs sm:text-sm">
               <div>
-                <label className="font-semibold text-muted-foreground block mb-1.5">
+                <label className="font-extrabold text-foreground block mb-1.5">
                   Nombre Comercial del Negocio *
                 </label>
                 <input
@@ -796,12 +796,12 @@ export function StoreSettingsTab({
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
                   placeholder="Ej: Mi Comercio C.A."
-                  className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
+                  className="w-full h-11 px-3.5 rounded-xl border border-border bg-background text-foreground text-sm font-semibold focus:ring-2 focus:ring-primary focus:outline-none shadow-2xs"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-muted-foreground block mb-1.5">
+                <label className="font-extrabold text-foreground block mb-1.5">
                   Categoría o Ramo Comercial
                 </label>
                 <input
@@ -809,75 +809,75 @@ export function StoreSettingsTab({
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                   placeholder="Ej: Minimarket, Bodegón, Farmacia, Víveres"
-                  className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
+                  className="w-full h-11 px-3.5 rounded-xl border border-border bg-background text-foreground text-sm font-semibold focus:ring-2 focus:ring-primary focus:outline-none shadow-2xs"
                 />
               </div>
             </div>
 
             <div>
-              <label className="font-semibold text-muted-foreground block mb-1.5">
+              <label className="font-extrabold text-foreground block mb-1.5">
                 Dirección Física de la Tienda (Visible para clientes en cabecera y retiro) *
               </label>
               <div className="relative">
-                <MapPin className="w-4 h-4 text-muted-foreground absolute left-3.5 top-3" />
+                <MapPin className="w-4 h-4 text-muted-foreground absolute left-3.5 top-3.5" />
                 <textarea
                   rows={2}
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder="Calle 3 entre Carreras 1 y 2, Urb. Nueva Segovia, Barquisimeto, Edo. Lara"
-                  className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none resize-none"
+                  className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm font-semibold focus:ring-2 focus:ring-primary focus:outline-none resize-none shadow-2xs"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs sm:text-sm">
               <div>
-                <label className="font-semibold text-muted-foreground block mb-1.5">
+                <label className="font-extrabold text-foreground block mb-1.5">
                   Teléfono de Atención Local
                 </label>
                 <div className="relative">
-                  <Phone className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
+                  <Phone className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+58 424-5919577"
-                    className="w-full h-10 pl-9 pr-3 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
+                    className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-border bg-background text-foreground text-sm font-semibold focus:ring-2 focus:ring-primary focus:outline-none shadow-2xs"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="font-semibold text-muted-foreground block mb-1.5">
+                <label className="font-extrabold text-foreground block mb-1.5">
                   WhatsApp para Despachos y Pedidos (Formato: 584XXXXXXXXX) *
                 </label>
                 <div className="relative">
-                  <MessageCircle className="w-4 h-4 text-emerald-500 absolute left-3 top-3" />
+                  <MessageCircle className="w-4 h-4 text-emerald-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     value={whatsappNumber}
                     onChange={(e) => setWhatsappNumber(e.target.value.replace(/\D/g, ""))}
                     placeholder="584245919577"
-                    className="w-full h-10 pl-9 pr-3 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none font-mono"
+                    className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-border bg-background text-foreground text-sm font-semibold focus:ring-2 focus:ring-primary focus:outline-none font-mono shadow-2xs"
                   />
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-1">
+                <p className="text-xs text-foreground/80 font-medium mt-1">
                   A este número los clientes enviarán su confirmación de pedido por WhatsApp.
                 </p>
               </div>
 
               <div>
-                <label className="font-semibold text-muted-foreground block mb-1.5">
+                <label className="font-extrabold text-foreground block mb-1.5">
                   Correo Electrónico de Contacto
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
+                  <Mail className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="contacto@shopmarket.com"
-                    className="w-full h-10 pl-9 pr-3 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
+                    className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-border bg-background text-foreground text-sm font-semibold focus:ring-2 focus:ring-primary focus:outline-none shadow-2xs"
                   />
                 </div>
               </div>
@@ -885,15 +885,15 @@ export function StoreSettingsTab({
           </div>
 
           {/* Social Links */}
-          <div className="p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
-            <div className="flex items-center gap-2 text-foreground font-bold text-sm">
-              <Sparkles className="w-4 h-4 text-amber-500" />
+          <div className="p-5 sm:p-6 rounded-2xl bg-card border border-border shadow-xs space-y-4">
+            <div className="flex items-center gap-2 text-foreground font-black text-sm sm:text-base">
+              <Sparkles className="w-5 h-5 text-amber-500" />
               <span>Redes Sociales de la Marca</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs sm:text-sm">
               <div>
-                <label className="font-semibold text-muted-foreground block mb-1.5">
+                <label className="font-extrabold text-foreground block mb-1.5">
                   Instagram (@usuario)
                 </label>
                 <input
@@ -901,12 +901,12 @@ export function StoreSettingsTab({
                   value={instagram}
                   onChange={(e) => setInstagram(e.target.value)}
                   placeholder="@shopmarketca"
-                  className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
+                  className="w-full h-11 px-3.5 rounded-xl border border-border bg-background text-foreground text-sm font-semibold focus:ring-2 focus:ring-primary focus:outline-none shadow-2xs"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-muted-foreground block mb-1.5">
+                <label className="font-extrabold text-foreground block mb-1.5">
                   Facebook (Nombre o enlace)
                 </label>
                 <input
@@ -914,12 +914,12 @@ export function StoreSettingsTab({
                   value={facebook}
                   onChange={(e) => setFacebook(e.target.value)}
                   placeholder="facebook.com/shopmarket"
-                  className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
+                  className="w-full h-11 px-3.5 rounded-xl border border-border bg-background text-foreground text-sm font-semibold focus:ring-2 focus:ring-primary focus:outline-none shadow-2xs"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-muted-foreground block mb-1.5">
+                <label className="font-extrabold text-foreground block mb-1.5">
                   TikTok (@usuario)
                 </label>
                 <input
@@ -927,7 +927,7 @@ export function StoreSettingsTab({
                   value={tiktok}
                   onChange={(e) => setTiktok(e.target.value)}
                   placeholder="@shopmarket"
-                  className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-foreground text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
+                  className="w-full h-11 px-3.5 rounded-xl border border-border bg-background text-foreground text-sm font-semibold focus:ring-2 focus:ring-primary focus:outline-none shadow-2xs"
                 />
               </div>
             </div>

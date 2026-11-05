@@ -138,13 +138,13 @@ export function InventoryTab({
   return (
     <div className="space-y-4 animate-in fade-in">
       {/* ── Main Inventory Header ─────────────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-card p-4 sm:p-5 rounded-3xl border border-border">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-card p-4 sm:p-5 rounded-3xl border border-border shadow-xs">
         <div>
-          <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-            <Boxes className="w-4 h-4 text-primary" />
+          <h2 className="text-base sm:text-xl md:text-2xl font-black text-foreground flex items-center gap-2.5 tracking-tight">
+            <Boxes className="w-5 h-5 text-primary" />
             Catálogo & Control de Inventario
           </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="text-xs sm:text-sm font-medium text-foreground/80 mt-1">
             Administra existencias, códigos de barra, precios en USD/Bs y catálogo de productos.
           </p>
         </div>
@@ -155,10 +155,10 @@ export function InventoryTab({
           <button
             type="button"
             onClick={() => downloadProductImportTemplate(categories)}
-            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-muted/40 hover:bg-muted text-xs font-semibold text-foreground transition-all cursor-pointer min-h-[44px] sm:min-h-0"
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl border border-border bg-muted/60 hover:bg-muted text-xs sm:text-sm font-bold text-foreground transition-all cursor-pointer min-h-[44px] sm:min-h-0 shadow-2xs active:scale-95"
             title="Descargar plantilla de Excel oficial"
           >
-            <Download className="w-3.5 h-3.5 text-muted-foreground" />
+            <Download className="w-4 h-4 text-muted-foreground" />
             <span className="hidden sm:inline">Plantilla Excel</span>
             <span className="sm:hidden">Plantilla</span>
           </button>
@@ -167,10 +167,10 @@ export function InventoryTab({
           <button
             type="button"
             onClick={() => setIsImportModalOpen(true)}
-            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-muted/40 hover:bg-muted text-xs font-semibold text-foreground transition-all cursor-pointer min-h-[44px] sm:min-h-0"
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl border border-border bg-muted/60 hover:bg-muted text-xs sm:text-sm font-bold text-foreground transition-all cursor-pointer min-h-[44px] sm:min-h-0 shadow-2xs active:scale-95"
             title="Carga masiva desde archivo Excel"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500" />
+            <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
             <span>Importar Excel</span>
           </button>
 
@@ -178,10 +178,10 @@ export function InventoryTab({
           <button
             type="button"
             onClick={() => setIsCategoryModalOpen(true)}
-            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-muted/40 hover:bg-muted text-xs font-semibold text-foreground transition-all cursor-pointer min-h-[44px] sm:min-h-0"
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl border border-border bg-muted/60 hover:bg-muted text-xs sm:text-sm font-bold text-foreground transition-all cursor-pointer min-h-[44px] sm:min-h-0 shadow-2xs active:scale-95"
             title="Gestionar y crear categorías del catálogo"
           >
-            <FolderTree className="w-3.5 h-3.5 text-primary" />
+            <FolderTree className="w-4 h-4 text-primary" />
             <span>Categorías</span>
           </button>
 
@@ -195,7 +195,7 @@ export function InventoryTab({
               }
               onNewProduct();
             }}
-            className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold shadow-sm cursor-pointer transition-all shrink-0 min-h-[44px] sm:min-h-0 ${
+            className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black shadow-xs cursor-pointer transition-all shrink-0 min-h-[44px] sm:min-h-0 active:scale-95 ${
               isAtCapacity
                 ? "bg-rose-600 hover:bg-rose-500 text-white ring-2 ring-rose-500/30"
                 : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white"
@@ -219,7 +219,7 @@ export function InventoryTab({
 
       {/* ── SaaS Catalog Quota Indicator Card ─────────────────────────────────── */}
       <div
-        className={`p-4 rounded-2xl border transition-all ${
+        className={`p-4 sm:p-5 rounded-2xl border transition-all shadow-xs ${
           isAtCapacity
             ? "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
             : productUsagePct >= 80
@@ -230,7 +230,7 @@ export function InventoryTab({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+              className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
                 isAtCapacity
                   ? "bg-rose-500/20 text-rose-500"
                   : productUsagePct >= 80
@@ -242,11 +242,11 @@ export function InventoryTab({
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-extrabold text-sm text-foreground">
+                <span className="font-black text-sm sm:text-base text-foreground">
                   Capacidad de Catálogo ({currentProductsCount} / {maxProducts} productos)
                 </span>
                 <span
-                  className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                  className={`text-xs font-black uppercase tracking-wider px-2.5 py-1 rounded-full ${
                     isAtCapacity
                       ? "bg-rose-500 text-white"
                       : productUsagePct >= 80
@@ -261,8 +261,8 @@ export function InventoryTab({
                     : `${productUsagePct}% En Uso`}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Plan actual: <strong className="text-foreground">{planLimitsState?.plan.name || "Starter"}</strong>.
+              <p className="text-xs sm:text-sm font-medium text-foreground/80 mt-1">
+                Plan actual: <strong className="text-foreground font-bold">{planLimitsState?.plan.name || "Starter"}</strong>.
                 {isAtCapacity
                   ? " Has alcanzado el cupo máximo de tu plan. No podrás agregar más artículos hasta actualizar a un plan superior."
                   : ` Te quedan ${Math.max(0, maxProducts - currentProductsCount)} espacios para nuevos productos en tu catálogo.`}
@@ -273,19 +273,19 @@ export function InventoryTab({
           <button
             type="button"
             onClick={() => onTriggerUpgrade("products")}
-            className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer min-h-[44px] sm:min-h-0 ${
+            className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all shrink-0 cursor-pointer min-h-[44px] sm:min-h-0 shadow-2xs active:scale-95 ${
               isAtCapacity
-                ? "bg-rose-600 hover:bg-rose-500 text-white shadow-sm hover:scale-105 active:scale-95"
-                : "bg-muted hover:bg-muted/80 text-foreground border border-border"
+                ? "bg-rose-600 hover:bg-rose-500 text-white shadow-sm hover:scale-102"
+                : "bg-muted/80 hover:bg-muted text-foreground border border-border"
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <Sparkles className="w-4 h-4 text-amber-400" />
             <span>{isAtCapacity ? "Actualizar Plan Ahora" : "Ver Opciones de Upgrade"}</span>
           </button>
         </div>
 
         {/* Progress bar */}
-        <div className="mt-3 w-full h-2 rounded-full bg-muted overflow-hidden border border-border/50">
+        <div className="mt-3.5 w-full h-2.5 rounded-full bg-muted overflow-hidden border border-border/50">
           <div
             className={`h-full transition-all duration-500 rounded-full ${
               isAtCapacity
@@ -300,34 +300,34 @@ export function InventoryTab({
       </div>
 
       {/* ── Filter Bar: Search, Category & View Switcher ──────────────────────── */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-card p-3 rounded-2xl border border-border">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-card p-3.5 rounded-2xl border border-border shadow-xs">
         {/* Search Input */}
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
             placeholder="Buscar por nombre, SKU, código de barra..."
             value={searchQuery}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 rounded-xl bg-background border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-hidden focus:ring-1 focus:ring-primary min-h-[44px] sm:min-h-0"
+            className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-background border border-border text-sm sm:text-base font-medium text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary min-h-[46px] shadow-2xs"
           />
           {searchQuery && (
             <button
               onClick={() => handleSearchChange("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted cursor-pointer transition-colors"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4" />
             </button>
           )}
         </div>
 
         {/* Category Filter */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <div className="relative shrink-0">
             <select
               value={selectedCategory}
               onChange={(e) => handleCategoryChange(e.target.value)}
-              className="px-3 py-2 rounded-xl bg-background border border-border text-xs text-foreground font-medium focus:outline-hidden focus:ring-1 focus:ring-primary min-h-[44px] sm:min-h-0 cursor-pointer"
+              className="h-[46px] px-3.5 py-2 rounded-xl bg-background border border-border text-xs sm:text-sm text-foreground font-bold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer shadow-2xs"
             >
               <option value="ALL">Todas las Categorías</option>
               {categories.map((cat) => (
@@ -343,9 +343,9 @@ export function InventoryTab({
             <button
               type="button"
               onClick={() => setViewMode("list")}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center ${
+              className={`p-2 rounded-lg transition-all cursor-pointer min-w-[38px] min-h-[38px] flex items-center justify-center ${
                 viewMode === "list"
-                  ? "bg-card text-primary shadow-xs font-bold"
+                  ? "bg-card text-primary shadow-xs font-black"
                   : "text-muted-foreground hover:text-foreground"
               }`}
               title="Vista de Lista Tabular"
@@ -357,9 +357,9 @@ export function InventoryTab({
             <button
               type="button"
               onClick={() => setViewMode("cards")}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center ${
+              className={`p-2 rounded-lg transition-all cursor-pointer min-w-[38px] min-h-[38px] flex items-center justify-center ${
                 viewMode === "cards"
-                  ? "bg-card text-primary shadow-xs font-bold"
+                  ? "bg-card text-primary shadow-xs font-black"
                   : "text-muted-foreground hover:text-foreground"
               }`}
               title="Vista de Cuadrícula / Tarjetas"
@@ -399,19 +399,19 @@ export function InventoryTab({
         /* ── VIEW 1: COMPACT LIST / TABULAR VIEW ─────────────────────────────── */
         <div className="border border-border rounded-2xl overflow-hidden bg-card shadow-xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-xs sm:text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted/40 text-muted-foreground font-bold">
-                  <th className="p-3 w-16">Foto</th>
-                  <th className="p-3">Producto & Códigos</th>
-                  <th className="p-3">Categoría</th>
-                  <th className="p-3 text-right">Precio ({effectiveRateInfo.baseCurrency})</th>
+                <tr className="border-b border-border bg-muted/50 text-foreground/80 font-black text-xs sm:text-sm">
+                  <th className="p-3.5 w-16 uppercase tracking-wider">Foto</th>
+                  <th className="p-3.5 uppercase tracking-wider">Producto & Códigos</th>
+                  <th className="p-3.5 uppercase tracking-wider">Categoría</th>
+                  <th className="p-3.5 text-right uppercase tracking-wider">Precio ({effectiveRateInfo.baseCurrency})</th>
                   {activeModuleIds.includes("local_venezuela") && (
-                    <th className="p-3 text-right">Precio VES</th>
+                    <th className="p-3.5 text-right uppercase tracking-wider">Precio VES</th>
                   )}
-                  <th className="p-3 text-center">Stock / Control</th>
-                  <th className="p-3 text-center">Estado</th>
-                  <th className="p-3 text-center w-20">Acción</th>
+                  <th className="p-3.5 text-center uppercase tracking-wider">Stock / Control</th>
+                  <th className="p-3.5 text-center uppercase tracking-wider">Estado</th>
+                  <th className="p-3.5 text-center w-24 uppercase tracking-wider">Acción</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -422,72 +422,72 @@ export function InventoryTab({
                   const isZeroStock = prod.stock <= 0;
 
                   return (
-                    <tr key={prod.id} className="hover:bg-muted/20 transition-colors">
+                    <tr key={prod.id} className="hover:bg-muted/30 transition-colors">
                       {/* Thumbnail */}
-                      <td className="p-3">
+                      <td className="p-3.5">
                         {prod.image_url ? (
                           <img
                             src={prod.image_url}
                             alt={prod.name}
-                            className="w-10 h-10 object-cover rounded-xl border border-border bg-muted shrink-0"
+                            className="w-11 h-11 object-cover rounded-xl border border-border bg-muted shrink-0"
                             loading="lazy"
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground shrink-0">
-                            <ImageIcon className="w-4 h-4 opacity-40" />
+                          <div className="w-11 h-11 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground shrink-0">
+                            <ImageIcon className="w-5 h-5 opacity-40" />
                           </div>
                         )}
                       </td>
 
                       {/* Product details */}
-                      <td className="p-3">
-                        <p className="font-bold text-foreground text-xs">{prod.name}</p>
-                        <p className="text-[10px] text-muted-foreground font-mono flex items-center gap-2 mt-0.5">
+                      <td className="p-3.5">
+                        <p className="font-bold text-foreground text-sm sm:text-base leading-snug">{prod.name}</p>
+                        <p className="text-xs text-neutral-600 dark:text-neutral-400 font-mono font-semibold flex items-center gap-2 mt-1">
                           {prod.sku && <span>SKU: {prod.sku}</span>}
                           {prod.barcode && <span>• Barra: {prod.barcode}</span>}
                         </p>
                       </td>
 
                       {/* Category */}
-                      <td className="p-3">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                          <Tag className="w-2.5 h-2.5" />
+                      <td className="p-3.5">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
+                          <Tag className="w-3 h-3" />
                           <span>{categoryName}</span>
                         </span>
                       </td>
 
                       {/* Price in Base Currency */}
-                      <td className="p-3 text-right font-mono font-bold text-foreground">
+                      <td className="p-3.5 text-right font-mono font-black text-sm sm:text-base text-foreground">
                         {formatCurrency(prod.price_usd, effectiveRateInfo.baseCurrency)}
                       </td>
 
                       {/* Price VES */}
                       {activeModuleIds.includes("local_venezuela") && (
-                        <td className="p-3 text-right font-mono text-[11px] text-muted-foreground whitespace-nowrap">
+                        <td className="p-3.5 text-right font-mono text-xs sm:text-sm font-bold text-foreground/80 whitespace-nowrap">
                           Bs. {priceVes.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                       )}
 
                       {/* Stock controls */}
-                      <td className="p-3 text-center">
-                        <div className="inline-flex items-center gap-1 bg-muted/40 p-1 rounded-xl border border-border">
+                      <td className="p-3.5 text-center">
+                        <div className="inline-flex items-center gap-1.5 bg-muted/40 p-1 rounded-xl border border-border">
                           <button
                             type="button"
                             onClick={() => onStockChange(prod.id, -1)}
-                            className="w-6 h-6 rounded-lg border border-border bg-card flex items-center justify-center hover:bg-muted text-foreground transition-all cursor-pointer min-h-[32px] min-w-[32px] sm:min-h-0 sm:min-w-0"
+                            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-border bg-card flex items-center justify-center hover:bg-muted text-foreground transition-all cursor-pointer shadow-2xs active:scale-95"
                             title="Restar 1 unidad"
                           >
-                            <Minus className="w-3 h-3" />
+                            <Minus className="w-3.5 h-3.5" />
                           </button>
 
-                          <div className="w-10 text-center font-mono font-black text-xs">
+                          <div className="w-12 text-center font-mono font-black text-sm sm:text-base">
                             <span
                               className={
                                 isZeroStock
-                                  ? "text-rose-500 font-bold"
+                                  ? "text-rose-500 font-black"
                                   : isLowStock
-                                  ? "text-amber-500 font-bold"
-                                  : "text-foreground"
+                                  ? "text-amber-500 font-black"
+                                  : "text-foreground font-black"
                               }
                             >
                               {prod.stock}
@@ -497,18 +497,18 @@ export function InventoryTab({
                           <button
                             type="button"
                             onClick={() => onStockChange(prod.id, 1)}
-                            className="w-6 h-6 rounded-lg border border-border bg-card flex items-center justify-center hover:bg-muted text-foreground transition-all cursor-pointer min-h-[32px] min-w-[32px] sm:min-h-0 sm:min-w-0"
+                            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-border bg-card flex items-center justify-center hover:bg-muted text-foreground transition-all cursor-pointer shadow-2xs active:scale-95"
                             title="Sumar 1 unidad"
                           >
-                            <Plus className="w-3 h-3" />
+                            <Plus className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
 
                       {/* Active Status */}
-                      <td className="p-3 text-center">
+                      <td className="p-3.5 text-center">
                         <span
-                          className={`inline-block text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                          className={`inline-block text-xs font-black uppercase tracking-wide px-3 py-1 rounded-full border ${
                             prod.is_active
                               ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
                               : "bg-rose-500/10 text-rose-600 border-rose-500/20"
@@ -519,14 +519,14 @@ export function InventoryTab({
                       </td>
 
                       {/* Actions */}
-                      <td className="p-3 text-center whitespace-nowrap">
+                      <td className="p-3.5 text-center whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => onEditProduct(prod)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-muted/40 hover:bg-muted text-xs font-semibold text-foreground transition-colors cursor-pointer min-h-[36px] sm:min-h-0"
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-muted/60 hover:bg-muted text-xs sm:text-sm font-bold text-foreground transition-all cursor-pointer shadow-2xs active:scale-95"
                           title="Editar producto"
                         >
-                          <Pencil className="w-3.5 h-3.5 text-primary" />
+                          <Pencil className="w-4 h-4 text-primary" />
                           <span>Editar</span>
                         </button>
                       </td>
@@ -539,7 +539,7 @@ export function InventoryTab({
         </div>
       ) : (
         /* ── VIEW 2: CARDS GRID VIEW ─────────────────────────────────────────── */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {paginatedProducts.map((prod) => {
             const categoryName = categoryMap.get(prod.category_id) || "General";
             const priceVes = prod.price_usd * effectiveRateInfo.effectiveRate;
@@ -549,44 +549,44 @@ export function InventoryTab({
             return (
               <div
                 key={prod.id}
-                className="p-3.5 rounded-2xl border border-border bg-card flex flex-col justify-between gap-3 transition-all hover:border-border/80 shadow-xs"
+                className="p-4 rounded-2xl border border-border bg-card flex flex-col justify-between gap-3.5 transition-all hover:border-primary/40 shadow-xs"
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-3.5">
                   {prod.image_url ? (
                     <img
                       src={prod.image_url}
                       alt={prod.name}
-                      className="w-14 h-14 object-cover rounded-xl border border-border shrink-0 bg-muted"
+                      className="w-16 h-16 object-cover rounded-xl border border-border shrink-0 bg-muted"
                       loading="lazy"
                     />
                   ) : (
-                    <div className="w-14 h-14 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground shrink-0">
+                    <div className="w-16 h-16 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground shrink-0">
                       <ImageIcon className="w-6 h-6 opacity-40" />
                     </div>
                   )}
 
-                  <div className="space-y-0.5 min-w-0 flex-1">
+                  <div className="space-y-1 min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <h3 className="text-xs font-bold text-foreground truncate">{prod.name}</h3>
+                      <h3 className="text-sm sm:text-base font-bold text-foreground line-clamp-2 leading-snug">{prod.name}</h3>
                       {!prod.is_active && (
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-500/10 text-rose-500 font-semibold">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 font-black">
                           Inactivo
                         </span>
                       )}
                     </div>
 
-                    <span className="inline-block text-[10px] px-2 py-0.2 rounded-full bg-primary/10 text-primary font-semibold">
+                    <span className="inline-block text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold">
                       {categoryName}
                     </span>
 
-                    <p className="text-[10px] text-muted-foreground font-mono truncate">
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400 font-mono truncate">
                       {prod.sku ? `SKU: ${prod.sku}` : prod.barcode ? `Barra: ${prod.barcode}` : ""}
                     </p>
 
-                    <p className="text-xs font-mono font-bold text-primary mt-1">
+                    <p className="text-sm sm:text-base font-mono font-black text-primary mt-1">
                       {formatCurrency(prod.price_usd, effectiveRateInfo.baseCurrency)}
                       {activeModuleIds.includes("local_venezuela") && (
-                        <span className="text-[10px] text-muted-foreground font-normal block sm:inline">
+                        <span className="text-xs text-foreground/80 font-bold block sm:inline">
                           {" "}(Bs. {priceVes.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                         </span>
                       )}
@@ -594,14 +594,14 @@ export function InventoryTab({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-2 pt-2 border-t border-border">
+                <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-border">
                   <button
                     type="button"
                     onClick={() => onEditProduct(prod)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-muted/40 hover:bg-muted text-xs font-semibold text-foreground transition-all cursor-pointer min-h-[36px] sm:min-h-0"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-muted/60 hover:bg-muted text-xs sm:text-sm font-bold text-foreground transition-all cursor-pointer shadow-2xs active:scale-95"
                     title="Editar producto"
                   >
-                    <Pencil className="w-3 h-3 text-primary" />
+                    <Pencil className="w-4 h-4 text-primary" />
                     <span>Editar</span>
                   </button>
 
@@ -609,15 +609,15 @@ export function InventoryTab({
                     <button
                       type="button"
                       onClick={() => onStockChange(prod.id, -1)}
-                      className="w-7 h-7 rounded-lg border border-border bg-card flex items-center justify-center hover:bg-muted text-foreground transition-all cursor-pointer min-h-[36px] min-w-[36px] sm:min-h-0 sm:min-w-0"
+                      className="w-8 h-8 rounded-xl border border-border bg-card flex items-center justify-center hover:bg-muted text-foreground transition-all cursor-pointer shadow-2xs active:scale-95"
                       title="Restar 1 unidad"
                     >
                       <Minus className="w-3.5 h-3.5" />
                     </button>
 
-                    <div className="w-9 text-center">
+                    <div className="w-10 text-center">
                       <span
-                        className={`font-mono font-black text-xs block ${
+                        className={`font-mono font-black text-sm sm:text-base block ${
                           isZeroStock ? "text-rose-500" : isLowStock ? "text-amber-500" : "text-foreground"
                         }`}
                       >
@@ -628,7 +628,7 @@ export function InventoryTab({
                     <button
                       type="button"
                       onClick={() => onStockChange(prod.id, 1)}
-                      className="w-7 h-7 rounded-lg border border-border bg-card flex items-center justify-center hover:bg-muted text-foreground transition-all cursor-pointer min-h-[36px] min-w-[36px] sm:min-h-0 sm:min-w-0"
+                      className="w-8 h-8 rounded-xl border border-border bg-card flex items-center justify-center hover:bg-muted text-foreground transition-all cursor-pointer shadow-2xs active:scale-95"
                       title="Sumar 1 unidad"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -643,23 +643,23 @@ export function InventoryTab({
 
       {/* ── Pagination Controls ───────────────────────────────────────────────── */}
       {filteredProducts.length > 0 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card p-3.5 rounded-2xl border border-border text-xs">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card p-4 rounded-2xl border border-border text-xs sm:text-sm shadow-xs">
           {/* Info & Page Size */}
           <div className="flex items-center gap-3">
-            <span className="text-muted-foreground">
+            <span className="text-foreground/80 font-medium">
               Mostrando{" "}
-              <strong className="text-foreground">
+              <strong className="text-foreground font-black">
                 {(activePage - 1) * pageSize + 1}–{Math.min(activePage * pageSize, totalItems)}
               </strong>{" "}
-              de <strong className="text-foreground">{totalItems}</strong> productos
+              de <strong className="text-foreground font-black">{totalItems}</strong> productos
             </span>
 
-            <div className="flex items-center gap-1.5 text-muted-foreground">
+            <div className="flex items-center gap-2 text-foreground/80 font-bold">
               <span>Por página:</span>
               <select
                 value={pageSize}
                 onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                className="px-2 py-1 rounded-lg bg-background border border-border text-xs text-foreground font-semibold cursor-pointer focus:outline-hidden"
+                className="px-2.5 py-1.5 rounded-lg bg-background border border-border text-xs sm:text-sm text-foreground font-black cursor-pointer focus:outline-hidden shadow-2xs"
               >
                 <option value={10}>10</option>
                 <option value={25}>25</option>
@@ -670,19 +670,19 @@ export function InventoryTab({
           </div>
 
           {/* Navigation Buttons */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={activePage <= 1}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-border bg-background hover:bg-muted font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer min-h-[44px] sm:min-h-0"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-border bg-background hover:bg-muted font-bold text-xs sm:text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs active:scale-95"
               aria-label="Página anterior"
             >
               <ChevronLeft className="w-4 h-4" />
               <span>Anterior</span>
             </button>
 
-            <span className="px-3 py-1.5 rounded-xl bg-muted/40 border border-border font-mono font-bold text-foreground">
+            <span className="px-3.5 py-2 rounded-xl bg-muted/50 border border-border font-mono font-black text-xs sm:text-sm text-foreground">
               {activePage} / {totalPages}
             </span>
 
@@ -690,7 +690,7 @@ export function InventoryTab({
               type="button"
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={activePage >= totalPages}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-border bg-background hover:bg-muted font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer min-h-[44px] sm:min-h-0"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-border bg-background hover:bg-muted font-bold text-xs sm:text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs active:scale-95"
               aria-label="Página siguiente"
             >
               <span>Siguiente</span>

@@ -37,6 +37,7 @@ import {
   TrendingUp,
   BookOpen,
   BellRing,
+  Printer,
 } from "lucide-react";
 import { PluginDetailModal } from "./plugin-detail-modal";
 
@@ -238,6 +239,25 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
     ],
     targetAudience:
       "Sublimación, imprentas, talleres textiles, carpinterías, cristalerías, letreros y fabricantes bajo pedido que necesitan costeo Cost-Plus y hojas de taller.",
+    themeColor: "indigo",
+  },
+  {
+    id: "craft_workshop",
+    name: "Taller de Sublimación, DTF & Artes Gráficas",
+    badge: "v1.0.0 • Escandallo & WhatsApp",
+    category: "Fabricación & Personalización",
+    categoryShort: "Sublimación & DTF",
+    description:
+      "Herramienta integral de costeo de taller de personalización: cálculo unitario a partir de bultos/paquetes, merma operativa por fallas de calor/corte, mano de obra, recálculo atómico ante inflación y cotizador WhatsApp con anticipo obligatorio del 50%.",
+    icon: <Printer className="w-5 h-5 text-fuchsia-500" />,
+    features: [
+      "Insumos por Bulto: Rendimiento por resma, caja o metro lineal y costo unitario exacto",
+      "Calculadora de Escandallo: Checkboxes por técnica, % de merma técnica y mano de obra",
+      "Blindaje Anti-Inflación: Recálculo en bloque (< 5 ms) cuando suben los insumos",
+      "Cotizador WhatsApp: Mensajes con 50% de anticipo desglosado y conversión directa a pedido",
+    ],
+    targetAudience:
+      "Talleres de sublimación, DTF textil, vinil adhesivo, papelería creativa, esferas navideñas y personalización por encargo.",
     themeColor: "indigo",
   },
   {

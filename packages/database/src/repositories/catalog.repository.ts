@@ -556,6 +556,7 @@ export class CatalogRepository {
             barcode: input.barcode || null,
             image_url: input.imageUrl || null,
             price_usd: input.priceUsd,
+            cost_price: input.costPrice !== undefined ? input.costPrice : null,
             is_active: true,
           };
 
@@ -651,6 +652,7 @@ export class CatalogRepository {
         }
         if (input.description !== undefined) updatePayload.description = input.description;
         if (input.priceUsd !== undefined) updatePayload.price_usd = input.priceUsd;
+        if (input.costPrice !== undefined) updatePayload.cost_price = input.costPrice;
         if (input.sku !== undefined) updatePayload.sku = input.sku;
         if (input.barcode !== undefined) updatePayload.barcode = input.barcode;
         if (input.imageUrl !== undefined) updatePayload.image_url = input.imageUrl;
