@@ -44,16 +44,12 @@ export async function loginUserAction(email: string, password?: string) {
     const DEMO_ACCOUNTS = [
       "owner@shopmarket.com",
       "admin@shopmarket.com",
-      "superadmin@marketos.com",
-      "admin@marketos.platform",
       "gerente@shopmarket.com",
       "caja@shopmarket.com",
     ];
 
     const isDemoAccount = DEMO_ACCOUNTS.includes(cleanEmail);
-    const isDemoPasswordValid =
-      password === "MarketOS2026*" ||
-      password === "PlatformMaster2026*";
+    const isDemoPasswordValid = password === "MarketOS2026*";
 
     const isDemoAllowed =
       process.env.NODE_ENV !== "production" ||
@@ -117,21 +113,6 @@ export async function loginUserAction(email: string, password?: string) {
     // 3. Fallback defaults for demo accounts (STRICTLY non-production or explicit demo flag)
     if (!profile && isDemoAllowed) {
       if (
-        cleanEmail === "superadmin@marketos.com" ||
-        cleanEmail === "admin@marketos.platform"
-      ) {
-        profile = {
-          id: "usr-super-admin-01",
-          tenant_id: null,
-          email: cleanEmail,
-          full_name: "Super Admin Maestro",
-          phone: "+58 412-0000000",
-          avatar_url: null,
-          role: "PLATFORM_SUPER_ADMIN",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-      } else if (
         cleanEmail === "owner@shopmarket.com" ||
         cleanEmail === "admin@shopmarket.com"
       ) {
