@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { toast } from "sonner";
 import {
   StorefrontConfig,
   StorefrontBlock,
@@ -131,10 +132,11 @@ export function AdminStorefrontStudio({
       await onSave(config);
       setSaveSuccess(true);
       setHasUnsavedChanges(false);
+      toast.success("Configuración de vitrina guardada con éxito.");
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
       console.error(err);
-      alert("Error al guardar la configuración de la vitrina.");
+      toast.error("Error al guardar la configuración de la vitrina.");
     } finally {
       setIsSaving(false);
     }

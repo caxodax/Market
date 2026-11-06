@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import { PickingItem } from "@marketos/types";
 import { optimizePickingRoute, formatLocationCode } from "../services/picking-route-optimizer";

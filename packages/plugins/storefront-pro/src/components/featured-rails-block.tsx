@@ -4,6 +4,7 @@ import React, { useRef, useState } from "react";
 import { FeaturedRailsConfig, Product, ExchangeRate } from "@marketos/types";
 import { ChevronLeft, ChevronRight, Plus, Sparkles, Check } from "lucide-react";
 import { formatCurrency, convertUsdToVes } from "@marketos/utils";
+import { OptimizedImage } from "@marketos/ui";
 
 interface FeaturedRailsBlockProps {
   config: FeaturedRailsConfig;
@@ -135,16 +136,14 @@ function RailItemView({
               key={prod.id}
               className="w-[145px] sm:w-[175px] md:w-[190px] shrink-0 snap-start rounded-2xl border border-border bg-card text-card-foreground shadow-sm hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group"
             >
-              {/* Product Image Container with strict locked dimensions */}
-              <div className="relative aspect-square w-full h-36 sm:h-44 bg-muted/40 overflow-hidden flex items-center justify-center p-2 rounded-t-2xl">
-                <img
-                  src={prod.image_url || "/brand/placeholder.png"}
+              {/* Product Image Container with strict locked dimensions and Shimmer */}
+              <div className="relative aspect-square w-full h-36 sm:h-44 bg-muted/20 overflow-hidden flex items-center justify-center p-2 rounded-t-2xl">
+                <OptimizedImage
+                  src={prod.image_url}
                   alt={prod.name}
+                  aspectRatio="square"
+                  containerClassName="w-full h-full"
                   className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src =
-                      "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='1.5'><rect width='18' height='18' x='3' y='3' rx='2'/><circle cx='8.5' cy='8.5' r='1.5'/><path d='m21 15-5-5L5 21'/></svg>";
-                  }}
                 />
                 {isOutOfStock && (
                   <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">

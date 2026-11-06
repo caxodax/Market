@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import { ScanBarcode, Volume2, VolumeX, CheckCircle, Package, Search, ShoppingBag } from "lucide-react";
 import { useBarcodeScanner } from "../hooks/use-barcode-scanner";

@@ -107,7 +107,9 @@ export async function reviewPaymentAction(
       }
     }
 
-    revalidatePath("/admin");
+    revalidatePath("/admin/payments");
+    revalidatePath("/admin/orders");
+    revalidatePath("/admin", "layout");
     return { success: true, payment: updated };
   } catch (error) {
     console.error("Error reviewing payment:", error);
@@ -135,7 +137,8 @@ export async function adjustStockAction(
       actor
     );
     invalidateProductsCache(tenantId);
-    revalidatePath("/admin");
+    revalidatePath("/admin/inventory");
+    revalidatePath("/admin", "layout");
     revalidatePath("/");
     revalidatePath(`/t/${tenantId}`);
     revalidatePath("/t/[tenant]", "page");
@@ -217,7 +220,9 @@ export async function updateOrderStatusAction(
       console.warn("[MarketOS Push] No se pudo despachar push de pedido:", pushErr);
     }
 
-    revalidatePath("/admin");
+    revalidatePath("/admin/orders");
+    revalidatePath("/admin/payments");
+    revalidatePath("/admin", "layout");
     revalidatePath("/");
     return { success: true, order };
   } catch (error) {

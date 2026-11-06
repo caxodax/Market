@@ -619,8 +619,13 @@ export function TenantPluginsModal({
   const inactiveCount = AVAILABLE_PLUGINS.length - activeCount;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in overflow-y-auto">
-      <div className="bg-card w-full max-w-2xl sm:max-w-3xl rounded-2xl border border-border shadow-2xl flex flex-col max-h-[92vh] overflow-hidden my-auto">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+      <div className="bg-card w-full max-w-2xl sm:max-w-3xl rounded-t-[28px] sm:rounded-2xl border border-border shadow-2xl flex flex-col max-h-[92vh] overflow-hidden animate-sheet-enter sm:animate-in sm:zoom-in-95 duration-200">
+        {/* Mobile drag handle */}
+        <div className="pt-3 pb-1 flex justify-center sm:hidden shrink-0 bg-muted/20">
+          <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full" />
+        </div>
+
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between bg-muted/20 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
@@ -649,8 +654,9 @@ export function TenantPluginsModal({
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0 ml-2"
+            className="min-h-[44px] min-w-[44px] p-2.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0 ml-2 flex items-center justify-center"
             title="Cerrar ventana"
+            aria-label="Cerrar ventana"
           >
             <X className="w-5 h-5" />
           </button>

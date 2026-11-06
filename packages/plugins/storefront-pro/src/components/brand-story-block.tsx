@@ -3,6 +3,7 @@
 import React from "react";
 import { BrandStoryConfig, Store } from "@marketos/types";
 import { Store as StoreIcon, Clock, MapPin, ExternalLink } from "lucide-react";
+import { OptimizedImage } from "@marketos/ui";
 
 interface BrandStoryBlockProps {
   config: BrandStoryConfig;
@@ -17,17 +18,12 @@ export function BrandStoryBlock({ config, selectedStore }: BrandStoryBlockProps)
       <div className="rounded-2xl sm:rounded-3xl border border-border bg-card text-card-foreground shadow-sm overflow-hidden grid grid-cols-1 md:grid-cols-2">
         {/* Photo with strict responsive height constraints */}
         <div className="relative h-48 sm:h-64 md:h-full min-h-[180px] max-h-[280px] md:max-h-none w-full bg-muted overflow-hidden">
-          <img
-            src={
-              config.imageUrl ||
-              "https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=800&auto=format&fit=crop&q=80"
-            }
+          <OptimizedImage
+            src={config.imageUrl}
             alt={config.title}
+            fallbackSrc="https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=800&auto=format&fit=crop&q=80"
+            containerClassName="w-full h-full"
             className="w-full h-full object-cover"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src =
-                "https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=800&auto=format&fit=crop&q=80";
-            }}
           />
         </div>
 

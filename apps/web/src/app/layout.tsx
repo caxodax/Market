@@ -1,6 +1,20 @@
 import type { Metadata, Viewport } from "next";
+import { Plus_Jakarta_Sans, Outfit } from "next/font/google";
+import { Toaster } from "sonner";
 import "./globals.css";
 import { PwaUpdateManager } from "../components/pwa/pwa-update-manager";
+
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+});
 
 export const viewport: Viewport = {
   themeColor: "#DC2626",
@@ -39,9 +53,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es" className="overflow-x-clip">
-      <body className="min-h-screen bg-background text-foreground antialiased overflow-x-clip w-full max-w-full">
+    <html
+      lang="es"
+      className={`${plusJakartaSans.variable} ${outfit.variable} overflow-x-clip`}
+    >
+      <body className="min-h-screen bg-background text-foreground font-sans antialiased overflow-x-clip w-full max-w-full">
         {children}
+        <Toaster position="top-right" richColors closeButton />
         <PwaUpdateManager />
       </body>
     </html>

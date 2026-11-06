@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { toast } from "sonner";
 import {
   Order,
   OrderStatus,
@@ -146,14 +147,15 @@ export function OrderDetailsModal({
       );
       if (res.success && res.order) {
         setFiscalSuccessMsg(`Factura fiscal #${physicalInvoiceInput.trim()} vinculada exitosamente.`);
+        toast.success(`Factura fiscal #${physicalInvoiceInput.trim()} vinculada exitosamente.`);
         if (onOrderUpdated) {
           onOrderUpdated(res.order);
         }
       } else {
-        alert(res.error || "No se pudo vincular la factura fiscal física.");
+        toast.error(res.error || "No se pudo vincular la factura fiscal física.");
       }
     } catch (e: any) {
-      alert(e.message || "Error al vincular factura fiscal.");
+      toast.error(e.message || "Error al vincular factura fiscal.");
     } finally {
       setIsRegisteringFiscal(false);
     }
@@ -255,7 +257,7 @@ export function OrderDetailsModal({
             <button
               type="button"
               onClick={onClose}
-              className="min-h-[40px] min-w-[40px] text-muted-foreground hover:text-foreground hover:bg-muted p-2 rounded-xl transition-colors cursor-pointer flex items-center justify-center shrink-0"
+              className="min-h-[44px] min-w-[44px] text-muted-foreground hover:text-foreground hover:bg-muted p-2.5 rounded-xl transition-colors cursor-pointer flex items-center justify-center shrink-0"
               aria-label="Cerrar modal"
             >
               <X className="w-5 h-5" />

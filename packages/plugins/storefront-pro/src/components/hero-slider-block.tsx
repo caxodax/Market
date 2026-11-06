@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { HeroSliderConfig } from "@marketos/types";
 import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
+import { OptimizedImage } from "@marketos/ui";
 
 interface HeroSliderBlockProps {
   config: HeroSliderConfig;
@@ -83,16 +84,15 @@ export function HeroSliderBlock({ config, onActionClick }: HeroSliderBlockProps)
           hasCta ? "cursor-pointer" : ""
         }`}
       >
-        {/* Background Image with Fallback */}
-        <img
+        {/* Background Image with Fallback and Shimmer */}
+        <OptimizedImage
           key={currentSlide.id}
           src={currentSlide.imageUrl}
           alt={currentSlide.title}
-          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 animate-in fade-in"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src =
-              "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=1600&auto=format&fit=crop&q=80";
-          }}
+          fallbackSrc="https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=1600&auto=format&fit=crop&q=80"
+          containerClassName="absolute inset-0 w-full h-full"
+          className="w-full h-full object-cover transition-opacity duration-700"
+          priority={currentIndex === 0}
         />
 
         {/* Dynamic Gradient Overlay */}

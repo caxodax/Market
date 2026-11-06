@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import {
   Order,
   PaymentProof,
@@ -40,6 +41,7 @@ import {
   Receipt,
 } from "lucide-react";
 import { OrderDetailsModal } from "./order-details-modal";
+import { EmptyState } from "./ui/empty-state";
 
 interface SalesReportsTabProps {
   tenantId: string;
@@ -110,7 +112,7 @@ export function SalesReportsTab({
   // Export full multi-sheet executive report to Excel (.xlsx)
   const handleExportExcel = async () => {
     if (!dateFilteredOrders || dateFilteredOrders.length === 0) {
-      alert("No hay pedidos registrados en el período seleccionado para exportar.");
+      toast.warning("No hay pedidos registrados en el período seleccionado para exportar.");
       return;
     }
 
@@ -125,9 +127,10 @@ export function SalesReportsTab({
         dateRange,
         activeModuleIds,
       });
+      toast.success("Reporte Excel generado con éxito.");
     } catch (err) {
       console.error("Error exportando reporte a Excel:", err);
-      alert("Ocurrió un error al generar el archivo Excel.");
+      toast.error("Ocurrió un error al generar el archivo Excel.");
     } finally {
       setIsExportingExcel(false);
     }
@@ -136,7 +139,7 @@ export function SalesReportsTab({
   // Export report to CSV
   const handleExportCsv = () => {
     if (!dateFilteredOrders || dateFilteredOrders.length === 0) {
-      alert("No hay pedidos registrados en el período seleccionado para exportar.");
+      toast.warning("No hay pedidos registrados en el período seleccionado para exportar.");
       return;
     }
 
@@ -188,7 +191,7 @@ export function SalesReportsTab({
   // Export Libro de Ventas Fiscal SENIAT (Art. 56 Ley del IVA / Providencia 00071)
   const handleExportSeniatSalesBook = async () => {
     if (!dateFilteredOrders || dateFilteredOrders.length === 0) {
-      alert("No hay pedidos registrados en el período seleccionado para exportar.");
+      toast.warning("No hay pedidos registrados en el período seleccionado para exportar.");
       return;
     }
 
@@ -211,9 +214,10 @@ export function SalesReportsTab({
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      toast.success("Libro de Ventas SENIAT exportado con éxito.");
     } catch (err) {
       console.error("Error exportando Libro de Ventas SENIAT:", err);
-      alert("Ocurrió un error al generar el Libro de Ventas SENIAT.");
+      toast.error("Ocurrió un error al generar el Libro de Ventas SENIAT.");
     }
   };
 
@@ -621,12 +625,35 @@ export function SalesReportsTab({
         </div>
 
         {filteredOrders.length === 0 ? (
-          <div className="p-8 text-center rounded-2xl border border-dashed border-border bg-muted/20 text-xs text-muted-foreground">
-            No se encontraron pedidos coincidentes.
-          </div>
+          <EmptyState
+            icon={FileSpreadsheet}
+            title={
+              searchQuery
+                ? "No se encontraron pedidos con esta búsqueda"
+                : "No hay pedidos registrados en este período"
+            }
+            description={
+              searchQuery
+                ? `No encontramos coincidencias para "${searchQuery}". Intenta limpiar el buscador o seleccionar un rango de fechas diferente.`
+                : "No se registran transacciones para el rango de fechas actual. Prueba seleccionando un período más amplio como 'Este Mes' o 'Todo'."
+            }
+            action={
+              searchQuery
+                ? {
+                    label: "Limpiar buscador",
+                    onClick: () => setSearchQuery(""),
+                  }
+                : {
+                    label: "Ver Todo el Historial",
+                    onClick: () => setDateRange("all"),
+                  }
+            }
+          />
         ) : (
-          <div className="border border-border rounded-2xl overflow-hidden bg-background overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+          <div className="border border-border rounded-2xl overflow-hidden bg-background shadow-xs">
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-border bg-muted/50 text-muted-foreground font-bold">
                   <th className="p-3">Pedido</th>
@@ -731,8 +758,84 @@ export function SalesReportsTab({
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+
+          {/* Mobile Hybrid Cards View (Sin scroll horizontal) */}
+          <div className="md:hidden divide-y divide-border">
+            {filteredOrders.map((order) => {
+              const itemsCount =
+                order.items?.reduce((acc, it) => acc + it.quantity, 0) || 0;
+
+              return (
+                <div key={order.id} className="p-4 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono font-black text-sm text-foreground">
+                      {order.order_number}
+                    </span>
+                    <span
+                      className={`inline-block text-[10px] font-black px-2.5 py-0.5 rounded-full border ${
+                        order.status === "COMPLETED"
+                          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                          : order.status === "CANCELLED"
+                          ? "bg-rose-500/10 text-rose-600 border-rose-500/20"
+                          : order.status === "PAYMENT_APPROVED" ||
+                            order.status === "PREPARING"
+                          ? "bg-indigo-500/10 text-indigo-600 border-indigo-500/20"
+                          : "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                      }`}
+                    >
+                      {order.status}
+                    </span>
+                  </div>
+
+                  <div className="text-xs space-y-1">
+                    <p className="font-semibold text-foreground">
+                      {order.customer_name || "Cliente General"}{" "}
+                      {order.customer_phone && (
+                        <span className="text-muted-foreground font-normal">
+                          ({order.customer_phone})
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground font-mono">
+                      {formatCaracasDateTime(order.created_at)}
+                    </p>
+                  </div>
+
+                  {order.items && order.items.length > 0 && (
+                    <div className="text-xs text-muted-foreground bg-muted/40 p-2 rounded-xl border border-border/50">
+                      <strong className="text-primary font-bold">{itemsCount} artículos:</strong>{" "}
+                      {order.items.map((it) => `${it.quantity}x ${it.product_name}`).join(", ")}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                    <div>
+                      <span className="font-mono font-black text-sm text-foreground">
+                        {formatCurrency(order.total_usd, "USD")}
+                      </span>
+                      {isVenezuelaActive && (
+                        <span className="font-mono text-xs text-muted-foreground block">
+                          Bs. {order.total_ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedOrder(order)}
+                      className="min-h-[44px] px-3.5 py-2 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs active:scale-95"
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span>Ver Pedido</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
 
       {/* Modal de Detalle de Pedido */}
       <OrderDetailsModal

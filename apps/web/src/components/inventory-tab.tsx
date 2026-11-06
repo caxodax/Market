@@ -28,9 +28,11 @@ import type {
   StoreCurrencySettings,
 } from "@marketos/types";
 import { formatCurrency, calculateEffectiveExchangeRate } from "@marketos/utils";
+import { OptimizedImage } from "@marketos/ui";
 import { downloadProductImportTemplate } from "../lib/productExcel";
 import { ProductImportModal } from "./product-import-modal";
 import { CategoryManagerModal } from "./category-manager-modal";
+import { EmptyState } from "./ui/empty-state";
 
 interface InventoryTabProps {
   tenantId: string;
@@ -373,32 +375,53 @@ export function InventoryTab({
 
       {/* ── Empty State ───────────────────────────────────────────────────────── */}
       {filteredProducts.length === 0 ? (
-        <div className="p-12 text-center rounded-3xl border border-dashed border-border bg-card space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-muted/50 border border-border flex items-center justify-center mx-auto text-muted-foreground">
-            <Boxes className="w-6 h-6 opacity-40" />
-          </div>
-          <div className="space-y-1">
-            <p className="font-bold text-foreground text-sm">No se encontraron productos</p>
-            <p className="text-xs text-muted-foreground">
-              {searchQuery
-                ? `No hay coincidencias para "${searchQuery}". Prueba con otro término o categoría.`
-                : "Aún no tienes productos registrados en tu catálogo."}
-            </p>
-          </div>
-          {searchQuery && (
-            <button
-              onClick={() => handleSearchChange("")}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-background hover:bg-muted text-xs font-semibold text-foreground transition-colors cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-              <span>Limpiar Búsqueda</span>
-            </button>
-          )}
-        </div>
+        <EmptyState
+          icon={Boxes}
+          title={
+            searchQuery || selectedCategory !== "ALL"
+              ? "No se encontraron productos coincidentes"
+              : "Tu catálogo de productos está vacío"
+          }
+          description={
+            searchQuery || selectedCategory !== "ALL"
+              ? `No encontramos resultados para "${searchQuery || selectedCategory}". Intenta con otro término o limpia los filtros.`
+              : "Comienza a construir tu catálogo registrando tu primer producto o importando un listado masivo en Excel."
+          }
+          action={
+            searchQuery || selectedCategory !== "ALL"
+              ? {
+                  label: "Limpiar Filtros",
+                  onClick: () => {
+                    handleSearchChange("");
+                    handleCategoryChange("ALL");
+                  },
+                }
+              : isAtCapacity
+              ? {
+                  label: "Actualizar Plan",
+                  onClick: () => onTriggerUpgrade("products"),
+                  icon: Sparkles,
+                }
+              : {
+                  label: "Crear Nuevo Producto",
+                  onClick: onNewProduct,
+                  icon: Plus,
+                }
+          }
+          secondaryAction={
+            searchQuery || selectedCategory !== "ALL"
+              ? undefined
+              : {
+                  label: "Importar desde Excel",
+                  onClick: () => setIsImportModalOpen(true),
+                }
+          }
+        />
       ) : viewMode === "list" ? (
         /* ── VIEW 1: COMPACT LIST / TABULAR VIEW ─────────────────────────────── */
         <div className="border border-border rounded-2xl overflow-hidden bg-card shadow-xs">
-          <div className="overflow-x-auto">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs sm:text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50 text-foreground/80 font-black text-xs sm:text-sm">
@@ -425,18 +448,13 @@ export function InventoryTab({
                     <tr key={prod.id} className="hover:bg-muted/30 transition-colors">
                       {/* Thumbnail */}
                       <td className="p-3.5">
-                        {prod.image_url ? (
-                          <img
-                            src={prod.image_url}
-                            alt={prod.name}
-                            className="w-11 h-11 object-cover rounded-xl border border-border bg-muted shrink-0"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="w-11 h-11 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground shrink-0">
-                            <ImageIcon className="w-5 h-5 opacity-40" />
-                          </div>
-                        )}
+                        <OptimizedImage
+                          src={prod.image_url}
+                          alt={prod.name}
+                          aspectRatio="square"
+                          containerClassName="w-11 h-11 rounded-xl border border-border bg-muted shrink-0 overflow-hidden"
+                          className="w-full h-full object-cover"
+                        />
                       </td>
 
                       {/* Product details */}
@@ -536,6 +554,119 @@ export function InventoryTab({
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Hybrid Cards View (Sin scroll horizontal) */}
+          <div className="md:hidden divide-y divide-border">
+            {paginatedProducts.map((prod) => {
+              const categoryName = categoryMap.get(prod.category_id) || "General";
+              const priceVes = prod.price_usd * effectiveRateInfo.effectiveRate;
+              const isLowStock = prod.stock <= 5 && prod.stock > 0;
+              const isZeroStock = prod.stock <= 0;
+
+              return (
+                <div key={prod.id} className="p-4 space-y-3 hover:bg-muted/10 transition-colors">
+                  <div className="flex items-start gap-3">
+                    <OptimizedImage
+                      src={prod.image_url}
+                      alt={prod.name}
+                      aspectRatio="square"
+                      containerClassName="w-14 h-14 rounded-xl border border-border bg-muted shrink-0 overflow-hidden"
+                      className="w-full h-full object-cover"
+                    />
+
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="font-bold text-foreground text-sm leading-snug line-clamp-2">
+                          {prod.name}
+                        </h4>
+                        <span
+                          className={`inline-block text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0 ${
+                            prod.is_active
+                              ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                              : "bg-rose-500/10 text-rose-600 border-rose-500/20"
+                          }`}
+                        >
+                          {prod.is_active ? "Activo" : "Inactivo"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                          <Tag className="w-2.5 h-2.5" />
+                          <span>{categoryName}</span>
+                        </span>
+                        {(prod.sku || prod.barcode) && (
+                          <span className="text-[10px] font-mono text-muted-foreground truncate">
+                            {prod.sku ? `SKU: ${prod.sku}` : `Barra: ${prod.barcode}`}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="pt-0.5">
+                        <span className="font-mono font-black text-sm text-foreground">
+                          {formatCurrency(prod.price_usd, effectiveRateInfo.baseCurrency)}
+                        </span>
+                        {activeModuleIds.includes("local_venezuela") && (
+                          <span className="font-mono text-xs font-bold text-muted-foreground ml-1.5">
+                            (Bs. {priceVes.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mobile Controls: Stock stepper & Edit button */}
+                  <div className="flex items-center justify-between gap-3 pt-1 border-t border-border/50">
+                    <div className="flex items-center gap-1.5 bg-muted/40 p-1 rounded-xl border border-border">
+                      <button
+                        type="button"
+                        onClick={() => onStockChange(prod.id, -1)}
+                        className="w-10 h-10 rounded-lg border border-border bg-card flex items-center justify-center hover:bg-muted text-foreground transition-all cursor-pointer shadow-2xs active:scale-95"
+                        title="Restar 1 unidad"
+                        aria-label="Restar 1 unidad"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+
+                      <div className="w-12 text-center font-mono font-black text-sm">
+                        <span
+                          className={
+                            isZeroStock
+                              ? "text-rose-500 font-black"
+                              : isLowStock
+                              ? "text-amber-500 font-black"
+                              : "text-foreground font-black"
+                          }
+                        >
+                          {prod.stock}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => onStockChange(prod.id, 1)}
+                        className="w-10 h-10 rounded-lg border border-border bg-card flex items-center justify-center hover:bg-muted text-foreground transition-all cursor-pointer shadow-2xs active:scale-95"
+                        title="Sumar 1 unidad"
+                        aria-label="Sumar 1 unidad"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => onEditProduct(prod)}
+                      className="min-h-[44px] px-4 py-2 rounded-xl border border-border bg-muted/60 hover:bg-muted text-xs font-bold text-foreground transition-all cursor-pointer shadow-2xs active:scale-95 flex items-center gap-1.5"
+                      title="Editar producto"
+                    >
+                      <Pencil className="w-4 h-4 text-primary" />
+                      <span>Editar</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : (
         /* ── VIEW 2: CARDS GRID VIEW ─────────────────────────────────────────── */
@@ -552,18 +683,13 @@ export function InventoryTab({
                 className="p-4 rounded-2xl border border-border bg-card flex flex-col justify-between gap-3.5 transition-all hover:border-primary/40 shadow-xs"
               >
                 <div className="flex items-start gap-3.5">
-                  {prod.image_url ? (
-                    <img
-                      src={prod.image_url}
-                      alt={prod.name}
-                      className="w-16 h-16 object-cover rounded-xl border border-border shrink-0 bg-muted"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground shrink-0">
-                      <ImageIcon className="w-6 h-6 opacity-40" />
-                    </div>
-                  )}
+                  <OptimizedImage
+                    src={prod.image_url}
+                    alt={prod.name}
+                    aspectRatio="square"
+                    containerClassName="w-16 h-16 rounded-xl border border-border shrink-0 bg-muted overflow-hidden"
+                    className="w-full h-full object-cover"
+                  />
 
                   <div className="space-y-1 min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -598,7 +724,7 @@ export function InventoryTab({
                   <button
                     type="button"
                     onClick={() => onEditProduct(prod)}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-muted/60 hover:bg-muted text-xs sm:text-sm font-bold text-foreground transition-all cursor-pointer shadow-2xs active:scale-95"
+                    className="min-h-[44px] px-3.5 py-2 rounded-xl border border-border bg-muted/60 hover:bg-muted text-xs font-bold text-foreground transition-all cursor-pointer shadow-2xs active:scale-95 flex items-center gap-1.5"
                     title="Editar producto"
                   >
                     <Pencil className="w-4 h-4 text-primary" />

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import type {
   CraftMaterial,
   CraftMaterialCategory,
@@ -121,12 +122,12 @@ export function CraftWorkshopAdminPanel({
     try {
       const res = await actions.recalculateRecipes(syncStorefront);
       if (res.success && res.result) {
-        alert(
-          `¡Recálculo exitoso!\n• Recetas actualizadas: ${res.result.updated_recipes}\n• Productos en tienda sincronizados: ${res.result.synced_products}`
+        toast.success(
+          `¡Recálculo exitoso! ${res.result.updated_recipes} recetas actualizadas, ${res.result.synced_products} productos en vitrina sincronizados.`
         );
         await loadWorkshopData();
       } else {
-        alert(res.error || "No se pudo completar el recálculo masivo.");
+        toast.error(res.error || "No se pudo completar el recálculo masivo.");
       }
     } finally {
       setIsRecalculating(false);
@@ -139,15 +140,17 @@ export function CraftWorkshopAdminPanel({
       if (payload.recipeId && actions.updateRecipe) {
         const res = await actions.updateRecipe(payload);
         if (!res.success) {
-          alert(res.error || "Error al actualizar la ficha técnica");
+          toast.error(res.error || "Error al actualizar la ficha técnica");
           return false;
         }
+        toast.success("Ficha técnica actualizada con éxito");
       } else if (actions.createRecipe) {
         const res = await actions.createRecipe(payload);
         if (!res.success) {
-          alert(res.error || "Error al registrar la ficha técnica");
+          toast.error(res.error || "Error al registrar la ficha técnica");
           return false;
         }
+        toast.success("Ficha técnica creada con éxito");
       }
 
       await loadWorkshopData();
@@ -155,7 +158,7 @@ export function CraftWorkshopAdminPanel({
       setActiveTab("CATALOG");
       return true;
     } catch {
-      alert("Error inesperado al guardar receta");
+      toast.error("Error inesperado al guardar receta");
       return false;
     }
   };
@@ -166,19 +169,21 @@ export function CraftWorkshopAdminPanel({
       if (shouldPublish && actions.publishRecipe) {
         const res = await actions.publishRecipe(recipeId);
         if (!res.success) {
-          alert(res.error || "Error al publicar producto en vitrina online");
+          toast.error(res.error || "Error al publicar producto en vitrina online");
           return;
         }
+        toast.success("Producto publicado en vitrina online con éxito");
       } else if (!shouldPublish && actions.unpublishRecipe) {
         const res = await actions.unpublishRecipe(recipeId);
         if (!res.success) {
-          alert(res.error || "Error al retirar producto de vitrina online");
+          toast.error(res.error || "Error al retirar producto de vitrina online");
           return;
         }
+        toast.info("Producto retirado de vitrina online");
       }
       await loadWorkshopData();
     } catch {
-      alert("Error al cambiar estado de publicación");
+      toast.error("Error al cambiar estado de publicación");
     }
   };
 
@@ -187,9 +192,10 @@ export function CraftWorkshopAdminPanel({
     if (!confirm("¿Está seguro de desactivar esta ficha técnica?")) return;
     try {
       await actions.deleteRecipe(recipeId);
+      toast.success("Ficha técnica desactivada con éxito");
       await loadWorkshopData();
     } catch {
-      alert("Error al eliminar receta");
+      toast.error("Error al eliminar receta");
     }
   };
 
@@ -207,10 +213,11 @@ export function CraftWorkshopAdminPanel({
     if (!actions?.createMaterial) return false;
     const res = await actions.createMaterial(input);
     if (res.success) {
+      toast.success("Insumo registrado con éxito");
       await loadWorkshopData();
       return true;
     }
-    alert(res.error || "Error al registrar insumo");
+    toast.error(res.error || "Error al registrar insumo");
     return false;
   };
 
@@ -218,10 +225,11 @@ export function CraftWorkshopAdminPanel({
     if (!actions?.updateMaterial) return false;
     const res = await actions.updateMaterial(input);
     if (res.success) {
+      toast.success("Insumo actualizado con éxito");
       await loadWorkshopData();
       return true;
     }
-    alert(res.error || "Error al actualizar insumo");
+    toast.error(res.error || "Error al actualizar insumo");
     return false;
   };
 
@@ -229,10 +237,11 @@ export function CraftWorkshopAdminPanel({
     if (!actions?.deleteMaterial) return false;
     const res = await actions.deleteMaterial(materialId);
     if (res.success) {
+      toast.success("Insumo eliminado con éxito");
       await loadWorkshopData();
       return true;
     }
-    alert(res.error || "Error al eliminar insumo");
+    toast.error(res.error || "Error al eliminar insumo");
     return false;
   };
 
@@ -240,10 +249,11 @@ export function CraftWorkshopAdminPanel({
     if (!actions?.createQuote) return null;
     const res = await actions.createQuote(input);
     if (res.success && res.quote) {
+      toast.success(`Cotización ${res.quote.quote_number} generada con éxito`);
       await loadWorkshopData();
       return res.quote;
     }
-    alert(res.error || "Error al registrar cotización");
+    toast.error(res.error || "Error al registrar cotización");
     return null;
   };
 
@@ -251,11 +261,11 @@ export function CraftWorkshopAdminPanel({
     if (!actions?.convertQuoteToOrder) return false;
     const res = await actions.convertQuoteToOrder(quoteId);
     if (res.success) {
-      alert("¡Cotización convertida con éxito en Pedido Oficial de Taller!");
+      toast.success("¡Cotización convertida con éxito en Pedido Oficial de Taller!");
       await loadWorkshopData();
       return true;
     }
-    alert(res.error || "No se pudo convertir la cotización a pedido");
+    toast.error(res.error || "No se pudo convertir la cotización a pedido");
     return false;
   };
 

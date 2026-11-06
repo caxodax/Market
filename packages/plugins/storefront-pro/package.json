@@ -14,8 +14,10 @@
   },
   "dependencies": {
     "@marketos/types": "workspace:*",
+    "@marketos/ui": "workspace:*",
     "@marketos/utils": "workspace:*",
-    "lucide-react": "^1.16.0"
+    "lucide-react": "^1.16.0",
+    "sonner": "^2.0.8"
   },
   "devDependencies": {
     "@marketos/typescript-config": "workspace:*",

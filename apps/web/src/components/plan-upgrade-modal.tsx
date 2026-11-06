@@ -135,7 +135,7 @@ export function PlanUpgradeModal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto"
     >
       {/* Backdrop */}
       <div
@@ -144,7 +144,12 @@ export function PlanUpgradeModal({
       />
 
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-2xl bg-card border border-border rounded-3xl shadow-2xl p-5 sm:p-7 overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-2xl bg-card border border-border rounded-t-[28px] sm:rounded-3xl shadow-2xl p-5 sm:p-7 overflow-y-auto max-h-[92vh] z-10 animate-sheet-enter sm:animate-in sm:zoom-in-95 duration-200">
+        {/* Mobile drag handle */}
+        <div className="pb-3 flex justify-center sm:hidden shrink-0">
+          <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full" />
+        </div>
+
         {/* Glow decoration */}
         <div className="absolute top-0 right-0 -mt-16 -mr-16 w-64 h-64 bg-gradient-to-br from-primary/20 via-emerald-500/10 to-transparent rounded-full blur-3xl pointer-events-none" />
 
@@ -152,7 +157,7 @@ export function PlanUpgradeModal({
         <button
           onClick={onClose}
           aria-label="Cerrar modal"
-          className="absolute top-5 right-5 p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+          className="absolute top-5 right-5 min-h-[44px] min-w-[44px] p-2.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer flex items-center justify-center"
         >
           <X className="w-5 h-5" />
         </button>

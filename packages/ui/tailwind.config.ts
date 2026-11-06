@@ -63,6 +63,10 @@ const config: Omit<Config, "content"> = {
           gray: "#F4F4F5",
         },
       },
+      fontFamily: {
+        sans: ["var(--font-sans)", "system-ui", "-apple-system", "sans-serif"],
+        display: ["var(--font-display)", "var(--font-sans)", "system-ui", "sans-serif"],
+      },
       borderRadius: {
         lg: "var(--radius, 0.5rem)",
         md: "calc(var(--radius, 0.5rem) - 2px)",
@@ -71,6 +75,8 @@ const config: Omit<Config, "content"> = {
       boxShadow: {
         "2xs": "0 1px 2px 0 rgb(0 0 0 / 0.03)",
         xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        premium: "0 4px 20px -2px rgba(220, 38, 38, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.03)",
+        "premium-hover": "0 12px 30px -4px rgba(220, 38, 38, 0.10), 0 4px 12px -2px rgba(0, 0, 0, 0.05)",
       },
       keyframes: {
         "accordion-down": {

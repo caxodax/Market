@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { toast } from "sonner";
 import {
   TenantSettings,
   PaymentMethodType,
@@ -412,7 +413,7 @@ export function StoreSettingsTab({
     setEnabledMethods((prev) => {
       if (prev.includes(methodId)) {
         if (prev.length === 1) {
-          alert("Debe haber al menos un método de pago activo para que los clientes puedan pagar.");
+          toast.warning("Debe haber al menos un método de pago activo para que los clientes puedan pagar.");
           return prev;
         }
         return prev.filter((m) => m !== methodId);

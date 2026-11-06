@@ -74,7 +74,7 @@ export function BottomSheetModal({
 
       {/* Sheet Container */}
       <div
-        className={`relative z-10 w-full ${maxWidth} bg-card text-foreground rounded-t-[28px] sm:rounded-3xl shadow-2xl border border-border overflow-hidden max-h-[92vh] flex flex-col transform transition-transform duration-300 ease-out animate-in slide-in-from-bottom-6 sm:slide-in-from-bottom-0 sm:zoom-in-95 ${className}`}
+        className={`relative z-10 w-full ${maxWidth} bg-card text-foreground rounded-t-[28px] sm:rounded-3xl shadow-2xl border border-border overflow-hidden max-h-[92vh] flex flex-col transform transition-transform duration-300 ease-out animate-sheet-enter sm:animate-in sm:slide-in-from-bottom-0 sm:zoom-in-95 ${className}`}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -108,7 +108,7 @@ export function BottomSheetModal({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="min-h-[40px] min-w-[40px] -mr-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  className="min-h-[44px] min-w-[44px] -mr-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl flex items-center justify-center transition-colors cursor-pointer shrink-0"
                   aria-label="Cerrar modal"
                 >
                   <X className="w-5 h-5" />

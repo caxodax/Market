@@ -14,3 +14,105 @@ html,
 body {
   overflow-x: clip;
 }
+
+/* ==============================================================================
+   MICRO-INTERACCIONES & TRANSICIONES FLUIDAS (Estilo iOS / Curvas Cúbicas)
+   ============================================================================== */
+
+@keyframes tabFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tabCrossFade {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes viewEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheetSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-tab-enter {
+  animation: tabFadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-view-enter {
+  animation: viewEnter 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-sheet-enter {
+  animation: sheetSlideUp 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-in {
+  animation: tabCrossFade 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+.dark .skeleton-shimmer {
+  background: linear-gradient(90deg, #18181b 0%, #27272a 50%, #18181b 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* Soporte formal para accesibilidad con movimiento reducido */
+@media (prefers-reduced-motion: reduce) {
+  .animate-tab-enter,
+  .animate-view-enter,
+  .animate-sheet-enter,
+  .animate-fade-in {
+    animation: none !important;
+    transform: none !important;
+  }
+  .skeleton-shimmer {
+    animation: none !important;
+    background: #e2e8f0 !important;
+  }
+  .dark .skeleton-shimmer {
+    background: #27272a !important;
+  }
+}
+

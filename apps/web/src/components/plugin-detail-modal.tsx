@@ -84,7 +84,7 @@ export function PluginDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
       <div
         className="fixed inset-0"
         onClick={onClose}
@@ -95,8 +95,13 @@ export function PluginDetailModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="plugin-detail-title"
-        className="relative z-10 w-full max-w-2xl bg-card border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150"
+        className="relative z-10 w-full max-w-2xl bg-card border border-border/80 rounded-t-[28px] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-sheet-enter sm:animate-in sm:zoom-in-95 duration-200"
       >
+        {/* Mobile drag handle */}
+        <div className="pt-3 pb-1 flex justify-center sm:hidden shrink-0 bg-muted/20">
+          <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full" />
+        </div>
+
         {/* Header */}
         <div className="p-5 sm:p-6 border-b border-border/70 bg-muted/20 shrink-0">
           <div className="flex items-start justify-between gap-4">
@@ -141,8 +146,9 @@ export function PluginDetailModal({
             <button
               type="button"
               onClick={onClose}
-              className="text-muted-foreground hover:text-foreground p-1.5 rounded-xl hover:bg-muted transition-colors cursor-pointer shrink-0"
+              className="text-muted-foreground hover:text-foreground min-h-[44px] min-w-[44px] p-2.5 rounded-xl hover:bg-muted transition-colors cursor-pointer shrink-0 flex items-center justify-center"
               title="Cerrar ventana"
+              aria-label="Cerrar ventana"
             >
               <X className="w-5 h-5" />
             </button>

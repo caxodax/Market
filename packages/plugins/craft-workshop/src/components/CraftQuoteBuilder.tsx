@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { toast } from "sonner";
 import type {
   CraftQuote,
   CraftRecipe,
@@ -202,9 +203,10 @@ export function CraftQuoteBuilder({
     try {
       await navigator.clipboard.writeText(previewMessage);
       setCopied(true);
+      toast.success("Mensaje copiado al portapapeles");
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      alert("No se pudo copiar al portapapeles");
+      toast.error("No se pudo copiar al portapapeles");
     }
   };
 
@@ -215,7 +217,7 @@ export function CraftQuoteBuilder({
 
   const handleSaveQuote = async () => {
     if (items.length === 0) {
-      alert("Agrega al menos un producto a la cotización");
+      toast.warning("Agrega al menos un producto a la cotización");
       return;
     }
 
@@ -241,7 +243,7 @@ export function CraftQuoteBuilder({
 
       if (created) {
         setActiveQuote(created);
-        alert(`¡Cotización ${created.quote_number} registrada con éxito!`);
+        toast.success(`¡Cotización ${created.quote_number} registrada con éxito!`);
       }
     } finally {
       setIsSubmitting(false);

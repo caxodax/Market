@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { toast } from "sonner";
 import type {
   CraftMaterial,
   CraftRecipe,
@@ -242,13 +243,13 @@ export function CraftPricingCalculator({
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!name.trim()) {
-      alert("Por favor ingresa el nombre del producto o trabajo");
+      toast.warning("Por favor ingresa el nombre del producto o trabajo");
       return;
     }
 
     const checkedItems = items.filter((it) => it.isChecked);
     if (checkedItems.length === 0) {
-      alert("Por favor marca o agrega al menos un insumo activo para la receta");
+      toast.warning("Por favor marca o agrega al menos un insumo activo para la receta");
       return;
     }
 

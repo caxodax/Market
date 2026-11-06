@@ -1,13 +1,5 @@
-import React from "react";
 import { redirect } from "next/navigation";
-import {
-  MarketOSRepository,
-  InvoicingRepository,
-  PurchasingRepository,
-} from "@marketos/database";
-import { AdminDashboard } from "../../components/admin-dashboard";
-import { SuspendedAdminScreen } from "../../components/suspended-admin-screen";
-import { getCurrentUser } from "../login/actions";
+import { resolveAuthorizedAdminContext } from "./admin-context";
 
 interface AdminPageProps {
   searchParams: Promise<{ tenant?: string; store?: string; tab?: string }>;
@@ -15,214 +7,49 @@ interface AdminPageProps {
 
 export const dynamic = "force-dynamic";
 
+const TAB_TO_ROUTE: Record<string, string> = {
+  PAYMENTS: "/admin/payments",
+  ORDERS: "/admin/orders",
+  INVENTORY: "/admin/inventory",
+  RATES: "/admin/rates",
+  REPORTS: "/admin/reports",
+  SETTINGS: "/admin/settings",
+  DELIVERY: "/admin/delivery",
+  COUPONS: "/admin/coupons",
+  PUSH: "/admin/push",
+  STORES: "/admin/stores",
+  STAFF: "/admin/staff",
+  AUDIT: "/admin/audit",
+  PLUGINS: "/admin/plugins",
+  INVOICING: "/admin/invoicing",
+  PURCHASING: "/admin/purchasing",
+  ACCOUNTING: "/admin/accounting",
+  CRAFT_WORKSHOP: "/admin/craft",
+  STOREFRONT_STUDIO: "/admin/storefront-studio",
+  RAW_MATERIALS: "/admin/food-service",
+  RECIPES: "/admin/food-service",
+  MODIFIERS: "/admin/food-service",
+  MTO_CPQ: "/admin/mto-cpq",
+  POS: "/admin/pos",
+};
+
+/**
+ * Root /admin entrypoint.
+ * Validates session authorization and immediately redirects to the dedicated sub-route
+ * with streaming loading skeleton and localized data fetch.
+ */
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const params = await searchParams;
-  const currentUser = await getCurrentUser();
+  await resolveAuthorizedAdminContext(params);
 
-  if (!currentUser) {
-    redirect("/login");
-  }
+  const tab = params?.tab ? params.tab.toUpperCase() : "PAYMENTS";
+  const targetRoute = TAB_TO_ROUTE[tab] || "/admin/payments";
 
-  // Verify role authorization
-  const allowedRoles = [
-    "PLATFORM_SUPER_ADMIN",
-    "TENANT_OWNER",
-    "TENANT_MANAGER",
-    "TENANT_CASHIER",
-    "TENANT_INVENTORY",
-    "TENANT_DELIVERY",
-  ];
+  // Preserve query parameters (e.g. ?tenant=... or ?store=...)
+  const query = new URLSearchParams();
+  if (params?.tenant) query.set("tenant", params.tenant);
+  if (params?.store) query.set("store", params.store);
+  const qs = query.toString() ? `?${query.toString()}` : "";
 
-  if (!allowedRoles.includes(currentUser.role)) {
-    redirect("/login");
-  }
-
-  const isSuperAdmin = currentUser.role === "PLATFORM_SUPER_ADMIN";
-  const isImpersonating = Boolean(currentUser.impersonation);
-
-  // Dynamic tenant selection:
-  // 1. If in support impersonation mode, target the impersonated tenant
-  // 2. If PLATFORM_SUPER_ADMIN, allow inspecting any tenant passed via query string (?tenant=...)
-  // 3. Otherwise, use currentUser.tenant_id or default tenant
-  let targetTenantId = process.env.DEFAULT_TENANT_ID || "shop-market-ca";
-  if (currentUser.impersonation) {
-    targetTenantId = currentUser.impersonation.targetTenantId;
-  } else if (isSuperAdmin) {
-    if (params?.tenant) {
-      targetTenantId = params.tenant;
-    }
-  } else if (currentUser.tenant_id) {
-    targetTenantId = currentUser.tenant_id;
-  }
-
-  // Verificar si la tienda está suspendida y resolver ID auténtico del tenant
-  const targetTenant = await MarketOSRepository.getTenant(targetTenantId);
-  if (targetTenant?.id) {
-    targetTenantId = targetTenant.id;
-  }
-
-  // BLOQUEO INMEDIATO: Si la tienda está suspendida y el usuario no es Super Admin ni está en modo soporte
-  if (
-    targetTenant &&
-    (targetTenant.status === "suspended" || targetTenant.status === "inactive") &&
-    !isSuperAdmin &&
-    !isImpersonating
-  ) {
-    const settings = await MarketOSRepository.getTenantSettings(targetTenantId);
-    return (
-      <SuspendedAdminScreen
-        tenant={targetTenant}
-        settings={settings}
-        currentUser={currentUser}
-      />
-    );
-  }
-
-  const activeTab = params?.tab || "PAYMENTS";
-
-  // Ponytail Ultra: Fast-Path Core Queries.
-  // Fetches core operational data + staff in parallel to render badges and views instantly.
-  const [
-    settings,
-    orders,
-    payments,
-    exchangeRate,
-    stores,
-    planLimits,
-    activeModuleIds,
-    products,
-    categories,
-    staffMembers,
-  ] = await Promise.all([
-    MarketOSRepository.getTenantSettings(targetTenantId),
-    MarketOSRepository.getTenantOrders(targetTenantId, 100),
-    MarketOSRepository.getTenantPayments(targetTenantId),
-    MarketOSRepository.getExchangeRate(targetTenantId),
-    MarketOSRepository.getStores(targetTenantId, true),
-    MarketOSRepository.getTenantPlanLimits(targetTenantId),
-    MarketOSRepository.getTenantActiveModuleIds(targetTenantId),
-    MarketOSRepository.getProducts(targetTenantId, undefined, undefined, 100),
-    MarketOSRepository.getCategories(targetTenantId),
-    MarketOSRepository.getTenantStaff(targetTenantId),
-  ]);
-
-  // Synchronize live granular permissions without requiring re-login
-  if (
-    currentUser &&
-    currentUser.role !== "PLATFORM_SUPER_ADMIN" &&
-    currentUser.role !== "TENANT_OWNER" &&
-    settings?.operational_settings?.staff_permissions
-  ) {
-    const permissionsMap = settings.operational_settings.staff_permissions;
-    const perms = permissionsMap[currentUser.id] || permissionsMap[currentUser.email.toLowerCase()];
-    if (perms) {
-      currentUser.custom_permissions = perms;
-    }
-  }
-
-  // Secondary tab data: fetched on server ONLY if explicitly requested by URL ?tab=..., otherwise deferred
-  const [
-    deliveryZones,
-    drivers,
-    auditLogs,
-    ratesHistory,
-    coupons,
-    rawMaterials,
-    existingRecipes,
-    existingModifierGroups,
-    fiscalDocuments,
-    purchaseInvoices,
-    retentionVouchers,
-    suppliers,
-    allTenants,
-  ] = await Promise.all([
-    activeTab === "DELIVERY"
-      ? MarketOSRepository.getDeliveryZones(targetTenantId, true)
-      : Promise.resolve([]),
-    activeTab === "DELIVERY"
-      ? MarketOSRepository.getDrivers(targetTenantId, true)
-      : Promise.resolve([]),
-    activeTab === "AUDIT"
-      ? MarketOSRepository.getAuditLogs(targetTenantId)
-      : Promise.resolve([]),
-    activeTab === "RATES"
-      ? MarketOSRepository.getExchangeRateHistory(targetTenantId, 40)
-      : Promise.resolve([]),
-    activeTab === "COUPONS"
-      ? MarketOSRepository.getCoupons(targetTenantId)
-      : Promise.resolve([]),
-    activeTab === "RAW_MATERIALS"
-      ? MarketOSRepository.getRawMaterials(targetTenantId)
-      : Promise.resolve([]),
-    activeTab === "RECIPES"
-      ? MarketOSRepository.getProductRecipes(targetTenantId)
-      : Promise.resolve([]),
-    activeTab === "MODIFIERS"
-      ? MarketOSRepository.getProductModifierGroups(targetTenantId)
-      : Promise.resolve([]),
-    activeTab === "INVOICING" || activeTab === "ACCOUNTING"
-      ? InvoicingRepository.getFiscalDocuments(targetTenantId)
-      : Promise.resolve([]),
-    activeTab === "PURCHASING" || activeTab === "ACCOUNTING"
-      ? PurchasingRepository.getPurchaseInvoices(targetTenantId)
-      : Promise.resolve([]),
-    activeTab === "PURCHASING"
-      ? PurchasingRepository.getRetentionVouchers(targetTenantId)
-      : Promise.resolve([]),
-    activeTab === "PURCHASING"
-      ? PurchasingRepository.getSuppliers(targetTenantId)
-      : Promise.resolve([]),
-    isSuperAdmin ? MarketOSRepository.getAllTenants() : Promise.resolve([]),
-  ]);
-
-  const storageTelemetry = undefined;
-
-  return (
-    <div className="relative">
-      {targetTenant?.status === "suspended" && isSuperAdmin && (
-        <div className="bg-rose-600 text-white text-xs font-bold px-4 py-2.5 flex items-center justify-between sticky top-0 z-50 shadow-md">
-          <div className="flex items-center gap-2">
-            <span className="text-base">⚠️</span>
-            <span>
-              COMERCIO SUSPENDIDO: Este comercio ({targetTenant.name}) se encuentra suspendido. Ni clientes ni empleados tienen acceso al sistema.
-            </span>
-          </div>
-          <a
-            href="/platform"
-            className="px-3 py-1 bg-white text-rose-700 rounded-lg text-xs font-bold hover:bg-neutral-100 transition-colors shadow-xs"
-          >
-            Gestionar en Master Platform
-          </a>
-        </div>
-      )}
-      <AdminDashboard
-        settings={settings}
-        products={products}
-        categories={categories}
-        orders={orders}
-        payments={payments}
-        exchangeRate={exchangeRate}
-        ratesHistory={ratesHistory}
-        deliveryZones={deliveryZones}
-        drivers={drivers}
-        auditLogs={auditLogs}
-        currentUser={currentUser}
-        staffMembers={staffMembers}
-        coupons={coupons}
-        stores={stores}
-        allTenants={allTenants}
-        currentStoreId={params?.store}
-        planLimits={planLimits}
-        storageTelemetry={storageTelemetry}
-        activeModuleIds={activeModuleIds}
-        initialRawMaterials={rawMaterials}
-        initialRecipes={existingRecipes}
-        initialModifierGroups={existingModifierGroups}
-        initialFiscalDocuments={fiscalDocuments}
-        initialPurchaseInvoices={purchaseInvoices}
-        initialRetentionVouchers={retentionVouchers}
-        initialSuppliers={suppliers}
-      />
-    </div>
-  );
+  redirect(`${targetRoute}${qs}`);
 }

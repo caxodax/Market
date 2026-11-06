@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { toast } from "sonner";
 import type {
   CraftMaterial,
   CraftMaterialCategory,
@@ -136,7 +137,7 @@ export function CraftMaterialsManager({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim()) {
-      alert("Por favor ingresa el nombre del insumo");
+      toast.warning("Por favor ingresa el nombre del insumo");
       return;
     }
 

@@ -3,6 +3,7 @@
 import React, { useRef } from "react";
 import { CategoryBubblesConfig, Category } from "@marketos/types";
 import { Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
+import { OptimizedImage } from "@marketos/ui";
 
 interface CategoryBubblesBlockProps {
   config: CategoryBubblesConfig;
@@ -103,14 +104,13 @@ export function CategoryBubblesBlock({
                       : "border-border hover:border-primary/50 group-hover:scale-105 shadow-xs"
                   }`}
                 >
-                  <img
+                  <OptimizedImage
                     src={item.imageUrl}
                     alt={item.customLabel || "Categoría"}
+                    aspectRatio="square"
+                    fallbackSrc="https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&auto=format&fit=crop&q=60"
+                    containerClassName={`w-full h-full ${shapeClass}`}
                     className={`w-full h-full object-cover ${shapeClass} transition-transform duration-300 group-hover:scale-110`}
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        "https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&auto=format&fit=crop&q=60";
-                    }}
                   />
                 </div>
 

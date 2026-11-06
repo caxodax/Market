@@ -112,8 +112,13 @@ export function StaffPermissionsModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="relative w-full max-w-2xl max-h-[92vh] flex flex-col rounded-2xl border border-border bg-card shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-2xl max-h-[92vh] flex flex-col rounded-t-[28px] sm:rounded-2xl border border-border bg-card shadow-2xl overflow-hidden animate-sheet-enter sm:animate-in sm:zoom-in-95 duration-200">
+        {/* Mobile drag handle */}
+        <div className="pt-3 pb-1 flex justify-center sm:hidden shrink-0 bg-muted/40">
+          <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full" />
+        </div>
+
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between bg-muted/40 shrink-0">
           <div className="flex items-center gap-3">
@@ -137,7 +142,8 @@ export function StaffPermissionsModal({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted cursor-pointer transition-colors"
+            className="min-h-[44px] min-w-[44px] p-2.5 rounded-xl text-muted-foreground hover:bg-muted cursor-pointer transition-colors flex items-center justify-center"
+            aria-label="Cerrar modal"
           >
             <X className="w-5 h-5" />
           </button>

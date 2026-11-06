@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import { CpqDimensions } from "@marketos/types";
 import { Eye, User, Layers } from "lucide-react";

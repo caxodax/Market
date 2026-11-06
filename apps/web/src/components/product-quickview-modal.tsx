@@ -6,6 +6,7 @@ import { formatCurrency, convertUsdToVes } from "@marketos/utils";
 import { useCart } from "../context/cart-context";
 import { useFavorites } from "../context/favorites-context";
 import { X, Plus, Minus, ShoppingCart, Heart, Check, Sparkles, ShieldCheck } from "lucide-react";
+import { OptimizedImage } from "@marketos/ui";
 
 export interface ProductQuickViewModalProps {
   isOpen: boolean;
@@ -103,44 +104,37 @@ export function ProductQuickViewModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="quickview-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative w-full max-w-2xl max-h-[92vh] flex flex-col md:flex-row rounded-3xl bg-card border border-border shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-2xl max-h-[92vh] flex flex-col md:flex-row rounded-t-[28px] sm:rounded-3xl bg-card border border-border shadow-2xl overflow-hidden animate-sheet-enter sm:animate-in sm:zoom-in-95 duration-200">
+        {/* Mobile drag handle */}
+        <div className="pt-3 pb-1 flex justify-center sm:hidden shrink-0">
+          <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full" />
+        </div>
+
         {/* Floating Close Button */}
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-3.5 right-3.5 z-20 w-9 h-9 rounded-full flex items-center justify-center bg-background/80 hover:bg-background border border-border/80 text-foreground transition-all cursor-pointer shadow-sm active:scale-90"
+          className="absolute top-3.5 right-3.5 z-20 w-11 h-11 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center bg-background/80 hover:bg-background border border-border/80 text-foreground transition-all cursor-pointer shadow-sm active:scale-90"
           aria-label="Cerrar vista rápida"
         >
-          <X className="w-4 h-4 stroke-[2.5]" />
+          <X className="w-5 h-5 stroke-[2.5]" />
         </button>
 
         {/* Media / Image Column */}
-        <div className="relative w-full md:w-1/2 aspect-square md:aspect-auto md:min-h-[360px] bg-muted/30 flex items-center justify-center p-6 border-b md:border-b-0 md:border-r border-border/50 shrink-0">
-          {product.image_url ? (
-            <img
-              src={product.image_url}
-              alt={product.name}
-              width={600}
-              height={600}
-              className="max-h-full max-w-full object-contain drop-shadow-sm select-none"
-              onError={(e) => {
-                e.currentTarget.onerror = null;
-                e.currentTarget.src =
-                  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z'/%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M16 10a4 4 0 0 1-8 0'/%3E%3C/svg%3E";
-                e.currentTarget.className = "h-32 w-32 object-contain opacity-40";
-              }}
-            />
-          ) : (
-            <div className="flex flex-col items-center justify-center text-muted-foreground/40 gap-2">
-              <ShoppingCart className="w-16 h-16 stroke-[1.2]" />
-              <span className="text-xs font-semibold">Sin imagen</span>
-            </div>
-          )}
+        <div className="relative w-full md:w-1/2 aspect-square md:aspect-auto md:min-h-[360px] bg-muted/20 flex items-center justify-center p-6 border-b md:border-b-0 md:border-r border-border/50 shrink-0">
+          <OptimizedImage
+            src={product.image_url}
+            alt={product.name}
+            aspectRatio="square"
+            containerClassName="w-full h-full max-h-[320px] max-w-[320px] flex items-center justify-center"
+            className="max-h-full max-w-full object-contain drop-shadow-sm select-none"
+            priority
+          />
 
           {/* Badges on top-left of image */}
           <div className="absolute top-3.5 left-3.5 flex flex-col gap-1 items-start">

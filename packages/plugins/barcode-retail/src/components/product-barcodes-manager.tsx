@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 import { ProductBarcode } from "@marketos/types";
 import { Barcode, Plus, Trash2, CheckCircle2, PackageCheck, AlertCircle } from "lucide-react";

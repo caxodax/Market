@@ -6,6 +6,7 @@ import { formatCurrency, convertUsdToVes } from "@marketos/utils";
 import { useCart } from "../context/cart-context";
 import { useFavorites } from "../context/favorites-context";
 import { Plus, Minus, ShoppingCart, Heart, Sparkles, Eye } from "lucide-react";
+import { OptimizedImage } from "@marketos/ui";
 
 interface ProductCardProps {
   product: Product & { stock: number };
@@ -54,27 +55,14 @@ export function ProductCard({
       className="group relative flex flex-col rounded-2xl border border-border bg-card overflow-hidden shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary text-left"
     >
       {/* Product Image */}
-      <div className="relative aspect-square w-full overflow-hidden bg-muted/30">
-        {product.image_url ? (
-          <img
-            src={product.image_url}
-            alt={product.name}
-            width={400}
-            height={400}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
-            onError={(e) => {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z'/%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M16 10a4 4 0 0 1-8 0'/%3E%3C/svg%3E";
-              e.currentTarget.className = "h-full w-full object-contain p-8 bg-muted/30 opacity-40";
-            }}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted-foreground/50">
-            <ShoppingCart className="w-12 h-12 stroke-[1.2]" />
-          </div>
-        )}
+      <div className="relative aspect-square w-full overflow-hidden bg-muted/20">
+        <OptimizedImage
+          src={product.image_url}
+          alt={product.name}
+          aspectRatio="square"
+          containerClassName="w-full h-full"
+          className="h-full w-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
+        />
 
         {/* Desktop Quick View Hover Overlay */}
         <div className="hidden sm:flex absolute inset-0 items-center justify-center bg-black/15 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">

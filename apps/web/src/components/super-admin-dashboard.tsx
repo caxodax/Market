@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import {
   PlatformMetrics,
   TenantWithDetails,
@@ -870,12 +871,12 @@ export function SuperAdminDashboard({
       if (res.success && res.redirectUrl) {
         window.location.href = res.redirectUrl;
       } else {
-        alert(res.error || "Error al iniciar sesión como dueño");
+        toast.error(res.error || "Error al iniciar sesión como dueño");
         setImpersonatingTenantId(null);
       }
     } catch (err: any) {
       console.error("Error logging in as tenant owner:", err);
-      alert(err?.message || "Error al iniciar sesión de soporte");
+      toast.error(err?.message || "Error al iniciar sesión de soporte");
       setImpersonatingTenantId(null);
     }
   };

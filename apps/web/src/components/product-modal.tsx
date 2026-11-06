@@ -296,8 +296,13 @@ export function ProductModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm">
-      <div className="relative w-full max-w-xl max-h-[92vh] flex flex-col rounded-2xl border border-border bg-card shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-xl max-h-[92vh] flex flex-col rounded-t-[28px] sm:rounded-2xl border border-border bg-card shadow-2xl overflow-hidden animate-sheet-enter sm:animate-in sm:zoom-in-95 duration-200">
+        {/* Drag handle for mobile */}
+        <div className="pt-3 pb-1 flex justify-center sm:hidden shrink-0 bg-muted/30">
+          <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full" />
+        </div>
+
         {/* Header */}
         <div className="p-4 border-b border-border flex items-center justify-between bg-muted/30">
           <div className="flex items-center gap-2">
@@ -316,7 +321,8 @@ export function ProductModal({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted"
+            className="min-h-[44px] min-w-[44px] rounded-xl text-muted-foreground hover:bg-muted flex items-center justify-center transition-colors cursor-pointer"
+            aria-label="Cerrar modal"
           >
             <X className="w-5 h-5" />
           </button>
@@ -636,7 +642,7 @@ export function ProductModal({
                 type="button"
                 onClick={handleDelete}
                 disabled={deleting || saving}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-destructive hover:bg-destructive/10 text-xs font-bold transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-destructive hover:bg-destructive/10 text-xs font-bold transition-colors disabled:opacity-50 min-h-[44px] cursor-pointer"
               >
                 {deleting ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -652,7 +658,7 @@ export function ProductModal({
                 type="button"
                 onClick={onClose}
                 disabled={saving}
-                className="px-4 py-2 rounded-xl border border-border text-foreground hover:bg-muted text-xs font-bold"
+                className="px-4 py-2.5 rounded-xl border border-border text-foreground hover:bg-muted text-xs font-bold min-h-[44px] cursor-pointer"
               >
                 Cancelar
               </button>
@@ -660,7 +666,7 @@ export function ProductModal({
               <button
                 type="submit"
                 disabled={saving || compressing}
-                className="px-5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm disabled:opacity-50 min-h-[44px] cursor-pointer"
               >
                 {saving ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

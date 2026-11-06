@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { toast } from "sonner";
 import type {
   PurchaseInvoice,
   RetentionVoucher,
@@ -367,11 +368,12 @@ export function PurchasingManagerAdmin({
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+        toast.success("Archivo TXT de retenciones generado con éxito.");
       } else {
-        alert(res.error || "No se encontraron retenciones de IVA para el período fiscal seleccionado.");
+        toast.warning(res.error || "No se encontraron retenciones de IVA para el período fiscal seleccionado.");
       }
     } catch (err: any) {
-      alert(err?.message || "Error al generar el archivo TXT para el SENIAT.");
+      toast.error(err?.message || "Error al generar el archivo TXT para el SENIAT.");
     } finally {
       setIsDownloadingTxt(false);
     }
@@ -393,9 +395,10 @@ export function PurchasingManagerAdmin({
           link.click();
           document.body.removeChild(link);
           URL.revokeObjectURL(url);
+          toast.success("Archivo XML de ISLR generado con éxito.");
           return;
         } else {
-          alert(res.error || "No se encontraron retenciones de ISLR para el período seleccionado.");
+          toast.warning(res.error || "No se encontraron retenciones de ISLR para el período seleccionado.");
           return;
         }
       }
@@ -418,8 +421,9 @@ export function PurchasingManagerAdmin({
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      toast.success("Archivo XML de ISLR generado con éxito.");
     } catch (err: any) {
-      alert(err?.message || "Error al generar el archivo XML de ISLR para el SENIAT.");
+      toast.error(err?.message || "Error al generar el archivo XML de ISLR para el SENIAT.");
     } finally {
       setIsDownloadingXml(false);
     }
