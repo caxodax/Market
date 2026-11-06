@@ -218,19 +218,18 @@ export async function loginUserAction(email: string, password?: string) {
       });
     }
 
-    try {
-      await MarketOSRepository.recordAuditLog({
-        tenantId: profile.tenant_id || TENANT_ID,
-        actorId: profile.id,
-        actorName: profile.full_name,
-        action: "USER_LOGIN",
-        entity: "profiles",
-        entityId: profile.id,
-        newData: { role: profile.role, email: profile.email, redirectTo },
-      });
-    } catch (auditErr) {
+    // Non-blocking audit log: does not hold up user redirect
+    void MarketOSRepository.recordAuditLog({
+      tenantId: profile.tenant_id || TENANT_ID,
+      actorId: profile.id,
+      actorName: profile.full_name,
+      action: "USER_LOGIN",
+      entity: "profiles",
+      entityId: profile.id,
+      newData: { role: profile.role, email: profile.email, redirectTo },
+    }).catch((auditErr) => {
       console.warn("[MarketOS Auth] Could not record login audit log:", auditErr);
-    }
+    });
 
     return { success: true, profile, redirectTo };
   } catch (error) {

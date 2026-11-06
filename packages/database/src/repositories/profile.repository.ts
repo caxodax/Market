@@ -210,17 +210,25 @@ export class ProfileRepository {
   /**
    * Get all staff members and employees for a tenant
    */
-  static async getTenantStaff(tenantId: string): Promise<UserProfile[]> {
-    const permissionsMap = await ProfileRepository.getTenantStaffPermissionsMap(tenantId);
+  static async getTenantStaff(
+    tenantId: string,
+    providedPermissionsMap?: Record<string, string[]> | null
+  ): Promise<UserProfile[]> {
     const supabase = getSupabase();
     if (supabase) {
       try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("tenant_id", tenantId)
-          .order("created_at", { ascending: true });
+        const [permissionsMap, profilesRes] = await Promise.all([
+          providedPermissionsMap
+            ? Promise.resolve(providedPermissionsMap)
+            : ProfileRepository.getTenantStaffPermissionsMap(tenantId),
+          supabase
+            .from("profiles")
+            .select("*")
+            .eq("tenant_id", tenantId)
+            .order("created_at", { ascending: true }),
+        ]);
 
+        const { data, error } = profilesRes;
         if (!error && Array.isArray(data)) {
           return (data as UserProfile[]).map((p) => ({
             ...p,
@@ -235,6 +243,10 @@ export class ProfileRepository {
         console.warn("[Supabase] Get tenant staff error:", e);
       }
     }
+
+    const permissionsMap =
+      providedPermissionsMap ||
+      (await ProfileRepository.getTenantStaffPermissionsMap(tenantId));
 
     if (isLiveDatabaseConfigured()) return [];
     return state.profiles

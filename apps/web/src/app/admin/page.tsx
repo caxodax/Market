@@ -80,8 +80,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   const activeTab = params?.tab || "PAYMENTS";
 
-  // Ponytail Ultra: Fast-Path Core Queries (Reduced from 23 to 8).
-  // Fetches only what is needed to immediately paint the active view without stalling TTFB.
+  // Ponytail Ultra: Fast-Path Core Queries.
+  // Fetches core operational data + staff in parallel to render badges and views instantly.
   const [
     settings,
     orders,
@@ -92,6 +92,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     activeModuleIds,
     products,
     categories,
+    staffMembers,
   ] = await Promise.all([
     MarketOSRepository.getTenantSettings(targetTenantId),
     MarketOSRepository.getTenantOrders(targetTenantId, 100),
@@ -102,6 +103,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     MarketOSRepository.getTenantActiveModuleIds(targetTenantId),
     MarketOSRepository.getProducts(targetTenantId, undefined, undefined, 100),
     MarketOSRepository.getCategories(targetTenantId),
+    MarketOSRepository.getTenantStaff(targetTenantId),
   ]);
 
   // Synchronize live granular permissions without requiring re-login
@@ -123,7 +125,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     deliveryZones,
     drivers,
     auditLogs,
-    staffMembers,
     ratesHistory,
     coupons,
     rawMaterials,
@@ -143,9 +144,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       : Promise.resolve([]),
     activeTab === "AUDIT"
       ? MarketOSRepository.getAuditLogs(targetTenantId)
-      : Promise.resolve([]),
-    activeTab === "STAFF"
-      ? MarketOSRepository.getTenantStaff(targetTenantId)
       : Promise.resolve([]),
     activeTab === "RATES"
       ? MarketOSRepository.getExchangeRateHistory(targetTenantId, 40)

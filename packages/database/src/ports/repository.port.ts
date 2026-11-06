@@ -565,7 +565,10 @@ export interface IUserRepository {
   /**
    * Listar staff del Tenant
    */
-  getTenantStaff(tenantId: string): Promise<UserProfile[]>;
+  getTenantStaff(
+    tenantId: string,
+    permissionsMap?: Record<string, string[]> | null
+  ): Promise<UserProfile[]>;
 
   /**
    * Invitar nuevo miembro del staff

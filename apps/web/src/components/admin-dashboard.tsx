@@ -383,8 +383,8 @@ export function AdminDashboard({
   // Ponytail Ultra: Auto-refresh admin data (orders, rate, payments) on tab focus and every 3 minutes (180s)
   useAutoRefresh(180000);
 
-  // Ponytail Ultra: Lazy load secondary tab data on demand
-  const loadedTabsRef = useRef<Set<string>>(new Set([activeTab]));
+  // Ponytail Ultra: Lazy load secondary tab data on demand (STAFF preloaded from SSR)
+  const loadedTabsRef = useRef<Set<string>>(new Set([activeTab, "STAFF"]));
 
   useEffect(() => {
     const tenantId = settingsState.tenant_id;
