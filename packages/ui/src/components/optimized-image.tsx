@@ -43,6 +43,16 @@ export function OptimizedImage({
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [currentSrc, setCurrentSrc] = useState<string | undefined>(src || undefined);
+  const imgRef = React.useRef<HTMLImageElement | null>(null);
+
+  const handleError = React.useCallback(() => {
+    if (!hasError) {
+      setHasError(true);
+      if (fallbackSrc && currentSrc !== fallbackSrc) {
+        setCurrentSrc(fallbackSrc);
+      }
+    }
+  }, [hasError, fallbackSrc, currentSrc]);
 
   useEffect(() => {
     setCurrentSrc(src || undefined);
@@ -50,14 +60,15 @@ export function OptimizedImage({
     setHasError(false);
   }, [src]);
 
-  const handleError = () => {
-    if (!hasError) {
-      setHasError(true);
-      if (fallbackSrc && currentSrc !== fallbackSrc) {
-        setCurrentSrc(fallbackSrc);
+  useEffect(() => {
+    if (imgRef.current && imgRef.current.complete) {
+      if (imgRef.current.naturalWidth > 0) {
+        setIsLoaded(true);
+      } else if (imgRef.current.naturalWidth === 0 && currentSrc) {
+        handleError();
       }
     }
-  };
+  }, [currentSrc, handleError]);
 
   const aspectClass = ASPECT_MAP[aspectRatio] || "";
 
@@ -80,11 +91,17 @@ export function OptimizedImage({
     <div className={cn("relative overflow-hidden", aspectClass, containerClassName)}>
       {/* Shimmer skeleton mientras descarga */}
       {!isLoaded && (
-        <div className="absolute inset-0 skeleton-shimmer z-10" />
+        <div className="absolute inset-0 skeleton-shimmer z-10 pointer-events-none" />
       )}
 
-      {/* Imagen renderizada de forma asíncrona con transición de opacidad */}
+      {/* Imagen renderizada con callback ref y transición suave */}
       <img
+        ref={(node) => {
+          imgRef.current = node;
+          if (node && node.complete && node.naturalWidth > 0 && !isLoaded) {
+            setIsLoaded(true);
+          }
+        }}
         src={currentSrc}
         alt={alt}
         loading={priority ? "eager" : "lazy"}

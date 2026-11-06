@@ -197,7 +197,7 @@ export function StoreHeader({
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* Admin link (desktop only) */}
           <Link
-            href="/login"
+            href={settings.tenant_id ? `/admin?tenant=${settings.tenant_id}` : "/admin"}
             className="hidden md:inline-flex items-center gap-1.5 h-10 px-3.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground text-xs sm:text-sm font-bold transition-all shadow-2xs hover:shadow-xs active:scale-95"
             title="Acceso administrativo de tienda y personal"
           >
@@ -264,7 +264,7 @@ export function StoreHeader({
                     <span>Instalar App en Móvil</span>
                   </button>
                   <Link
-                    href="/login"
+                    href={settings.tenant_id ? `/admin?tenant=${settings.tenant_id}` : "/admin"}
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-foreground hover:bg-muted font-bold transition-colors text-left"
                   >

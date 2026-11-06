@@ -860,6 +860,17 @@ export const INITIAL_PROFILES: UserProfile[] = [
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
+  {
+    id: "usr-owner-printopink",
+    tenant_id: "printopink",
+    email: "owner@printopink.com",
+    full_name: "Dueño PrintoPink",
+    phone: "+58 412-7654321",
+    avatar_url: null,
+    role: "TENANT_OWNER",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
 ];
 
 const nowMs = Date.now();
@@ -1046,6 +1057,14 @@ export const INITIAL_TENANT_MODULES: TenantModule[] = [
     id: "mod-pp-cpq",
     tenant_id: "printopink",
     module_id: "mto_cpq",
+    is_active: true,
+    installed_at: new Date(nowMs - 20 * oneDay).toISOString(),
+    updated_at: new Date(nowMs - 20 * oneDay).toISOString(),
+  },
+  {
+    id: "mod-pp-calc",
+    tenant_id: "printopink",
+    module_id: "printopink_calculator",
     is_active: true,
     installed_at: new Date(nowMs - 20 * oneDay).toISOString(),
     updated_at: new Date(nowMs - 20 * oneDay).toISOString(),

@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { headers, cookies } from "next/headers";
 import { MarketOSRepository } from "@marketos/database";
 import {
   TenantSettings,
@@ -66,8 +67,17 @@ export const resolveAuthorizedAdminContext = cache(async function resolveAuthori
   if (currentUser.impersonation) {
     targetTenantId = currentUser.impersonation.targetTenantId;
   } else if (isSuperAdmin) {
+    const headerList = await headers();
+    const cookieStore = await cookies();
+    const headerTenant = headerList.get("x-marketos-tenant");
+    const cookieTenant = cookieStore.get("marketos_admin_tenant")?.value;
+
     if (searchParams?.tenant) {
       targetTenantId = searchParams.tenant;
+    } else if (headerTenant) {
+      targetTenantId = headerTenant;
+    } else if (cookieTenant) {
+      targetTenantId = cookieTenant;
     }
   } else if (currentUser.tenant_id) {
     targetTenantId = currentUser.tenant_id;

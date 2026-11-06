@@ -165,19 +165,55 @@ export default function UnifiedLoginPage() {
             <div className="grid grid-cols-1 gap-2">
               <button
                 type="button"
+                onClick={() => handleQuickFill("admin@marketos.lat")}
+                className="w-full text-left p-2.5 rounded-xl bg-purple-950/40 hover:bg-purple-900/50 border border-purple-800/60 hover:border-purple-400 transition-all flex items-center justify-between group cursor-pointer"
+              >
+                <div>
+                  <span className="text-xs font-semibold text-white group-hover:text-purple-300 flex items-center gap-1">
+                    🛡️ Super Administrador Global
+                  </span>
+                  <span className="text-[11px] text-purple-300/80">
+                    admin@marketos.lat ➔ Consola SaaS (/platform)
+                  </span>
+                </div>
+                <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-purple-900 text-purple-200 border border-purple-700">
+                  SuperAdmin
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickFill("owner@printopink.com")}
+                className="w-full text-left p-2.5 rounded-xl bg-pink-950/40 hover:bg-pink-900/50 border border-pink-800/60 hover:border-pink-400 transition-all flex items-center justify-between group cursor-pointer"
+              >
+                <div>
+                  <span className="text-xs font-semibold text-white group-hover:text-pink-300 flex items-center gap-1">
+                    🌸 Dueño PrintoPink (Imprenta Digital)
+                  </span>
+                  <span className="text-[11px] text-pink-300/80">
+                    owner@printopink.com ➔ Panel Tienda (/admin)
+                  </span>
+                </div>
+                <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-pink-900 text-pink-200 border border-pink-700">
+                  PrintoPink
+                </span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => handleQuickFill("owner@shopmarket.com")}
                 className="w-full text-left p-2.5 rounded-xl bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800 hover:border-emerald-500/50 transition-all flex items-center justify-between group cursor-pointer"
               >
                 <div>
                   <span className="text-xs font-semibold text-white group-hover:text-emerald-400 flex items-center gap-1">
-                    👑 Dueño General (Luis Montes)
+                    👑 Dueño Shop Market (Luis Montes)
                   </span>
                   <span className="text-[11px] text-slate-400">
                     owner@shopmarket.com ➔ Panel Tienda (/admin)
                   </span>
                 </div>
                 <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
-                  Dueño
+                  ShopMarket
                 </span>
               </button>
 

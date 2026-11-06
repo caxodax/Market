@@ -14,6 +14,8 @@ export function proxy(request: NextRequest) {
     hostname.endsWith(".vercel.app") ||
     (Boolean(platformDomain) && hostname === platformDomain);
 
+  let customDomainRewrite = false;
+
   // If request arrives on a custom domain (e.g. tiendasanpedro.com or pedidos.fruteria.com)
   if (!isPlatformDomain && hostname) {
     // Check if it is a subdomain of the platform domain (e.g. mitienda.marketos.app)
@@ -26,11 +28,32 @@ export function proxy(request: NextRequest) {
     // Only if not explicitly overridden by query string
     if (!url.searchParams.has("tenant")) {
       url.searchParams.set("tenant", tenantIdentifier);
-      return NextResponse.rewrite(url);
+      customDomainRewrite = true;
     }
   }
 
-  return NextResponse.next();
+  // Multi-tenant header & cookie propagation for /admin
+  const requestHeaders = new Headers(request.headers);
+  const tenantFromQuery = url.searchParams.get("tenant");
+  const tenantFromCookie = request.cookies.get("marketos_admin_tenant")?.value;
+  const activeTenant = tenantFromQuery || (url.pathname.startsWith("/admin") ? tenantFromCookie : null);
+
+  if (activeTenant) {
+    requestHeaders.set("x-marketos-tenant", activeTenant);
+  }
+
+  const response = customDomainRewrite
+    ? NextResponse.rewrite(url, { request: { headers: requestHeaders } })
+    : NextResponse.next({ request: { headers: requestHeaders } });
+
+  if (tenantFromQuery && url.pathname.startsWith("/admin")) {
+    response.cookies.set("marketos_admin_tenant", tenantFromQuery, {
+      path: "/admin",
+      sameSite: "lax",
+    });
+  }
+
+  return response;
 }
 
 export const config = {

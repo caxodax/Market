@@ -38,6 +38,7 @@ import {
   BookOpen,
   BellRing,
   Printer,
+  Calculator,
 } from "lucide-react";
 import { PluginDetailModal } from "./plugin-detail-modal";
 
@@ -259,6 +260,26 @@ export const AVAILABLE_PLUGINS: PluginMetadata[] = [
     targetAudience:
       "Talleres de sublimación, DTF textil, vinil adhesivo, papelería creativa, esferas navideñas y personalización por encargo.",
     themeColor: "indigo",
+  },
+  {
+    id: "printopink_calculator",
+    name: "Calculadora de Costos & Presets PrintoPink",
+    badge: "v1.0.0 • Presets & Anticipo 50%",
+    category: "Fabricación & Personalización",
+    categoryShort: "PrintoPink Costeo",
+    description:
+      "Calculadora rápida e intuitiva para talleres de imprenta y personalización artesanal basada en la Guía Oficial de PrintoPink: triada de costos (materiales directos, amortización de maquinaria/luz y mano de obra/sueldo), 5 presets de 1 clic (stickers, impresiones, carnets, textil y cajas cameo), cálculo automático de PVP sugerido, ganancia neta libre y generador de cotizaciones para WhatsApp con solicitud de anticipo del 50%.",
+    icon: <Calculator className="w-5 h-5 text-purple-500" />,
+    features: [
+      "5 Presets de 1 Clic: Etiquetas adhesivas, impresiones negro/color, carnets, textil y cajas cameo",
+      "Triada de Costos: Insumos directos + desgaste de máquinas/luz + mano de obra (sueldo)",
+      "Ganancia Neta en Vivo: Desglose inmediato de beneficio limpio diferenciando el sueldo ya cobrado",
+      "Cotizador WhatsApp 50%: Mensaje formateado listo para enviar al cliente con desglose y abono requerido",
+      "Catálogo de Fichas: Guardado local de fórmulas de productos para reutilizar precios sin recalcular",
+    ],
+    targetAudience:
+      "Imprentas digitales, talleres de papelería creativa, rotulación, tarjetería, packaging artesanal y estampados que necesitan calcular precios al instante sin hojas de cálculo complejas.",
+    themeColor: "purple",
   },
   {
     id: "storefront_pro",

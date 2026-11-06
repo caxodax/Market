@@ -42,8 +42,10 @@ export async function loginUserAction(email: string, password?: string) {
 
   try {
     const DEMO_ACCOUNTS = [
+      "admin@marketos.lat",
       "owner@shopmarket.com",
       "admin@shopmarket.com",
+      "owner@printopink.com",
       "gerente@shopmarket.com",
       "caja@shopmarket.com",
     ];
@@ -112,7 +114,31 @@ export async function loginUserAction(email: string, password?: string) {
 
     // 3. Fallback defaults for demo accounts (STRICTLY non-production or explicit demo flag)
     if (!profile && isDemoAllowed) {
-      if (
+      if (cleanEmail === "admin@marketos.lat") {
+        profile = {
+          id: "usr-super-admin-01",
+          tenant_id: null,
+          email: cleanEmail,
+          full_name: "Super Administrador MarketOS",
+          phone: "+58 412-0000000",
+          avatar_url: null,
+          role: "PLATFORM_SUPER_ADMIN",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+      } else if (cleanEmail === "owner@printopink.com") {
+        profile = {
+          id: "usr-owner-printopink",
+          tenant_id: "printopink",
+          email: cleanEmail,
+          full_name: "Dueño PrintoPink",
+          phone: "+58 412-7654321",
+          avatar_url: null,
+          role: "TENANT_OWNER",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+      } else if (
         cleanEmail === "owner@shopmarket.com" ||
         cleanEmail === "admin@shopmarket.com"
       ) {

@@ -31,6 +31,7 @@ const PLUGIN_ROUTES: Record<string, string> = {
   storefront_pro: "/admin/storefront-studio",
   mto_cpq: "/admin/mto-cpq",
   craft_workshop: "/admin/craft",
+  printopink_calculator: "/admin/printopink-calculator",
   invoicing: "/admin/invoicing",
   purchasing_retentions: "/admin/purchasing",
   accounting: "/admin/accounting",
