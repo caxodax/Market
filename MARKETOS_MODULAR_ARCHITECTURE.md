@@ -1,196 +1,196 @@
-# MarketOS — Arquitectura Modular: Core y Sistema de Plugins
+# MarketOS — Arquitectura Modular: Core y Sistema de Plugins de la A a la Z
 
-Este documento establece la **especificación técnica oficial** para la modularización de **MarketOS**, basada en el patrón de arquitectura de **Odoo / Shopify Apps**. 
-
-Garantiza que la plataforma pueda operar en múltiples países y adaptarse a diferentes giros de negocio (supermercados, comida rápida, tiendas deportivas, etc.) **sin duplicar código, sin crear ramas paralelas de Git y permitiendo que nuevos programadores colaboren de forma segura e independiente**.
+> **Versión**: 3.0.0-production  
+> **Patrón**: Clean Architecture + Arquitectura Hexagonal (Puertos y Adaptadores) + Modelo Modular Odoo / Shopify Apps  
+> **Ubicación de Plugins**: `packages/plugins/*`  
+> **Contrato de Tipos**: [`packages/types/src/modules.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/types/src/modules.ts) y [`packages/types/src/ports.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/types/src/ports.ts)  
 
 ---
 
-## 1. Principio Fundamental de Diseño
+## 1. Principio Fundamental de Diseño: Core Agnóstico y Plugins Autocontenidos
+
+MarketOS está concebido para operar en múltiples industrias y geografías **sin duplicar código, sin ramas divergentes de Git y manteniendo un rendimiento extremo**:
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                       MARKETOS CORE (Agnóstico)                         │
-│   Auth • Carrito • Pedidos • Tracking QR • Sedes • Storage • WhatsApp   │
-└───────────────────┬─────────────────────────────────┬───────────────────┘
-                    │                                 │
-     ┌──────────────┴──────────────┐   ┌──────────────┴──────────────┐
-     │   PLUGINS DE LOCALIZACIÓN   │   │     PLUGINS DE NEGOCIO      │
-     │  🇻🇪 Venezuela (Pago Móvil/BCV)│  │  🌭 Gastronomía (Pulldog)   │
-     │  🇨🇴 Colombia (Nequi/PSE)   │   │  🏬 Supermercados (Shop)    │
-     │  🌎 Global (Stripe/PayPal) │   │  👟 Moda y Tallas (KsaSport)│
-     └─────────────────────────────┘   └─────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           MARKETOS CORE (Agnóstico)                             │
+│   Auth • Carrito • Pedidos • Tracking QR • Sedes • Storage R2 • Puertos Puros   │
+└────────────────────────┬───────────────────────────────┬────────────────────────┘
+                         │                               │
+        ┌────────────────┴───────────────┐   ┌───────────┴────────────────┐
+        │    PLUGINS DE LOCALIZACIÓN     │   │     PLUGINS DE VERTICAL    │
+        │  🇻🇪 Venezuela (BCV, PagoMóvil) │   │  🌭 Food Service (Recetas) │
+        │  🇨🇴 Colombia (TRM, Nequi/PSE)  │   │  🏭 Craft Workshop (DTF)   │
+        │  🌎 Global (Stripe / USD)      │   │  📏 MTO CPQ (Cotizador)    │
+        └────────────────────────────────┘   │  🏬 Barcode Retail (EAN13) │
+                                             └────────────────────────────┘
 ```
 
-1. **El Core no conoce países ni modelos específicos:** No contiene nombres de bancos locales (Banesco, Nequi), monedas locales fijas ni conceptos exclusivos de un rubro (como "receta de perro caliente" o "talla de zapato").
-2. **Los Plugins son paquetes autocontenidos:** Cada plugin vive en su propia carpeta dentro del monorepo (`packages/plugins/*`) y define sus propios tipos, componentes visuales, servicios y migraciones.
-3. **Activación dinámica por Base de Datos:** Cada comercio (*Tenant*) tiene una lista de plugins activos en la tabla `tenant_modules`. Si un plugin está inactivo para un cliente, su código no se ejecuta ni ensucia su interfaz.
+### Reglas de Oro de la Modularidad:
+1. **El Core no conoce de rubros ni de bancos locales**: El código central no contiene palabras como *"Banesco"*, *"Pago Móvil"*, *"Sublimación"* ni *"Hamburguesa"*.
+2. **Cada Plugin es un paquete independiente**: Vive en su propia carpeta en `packages/plugins/{nombre-del-plugin}`, tiene su propio `package.json`, exporta sus componentes visuales, servicios de negocio y tipos.
+3. **Licenciamiento Dinámico por Base de Datos**: Cada comercio (*Tenant*) tiene su lista de plugins activos en la tabla `tenant_modules`. Si un comercio no tiene contratado un plugin, su interfaz no se muestra, su código no se ejecuta y sus rutas quedan bloqueadas por el guardián de autorización.
 
 ---
 
-## 2. Catálogo Oficial: Core vs. Plugins
+## 2. Catálogo Oficial del Ecosistema: Los 13 Plugins Modulares
 
-### 🟦 A. MarketOS Core (Obligatorio para el 100% de los clientes)
-*Funcionalidades estándar compartidas por cualquier comercio en cualquier país:*
-
-* **1. Multi-Tenant y Autenticación:** Control de comercios, subdominios/dominios personalizados y control de acceso basado en roles (Superadmin, Dueño, Cajero).
-* **2. Catálogo Base de Productos:** Título, descripción, precio base en moneda principal, fotos, categorías y estado (activo/inactivo/agotado).
-* **3. Carrito y Checkout Central:** Selección de ítems, resumen de compra, formulario de datos de contacto (nombre, teléfono, notas).
-* **4. Motor de Pedidos y Tracking:** Generación de ID único (`ORD-XXXXXX`), generación de ticket digital, código QR y pantalla pública de rastreo.
-* **5. Despacho Base:** Retiro en Tienda (*Pick-up*) y Delivery por Zonas con recargos configurables.
-* **6. Gestión de Sedes / Sucursales:** Soporte para 1 o múltiples sucursales con dirección, teléfono y horarios independientes.
-* **7. Notificaciones WhatsApp:** Formateador del mensaje de orden para envío directo con un clic.
-* **8. Almacenamiento de Medios (Media Storage):** Subida y optimización de imágenes en Cloudflare R2 / Supabase Storage.
-* **9. Interfaces Abstractas (Adapters):** Interfaces genéricas para inyectar pasarelas de pago (`PaymentAdapter`) y proveedores de tipo de cambio (`ExchangeRateProvider`).
-
----
-
-### 🟩 B. Plugins de Localización (Por País)
-
-#### 🇻🇪 `plugin-local-venezuela`
-* **Pasarelas de Pago Nacionales:** Pago Móvil (banco, teléfono, cédula, validación de referencia), Transferencias Bancarias (Banesco, Mercantil, Venezuela, etc.), Zelle y Efectivo divisas/bolívares.
-* **Tasa Oficial BCV:** Sincronizador automático con la API oficial del Banco Central de Venezuela, cálculo en tiempo real y memoria caché.
-* **Facturación SENIAT e IGTF:** Cálculo del 3% IGTF sobre pagos en divisas y conexión fiscal (The Factory HKA / emulación de factura electrónica).
-
-#### 🇨🇴 `plugin-local-colombia`
-* **Pasarelas de Pago:** Nequi, Daviplata, PSE, Transferencias Bancolombia.
-* **Tasa:** Tasa Representativa del Mercado (TRM / Banco de la República).
-* **Facturación DIAN:** Mapeo de impuestos (IVA 19%, Impoconsumo) y factura electrónica.
-
-#### 🌎 `plugin-local-global`
-* Pasarelas internacionales estándar con tarjeta de crédito/débito (Stripe, Mercado Pago o PayPal).
+| Plugin | Directorio / Paquete | Giro / Propósito | Dependencias | Tablas Principales |
+| :--- | :--- | :--- | :--- | :--- |
+| **`local-venezuela`** | `packages/plugins/local-venezuela` | Pago Móvil, Tasa BCV en vivo, Transferencias y cálculo IGTF 3%. | Ninguna | `exchange_rates`, `exchange_rate_history` |
+| **`food-service`** | `packages/plugins/food-service` | Restaurantes, comida rápida, escandallo BOM, insumos y KDS de cocina. | Ninguna | `raw_materials`, `recipes`, `product_modifiers` |
+| **`craft-workshop`** | `packages/plugins/craft-workshop` | Talleres de sublimación, vinil, DTF y artes gráficas con merma técnica. | Ninguna | `craft_materials`, `craft_recipes`, `craft_recipe_items`, `craft_quotes` |
+| **`mto-cpq`** | `packages/plugins/mto-cpq` | Cotizador Make-to-Order para productos a la medida por área ($m^2$) o volumen. | Ninguna | `cpq_attribute_matrices`, `cpq_pricing_formulas`, `cpq_cost_settings` |
+| **`barcode-retail`** | `packages/plugins/barcode-retail` | Supermercados, ferreterías, balanzas comerciales de peso y pasillos. | Ninguna | `product_barcodes` |
+| **`invoicing`** | `packages/plugins/invoicing` | Facturación digital/manual, correlativos SENIAT y Libro de Ventas. | `local_venezuela` | `fiscal_documents`, `fiscal_document_items`, `fiscal_sequences` |
+| **`purchasing-retentions`** | `packages/plugins/purchasing-retentions` | Facturas de compra y comprobantes de retención IVA (75%/100%) SENIAT. | `local_venezuela` | `purchase_invoices`, `purchase_retentions` |
+| **`accounting`** | `packages/plugins/accounting` | Contabilidad NIIF, Plan Único de Cuentas (PUC) y partida doble. | Ninguna | `accounting_accounts`, `journal_entries`, `journal_entry_lines` |
+| **`promotions-coupons`** | `packages/plugins/promotions-coupons` | Cupones de descuento fijo o porcentual y promociones automáticas. | Ninguna | `coupons`, `coupon_usages` |
+| **`delivery-fleet`** | `packages/plugins/delivery-fleet` | Asignación de pedidos a repartidores propios y liquidación de envíos. | Ninguna | `delivery_zones`, `drivers` |
+| **`push-notifications`** | `packages/plugins/push-notifications` | Campañas de marketing y alertas de estado vía Web Push estándar VAPID. | Ninguna | `push_subscriptions`, `push_notification_logs` |
+| **`storefront-pro`** | `packages/plugins/storefront-pro` | Maquetador visual de 11 bloques para la vitrina digital del comercio. | Ninguna | `storefront_blocks` |
+| **`analytics`** | `packages/plugins/analytics` | Telemetría de tráfico, fuentes (Instagram, TikTok, WhatsApp) y embudo. | Ninguna | `tenant_page_views` |
 
 ---
 
-### 🟨 C. Plugins de Giro de Negocio (Verticales)
+## 3. Contratos de Tipos y Manifiestos de Plugin
 
-#### 🌭 `plugin-food-service` *(Caso de Uso: Pulldog / Comida Rápida / Restaurantes)*
-* **Modificadores y Opciones al Cliente (Storefront):**
-  * Modal al seleccionar platillos: selección de salsas (gratis), tipo de pan, toppings adicionales con costo (tocineta +$1.00, queso fundido +$0.50).
-* **Control de Materia Prima e Insumos (Admin):**
-  * Inventario de ingredientes por sede (panes, salchichas, carne, queso, salsas, vasos, servilletas).
-* **Motor de Recetas y Escandallo (BOM - Bill of Materials):**
-  * Relación producto -> receta (ej. 1 Perro Tradicional = 1 Pan + 1 Salchicha + 0.02 kg Papas).
-  * Descuento automático de insumos en tiempo real con cada venta concretada.
-  * Alertas de stock crítico para reabastecimiento de sedes.
-* **Pantalla de Cocina / KDS (Kitchen Display System):**
-  * Vista simplificada en tiempo real para cocineros sin datos de dinero.
+Cada plugin debe declarar su contrato mediante un objeto manifiesto que implementa la interfaz `TenantModuleManifest`:
 
-#### 🏬 `plugin-barcode-retail` *(Caso de Uso: Shop Market / Supermercados / Ferreterías)*
-* **Lector de Código de Barras:** Búsqueda y cobro rápido con escáner físico USB o cámara del dispositivo.
-* **Inventario Directo 1 a 1:** Descuento directo por unidad o peso.
-* **Importador / Exportador Masivo en Excel:** Carga de catálogos de 5.000+ productos en lote.
-* **Pasillos y Ubicaciones:** Control de estantería física para agilizar el picking.
+```typescript
+// packages/types/src/modules.ts
+export type TenantModuleId =
+  | "local_venezuela"
+  | "food_service"
+  | "craft_workshop"
+  | "mto_cpq"
+  | "barcode_retail"
+  | "invoicing"
+  | "purchasing_retentions"
+  | "accounting"
+  | "promotions_coupons"
+  | "delivery_fleet"
+  | "push_notifications"
+  | "storefront_pro"
+  | "analytics";
 
-#### 👟 `plugin-clothing-variants` *(Caso de Uso: KsaSport / Ropa y Calzado)*
-* **Matriz de Variantes:** Talla (S, M, L / 38, 39, 40) x Color (Negro, Blanco, Azul).
-* **Inventario por Variante:** Stock específico para cada combinación de atributo.
-
----
-
-### 🟧 D. Plugins de Operaciones y Crecimiento (Planes Superiores)
-
-* **`plugin-promotions-coupons`:** Códigos promocionales (`BIENVENIDO`, `PULLDOG10`), descuentos automáticos por volumen o combos 2x1.
-* **`plugin-delivery-fleet`:** Asignación de pedidos a repartidores propios del negocio y control de liquidación al final del turno.
-
----
-
-## 3. Estructura de Archivos en el Monorepo
-
-Los plugins se ubicarán en `packages/plugins/*` dentro del mismo repositorio:
-
+export interface TenantModuleManifest {
+  readonly id: TenantModuleId;
+  readonly name: string;
+  readonly description: string;
+  readonly category: "LOCALIZATION" | "VERTICAL" | "OPERATIONS" | "FINANCE" | "MARKETING";
+  readonly icon: string;
+  readonly requiredPlan: "STARTER" | "GROWTH" | "ENTERPRISE";
+  readonly dependencies?: TenantModuleId[];
+  readonly conflicts?: TenantModuleId[];
+}
 ```
-Market/
-├── apps/
-│   ├── web/                         # Tienda Online (Storefront)
-│   ├── admin/                       # Panel de Gestión del Comercio
-│   └── super-admin/                 # Panel de Control del Dueño de la Plataforma
-│
-└── packages/
-    ├── types/                       # Tipos TypeScript compartidos
-    ├── database/                    # Cliente Supabase, servicios y esquemas
-    ├── ui/                          # Componentes atómicos de diseño
-    ├── utils/                       # Utilidades generales
-    │
-    └── plugins/                     # ◄─── Directorio de Plugins (Estilo Odoo Addons)
-        │
-        ├── food-service/            # Plugin de Gastronomía (Pulldog)
-        │   ├── src/
-        │   │   ├── types.ts         # RawMaterial, Recipe, ProductModifier
-        │   │   ├── components/      # ModifierModal (Web), RecipeManager (Admin)
-        │   │   ├── services/        # deductRecipeStock, getRawMaterials
-        │   │   └── manifest.ts      # Metadatos del plugin
-        │   ├── package.json
-        │   └── index.ts
-        │
-        ├── barcode-retail/          # Plugin de Supermercados (Shop Market)
-        │   ├── src/
-        │   │   ├── components/      # BarcodeScanner, BulkExcelImporter
-        │   │   └── services/        # parseExcelCatalog
-        │   ├── package.json
-        │   └── index.ts
-        │
-        └── local-venezuela/         # Plugin Venezuela
-            ├── src/
-            │   ├── payments/        # PagoMovilHandler, ZelleHandler
-            │   ├── exchange/        # BcvSyncService
-            │   └── fiscal/          # IgtfCalculator, TheFactoryHkaClient
-            ├── package.json
-            └── index.ts
+
+### Ejemplo: Manifiesto de `craft-workshop`
+```typescript
+// packages/plugins/craft-workshop/src/manifest.ts
+export const CRAFT_WORKSHOP_MANIFEST: TenantModuleManifest = {
+  id: "craft_workshop",
+  name: "Taller Artesanal & Sublimación",
+  description: "Costeo de insumos por paquete, escandallo con merma técnica, mano de obra y presupuestos para WhatsApp.",
+  category: "VERTICAL",
+  icon: "Scissors",
+  requiredPlan: "GROWTH",
+};
 ```
 
 ---
 
-## 4. Esquema de Base de Datos para Activación Dinámica
+## 4. Activación Dinámica y Guardianes de Seguridad
 
-La activación de módulos por cliente se controla con una tabla relacional en PostgreSQL:
+La activación de módulos se almacena en la tabla `tenant_modules` de PostgreSQL. 
 
+### A. Guardián de Rutas en el Panel Administrativo
+Toda sub-ruta de plugin en `apps/web/src/app/admin/(protected)/` ejecuta el guardián de autorización en su primera línea:
+
+```typescript
+// apps/web/src/app/admin/craft/page.tsx
+export default async function CraftPage() {
+  const session = await getSession();
+  const tenantId = session.tenantId;
+
+  // 1. Guardián de seguridad multi-tenant
+  await assertAuthorizedTenantAdmin(tenantId);
+
+  // 2. Guardián de módulo activo
+  await assertTenantModuleActive(tenantId, "craft_workshop");
+
+  return <CraftWorkshopAdminPanel tenantId={tenantId} />;
+}
+```
+
+Si el comercio no tiene el plugin contratado en su base de datos, `assertTenantModuleActive` redirige inmediatamente al usuario a `/admin?error=module_not_available`, impidiendo cualquier fuga de interfaz o consumo indebido de recursos.
+
+### B. Inyección Condicional en el Menú Lateral (`AdminSidebar`)
+El sidebar consulta los `activeModuleIds` del comercio. Si un ítem de navegación requiere un módulo (`requiredModule: "craft_workshop"`), solo se renderiza si `activeModuleIds.includes("craft_workshop")`.
+
+---
+
+## 5. Tutorial: Cómo Crear un Nuevo Plugin en 15 Minutos
+
+Para añadir un nuevo módulo al ecosistema (por ejemplo, `plugin-loyalty-points` para puntos de fidelidad):
+
+### Paso 1: Registrar el ID en `@marketos/types`
+En [`packages/types/src/modules.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/types/src/modules.ts), añade `"loyalty_points"` al tipo `TenantModuleId`.
+
+### Paso 2: Crear el Paquete en `packages/plugins/loyalty-points`
+Crea la estructura base del paquete:
+```
+packages/plugins/loyalty-points/
+├── package.json
+├── tsconfig.json
+└── src/
+    ├── manifest.ts          # Metadatos del módulo
+    ├── types.ts             # Modelos de puntos y canjes
+    ├── components/          # Vistas React del módulo (con "use client" si usan useState)
+    ├── services/            # Lógica de cálculo y canje
+    └── index.ts             # Exportaciones públicas
+```
+
+### Paso 3: Configurar el `package.json`
+```json
+{
+  "name": "@marketos/plugin-loyalty-points",
+  "version": "1.0.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@marketos/types": "workspace:*",
+    "@marketos/ui": "workspace:*",
+    "lucide-react": "^1.16.0"
+  }
+}
+```
+
+### Paso 4: Crear la Migración SQL
+Crea la migración versionada en `packages/database/supabase/migrations/00034_loyalty_points.sql`:
 ```sql
--- Tabla de Módulos / Plugins Habilitados por Inquilino
-CREATE TABLE tenant_modules (
+CREATE TABLE loyalty_points (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  module_id TEXT NOT NULL, -- 'food_service' | 'barcode_retail' | 'local_venezuela'
-  is_active BOOLEAN DEFAULT true,
-  settings JSONB DEFAULT '{}'::jsonb, -- Opciones específicas del plugin para este cliente
-  installed_at TIMESTAMPTZ DEFAULT NOW(),
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  points_balance INT NOT NULL DEFAULT 0,
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(tenant_id, module_id)
+  UNIQUE(tenant_id, customer_id)
 );
-
--- Índice para consultas ultra-rápidas en caché
-CREATE INDEX idx_tenant_modules_lookup ON tenant_modules(tenant_id, is_active);
+ALTER TABLE loyalty_points ENABLE ROW LEVEL SECURITY;
 ```
 
-### Ejemplo de Configuración en Base de Datos:
+### Paso 5: Crear la Sub-ruta en `apps/web`
+Crea `apps/web/src/app/admin/loyalty/page.tsx` protegido con `assertTenantModuleActive(tenantId, 'loyalty_points')`.
 
-1. **Pulldog (Comida Rápida):**
-   * `module_id = 'food_service'`, `is_active = true`
-   * `module_id = 'local_venezuela'`, `is_active = true`
-   * *(Resultado: Tiene menú con salsas, inventario de panes/salchichas y pago móvil).*
-
-2. **Shop Market (Supermercado):**
-   * `module_id = 'barcode_retail'`, `is_active = true`
-   * `module_id = 'local_venezuela'`, `is_active = true`
-   * *(Resultado: Tiene catálogo con código de barras, paginación masiva y pago móvil; NO ve recetas ni salsas).*
+### Paso 6: Vincular en `AdminSidebar`
+Añade el ítem en la categoría deseada (`MANAGEMENT` u `OPERATIONS`) con `requiredModule: "loyalty_points"`.
 
 ---
 
-## 5. Guía para Futuros Desarrolladores y Colaboradores
+## 6. Verificación de Aislamiento y Reglas de Calidad
 
-Cuando un nuevo programador se una al proyecto, debe seguir estas **Reglas de Oro**:
-
-1. **Nunca modifiques el Core para un caso particular:** Si un cliente pide una función especial, esa lógica debe vivir dentro de un plugin nuevo o existente en `packages/plugins/`.
-2. **Usa siempre Soft Delete:** Ninguna eliminación debe ser destructiva (`DELETE`). Todas las tablas de plugins deben implementar la columna `deleted_at TIMESTAMPTZ NULL`.
-3. **Aislamiento Multi-Tenant:** Toda consulta debe filtrar explícitamente por `tenant_id` y respetar las políticas de RLS de Supabase.
-4. **Independencia de Plugins:** Un plugin de negocio (ej. `food-service`) no debe importar código de otro plugin de negocio (ej. `clothing-variants`). Ambos interactúan exclusivamente a través de las interfaces del Core.
-
----
-
-## 6. Plan de Ejecución y Migración Paso a Paso
-
-* [x] **Paso 1: Fundaciones en `@marketos/types`:** Definición de interfaces `TenantModule`, `PluginManifest`, `RawMaterial`, `ProductRecipe`, `ProductModifier`.
-* [x] **Paso 2: Infraestructura en `@marketos/database`:** Migración de tablas `tenant_modules`, `raw_materials`, `recipes`, `product_modifiers` y métodos del repositorio.
-* [x] **Paso 3: Creación de `packages/plugins/food-service`:** Componentes de gestión de insumos, escandallo, modales de salsas/extras y deducción de stock.
-* [x] **Paso 4: Conexión de UI e Interruptores:** Modal de gestión de plugins en Super Admin (Opción 1), pestañas condicionales en Admin y modal de personalización en Storefront.
-* [x] **Paso 5: Desacoplamiento de `packages/plugins/local-venezuela`:** Mover la lógica bancaria nacional (Pago Móvil, Zelle/Efectivo) y tasa BCV a su propio paquete modular desacoplado del core.
+* **Cero Imports Cruzados**: Un plugin jamás debe importar código de otro plugin hermano. Si dos plugins necesitan compartir un tipo o función, esta debe promoverse a `@marketos/types` o `@marketos/utils`.
+* **Directiva `"use client"`**: Todo componente visual exportado por un plugin que utilice `useState`, `useEffect` o eventos de usuario debe declarar `"use client";` en su primera línea para garantizar compatibilidad con React Server Components.
+* **Idempotencia de Pruebas**: Cada plugin debe incluir su suite de pruebas unitarias (`src/__tests__/run-checks.ts` o archivos `.test.ts` con Vitest).

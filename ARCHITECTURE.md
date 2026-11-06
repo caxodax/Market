@@ -1,9 +1,9 @@
 # MarketOS — Documento Maestro de Arquitectura y Especificación Técnica Integral
 
-> **Versión del Sistema**: 2.5.0-production  
-> **Patrón Arquitectónico**: Clean Architecture + Arquitectura Hexagonal (Puertos y Adaptadores) + Core Agnóstico con Plugins Modulares (Modelo Odoo / Shopify Apps)  
-> **Seguridad y Excelencia**: Estándar AgentShield (ECC) + Ponytail Ultra (Cero Código Muerto, Máxima Simplicidad)  
-> **Filosofía de Interfaz**: Mobile-First, PWA Multi-Tenant Aislada, Ergonomía de Pulgar y Cero Fricción Comercial  
+> **Versión del Sistema**: 3.0.0-production  
+> **Patrón Arquitectónico**: Clean Architecture + Arquitectura Hexagonal (Puertos y Adaptadores) + Core Agnóstico con Plugins Modulares (Modelo Odoo / Shopify Apps) + Next.js 16 App Router  
+> **Seguridad y Excelencia**: Estándar Criptográfico AgentShield (ECC) + Ponytail Ultra (Cero Código Muerto, Máxima Simplicidad)  
+> **Filosofía de Interfaz**: Mobile-First, PWA Multi-Tenant Aislada, Ergonomía de Pulgar (44px), CLS = 0 y Cero Fricción Comercial  
 
 ---
 
@@ -12,10 +12,10 @@
 1. [Visión del Sistema y Principios Rectores](#1-visión-del-sistema-y-principios-rectores)
 2. [Estructura del Monorepo (Turborepo + pnpm)](#2-estructura-del-monorepo-turborepo--pnpm)
 3. [Arquitectura Hexagonal: Puertos, Adaptadores y Ecosistema de Plugins](#3-arquitectura-hexagonal-puertos-adaptadores-y-ecosistema-de-plugins)
-4. [Base de Datos & Modelado Relacional (28 Migraciones SQL)](#4-base-de-datos--modelado-relacional-28-migraciones-sql)
+4. [Base de Datos & Modelado Relacional (33 Migraciones SQL y RPCs Transaccionales)](#4-base-de-datos--modelado-relacional-33-migraciones-sql-y-rpcs-transaccionales)
 5. [Seguridad Integral y Aislamiento Multi-Tenant (AgentShield)](#5-seguridad-integral-y-aislamiento-multi-tenant-agentshield)
 6. [Flujos Críticos de Negocio y Ciclo de Vida](#6-flujos-críticos-de-negocio-y-ciclo-de-vida)
-7. [Arquitectura Frontend, Mobile-First y PWA Multi-Tenant](#7-arquitectura-frontend-mobile-first-y-pwa-multi-tenant)
+7. [Arquitectura Frontend: App Router Modular, Mobile-First y CLS = 0](#7-arquitectura-frontend-app-router-modular-mobile-first-y-cls--0)
 8. [Conexiones Externas, APIs y Servicios de Infraestructura](#8-conexiones-externas-apis-y-servicios-de-infraestructura)
 9. [Guía de Despliegue, Variables de Entorno y Operaciones](#9-guía-de-despliegue-variables-de-entorno-y-operaciones)
 
@@ -39,26 +39,29 @@ flowchart TD
     end
 
     subgraph Core["MarketOS Core (Agnóstico)"]
-        Auth["Auth & Sesiones Criptográficas"]
+        Auth["Auth & Sesiones Criptográficas HMAC"]
         Catalog["Catálogo Base & Sucursales"]
         Cart["Carrito & Checkout Central"]
         Orders["Motor de Pedidos & Tracking QR"]
-        Ports["Puertos Hexagonales (Interfaces Puras)"]
+        Ports["Puertos Hexagonales (Interfaces Puras en @marketos/types)"]
     end
 
-    subgraph Plugins["Ecosistema Modular de Plugins"]
+    subgraph Plugins["Ecosistema Modular de Plugins (packages/plugins/*)"]
         P_VE["Localización Venezuela (BCV, Pago Móvil, IGTF)"]
         P_Food["Food Service (Recetas BOM, Modificadores, KDS)"]
         P_POS["POS Registers (Cajas, Turnos, Cortes X/Z)"]
         P_CPQ["MTO CPQ (Cotizador Taller & Matrices)"]
+        P_Craft["Craft Workshop (Sublimación, DTF & Merma)"]
         P_Fiscal["Invoicing & Purchasing (SENIAT, Retenciones)"]
+        P_Account["Accounting (Contabilidad NIIF & PUC)"]
         P_Push["Push Notifications & Campañas VAPID"]
+        P_Studio["Storefront Pro (11 Bloques Dinámicos)"]
     end
 
     subgraph Infra["Persistencia & Almacenamiento (Infraestructura)"]
-        PG["PostgreSQL en Supabase (RLS Estricto)"]
-        R2["Cloudflare R2 Object Storage (Zero Egress)"]
-        BCV["API Oficial BCV (Tasa USD/VES)"]
+        PG["PostgreSQL en Supabase (RLS Estricto + 33 Migraciones)"]
+        R2["Cloudflare R2 Object Storage (Zero Egress S3)"]
+        BCV["API Oficial BCV (Tasa USD/VES en Vivo)"]
     end
 
     Clientes --> Proxy
@@ -100,18 +103,34 @@ El proyecto está organizado como un monorepo administrado mediante **Turborepo*
 ```
 Market/
 ├── apps/
-│   └── web/                                # Aplicación Next.js 16 (App Router)
+│   └── web/                                # Aplicación Next.js 16 (App Router + Turbopack)
 │       ├── public/                         # Assets estáticos globales y Service Worker
 │       └── src/
 │           ├── app/                        # Rutas canónicas (Storefront, Admin, APIs)
 │           │   ├── actions.ts              # Server Actions públicas (checkout, rastreo)
-│           │   ├── admin/                  # Panel de administración del comercio (/admin)
-│           │   │   ├── actions.ts          # Server Actions administrativas blindadas
-│           │   │   ├── pos/                # Pantalla táctil del POS (/admin/pos)
-│           │   │   ├── pos-actions.ts      # Server Actions para cajas y turnos
-│           │   │   ├── invoicing-actions.ts# Facturación fiscal SENIAT / PAC
-│           │   │   ├── purchasing-actions.ts# Compras y retenciones de proveedores
-│           │   │   └── push-actions.ts     # Campañas y notificaciones Web Push
+│           │   ├── admin/                  # Panel de administración fragmentado en 20 sub-rutas
+│           │   │   ├── layout.tsx          # Shell canónico con guardián HMAC-SHA256
+│           │   │   ├── loading.tsx         # Skeleton universal de transición
+│           │   │   ├── admin-context.ts    # Contexto ligero para compartir datos del tenant
+│           │   │   ├── payments/           # Conciliación de comprobantes de pago
+│           │   │   ├── orders/             # Gestión de órdenes y despacho
+│           │   │   ├── inventory/          # Catálogo y control de stock
+│           │   │   ├── pos/                # Punto de Venta táctil (/admin/pos)
+│           │   │   ├── delivery/           # Asignación y tracking de motorizados
+│           │   │   ├── invoicing/          # Facturación SENIAT y correlativos
+│           │   │   ├── purchasing/         # Compras a proveedores y retenciones IVA
+│           │   │   ├── reports/            # Reportes de venta y Libro Fiscal
+│           │   │   ├── settings/           # Ajustes de marca, dominio y monedas
+│           │   │   ├── stores/             # Sedes físicas y sucursales
+│           │   │   ├── staff/              # Empleados, cajeros y permisos RBAC
+│           │   │   ├── storefront-studio/  # Maquetador visual de la vitrina digital
+│           │   │   ├── food-service/       # Insumos y recetas de cocina (Plugin)
+│           │   │   ├── mto-cpq/            # Cotizador Make-to-Order (Plugin)
+│           │   │   ├── craft/              # Taller de sublimación y DTF (Plugin)
+│           │   │   ├── coupons/            # Cupones y promociones (Plugin)
+│           │   │   ├── push/               # Campañas Web Push VAPID (Plugin)
+│           │   │   ├── plugins/            # Marketplace y activación de módulos
+│           │   │   └── audit/              # Registro forense inmutable de eventos
 │           │   ├── api/                    # Endpoints REST y Webhooks
 │           │   │   ├── analytics/          # Registro de tráfico y métricas en vivo
 │           │   │   ├── cron/               # Tareas programadas (Sincronización BCV)
@@ -120,30 +139,33 @@ Market/
 │           │   ├── platform/               # Panel del Super Administrador (/platform)
 │           │   ├── t/[tenant]/             # Storefront canónico aislado por ruta
 │           │   └── proxy.ts                # Detección y reescritura de subdominios
-│           ├── components/                 # Componentes UI (Storefront, Checkout, POS)
+│           ├── components/                 # Vistas y componentes especializados
+│           │   ├── admin/                  # AdminLayoutShell, AdminSidebar, AdminHeader, AdminSkeleton
+│           │   └── ui/                     # EmptyState, OptimizedImage, BottomSheetModal
 │           ├── context/                    # Contextos de React (Carrito, Favoritos)
 │           └── lib/                        # Clientes de caché, compresión y Excel
 ├── packages/
-│   ├── auth/                               # Seguridad, roles RBAC y sesiones HMAC
-│   ├── database/                           # Repositorios, migraciones SQL y Circuit Breaker
+│   ├── auth/                               # Seguridad, roles RBAC y sesiones HMAC-SHA256
+│   ├── database/                           # Repositorios, 33 migraciones SQL y Circuit Breaker
 │   │   └── supabase/
-│   │       ├── migrations/                 # 30 migraciones SQL versionadas
+│   │       ├── migrations/                 # 33 migraciones SQL versionadas e idempotentes
 │   │       └── PRODUCTION_FULL_SETUP.sql   # DDL consolidado de producción
-│   ├── plugins/                            # Ecosistema de 14 plugins modulares
-│   │   ├── accounting/                     # Contabilidad NIIF y Plan Único de Cuentas
+│   ├── plugins/                            # Ecosistema de 13 plugins modulares
+│   │   ├── accounting/                     # Contabilidad NIIF y Plan Único de Cuentas (PUC)
 │   │   ├── analytics/                      # Métricas de tráfico, fuentes y conversión
-│   │   ├── barcode-retail/                 # Códigos EAN-13, pasillos y balanzas
+│   │   ├── barcode-retail/                 # Códigos EAN-13, pasillos y balanzas comerciales
+│   │   ├── craft-workshop/                 # Sublimación, DTF, vinil textil y merma técnica
 │   │   ├── delivery-fleet/                 # Asignación de motorizados y tarifas por km
 │   │   ├── food-service/                   # Recetas BOM, modificadores y comandas KDS
-│   │   ├── invoicing/                      # Facturas, notas, Libro de Ventas SENIAT
-│   │   ├── local-venezuela/                # Pago Móvil, tasa BCV en vivo e IGTF
+│   │   ├── invoicing/                      # Facturas, notas y Libro de Ventas SENIAT
+│   │   ├── local-venezuela/                # Pago Móvil, tasa BCV en vivo e IGTF 3%
 │   │   ├── mto-cpq/                        # Cotizador Make-to-Order para talleres
 │   │   ├── promotions-coupons/             # Cupones de descuento y promociones
-│   │   ├── purchasing-retentions/          # Facturas de compra y retenciones IVA
+│   │   ├── purchasing-retentions/          # Facturas de compra y retenciones IVA SENIAT
 │   │   ├── push-notifications/             # Notificaciones masivas Web Push VAPID
 │   │   └── storefront-pro/                 # Maquetador modular de 11 bloques visuales
 │   ├── types/                              # Definiciones TypeScript y Puertos Hexagonales
-│   ├── ui/                                 # Librería de componentes (Tailwind + Radix)
+│   ├── ui/                                 # Librería de componentes compartidos (@marketos/ui)
 │   └── utils/                              # Utilidades de R2, fechas, WhatsApp y plugins
 └── package.json                            # Scripts globales de compilación y pruebas
 ```
@@ -152,85 +174,58 @@ Market/
 
 ## 3. Arquitectura Hexagonal: Puertos, Adaptadores y Ecosistema de Plugins
 
-Toda integración externa o variación por modelo de negocio se implementa desacoplando el Core mediante **Puertos** definidos en [`packages/types/src/ports.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/types/src/ports.ts):
+### Contratos de Puertos ([`packages/types/src/ports.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/types/src/ports.ts))
 
-### Puertos Principales del Sistema
+Los puertos definen las operaciones que el Core puede delegar a los plugins sin acoplarse a su implementación:
 
 ```typescript
-// 1. PUERTO DE PAGOS (Intercambiable entre Pago Móvil, Zelle, Stripe, Tarjetas)
+// 1. Puerto de Pagos Bimonetarios
 export interface PaymentPort {
-  readonly providerId: string;
-  processPayment(input: PaymentProcessInput): Promise<PaymentProcessResult>;
-  verifyPayment?(transactionId: string): Promise<PaymentProcessResult>;
+  readonly id: string;
+  readonly name: string;
+  processPayment(order: Order, payload: PaymentSubmissionPayload): Promise<PaymentResult>;
+  verifyPayment(proofId: string, verifierId: string): Promise<PaymentVerificationResult>;
 }
 
-// 2. PUERTO DE TASA DE CAMBIO (Sincronización BCV, TRM Colombia, Tipos Globales)
+// 2. Puerto de Tasas Cambiarias Oficiales
 export interface ExchangeRatePort {
-  readonly providerId: string;
-  getRate(from: CurrencyCode, to: CurrencyCode, tenantId?: string): Promise<ExchangeRateResult>;
+  readonly currencyCode: CurrencyCode;
+  fetchLiveRate(): Promise<ExchangeRateSnapshot>;
 }
 
-// 3. PUERTO DE INVENTARIO (Descarga directa 1 a 1 o Escandallo de Recetas BOM)
-export interface InventoryPort {
-  readonly strategyId: string;
-  deductStock(input: InventoryDeductInput): Promise<InventoryDeductResult>;
-  restoreStock(input: InventoryRestoreInput): Promise<void>;
-}
-
-// 4. PUERTO DE NOTIFICACIONES (WhatsApp, SMS, Correo Transaccional)
-export interface NotificationPort {
-  readonly channelId: string;
-  sendNotification(payload: NotificationPayload): Promise<NotificationResult>;
-}
-
-// 5. PUERTO FISCAL Y TRIBUTARIO (SENIAT Venezuela, DIAN Colombia, Global)
+// 3. Puerto de Facturación Fiscal y Conexión SENIAT
 export interface FiscalAdapterPort {
-  readonly countryCode: string;
-  readonly countryName: string;
-  readonly taxIdLabel: string;
-  readonly defaultIvaRate: number;
-  validateTaxId(taxId: string): boolean;
-  calculateTaxes(input: FiscalCalculationInput): FiscalCalculationBreakdown;
-  formatDocumentNumber(type: string, sequence: number, prefix?: string): string;
-  getLegalLegend(type: string): string;
+  issueInvoice(document: FiscalDocumentDraft): Promise<FiscalDocumentIssued>;
+  generateSalesBook(tenantId: string, period: string): Promise<FiscalSalesBookReport>;
+}
+
+// 4. Puerto de Notificaciones Multicanal
+export interface NotificationPort {
+  sendPush(subscription: PushSubscription, payload: PushNotificationPayload): Promise<void>;
+  formatWhatsAppOrderMessage(order: Order, settings: TenantSettings): string;
 }
 ```
 
-### Motor de Resolución de Dependencias y Conflictos
+### Resolución de Dependencias y Ciclo de Vida de Módulos
 
 El motor en [`packages/utils/src/plugin-resolver.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/utils/src/plugin-resolver.ts) gestiona el ciclo de vida de los módulos evitando inconsistencias tributarias o de negocio:
 - **Activación en Cascada (`REQUIRES` / `AUTO_ACTIVATE`)**: Activar un módulo avanzado (ej. `invoicing`) activa de forma automática sus dependencias requeridas (ej. `local_venezuela`).
 - **Desactivación en Cascada**: Desactivar un módulo base apaga de forma segura todos los módulos superiores dependientes.
 - **Resolución de Conflictos Territoriales (`CONFLICTS`)**: Evita que un comercio active simultáneamente localizaciones mutuamente excluyentes (como `local_venezuela` y `local_colombia`).
 
-### Desacoplamiento de Vitrina: Retail de 1 Clic vs Fabricación CPQ
-
-Para evitar choques operativos entre comercios de consumo masivo (**Shop Market**, retail/minimarket) y talleres de personalización (**Printo Prink**, sublimación/imprenta), el Storefront discrimina dinámicamente la experiencia de compra según las capacidades del producto:
-
-1. **Retail Inmediato (1-Click Add-to-Cart)**:
-   - Para productos sin modificadores gastronómicos ni ficha de personalización, el botón agrega directamente al carrito con la cantidad deseada.
-   - Valida el inventario físico en tiempo real (`inventory.quantity`).
-
-2. **Personalización y Cotización CPQ (`mto_cpq`)**:
-   - Detecta si el producto cuenta con matrices de atributos o el plugin `mto_cpq` está activo (`hasCpq: true`).
-   - El botón transmuta automáticamente a **"Personalizar / Cotizar"** (estilo índigo de taller).
-   - Abre el modal `CpqModal` (envoltorio de `CustomProductConfigurator`), permitiendo al usuario configurar dimensiones ($cm \times cm$), técnica de estampado, material base, porcentaje de anticipo y subir su arte o logotipo.
-   - En el carrito (`CartItem.is_cpq`), se respeta el precio unitario dinámico cotizado y se omite la restricción de stock fijo en estante (Make-to-Order).
-   - En el backend (`order.repository.ts`), las líneas CPQ conservan su precio cotizado y no bloquean el pedido por inexistencia en anaquel.
-
 ---
 
-## 4. Base de Datos & Modelado Relacional (30 Migraciones SQL y RPCs Transaccionales)
+## 4. Base de Datos & Modelado Relacional (33 Migraciones SQL y RPCs Transaccionales)
 
 La base de datos reside en **PostgreSQL (Supabase)**, con tipado estricto, integridad referencial en cascada, auditoría inmutable, procedimientos almacenados transaccionales (RPC) y Row-Level Security (RLS) en el 100% de las tablas.
 
-### Catálogo Cronológico de las 30 Migraciones
+### Catálogo Cronológico de las 33 Migraciones
 
 | Migración | Nombre / Identificador | Propósito Arquitectónico y Tablas Creadas |
 | :---: | :--- | :--- |
 | **00001** | `initial_schema.sql` | Fundamentos: `tenants`, `tenant_settings`, `stores`, `profiles`, `categories`, `products`, `inventory`, `orders`, `order_items`, `payments`, `audit_logs`. |
 | **00002** | `seed_shop_market.sql` | Datos semilla para el primer tenant piloto: **Shop Market C.A.** (Nueva Segovia, Barquisimeto). |
-| **00003** | `phase_2_operational.sql` | Operaciones: `coupons`, `delivery_zones`, `drivers`, soporte de trazabilidad operativa. |
+| **00003** | `phase_2_operational.sql` | Operaciones: `coupons`, `delivery_zones`, `drivers`, trazabilidad operativa. |
 | **00004** | `phase_3_saas_multi_tenant.sql` | SaaS: Planes de suscripción, límites de productos y sucursales por tenant. |
 | **00005** | `phase_4_production_hardening.sql` | Triggers automáticos para actualizar `updated_at` y restricciones de consistencia. |
 | **00006** | `auth_roles_profiles.sql` | RBAC: Definición del enum `app_role` y sincronización bidireccional con `auth.users`. |
@@ -256,41 +251,11 @@ La base de datos reside en **PostgreSQL (Supabase)**, con tipado estricto, integ
 | **00026** | `purchasing_and_retentions.sql` | Compras: `purchase_invoices`, comprobantes de retención IVA (75%/100%) y exportación TXT SENIAT. |
 | **00027** | `accounting_and_commissions.sql` | Contabilidad NIIF: `accounting_accounts` (PUC 4 niveles), `journal_entries`, `journal_entry_lines`, comisiones fintech. |
 | **00028** | `atomic_fiscal_sequences.sql` | Secuencias legales: `fiscal_sequences` con bloqueo `FOR UPDATE` para numeración consecutiva atómica. |
-| **00029** | `schema_cleanup_and_bimonetary.sql` | Poda y Moneda Dual: Eliminación de tablas muertas (`user_profiles`, `mto_quote_requests`, `mto_materials`, `tenant_plan_limits`), soporte fraccionario de pesaje (`NUMERIC(12,3)` en inventario), columnas `primary_currency`/`secondary_currency` y balances duales de caja (`pos_shifts`). |
-| **00030** | `core_transactional_rpcs.sql` | Stored Procedures ACID: `rpc_create_order_atomic` (descuento de recetas/stock sin carreras), `rpc_issue_fiscal_document` (bloqueo `FOR UPDATE` SENIAT y asiento doble contable automático), `rpc_close_pos_shift` (arqueo ciego de caja en BD) y `rpc_get_sales_book` (Libro de Ventas instantáneo). |
-
-### Diccionario de Datos: Entidades Principales
-
-```mermaid
-erDiagram
-    tenants ||--o{ stores : "posee sucursales"
-    tenants ||--o{ categories : "clasifica productos"
-    tenants ||--o{ products : "vende"
-    tenants ||--o{ orders : "procesa pedidos"
-    tenants ||--o{ tenant_modules : "activa módulos"
-    tenants ||--o{ pos_registers : "opera cajas"
-    
-    products ||--o{ inventory : "stock por sede"
-    stores ||--o{ inventory : "almacena"
-    
-    orders ||--|{ order_items : "contiene renglones"
-    orders ||--o{ payments : "respaldada por"
-    orders ||--o{ fiscal_documents : "genera factura"
-    
-    pos_registers ||--o{ pos_shifts : "registra turnos"
-    pos_shifts ||--o{ pos_cash_movements : "movimientos de caja"
-    
-    products ||--o{ recipes : "escandallo de insumos"
-    raw_materials ||--o{ recipes : "materia prima"
-```
-
-1. **`tenants`**: Registro de comercios (`id`, `name`, `slug`, `status`, `custom_domain`).
-2. **`tenant_settings`**: Personalización visual y operativa (`business_name`, `primary_color`, `logo_url`, `whatsapp_number`, `supported_currencies`).
-3. **`stores`**: Sedes físicas asociadas a un tenant (`id`, `tenant_id`, `name`, `code`, `address`).
-4. **`products` & `inventory`**: Catálogo base y existencias segregadas por sucursal (`product_id`, `store_id`, `quantity`).
-5. **`orders` & `order_items`**: Pedidos del comercio con desglose de ítems, precios unitarios, tasas de cambio y estado.
-6. **`pos_registers` & `pos_shifts`**: Control estricto de puntos de venta físicos, apertura con fondo de caja, arqueo ciego y cortes X/Z.
-7. **`fiscal_documents` & `fiscal_sequences`**: Facturación legal con numeración secuencial atómica garantizada sin saltos.
+| **00029** | `schema_cleanup_and_bimonetary.sql` | Poda y Moneda Dual: Eliminación de tablas muertas (`user_profiles`, `mto_quote_requests`, `mto_materials`), soporte de peso fraccionario (`NUMERIC(12,3)` en inventario), monedas duales y balance segregado en `pos_shifts`. |
+| **00030** | `core_transactional_rpcs.sql` | Stored Procedures ACID: `rpc_create_order_atomic`, `rpc_issue_fiscal_document`, `rpc_close_pos_shift` y `rpc_get_sales_book`. |
+| **00031** | `profiles_email_unique.sql` | Integridad de usuarios: Índice único sobre `email` en la tabla `profiles` para evitar duplicidad de colaboradores. |
+| **00032** | `fix_profiles_rls_recursion.sql` | Corrección RLS: Erradicación de bucles de recursión infinita en las políticas de seguridad de perfiles. |
+| **00033** | `craft_workshop_plugin.sql` | Taller de sublimación y DTF: `craft_materials` (insumos por bulto/paquete con costo unitario computado), `craft_recipes` (fichas de escandallo con merma y mano de obra), `craft_recipe_items` (fórmulas relacionales), `craft_quotes` (presupuestos con 50% de anticipo) y procedimiento `rpc_recalculate_craft_recipes`. |
 
 ---
 
@@ -302,7 +267,7 @@ El estándar **AgentShield (ECC)** implementa una defensa en profundidad de tres
 sequenceDiagram
     autonumber
     actor Cliente as Usuario / Navegador
-    participant Proxy as Next.js Proxy / Middleware
+    participant Proxy as Next.js Proxy / Layout Canónico
     participant Action as Server Action (Backend)
     participant Auth as Guardián Criptográfico HMAC
     participant Repo as Repositorio Scoped
@@ -339,18 +304,17 @@ sequenceDiagram
      // Solo continúa si user.role === 'PLATFORM_SUPER_ADMIN' o user.tenant_id === tenantId
      ```
 
-3. **Row-Level Security (RLS) Mandatorio en PostgreSQL**:
+3. **Guardián de Licenciamiento Dinámico de Plugins**:
+   - Toda sub-ruta de plugin en el panel administrativo invoca:
+     ```typescript
+     await assertTenantModuleActive(tenantId, moduleId);
+     ```
+   - Si el comercio intenta acceder por URL directa a un módulo que no tiene contratado en `tenant_modules`, es redirigido inmediatamente a `/admin?error=module_not_available`.
+
+4. **Row-Level Security (RLS) Mandatorio en PostgreSQL**:
    - El 100% de las tablas tienen RLS habilitado (`ALTER TABLE ... ENABLE ROW LEVEL SECURITY`).
    - Las lecturas públicas (Storefront) se restringen estrictamente a datos de comercios con `status = 'active'`.
    - Las escrituras quedan limitadas al usuario autenticado con pertenencia válida al `tenant_id`.
-
-4. **Custodia de Claves y Prevención de Fugas de `service_role`**:
-   - En [`packages/database/src/server.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/database/src/server.ts), la clave administrativa `SUPABASE_SERVICE_ROLE_KEY` se lee exclusivamente desde variables de entorno seguras de servidor.
-   - Si no está presente, el cliente degrada de forma segura a permisos anónimos.
-
-5. **Supabase Circuit Breaker**:
-   - Ubicación: [`packages/database/src/circuit-breaker.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/database/src/circuit-breaker.ts).
-   - Detección de fallos de red o latencias anómalas (>20s) con aislamiento temporal para prevenir cuelgues indefinidos en las funciones serverless de Vercel.
 
 ---
 
@@ -369,7 +333,7 @@ stateDiagram-v2
     CREATED --> PAYMENT_PENDING: Carga de referencia y comprobante
     PAYMENT_PENDING --> PAYMENT_APPROVED: Administrador / Cajero aprueba pago
     PAYMENT_PENDING --> CANCELLED: Comprobante rechazado o vencido
-    PAYMENT_APPROVED --> PREPARING: Cocina (KDS) o Picking en almacén
+    PAYMENT_APPROVED --> PREPARING: Cocina (KDS), Taller (Craft) o Picking en almacén
     PREPARING --> READY: Orden empaquetada y lista
     READY --> DELIVERING: Asignada a chofer (Delivery)
     READY --> COMPLETED: Retirada en tienda (Pick-up)
@@ -387,29 +351,36 @@ stateDiagram-v2
 
 ---
 
-## 7. Arquitectura Frontend, Mobile-First y PWA Multi-Tenant
+## 7. Arquitectura Frontend: App Router Modular, Mobile-First y CLS = 0
 
-El frontend está desarrollado bajo directrices estrictas de **ergonomía móvil**:
+El frontend de MarketOS ha sido modernizado bajo estándares de ingeniería de alto rendimiento:
 
-### Características Mobile-First
-- **Touch Targets Optimizados**: Todas las áreas de interacción táctil tienen dimensiones mínimas de $44 \times 44\,\text{px}$.
-- **Ergonomía de Pulgar**: Uso intensivo de *Bottom Sheets* ([`bottom-sheet-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/ui/bottom-sheet-modal.tsx)) para selectores de sucursal, filtros, variantes y confirmaciones de compra, ubicando los controles al alcance natural de una sola mano.
-- **Rendimiento Perceptual Instantáneo**: React Server Components (RSC) para el renderizado inicial sin JavaScript innecesario en el cliente.
-- **Microinteracciones y Feedback Háptico**: Estados inmediatos de carga, confirmación de agregado al carrito y botones directos a WhatsApp formateados con la comanda de la orden.
+### A. Desacoplamiento Modular del Panel `/admin`
+El antiguo archivo monolítico de 1.800 líneas ha sido segmentado en **20 sub-rutas independientes** con Server Components de Next.js 16:
+- **Layout Canónico (`apps/web/src/app/admin/layout.tsx`)**: Centraliza la autenticación, carga paralela de ajustes y perfil de usuario, y provee el shell visual [`AdminLayoutShell`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/admin/admin-layout-shell.tsx).
+- **Cero Pantallas en Blanco**: Cada sub-ruta posee su propio `loading.tsx` con esqueletos de carga visual [`AdminSkeleton`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/admin/admin-skeleton.tsx).
+- **Revalidación Quirúrgica**: Las mutaciones ya no recargan un estado monolítico en memoria; ejecutan `revalidatePath('/admin/orders')` o `revalidatePath('/admin/payments')` para refrescar solo los datos necesarios en milisegundos.
 
-### PWA Multi-Tenant sin Colisión de WebAPKs
-El reto habitual en plataformas SaaS de comercio es que al tener múltiples tiendas bajo el mismo dominio (ej. `marketos.app`), el navegador tiende a sobrescribir la PWA instalada. MarketOS resuelve esto mediante:
-1. **Endpoint de Manifiesto Dinámico ([`/api/manifest/route.ts`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/app/api/manifest/route.ts))**: Genera un manifiesto W3C parametrizado por tenant con nombre, colores de marca e íconos independientes.
-2. **Identificador y Scope Segmentado**:
-   ```json
-   {
-     "id": "/t/shop-market",
-     "start_url": "/t/shop-market?source=pwa",
-     "scope": "/t/shop-market"
-   }
-   ```
-   Esto permite que un usuario instale simultáneamente la tienda **Shop Market C.A.** y el restaurante **Pulldog** como dos aplicaciones nativas independientes en su pantalla de inicio de Android o iOS.
-3. **Modales de Instalación Asistida**: Guías ilustradas paso a paso para iOS (Safari Compartir > Añadir a pantalla de inicio) y Android ([`android-install-guide-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/pwa/android-install-guide-modal.tsx)).
+### B. Menú Lateral en 4 Macro-dominios ([`AdminSidebar`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/admin/admin-sidebar.tsx))
+La navegación se estructura en 4 macro-categorías para reducir la carga cognitiva del usuario:
+1. **OPERACIONES DEL DÍA**: Pagos por Conciliar, Pedidos Activos, Cajas POS, Delivery.
+2. **CATÁLOGO & STOCK**: Inventario Multitienda, Food Service, MTO CPQ, Taller Artesanal.
+3. **FINANZAS & FISCAL**: Tasa Oficial BCV, Facturas SENIAT, Compras & Retenciones, Contabilidad NIIF, Reportes de Venta.
+4. **ADMINISTRACIÓN & TIENDA**: Ajustes Generales, Sucursales, Equipo & Roles, Vitrina Pro (Storefront), Cupones, Notificaciones Push, Plugins, Auditoría.
+
+### C. Estabilidad Visual Absoluta (CLS = 0)
+- **Componente [`OptimizedImage`](file:///home/lmontes/Documentos/Telegram/Market/packages/ui/src/components/optimized-image.tsx)**:
+  - Reserva matemática estricta del espacio en el DOM (`aspectRatio: square | video | wide | portrait`).
+  - Efecto de carga shimmer que previene cualquier salto de contenido durante la descarga de imágenes.
+  - Fallback automático con icono ante imágenes rotas o nulas.
+
+### D. Patrón Híbrido Responsive y Modales Bottom-Sheet
+- **Escritorio (`≥ 768px`)**: Tablas de alta densidad de información con ordenamiento y paginación.
+- **Móvil (`< 768px`)**: Tarjetas táctiles individuales sin barra de desplazamiento horizontal (`overflow-x`).
+- **Modales Bottom-Sheet ([`bottom-sheet-modal.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/ui/bottom-sheet-modal.tsx))**:
+  - En móviles, los modales se anclan a la parte inferior de la pantalla (`rounded-t-[28px]`).
+  - Tirador físico de arrastre (`w-12 h-1.5`) y botones de cierre ergonómicos de $44 \times 44\,\text{px}$.
+  - Animaciones fluidas gobernadas por física cúbica (`cubic-bezier(0.16, 1, 0.3, 1)`).
 
 ---
 
@@ -461,13 +432,13 @@ VAPID_SUBJECT="mailto:soporte@marketos.app"
 # Instalar dependencias en todo el monorepo
 pnpm install
 
-# Ejecutar suite de pruebas unitarias y de arquitectura
+# Ejecutar suite de pruebas unitarias y de arquitectura (16 suites)
 pnpm test
 
-# Verificar tipos TypeScript en apps y paquetes
+# Verificar tipos TypeScript en los 20 paquetes
 pnpm check-types
 
-# Compilar proyecto completo con Turborepo
+# Compilar proyecto completo para producción con Turbopack
 pnpm build
 ```
 
