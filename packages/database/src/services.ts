@@ -14,6 +14,7 @@ import {
   InvoicingRepository,
   PosRepository,
   CraftWorkshopRepository,
+  PrintopinkCalculatorRepository,
 } from "./repositories/index.ts";
 
 /**
@@ -183,5 +184,15 @@ export class MarketOSRepository {
   static getCraftQuotes = CraftWorkshopRepository.getQuotes;
   static createCraftQuote = CraftWorkshopRepository.createQuote;
   static updateCraftQuoteStatus = CraftWorkshopRepository.updateQuoteStatus;
+
+  // --- PrintoPink Calculator & Cotizador Taller ---
+  static getPrintopinkCalculations = PrintopinkCalculatorRepository.listCalculations;
+  static getPrintopinkCalculationById = PrintopinkCalculatorRepository.getCalculationById;
+  static savePrintopinkCalculation = PrintopinkCalculatorRepository.saveCalculation;
+  static updatePrintopinkCalculation = PrintopinkCalculatorRepository.updateCalculation;
+  static deletePrintopinkCalculation = PrintopinkCalculatorRepository.deleteCalculation;
+  static getPrintopinkQuotes = PrintopinkCalculatorRepository.listQuotes;
+  static createPrintopinkQuote = PrintopinkCalculatorRepository.createQuote;
+  static updatePrintopinkQuoteStatus = PrintopinkCalculatorRepository.updateQuoteStatus;
 }
 

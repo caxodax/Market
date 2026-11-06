@@ -12,7 +12,7 @@
 1. [Visión del Sistema y Principios Rectores](#1-visión-del-sistema-y-principios-rectores)
 2. [Estructura del Monorepo (Turborepo + pnpm)](#2-estructura-del-monorepo-turborepo--pnpm)
 3. [Arquitectura Hexagonal: Puertos, Adaptadores y Ecosistema de Plugins](#3-arquitectura-hexagonal-puertos-adaptadores-y-ecosistema-de-plugins)
-4. [Base de Datos & Modelado Relacional (34 Migraciones SQL y RPCs Transaccionales)](#4-base-de-datos--modelado-relacional-34-migraciones-sql-y-rpcs-transaccionales)
+4. [Base de Datos & Modelado Relacional (35 Migraciones SQL y RPCs Transaccionales)](#4-base-de-datos--modelado-relacional-35-migraciones-sql-y-rpcs-transaccionales)
 5. [Seguridad Integral y Aislamiento Multi-Tenant (AgentShield)](#5-seguridad-integral-y-aislamiento-multi-tenant-agentshield)
 6. [Flujos Críticos de Negocio y Ciclo de Vida](#6-flujos-críticos-de-negocio-y-ciclo-de-vida)
 7. [Arquitectura Frontend: App Router Modular, Mobile-First y CLS = 0](#7-arquitectura-frontend-app-router-modular-mobile-first-y-cls--0)
@@ -146,11 +146,11 @@ Market/
 │           └── lib/                        # Clientes de caché, compresión y Excel
 ├── packages/
 │   ├── auth/                               # Seguridad, roles RBAC y sesiones HMAC-SHA256
-│   ├── database/                           # Repositorios, 34 migraciones SQL y Circuit Breaker
+│   ├── database/                           # Repositorios, 35 migraciones SQL y Circuit Breaker
 │   │   └── supabase/
-│   │       ├── migrations/                 # 34 migraciones SQL versionadas e idempotentes
+│   │       ├── migrations/                 # 35 migraciones SQL versionadas e idempotentes
 │   │       └── PRODUCTION_FULL_SETUP.sql   # DDL consolidado de producción
-│   ├── plugins/                            # Ecosistema de 13 plugins modulares
+│   ├── plugins/                            # Ecosistema de 14 plugins modulares
 │   │   ├── accounting/                     # Contabilidad NIIF y Plan Único de Cuentas (PUC)
 │   │   ├── analytics/                      # Métricas de tráfico, fuentes y conversión
 │   │   ├── barcode-retail/                 # Códigos EAN-13, pasillos y balanzas comerciales
@@ -160,6 +160,7 @@ Market/
 │   │   ├── invoicing/                      # Facturas, notas y Libro de Ventas SENIAT
 │   │   ├── local-venezuela/                # Pago Móvil, tasa BCV en vivo e IGTF 3%
 │   │   ├── mto-cpq/                        # Cotizador Make-to-Order para talleres
+│   │   ├── printopink-calculator/          # Costeo de taller artesanal, presets y cotizador WhatsApp 50%
 │   │   ├── promotions-coupons/             # Cupones de descuento y promociones
 │   │   ├── purchasing-retentions/          # Facturas de compra y retenciones IVA SENIAT
 │   │   ├── push-notifications/             # Notificaciones masivas Web Push VAPID
@@ -215,11 +216,11 @@ El motor en [`packages/utils/src/plugin-resolver.ts`](file:///home/lmontes/Docum
 
 ---
 
-## 4. Base de Datos & Modelado Relacional (34 Migraciones SQL y RPCs Transaccionales)
+## 4. Base de Datos & Modelado Relacional (35 Migraciones SQL y RPCs Transaccionales)
 
 La base de datos reside en **PostgreSQL (Supabase)**, con tipado estricto, integridad referencial en cascada, auditoría inmutable, procedimientos almacenados transaccionales (RPC) y Row-Level Security (RLS) en el 100% de las tablas.
 
-### Catálogo Cronológico de las 34 Migraciones
+### Catálogo Cronológico de las 35 Migraciones
 
 | Migración | Nombre / Identificador | Propósito Arquitectónico y Tablas Creadas |
 | :---: | :--- | :--- |
@@ -257,6 +258,7 @@ La base de datos reside en **PostgreSQL (Supabase)**, con tipado estricto, integ
 | **00032** | `fix_profiles_rls_recursion.sql` | Corrección RLS: Erradicación de bucles de recursión infinita en las políticas de seguridad de perfiles. |
 | **00033** | `craft_workshop_plugin.sql` | Taller de sublimación y DTF: `craft_materials` (insumos por bulto/paquete con costo unitario computado), `craft_recipes` (fichas de escandallo con merma y mano de obra), `craft_recipe_items` (fórmulas relacionales), `craft_quotes` (presupuestos con 50% de anticipo) y procedimiento `rpc_recalculate_craft_recipes`. |
 | **00034** | `decouple_core_rpcs.sql` | Desacoplamiento de RPCs del Core: Ordenamiento determinista (`ORDER BY product_id ASC FOR UPDATE`) para erradicar deadlocks bajo concurrencia, comprobación dinámica de módulos en `tenant_modules` y totales bimonetarios canónicos. |
+| **00035** | `printopink_calculator_plugin.sql` | Costeo PrintoPink: `printopink_calculations` (fórmulas de materiales directos, amortización de equipos y mano de obra/sueldo), `printopink_quotes` (cotizaciones con 50% de anticipo) y auto-activación para tenant `printopink`. |
 
 ---
 

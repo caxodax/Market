@@ -2,7 +2,7 @@
 
 > **Gestor de Base de Datos**: PostgreSQL 15+ en Supabase  
 > **Script Consolidado de Producción**: [`packages/database/supabase/PRODUCTION_FULL_SETUP.sql`](file:///home/lmontes/Documentos/Telegram/Market/packages/database/supabase/PRODUCTION_FULL_SETUP.sql)  
-> **Migraciones Activas**: 34 migraciones secuenciales idempotentes en [`packages/database/supabase/migrations/`](file:///home/lmontes/Documentos/Telegram/Market/packages/database/supabase/migrations)  
+> **Migraciones Activas**: 35 migraciones secuenciales idempotentes en [`packages/database/supabase/migrations/`](file:///home/lmontes/Documentos/Telegram/Market/packages/database/supabase/migrations)  
 > **Aislamiento**: Row-Level Security (RLS) mandatorio en el 100% de las tablas con políticas multi-tenant segregadas por `tenant_id`.  
 
 ---
@@ -27,7 +27,8 @@
    - 5.11. [Maquetador Visual (`storefront_pro`)](#511-maquetador-visual-storefront_pro)
    - 5.12. [Telemetría & Tráfico (`analytics`)](#512-telemetría--tráfico-analytics)
    - 5.13. [Auditoría Forense Inmutable (`audit_logs`)](#513-auditoría-forense-inmutable-audit_logs)
-6. [Catálogo Cronológico de las 34 Migraciones SQL](#6-catálogo-cronológico-de-las-34-migraciones-sql)
+   - 5.14. [Calculadora PrintoPink & Taller (`printopink_calculator`)](#514-calculadora-printopink--taller-printopink_calculator)
+6. [Catálogo Cronológico de las 35 Migraciones SQL](#6-catálogo-cronológico-de-las-35-migraciones-sql)
 7. [Procedimientos Almacenados y RPCs Transaccionales ACID](#7-procedimientos-almacenados-y-rpcs-transaccionales-acid)
 8. [Políticas de Seguridad Row-Level Security (RLS)](#8-políticas-de-seguridad-row-level-security-rls)
 9. [Estrategia de Indexación de Alto Rendimiento](#9-estrategia-de-indexación-de-alto-rendimiento)
@@ -348,9 +349,13 @@ Migración `00033_craft_workshop_plugin.sql`. Control de insumos por paquete, es
 ### 5.13. Auditoría Forense Inmutable (`audit_logs`)
 * **`audit_logs`**: Trazabilidad completa con `tenant_id`, `user_id`, `action`, `resource_type`, `resource_id`, `ip_address`, `user_agent` y `payload` JSONB de cambios antes y después de cada mutación.
 
+### 5.14. Calculadora PrintoPink & Taller (`printopink_calculator`)
+* **`printopink_calculations`**: Fichas de costeo rápido de taller basadas en la tríada real: insumos directos (`materials_cost_base`), desgaste de máquinas y luz (`machinery_cost_base`) y mano de obra/sueldo cobrado (`labor_cost_base`). Incluye desglose detallado en JSONB (`materials_breakdown`), PVP sugerido y ganancia neta libre calculada.
+* **`printopink_quotes`**: Presupuestos rápidos para clientes con cálculo obligatorio del anticipo del 50% para arrancar producción y espejo de mensaje formateado para WhatsApp.
+
 ---
 
-## 6. Catálogo Cronológico de las 34 Migraciones SQL
+## 6. Catálogo Cronológico de las 35 Migraciones SQL
 
 | N° | Archivo de Migración | Propósito y Cambios en el Modelo |
 | :---: | :--- | :--- |
@@ -388,6 +393,7 @@ Migración `00033_craft_workshop_plugin.sql`. Control de insumos por paquete, es
 | **00032** | `00032_fix_profiles_rls_recursion.sql` | Corrección de bucles de recursión infinita en las políticas de seguridad de la tabla `profiles`. |
 | **00033** | `00033_craft_workshop_plugin.sql` | Taller de sublimación y DTF: Insumos por paquete (`craft_materials`), recetas con merma y mano de obra (`craft_recipes`), presupuestos (`craft_quotes`) y función `rpc_recalculate_craft_recipes`. |
 | **00034** | `00034_decouple_core_rpcs.sql` | Desacoplamiento de RPCs del Core, ordenamiento determinista (`ORDER BY product_id ASC FOR UPDATE`) para erradicar deadlocks en concurrencia y verificación dinámica de módulos en `tenant_modules`. |
+| **00035** | `00035_printopink_calculator_plugin.sql` | Plugin autónomo PrintoPink Calculator: Tablas `printopink_calculations` y `printopink_quotes` con RLS Zero-Trust, índices de tenant y activación automática para el comercio PrintoPink. |
 
 ---
 

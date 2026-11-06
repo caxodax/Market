@@ -25,6 +25,7 @@
     "@marketos/plugin-accounting": "workspace:*",
     "@marketos/plugin-push-notifications": "workspace:*",
     "@marketos/plugin-craft-workshop": "workspace:*",
+    "@marketos/plugin-printopink-calculator": "workspace:*",
 
     "@marketos/types": "workspace:*",
     "@marketos/ui": "workspace:*",

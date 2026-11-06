@@ -33,13 +33,14 @@ MarketOS está concebido para operar en múltiples industrias y geografías **si
 
 ---
 
-## 2. Catálogo Oficial del Ecosistema: Los 13 Plugins Modulares
+## 2. Catálogo Oficial del Ecosistema: Los 14 Plugins Modulares
 
 | Plugin | Directorio / Paquete | Giro / Propósito | Dependencias | Tablas Principales |
 | :--- | :--- | :--- | :--- | :--- |
 | **`local-venezuela`** | `packages/plugins/local-venezuela` | Pago Móvil, Tasa BCV en vivo, Transferencias y cálculo IGTF 3%. | Ninguna | `exchange_rates`, `exchange_rate_history` |
 | **`food-service`** | `packages/plugins/food-service` | Restaurantes, comida rápida, escandallo BOM, insumos y KDS de cocina. | Ninguna | `raw_materials`, `recipes`, `product_modifiers` |
 | **`craft-workshop`** | `packages/plugins/craft-workshop` | Talleres de sublimación, vinil, DTF y artes gráficas con merma técnica. | Ninguna | `craft_materials`, `craft_recipes`, `craft_recipe_items`, `craft_quotes` |
+| **`printopink-calculator`** | `packages/plugins/printopink-calculator` | Calculadora de taller por tríada real (Materiales + Desgaste + Mano de Obra) y cotizador WhatsApp 50%. | Ninguna | `printopink_calculations`, `printopink_quotes` |
 | **`mto-cpq`** | `packages/plugins/mto-cpq` | Cotizador Make-to-Order para productos a la medida por área ($m^2$) o volumen. | Ninguna | `cpq_attribute_matrices`, `cpq_pricing_formulas`, `cpq_cost_settings` |
 | **`barcode-retail`** | `packages/plugins/barcode-retail` | Supermercados, ferreterías, balanzas comerciales de peso y pasillos. | Ninguna | `product_barcodes` |
 | **`invoicing`** | `packages/plugins/invoicing` | Facturación digital/manual, correlativos SENIAT y Libro de Ventas. | `local_venezuela` | `fiscal_documents`, `fiscal_document_items`, `fiscal_sequences` |
@@ -63,6 +64,7 @@ export type TenantModuleId =
   | "local_venezuela"
   | "food_service"
   | "craft_workshop"
+  | "printopink_calculator"
   | "mto_cpq"
   | "barcode_retail"
   | "invoicing"
@@ -165,7 +167,7 @@ packages/plugins/loyalty-points/
 ```
 
 ### Paso 4: Crear la Migración SQL
-Crea la migración versionada en `packages/database/supabase/migrations/00035_loyalty_points.sql`:
+Crea la migración versionada en `packages/database/supabase/migrations/00036_loyalty_points.sql`:
 ```sql
 CREATE TABLE loyalty_points (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

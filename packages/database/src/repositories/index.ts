@@ -13,3 +13,4 @@ export * from "./food-service.repository.ts";
 export * from "./cpq.repository.ts";
 export * from "./pos.repository.ts";
 export * from "./craft-workshop.repository.ts";
+export * from "./printopink-calculator.repository.ts";

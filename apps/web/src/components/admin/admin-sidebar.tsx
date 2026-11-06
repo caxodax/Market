@@ -21,6 +21,7 @@ import {
   LayoutTemplate,
   Layers,
   Printer,
+  Calculator,
   BarChart3,
   Landmark,
   ReceiptText,
@@ -90,6 +91,7 @@ const MODULE_ROLE_PERMISSIONS: Record<string, UserRole[]> = {
   FOOD_SERVICE: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_INVENTORY"],
   MTO_CPQ: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_INVENTORY"],
   CRAFT_WORKSHOP: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_INVENTORY"],
+  PRINTOPINK_CALCULATOR: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER", "TENANT_INVENTORY"],
   COUPONS: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER"],
   PUSH: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER"],
   STOREFRONT_STUDIO: ["PLATFORM_SUPER_ADMIN", "TENANT_OWNER", "TENANT_MANAGER"],
@@ -223,6 +225,17 @@ export function AdminSidebar({
       badge: "Craft",
       badgeClassName: "bg-fuchsia-500/10 text-fuchsia-600 border border-fuchsia-500/20 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
       requiredModule: "craft_workshop",
+    },
+    {
+      id: "PRINTOPINK_CALCULATOR",
+      href: "/admin/printopink-calculator",
+      category: "CATALOG",
+      label: "Calculadora PrintoPink",
+      shortLabel: "Costeo PrintoPink",
+      icon: <Calculator className="w-4 h-4 shrink-0" />,
+      badge: "PrintoPink",
+      badgeClassName: "bg-pink-500/10 text-pink-600 border border-pink-500/20 text-[10px] px-1.5 py-0.5 rounded-full font-bold",
+      requiredModule: "printopink_calculator",
     },
 
     // 3. FINANZAS & FISCAL

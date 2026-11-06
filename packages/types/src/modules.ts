@@ -21,7 +21,8 @@ export type TenantModuleId =
   | "analytics"             // Analítica & Audiencia: Vistas, visitantes únicos, fuentes y conversión de tienda
   | "accounting"            // Contabilidad: Catálogo de Cuentas, Asientos Automáticos y Balance de Comprobación
   | "push_notifications"   // Marketing PWA: Suscripciones Web Push, campañas de difusión y tracking de pedidos
-  | "craft_workshop";      // Taller de Sublimación, DTF, Vinil, Papelería y Manualidades (Printopink)
+  | "craft_workshop"       // Taller de Sublimación, DTF, Vinil, Papelería y Manualidades (Printopink)
+  | "printopink_calculator"; // Calculadora Rápida & Cotizador PrintoPink (Tríada de Costos & Presets de Guía)
 
 export type PluginCategory =
   | "location"              // Localización por país
