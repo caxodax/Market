@@ -113,7 +113,7 @@ export function CustomerOrderTicketModal({
       } catch {
         // Silent polling error
       }
-    }, 4000);
+    }, 12000);
 
     return () => {
       isMounted = false;

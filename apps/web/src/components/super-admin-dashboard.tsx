@@ -243,8 +243,8 @@ export function SuperAdminDashboard({
   const [currentRate, setCurrentRate] = useState<ExchangeRate | undefined>(exchangeRate);
   const [isSyncingRate, setIsSyncingRate] = useState(false);
 
-  // Ponytail Ultra: Background auto-refresh on tab focus & interval
-  useAutoRefresh(60000);
+  // Ponytail Ultra: Background auto-refresh on tab focus & interval (5m)
+  useAutoRefresh(300000);
 
   useEffect(() => {
     if (exchangeRate) setCurrentRate(exchangeRate);

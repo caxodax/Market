@@ -26,8 +26,8 @@ export function useAutoRefresh(intervalMs: number = 120000) {
       if (typeof document !== "undefined" && document.visibilityState === "visible") {
         if (isUserInteracting()) return;
         const now = Date.now();
-        // Debounce: don't refresh if refreshed less than 60s ago
-        if (now - lastRefreshRef.current >= 60000) {
+        // Debounce: don't refresh if refreshed less than 120s (2m) ago
+        if (now - lastRefreshRef.current >= 120000) {
           lastRefreshRef.current = now;
           router.refresh();
         }

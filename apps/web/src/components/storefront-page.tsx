@@ -116,8 +116,8 @@ export function StorefrontPage({
   cpqAttributeOptions = [],
   cpqVolumeTiers = [],
 }: StorefrontPageProps) {
-  // Ponytail Ultra: Auto-refresh store data & BCV rate on focus and every 60s without full reload
-  useAutoRefresh(60000);
+  // Ponytail Ultra: Auto-refresh store data & BCV rate on focus and every 5m without full reload
+  useAutoRefresh(300000);
 
   const [isTrackerOpen, setIsTrackerOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);

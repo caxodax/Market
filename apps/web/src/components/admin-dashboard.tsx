@@ -380,8 +380,8 @@ export function AdminDashboard({
   const [invoicingOrderTarget, setInvoicingOrderTarget] = useState<Order | null>(null);
   const [isQuickInvoiceModalOpen, setIsQuickInvoiceModalOpen] = useState(false);
 
-  // Ponytail Ultra: Auto-refresh admin data (orders, rate, payments) on tab focus and every 45s
-  useAutoRefresh(45000);
+  // Ponytail Ultra: Auto-refresh admin data (orders, rate, payments) on tab focus and every 3 minutes (180s)
+  useAutoRefresh(180000);
 
   // Ponytail Ultra: Lazy load secondary tab data on demand
   const loadedTabsRef = useRef<Set<string>>(new Set([activeTab]));

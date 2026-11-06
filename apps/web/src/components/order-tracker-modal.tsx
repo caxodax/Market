@@ -151,7 +151,7 @@ export function OrderTrackerModal({
       } catch {
         // silent polling
       }
-    }, 4000);
+    }, 12000);
 
     return () => {
       isMounted = false;
