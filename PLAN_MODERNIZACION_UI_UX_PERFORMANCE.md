@@ -9,17 +9,17 @@
 
 ## 📊 1. Diagnóstico y Comparativa Inicial (Superada con Éxito)
 
-| Criterio / Dimensión | 🏆 KsaSport (Referencia de Fluidez) | ⚠️ MarketOS (Estado Anterior a Modernización) | Resultado Actual en MarketOS v3.0 |
+| Criterio / Dimensión | 🏆 KsaSport (Referencia) | ⚠️ MarketOS (Estado Legacy Pre-v3.0) | ✅ Resultado Actual en MarketOS v3.0 (Producción) |
 | :--- | :--- | :--- | :--- |
-| **Arquitectura de Enrutamiento Admin** | **Sub-rutas reales de Next.js App Router** (`/admin/payments`, `/admin/athletes`, etc.). | **Monolito en cliente** de 4.190 líneas ([`admin-dashboard.tsx`](apps/web/src/components/admin-dashboard.tsx)) gobernado por `useState(activeTab)`. | En Market, el navegador debe procesar un árbol de React colosal en cada clic. En KsaSport, el cambio de ruta es instantáneo. |
-| **Carga de Datos en Servidor** | **Aislada por contexto**: cada ruta hace una consulta SQL rápida y atómica para lo que necesita. | **Megapetición inicial**: [`page.tsx`](apps/web/src/app/admin/page.tsx) corre un `Promise.all` de 10 tablas masivas al entrar a `/admin`. | Market descarga pedidos, productos, sedes, tasas, staff y plugins de golpe. Tiempo inicial alto y desperdicio de memoria. |
-| **Percepción de Velocidad (Streaming)** | **0 ms percibidos**: cada sub-ruta cuenta con un [`loading.tsx`](../KsaSport/src/app/admin/(protected)/loading.tsx) con esqueletos animados (*shimmer*). | **Sin esqueletos por sección**: spinners genéricos en pestañas secundarias o pantallas en blanco transitorias. | KsaSport da retroalimentación visual inmediata antes de que lleguen los datos. |
-| **Tipografía y Jerarquía Visual** | **Tipografías Google integradas**: `Bebas Neue` (titulares y números imponentes) + `Geist Sans` (tablas y textos). | **Tipografía del sistema**: cae por defecto en `Arial / Helvetica` en [`layout.tsx`](apps/web/src/app/layout.tsx). | KsaSport proyecta carácter deportivo de alta gama; Market se percibe como una plantilla genérica o prototipo. |
-| **Notificaciones & Alertas** | **Toasts fluidos con `sonner`**: alertas no bloqueantes con animaciones ricas y colores semánticos. | **Uso de `alert(...)` nativo del navegador** en múltiples modales y reportes. | Las alertas nativas congelan el hilo de JavaScript, rompen la estética y degradan la confianza del usuario. |
-| **Micro-interacciones & Animaciones** | **Framer Motion + Curvas iOS**: transiciones suaves de 200 ms (`cubic-bezier(0.16, 1, 0.3, 1)`). | **Cortes secos e instantáneos**: pestañas y elementos aparecen o desaparecen sin suavizado ni física de movimiento. | KsaSport se siente "táctil y suave"; Market se siente rígido y estático. |
-| **Estabilidad de Imágenes (CLS)** | **Componente `OptimizedImage`**: ratio de aspecto reservado, shimmer de carga y fade-in de 300 ms. Cero saltos. | **Etiquetas crudas `<img>`**: en tarjetas de producto y catálogo sin reserva de dimensiones fijas. | En Market, las imágenes mueven el contenido al cargar, generando saltos visuales (*Cumulative Layout Shift*). |
-| **Experiencia Móvil (Responsive)** | **Tarjetas Híbridas y Bottom Sheets**: en móviles las tablas se convierten en tarjetas y los modales suben desde abajo con tirador. | **Tablas con scroll horizontal**: modales centrados rígidos de escritorio adaptados con scroll forzado. | En un teléfono celular, KsaSport se siente como una app nativa de App Store / Play Store. |
-| **Carga Cognitiva (Arquitectura de Información)** | **3 Bloques Claros en Sidebar**: Gestión Deportiva, Finanzas & Crédito, Configuración & Club. | **18 pestañas continuas**: POS, Craft, CPQ, Delivery, SENIAT, Compras, Facturación, Cupones, etc. todo junto. | Market abruma al comerciante con demasiadas opciones simultáneas sin jerarquía. |
+| **Arquitectura de Enrutamiento Admin** | Sub-rutas de Next.js App Router. | Monolito en cliente de 4.190 líneas gobernado por `useState(activeTab)`. | **20 sub-rutas SSR desacopladas** en `apps/web/src/app/admin/*` con navegación nativa instantánea. |
+| **Carga de Datos en Servidor** | Aislada por contexto. | Megapetición inicial (`Promise.all` de 10 tablas) al entrar a `/admin`. | **Consultas atómicas por ruta** + caché con alcance de tenant (`tenant:${id}:*`). |
+| **Percepción de Velocidad (Streaming)** | 0 ms percibidos con `loading.tsx`. | Spinners genéricos o pantallas en blanco transitorias. | **0 ms percibidos**: cada sub-ruta posee su propio `loading.tsx` con `AdminSkeleton` shimmer. |
+| **Tipografía y Jerarquía Visual** | `Bebas Neue` + `Geist Sans`. | Fuentes del sistema (`Arial / Helvetica`). | **`Outfit` (Display/KPIs) + `Plus Jakarta Sans` (UI/Tablas)** vía `next/font/google` con 0 FOUT. |
+| **Notificaciones & Alertas** | Toasts con `sonner`. | Uso de `alert(...)` nativo bloqueante. | **100% erradicados los `alert()`**. Toasts semánticos no bloqueantes con `sonner`. |
+| **Micro-interacciones & Animaciones** | Curvas iOS de 200 ms. | Cortes secos e instantáneos. | **Física cúbica (`cubic-bezier(0.16, 1, 0.3, 1)`)** con `.animate-view-enter` y soporte `prefers-reduced-motion`. |
+| **Estabilidad de Imágenes (CLS)** | `OptimizedImage` con ratio fijo. | Etiquetas `<img>` crudas sin dimensiones. | **CLS = 0 garantizado** mediante `@marketos/ui/OptimizedImage` con aspect-ratio reservado y shimmer. |
+| **Experiencia Móvil (Responsive)** | Tarjetas Híbridas y Bottom Sheets. | Tablas con scroll horizontal forzado. | **Patrón Híbrido** (Tablas en desktop / Tarjetas en móvil) + `BottomSheetModal` con tirador físico y targets de 44px. |
+| **Carga Cognitiva (Sidebar)** | 3 Bloques Claros en Sidebar. | 18 pestañas planas sin jerarquía. | **Sidebar organizado en 4 Macro-dominios** + KPIs "Big Number / Small Label" y `EmptyState` guiados. |
 
 ---
 
@@ -192,11 +192,9 @@ Durante la ejecución y especialmente en la fragmentación de la Fase 3, se debe
   - Toda sub-ruta de plugin debe invocar este guardián en la primera línea de su `page.tsx`.
 
 ### 3. Persistencia del Contexto Multi-Tenant y Seguridad Criptográfica
-* **El Peligro:** Al pasar de un solo `admin/page.tsx` a 10+ sub-rutas, se corre el riesgo de olvidar la validación de sesión en alguna de ellas, o permitir que un usuario malicioso inyecte `?tenant=otro-comercio` en una sub-ruta desprotegida.
-* **Solución Técnica:**
-  - **Layout Canónico Obligatorio (`apps/web/src/app/admin/layout.tsx`):**  
-    El layout padre valida la cookie criptográfica HMAC-SHA256, determina el `targetTenantId` legítimo y bloquea inmediatamente a cualquier usuario no autorizado antes de que se ejecute cualquier sub-ruta.
-  - **Guarda Atómica en cada Server Action:** Mantener de forma innegociable `await assertAuthorizedTenantAdmin(tenantId)` en cada mutación de base de datos.
+* **Solución Técnica Implementada:**
+  - **Verificación en Cada Sub-ruta y Layout (`resolveAuthorizedAdminContext`):** Dado que los Layouts de Next.js no se re-ejecutan en navegaciones cliente, tanto el `layout.tsx` como cada `page.tsx` invocan `await resolveAuthorizedAdminContext()` (memoizado con `React.cache()`) para verificar la firma HMAC-SHA256 y el aislamiento del `targetTenantId`.
+  - **Guarda Atómica en cada Server Action:** Se ejecuta de forma innegociable `await assertAuthorizedTenantAdmin(tenantId)` en la primera línea de cada mutación.
 
 ---
 

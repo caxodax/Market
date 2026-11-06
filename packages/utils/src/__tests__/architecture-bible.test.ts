@@ -186,4 +186,59 @@ console.log("  [Bible Rule 4] Testing Modern Notification UX (Zero Native alert(
   console.log(`    ✔ Zero native alert() invocations across ${webFiles.length} web source files.`);
 }
 
+// ─── 5. TEST DOCUMENTATION SYNCHRONIZATION: ZERO CONTRADICTIONS ──────────────
+console.log("  [Bible Rule 5] Testing Documentation Synchronization Across Master Docs...");
+{
+  const migrationsDir = path.join(repoRoot, "packages/database/supabase/migrations");
+  const actualMigrations = fs
+    .readdirSync(migrationsDir)
+    .filter((f) => f.endsWith(".sql"));
+  const expectedCount = actualMigrations.length; // e.g. 34
+
+  // Check DATABASE.md
+  const dbMd = fs.readFileSync(path.join(repoRoot, "DATABASE.md"), "utf8");
+  assert.ok(
+    dbMd.includes(`${expectedCount} migraciones`),
+    `DATABASE.md must reference exact migration count (${expectedCount})`
+  );
+
+  // Check ARCHITECTURE.md
+  const archMd = fs.readFileSync(path.join(repoRoot, "ARCHITECTURE.md"), "utf8");
+  assert.ok(
+    archMd.includes(`${expectedCount} Migraciones`) || archMd.includes(`${expectedCount} migraciones`),
+    `ARCHITECTURE.md must reference exact migration count (${expectedCount})`
+  );
+  assert.ok(
+    !archMd.includes("33 Migraciones") && !archMd.includes("33 migraciones"),
+    "ARCHITECTURE.md must not contain stale '33 migraciones' references"
+  );
+
+  // Check README.md
+  const readMd = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
+  assert.ok(
+    readMd.includes(`${expectedCount} migraciones`),
+    `README.md must reference exact migration count (${expectedCount})`
+  );
+  assert.ok(
+    !readMd.includes("33 migraciones"),
+    "README.md must not contain stale '33 migraciones' references"
+  );
+
+  // Check MARKETOS_MODULAR_ARCHITECTURE.md
+  const modularMd = fs.readFileSync(
+    path.join(repoRoot, "MARKETOS_MODULAR_ARCHITECTURE.md"),
+    "utf8"
+  );
+  assert.ok(
+    !modularMd.includes("(protected)"),
+    "MARKETOS_MODULAR_ARCHITECTURE.md must not reference non-existent '(protected)' folder"
+  );
+  assert.ok(
+    !modularMd.includes("00034_loyalty_points.sql"),
+    "MARKETOS_MODULAR_ARCHITECTURE.md must not collide with migration 00034"
+  );
+
+  console.log(`    ✔ Master documentation is 100% synchronized with actual code and ${expectedCount} migrations.`);
+}
+
 console.log("🏆 Architecture Bible & Multi-Tenant Enforcement Suite: ALL CHECKS PASSED!");

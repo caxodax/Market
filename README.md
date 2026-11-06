@@ -15,7 +15,7 @@ Para que cualquier desarrollador, arquitecto o agente de inteligencia artificial
 | :--- | :--- |
 | 📘 [**`README.md`**](file:///home/lmontes/Documentos/Telegram/Market/README.md) | **(Este archivo)** Portal central de bienvenida, estructura del monorepo, instalación y conceptos clave. |
 | 🏛️ [**`ARCHITECTURE.md`**](file:///home/lmontes/Documentos/Telegram/Market/ARCHITECTURE.md) | **Especificación de Arquitectura Integral:** Puertos hexagonales, App Router modular (20 sub-rutas), seguridad de sesiones HMAC, capas de caché Edge y micro-interacciones. |
-| 🗄️ [**`DATABASE.md`**](file:///home/lmontes/Documentos/Telegram/Market/DATABASE.md) | **Diccionario de Datos de la A a la Z:** Las 33 migraciones SQL, esquemas de tablas Core y Plugins, RPCs atómicos ACID, políticas RLS e índices B-Tree/GIN. |
+| 🗄️ [**`DATABASE.md`**](file:///home/lmontes/Documentos/Telegram/Market/DATABASE.md) | **Diccionario de Datos de la A a la Z:** Las 34 migraciones SQL, esquemas de tablas Core y Plugins, RPCs atómicos ACID, políticas RLS e índices B-Tree/GIN. |
 | 🧩 [**`MARKETOS_MODULAR_ARCHITECTURE.md`**](file:///home/lmontes/Documentos/Telegram/Market/MARKETOS_MODULAR_ARCHITECTURE.md) | **Manual de Plugins y Modularidad:** Especificación del modelo Odoo/Shopify, contratos de manifiestos, inyección de componentes y guía para crear plugins nuevos. |
 | 🤖 [**`AI_RULES.md`**](file:///home/lmontes/Documentos/Telegram/Market/AI_RULES.md) | **Reglas de Oro para Agentes IA y Desarrolladores:** Estándares de código, principios de seguridad AgentShield, directrices Ponytail y protocolos de verificación. |
 | 🚀 [**`PLAN_MODERNIZACION_UI_UX_PERFORMANCE.md`**](file:///home/lmontes/Documentos/Telegram/Market/PLAN_MODERNIZACION_UI_UX_PERFORMANCE.md) | **Bitácora del Plan de Modernización:** Historial de ejecución de las 5 fases de rendimiento, tipografía, prevención de CLS y diseño responsive. |
@@ -75,13 +75,13 @@ Market/
 │           │   └── t/[tenant]/             # Vitrina digital (Storefront PWA multi-tenant)
 │           ├── components/                 # Vistas y componentes UI especializados
 │           │   ├── admin/                  # Sidebar (4 macro-dominios), header, skeletons
-│           │   └── ui/                     # EmptyState, OptimizedImage, BottomSheetModal
+│           │   └── ui/                     # EmptyState, BottomSheetModal
 │           └── lib/                        # Clientes de caché Edge, Supabase y Excel
 ├── packages/
 │   ├── auth/                               # Sesiones criptográficas HMAC-SHA256 y roles RBAC
-│   ├── database/                           # Repositorio central, 33 migraciones SQL y Circuit Breaker
+│   ├── database/                           # Repositorio central, 34 migraciones SQL y Circuit Breaker
 │   │   └── supabase/
-│   │       ├── migrations/                 # 33 migraciones secuenciales idempotentes
+│   │       ├── migrations/                 # 34 migraciones secuenciales idempotentes
 │   │       └── PRODUCTION_FULL_SETUP.sql   # DDL consolidado de inicialización
 │   ├── plugins/                            # Ecosistema de 13 plugins modulares
 │   │   ├── accounting/                     # Contabilidad NIIF y Plan Único de Cuentas (PUC)
@@ -98,7 +98,7 @@ Market/
 │   │   ├── push-notifications/             # Notificaciones masivas Web Push estándar VAPID
 │   │   └── storefront-pro/                 # Constructor modular de 11 bloques para vitrina web
 │   ├── types/                              # Tipos TypeScript compartidos y Puertos Hexagonales
-│   ├── ui/                                 # Componentes compartidos `@marketos/ui`
+│   ├── ui/                                 # Componentes compartidos `@marketos/ui` (OptimizedImage, ThemeProvider)
 │   └── utils/                              # Formateo de moneda, R2 storage, WhatsApp links
 └── package.json                            # Scripts globales del monorepo
 ```
@@ -135,7 +135,7 @@ R2_ACCOUNT_ID="tu-account-id"
 R2_ACCESS_KEY_ID="tu-access-key"
 R2_SECRET_ACCESS_KEY="tu-secret-key"
 R2_BUCKET_NAME="marketos-media"
-R2_PUBLIC_URL="https://media.tudominio.com"
+NEXT_PUBLIC_R2_PUBLIC_URL="https://media.tudominio.com"
 
 # Web Push VAPID (Plugin push-notifications)
 NEXT_PUBLIC_VAPID_PUBLIC_KEY="tu-vapid-public-key"

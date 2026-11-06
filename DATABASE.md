@@ -2,7 +2,7 @@
 
 > **Gestor de Base de Datos**: PostgreSQL 15+ en Supabase  
 > **Script Consolidado de Producción**: [`packages/database/supabase/PRODUCTION_FULL_SETUP.sql`](file:///home/lmontes/Documentos/Telegram/Market/packages/database/supabase/PRODUCTION_FULL_SETUP.sql)  
-> **Migraciones Activas**: 33 migraciones secuenciales idempotentes en [`packages/database/supabase/migrations/`](file:///home/lmontes/Documentos/Telegram/Market/packages/database/supabase/migrations)  
+> **Migraciones Activas**: 34 migraciones secuenciales idempotentes en [`packages/database/supabase/migrations/`](file:///home/lmontes/Documentos/Telegram/Market/packages/database/supabase/migrations)  
 > **Aislamiento**: Row-Level Security (RLS) mandatorio en el 100% de las tablas con políticas multi-tenant segregadas por `tenant_id`.  
 
 ---
@@ -27,7 +27,7 @@
    - 5.11. [Maquetador Visual (`storefront_pro`)](#511-maquetador-visual-storefront_pro)
    - 5.12. [Telemetría & Tráfico (`analytics`)](#512-telemetría--tráfico-analytics)
    - 5.13. [Auditoría Forense Inmutable (`audit_logs`)](#513-auditoría-forense-inmutable-audit_logs)
-6. [Catálogo Cronológico de las 33 Migraciones SQL](#6-catálogo-cronológico-de-las-33-migraciones-sql)
+6. [Catálogo Cronológico de las 34 Migraciones SQL](#6-catálogo-cronológico-de-las-34-migraciones-sql)
 7. [Procedimientos Almacenados y RPCs Transaccionales ACID](#7-procedimientos-almacenados-y-rpcs-transaccionales-acid)
 8. [Políticas de Seguridad Row-Level Security (RLS)](#8-políticas-de-seguridad-row-level-security-rls)
 9. [Estrategia de Indexación de Alto Rendimiento](#9-estrategia-de-indexación-de-alto-rendimiento)
@@ -84,7 +84,8 @@ Sedes físicas, depósitos o sucursales del tenant.
 Usuarios y empleados vinculados al comercio o a la plataforma administrativa.
 * `id` (`UUID`, PK, FK -> `auth.users.id` ON DELETE CASCADE).
 * `tenant_id` (`TEXT`, FK -> `tenants.id` ON DELETE CASCADE, NULL para Super Administradores).
-* `email` (`TEXT`, NOT NULL, UNIQUE): Correo corporativo del empleado.
+* `email` (`TEXT`, NOT NULL, UNIQUE): Correo corporativo del empleado (vínculo 1:1 con `auth.users`).
+  - *Restricción de Integridad y Multi-Negocio*: Por diseño Ponytail Zero-Trust, cada correo está anclado a un único usuario/tenant. Para dueños con múltiples tiendas, la plataforma soporta acceso a múltiples sedes bajo el mismo tenant o impersonación controlada vía `PLATFORM_SUPER_ADMIN`.
 * `full_name` (`TEXT`, NOT NULL): Nombre y apellido del usuario.
 * `phone` (`TEXT`): Teléfono de contacto.
 * `id_number` (`TEXT`): Cédula de identidad o RIF personal.
@@ -191,11 +192,10 @@ Cabecera de pedidos generados en vitrina web o cajas de mostrador.
 * `delivery_address` (`TEXT`): Dirección de entrega o indicaciones especiales.
 * `delivery_type` (`TEXT`, NOT NULL, DEFAULT `'pickup'`): `'pickup' | 'delivery'`.
 * `delivery_zone_id` (`UUID`, FK -> `delivery_zones.id`).
-* `delivery_fee_usd` (`NUMERIC(12,2)`, DEFAULT `0.00`): Tarifa de envío.
-* `total_usd` (`NUMERIC(12,2)`, NOT NULL): Monto total en divisa de referencia (USD).
-* `total_ves` (`NUMERIC(14,2)`, NOT NULL): Monto total en bolívares (VES) a la tasa BCV aplicada.
-* `total_primary` (`NUMERIC(12,2)`), `total_secondary` (`NUMERIC(14,2)`): Totales bimonetarios canónicos.
+* `total_primary` (`NUMERIC(12,2)`, NOT NULL), `total_secondary` (`NUMERIC(14,2)`, NOT NULL): Totales bimonetarios canónicos gobernados por `primary_currency` y `secondary_currency` de `tenant_settings`.
+* `delivery_fee_primary` (`NUMERIC(12,2)`, DEFAULT `0.00`), `delivery_fee_secondary` (`NUMERIC(14,2)`, DEFAULT `0.00`): Tarifas de despacho bimonetarias.
 * `exchange_rate_applied` (`NUMERIC(14,4)`, NOT NULL): Tasa cambiaria oficial congelada al momento de la compra.
+* `total_usd` (`NUMERIC(12,2)`), `total_ves` (`NUMERIC(14,2)`), `delivery_fee_usd` (`NUMERIC(12,2)`): Columnas heredadas conservadas para retrocompatibilidad con integraciones externas.
 * `status` (`TEXT`, NOT NULL, DEFAULT `'CREATED'`):
   - `'CREATED'`: Pedido registrado por el cliente, en espera de pago.
   - `'PAYMENT_PENDING'`: Comprobante de pago subido, en espera de validación bancaria.
@@ -226,6 +226,7 @@ Renglones de detalle de cada pedido.
 
 ### `payments`
 Comprobantes bancarios y validaciones de pago bimonetario.
+* **Soporte de Pagos Mixtos (Split-Tender)**: Relación 1:N entre `orders` y `payments`. Un pedido puede liquidarse con múltiples comprobantes fraccionados (ej. $10 en Efectivo USD + saldo en Pago Móvil VES con IGTF 3%). La conciliación solo conmuta `orders.payment_status` a `'APPROVED'` cuando la suma convertida de los pagos con `status = 'APPROVED'` cubre o supera el importe total requerido.
 * `id` (`UUID`, PK, DEFAULT `gen_random_uuid()`).
 * `tenant_id` (`TEXT`, NOT NULL, FK -> `tenants.id` ON DELETE CASCADE).
 * `order_id` (`UUID`, NOT NULL, FK -> `orders.id` ON DELETE CASCADE).
@@ -349,7 +350,7 @@ Migración `00033_craft_workshop_plugin.sql`. Control de insumos por paquete, es
 
 ---
 
-## 6. Catálogo Cronológico de las 33 Migraciones SQL
+## 6. Catálogo Cronológico de las 34 Migraciones SQL
 
 | N° | Archivo de Migración | Propósito y Cambios en el Modelo |
 | :---: | :--- | :--- |
@@ -397,8 +398,8 @@ PostgreSQL gestiona de manera autónoma las operaciones críticas que requieren 
 | Procedimiento Almacenado | Argumentos | Responsabilidad y Garantía ACID |
 | :--- | :--- | :--- |
 | **`rpc_create_order_atomic`** | `p_order_data JSONB` | Crea el pedido, valida cupones de descuento, adquiere bloqueos con **ordenamiento determinista lexicográfico (`ORDER BY product_id ASC FOR UPDATE`)** para garantizar 0 deadlocks bajo alto tráfico/Flash Sales, evalúa dinámicamente plugins en `tenant_modules` (`food_service`, `craft_workshop`), descuenta inventario o materias primas, registra kardex en `inventory_movements` y guarda totales bimonetarios canónicos (`total_primary`, `total_secondary`). Rollback total si falla el stock. |
-| **`rpc_recalculate_craft_recipes`** | `p_tenant_id TEXT, p_sync_storefront BOOLEAN` | Actualiza en bloque (< 5 ms) todos los snapshots de costos de recetas en `craft_recipe_items` y recalcula costos directos y precios de venta en `craft_recipes`. Si se activa `p_sync_storefront`, sincroniza `price_usd` y `cost_price` en la tabla `products`. |
-| **`rpc_issue_fiscal_document`** | `p_payload JSONB` | Adquiere bloqueo exclusivo con `FOR UPDATE` sobre `fiscal_sequences`, asigna el siguiente número consecutivo legal SENIAT sin saltos ni duplicados, crea el documento en `fiscal_documents` y genera el asiento contable por partida doble balanceado ($\sum \text{Débito} = \sum \text{Crédito}$) en `journal_entries`. |
+| **`rpc_recalculate_craft_recipes`** | `p_tenant_id TEXT, p_sync_storefront BOOLEAN` | Actualiza en bloque (< 5 ms) todos los snapshots de costos de recetas en `craft_recipe_items` y recalcula costos directos y precios de venta en `craft_recipes`. Si se activa `p_sync_storefront`, sincroniza `base_price` (y `price_usd`) y `cost_price` en la tabla `products`. |
+| **`rpc_issue_fiscal_document`** | `p_payload JSONB` | Adquiere bloqueo exclusivo con `FOR UPDATE` sobre `fiscal_sequences`, asigna el siguiente número consecutivo legal SENIAT sin saltos ni duplicados y crea el documento en `fiscal_documents`. **Si el comercio tiene activo el módulo `accounting` en `tenant_modules`**, genera automáticamente el asiento contable por partida doble balanceado ($\sum \text{Débito} = \sum \text{Crédito}$) en `journal_entries`. |
 | **`rpc_close_pos_shift`** | `p_payload JSONB` | Ejecuta el arqueo ciego de caja en PostgreSQL: suma todos los pagos en efectivo recibidos durante el turno en moneda principal y secundaria, calcula sobrantes o faltantes (`difference_primary`, `difference_secondary`) y sella el turno en `pos_shifts`. |
 | **`rpc_get_sales_book`** | `p_tenant_id TEXT, p_year_month TEXT` | Agrega y formatea en milisegundos todo el Libro de Ventas mensual con base imponible, alícuotas IVA, exenciones, IGTF y retenciones para declaración tributaria ante el SENIAT. |
 

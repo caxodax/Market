@@ -106,21 +106,18 @@ export const CRAFT_WORKSHOP_MANIFEST: TenantModuleManifest = {
 La activación de módulos se almacena en la tabla `tenant_modules` de PostgreSQL. 
 
 ### A. Guardián de Rutas en el Panel Administrativo
-Toda sub-ruta de plugin en `apps/web/src/app/admin/(protected)/` ejecuta el guardián de autorización en su primera línea:
+Toda sub-ruta de plugin en `apps/web/src/app/admin/[plugin]/page.tsx` ejecuta el guardián de autorización canónico en su primera línea:
 
 ```typescript
 // apps/web/src/app/admin/craft/page.tsx
 export default async function CraftPage() {
-  const session = await getSession();
-  const tenantId = session.tenantId;
+  // 1. Guardián criptográfico multi-tenant (memoizado con React.cache)
+  const { targetTenantId } = await resolveAuthorizedAdminContext();
 
-  // 1. Guardián de seguridad multi-tenant
-  await assertAuthorizedTenantAdmin(tenantId);
+  // 2. Guardián de licenciamiento de módulo activo
+  await assertTenantModuleActive(targetTenantId, "craft_workshop");
 
-  // 2. Guardián de módulo activo
-  await assertTenantModuleActive(tenantId, "craft_workshop");
-
-  return <CraftWorkshopAdminPanel tenantId={tenantId} />;
+  return <CraftWorkshopAdminPanel tenantId={targetTenantId} />;
 }
 ```
 
@@ -168,7 +165,7 @@ packages/plugins/loyalty-points/
 ```
 
 ### Paso 4: Crear la Migración SQL
-Crea la migración versionada en `packages/database/supabase/migrations/00034_loyalty_points.sql`:
+Crea la migración versionada en `packages/database/supabase/migrations/00035_loyalty_points.sql`:
 ```sql
 CREATE TABLE loyalty_points (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

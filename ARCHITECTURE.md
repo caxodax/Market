@@ -12,7 +12,7 @@
 1. [Visión del Sistema y Principios Rectores](#1-visión-del-sistema-y-principios-rectores)
 2. [Estructura del Monorepo (Turborepo + pnpm)](#2-estructura-del-monorepo-turborepo--pnpm)
 3. [Arquitectura Hexagonal: Puertos, Adaptadores y Ecosistema de Plugins](#3-arquitectura-hexagonal-puertos-adaptadores-y-ecosistema-de-plugins)
-4. [Base de Datos & Modelado Relacional (33 Migraciones SQL y RPCs Transaccionales)](#4-base-de-datos--modelado-relacional-33-migraciones-sql-y-rpcs-transaccionales)
+4. [Base de Datos & Modelado Relacional (34 Migraciones SQL y RPCs Transaccionales)](#4-base-de-datos--modelado-relacional-34-migraciones-sql-y-rpcs-transaccionales)
 5. [Seguridad Integral y Aislamiento Multi-Tenant (AgentShield)](#5-seguridad-integral-y-aislamiento-multi-tenant-agentshield)
 6. [Flujos Críticos de Negocio y Ciclo de Vida](#6-flujos-críticos-de-negocio-y-ciclo-de-vida)
 7. [Arquitectura Frontend: App Router Modular, Mobile-First y CLS = 0](#7-arquitectura-frontend-app-router-modular-mobile-first-y-cls--0)
@@ -59,7 +59,7 @@ flowchart TD
     end
 
     subgraph Infra["Persistencia & Almacenamiento (Infraestructura)"]
-        PG["PostgreSQL en Supabase (RLS Estricto + 33 Migraciones)"]
+        PG["PostgreSQL en Supabase (RLS Estricto + 34 Migraciones)"]
         R2["Cloudflare R2 Object Storage (Zero Egress S3)"]
         BCV["API Oficial BCV (Tasa USD/VES en Vivo)"]
     end
@@ -141,14 +141,14 @@ Market/
 │           │   └── proxy.ts                # Detección y reescritura de subdominios
 │           ├── components/                 # Vistas y componentes especializados
 │           │   ├── admin/                  # AdminLayoutShell, AdminSidebar, AdminHeader, AdminSkeleton
-│           │   └── ui/                     # EmptyState, OptimizedImage, BottomSheetModal
+│           │   └── ui/                     # EmptyState, BottomSheetModal
 │           ├── context/                    # Contextos de React (Carrito, Favoritos)
 │           └── lib/                        # Clientes de caché, compresión y Excel
 ├── packages/
 │   ├── auth/                               # Seguridad, roles RBAC y sesiones HMAC-SHA256
-│   ├── database/                           # Repositorios, 33 migraciones SQL y Circuit Breaker
+│   ├── database/                           # Repositorios, 34 migraciones SQL y Circuit Breaker
 │   │   └── supabase/
-│   │       ├── migrations/                 # 33 migraciones SQL versionadas e idempotentes
+│   │       ├── migrations/                 # 34 migraciones SQL versionadas e idempotentes
 │   │       └── PRODUCTION_FULL_SETUP.sql   # DDL consolidado de producción
 │   ├── plugins/                            # Ecosistema de 13 plugins modulares
 │   │   ├── accounting/                     # Contabilidad NIIF y Plan Único de Cuentas (PUC)
@@ -165,7 +165,7 @@ Market/
 │   │   ├── push-notifications/             # Notificaciones masivas Web Push VAPID
 │   │   └── storefront-pro/                 # Maquetador modular de 11 bloques visuales
 │   ├── types/                              # Definiciones TypeScript y Puertos Hexagonales
-│   ├── ui/                                 # Librería de componentes compartidos (@marketos/ui)
+│   ├── ui/                                 # Librería de componentes compartidos (@marketos/ui, OptimizedImage, ThemeProvider)
 │   └── utils/                              # Utilidades de R2, fechas, WhatsApp y plugins
 └── package.json                            # Scripts globales de compilación y pruebas
 ```
@@ -215,11 +215,11 @@ El motor en [`packages/utils/src/plugin-resolver.ts`](file:///home/lmontes/Docum
 
 ---
 
-## 4. Base de Datos & Modelado Relacional (33 Migraciones SQL y RPCs Transaccionales)
+## 4. Base de Datos & Modelado Relacional (34 Migraciones SQL y RPCs Transaccionales)
 
 La base de datos reside en **PostgreSQL (Supabase)**, con tipado estricto, integridad referencial en cascada, auditoría inmutable, procedimientos almacenados transaccionales (RPC) y Row-Level Security (RLS) en el 100% de las tablas.
 
-### Catálogo Cronológico de las 33 Migraciones
+### Catálogo Cronológico de las 34 Migraciones
 
 | Migración | Nombre / Identificador | Propósito Arquitectónico y Tablas Creadas |
 | :---: | :--- | :--- |
@@ -256,6 +256,7 @@ La base de datos reside en **PostgreSQL (Supabase)**, con tipado estricto, integ
 | **00031** | `profiles_email_unique.sql` | Integridad de usuarios: Índice único sobre `email` en la tabla `profiles` para evitar duplicidad de colaboradores. |
 | **00032** | `fix_profiles_rls_recursion.sql` | Corrección RLS: Erradicación de bucles de recursión infinita en las políticas de seguridad de perfiles. |
 | **00033** | `craft_workshop_plugin.sql` | Taller de sublimación y DTF: `craft_materials` (insumos por bulto/paquete con costo unitario computado), `craft_recipes` (fichas de escandallo con merma y mano de obra), `craft_recipe_items` (fórmulas relacionales), `craft_quotes` (presupuestos con 50% de anticipo) y procedimiento `rpc_recalculate_craft_recipes`. |
+| **00034** | `decouple_core_rpcs.sql` | Desacoplamiento de RPCs del Core: Ordenamiento determinista (`ORDER BY product_id ASC FOR UPDATE`) para erradicar deadlocks bajo concurrencia, comprobación dinámica de módulos en `tenant_modules` y totales bimonetarios canónicos. |
 
 ---
 
@@ -321,8 +322,8 @@ sequenceDiagram
 ## 6. Flujos Críticos de Negocio y Ciclo de Vida
 
 ### A. Resolución de Tenant en Tiempo de Ejecución
-La resolución del comercio se ejecuta en [`apps/web/src/proxy.ts`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/proxy.ts) y [`apps/web/src/app/page.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/app/page.tsx):
-1. **Dominio Personalizado**: Si la cabecera `host` es `pedidos.mimercado.com`, el proxy consulta el `custom_domain` en la base de datos.
+La resolución del comercio se ejecuta de forma perimetral de latencia cero en [`apps/web/src/proxy.ts`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/proxy.ts) y [`apps/web/src/app/page.tsx`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/app/page.tsx):
+1. **Dominio Personalizado**: Si la cabecera `host` es `pedidos.mimercado.com`, el proxy perimetral en Edge reescribe internamente la URL hacia `?tenant=pedidos.mimercado.com` sin tocar la base de datos (0ms overhead). La resolución del tenant se efectúa en servidor mediante `getCachedTenant()`, respaldada por la caché de datos de Next.js (`unstable_cache`) con clave `tenant-routing:${host}` y tag `tenant:${tenantId}:settings`, evitando consultas SQL redundantes en cada petición.
 2. **Subdominio de Plataforma**: Si la cabecera es `mimercado.marketos.app`, extrae `mimercado` como identificador de tenant.
 3. **Ruta Canónica Aislada**: En el dominio principal, las peticiones se enrutan de forma canónica hacia `/t/[tenant]` (e.g. `/t/shop-market`), lo cual aísla el contexto del Web App Manifest y permite instalar múltiples tiendas en el mismo dispositivo móvil.
 
