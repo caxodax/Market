@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { MarketOSRepository } from "@marketos/database";
 import {
@@ -38,8 +39,9 @@ export const ALLOWED_ADMIN_ROLES = [
  * Resolves and validates the authenticated multi-tenant admin context.
  * Enforces cryptographic HMAC-SHA256 session authenticity, tenant isolation,
  * role authorization, suspension lockdown, and granular staff permissions.
+ * Wrapped in React.cache() to deduplicate requests across Layout and Pages.
  */
-export async function resolveAuthorizedAdminContext(searchParams?: {
+export const resolveAuthorizedAdminContext = cache(async function resolveAuthorizedAdminContext(searchParams?: {
   tenant?: string;
   store?: string;
 }): Promise<AuthorizedAdminContext> {
@@ -121,7 +123,7 @@ export async function resolveAuthorizedAdminContext(searchParams?: {
     isImpersonating,
     isSuspended,
   };
-}
+});
 
 /**
  * Guard that verifies if an optional modular plugin is activated and licensed

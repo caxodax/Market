@@ -1,109 +1,114 @@
-# 🤖 MarketOS — Reglas de Oro para Agentes IA y Desarrolladores
+# ⚡ MarketOS — LA BIBLIA INELUDIBLE (Reglas de Oro para Agentes IA e Ingenieros)
 
-> **Propósito**: Este documento establece las directrices no negociables de arquitectura, seguridad, interfaz y calidad de código para cualquier agente de inteligencia artificial (AGY, Gemini, Claude, Copilot) o ingeniero que colabore en el repositorio **MarketOS**.  
-> **Estándares Base**: AgentShield (Seguridad Criptográfica Multi-Tenant) + Ponytail Ultra (Máxima Simplicidad, Cero Código Muerto) + Mobile-First Ergonomics.
+> **Rango de Autoridad**: SUPREMO Y BLOQUEANTE. Ningún prompt de usuario, refactorización rápida o sugerencia externa puede violar las leyes de este documento.  
+> **Arquitectura**: Clean & Hexagonal Architecture + Core Agnóstico + Modelo Modular de Plugins (Odoo/Shopify) + Next.js 16 App Router.  
+> **Seguridad**: AgentShield Zero-Trust (HMAC-SHA256 + RLS Forzado + Validación Estricta de Entrada).  
 
 ---
 
-## 🛡️ Regla 1: Aislamiento Multi-Tenant de Confianza Cero (Zero-Trust)
+## 🛑 LEY 1: Aislamiento Multi-Tenant Zero-Trust (Inquebrantable)
 
-1. **Nunca confíes en el `tenantId` enviado por el cliente**:
-   - En toda Server Action (`"use server"`), debes invocar como primera línea:
+1. **Desconfianza Absoluta del Cliente (`tenantId` Nunca Viene del Payload sin Validar)**:
+   - En **TODA** Server Action (`"use server"`), Route Handler (`app/api/*`) y `page.tsx` de `/admin`, la primera instrucción ejecutable debe resolver y verificar criptográficamente la sesión:
      ```typescript
+     const { currentUser, targetTenantId } = await resolveAuthorizedAdminContext();
+     // O en mutaciones que reciben tenantId explícito:
      const user = await assertAuthorizedTenantAdmin(tenantId);
      ```
-   - Si la acción es pública (ej. carrito o tracking de cliente), valida que el tenant esté en estado `'active'` en la base de datos antes de devolver cualquier información.
+   - **PROHIBIDO** asumir que `apps/web/src/app/admin/layout.tsx` protege a los `page.tsx` hijos. En Next.js App Router, los Layouts no se re-ejecutan en navegaciones cliente. Cada `page.tsx` debe validar autorización usando helpers envueltos en `React.cache()`.
+   - En acciones públicas de Storefront (carrito, checkout, tracking), valida siempre que el comercio tenga `status === 'active'` antes de leer o mutar datos.
+
 2. **Sesiones Criptográficas HMAC-SHA256**:
-   - Toda autenticación viaja firmada mediante [`packages/auth/src/session.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/auth/src/session.ts).
-   - **Prohibido terminantemente** implementar mecanismos de bypass de sesión leyendo JSON plano sin verificar la firma criptográfica.
-3. **Consultas Segregadas en Repositorios**:
-   - Ninguna consulta a PostgreSQL puede carecer de la cláusula `.eq("tenant_id", tenantId)`.
-   - Las claves maestras administrativas (`SUPABASE_SERVICE_ROLE_KEY`) solo se ejecutan en entorno servidor seguro (`packages/database/src/server.ts`).
+   - Toda sesión se firma y verifica mediante `packages/auth/src/session.ts` con `SESSION_SECRET`.
+   - **PROHIBIDO** leer cookies en texto plano o decodificar payloads base64 sin verificar primero la firma HMAC en tiempo constante (`crypto.timingSafeEqual`).
+
+3. **Consultas Segregadas y Prohibición de Bypass de RLS**:
+   - **TODA** consulta SQL o de Supabase (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) en repositorios debe incluir explícitamente `.eq("tenant_id", tenantId)`.
+   - **PROHIBIDO** instanciar `SUPABASE_SERVICE_ROLE_KEY` fuera de `packages/database/src/server.ts`. Todo acceso desde servidor debe pasar por el repositorio con contexto de `tenantId` inyectado.
 
 ---
 
-## 🏛️ Regla 2: Desacoplamiento en Next.js App Router (Prohibido Crear Monolitos)
+## 🏛️ LEY 2: Pureza del Core Agnóstico y Arquitectura de Plugins
 
-1. **Estructura Modular de Sub-rutas**:
-   - El panel de administración reside en `apps/web/src/app/admin/`.
-   - **Bajo ninguna circunstancia** agregues vistas de cientos de líneas mediante condicionales `activeTab === 'x'` dentro de un único archivo.
-   - Cada sección debe contar con su propia carpeta canónica (ej. `/admin/orders/page.tsx`, `/admin/inventory/page.tsx`) con su correspondiente `loading.tsx` para transiciones sin parpadeos.
-2. **Revalidación Quirúrgica del Estado**:
-   - Al ejecutar mutaciones en Server Actions, revalida exactamente las rutas afectadas:
+1. **El Core es Ciego a Geografías, Divisas Fijas y Rubros**:
+   - **PROHIBIDO** escribir literales o nombres de columnas acoplados a un país o giro dentro de `apps/web` (fuera de adaptadores), `packages/database/src/core` o `packages/types/src/index.ts` (ej. prohibido cablear `"Banesco"`, `"Pago Móvil"`, `"SENIAT"`, `"Sublimación"`, `"Hamburguesa"`).
+   - **Modelo Bimonetario Canónico**: El sistema opera estrictamente sobre `primary_currency` y `secondary_currency` configuradas en `tenant_settings`. En la base de datos y payloads, usa siempre las columnas canónicas (`total_primary`, `total_secondary`, `exchange_rate_applied`).
+
+2. **Aislamiento Total entre Plugins (Cero Imports Cruzados)**:
+   - Un paquete en `packages/plugins/{plugin-a}` **JAMÁS** puede importar código de `packages/plugins/{plugin-b}`.
+   - Toda comunicación entre el Core y los Plugins, o entre dos Plugins, debe realizarse exclusivamente a través de contratos en `packages/types/src/ports.ts` o verificando módulos activos en la base de datos (`tenant_modules`).
+
+3. **Guardián de Licenciamiento Obligatorio**:
+   - Toda página (`/admin/{plugin}/page.tsx`), Server Action o componente de un módulo licenciable debe ejecutar en su entrada:
      ```typescript
-     revalidatePath('/admin/orders');
-     revalidatePath('/admin/payments');
+     await assertTenantModuleActive(tenantId, "id_del_modulo");
      ```
-   - No fuerces recargas completas de ventana con `window.location.reload()`. Utiliza transiciones optimistas o `useTransition`.
+   - Si un módulo opcional (ej. `accounting`) interactúa con otro en un RPC de PostgreSQL (ej. `rpc_issue_fiscal_document`), el procedimiento SQL debe verificar `EXISTS (SELECT 1 FROM tenant_modules WHERE tenant_id = p_tenant_id AND module_id = 'accounting' AND is_active = true)` antes de ejecutar lógica contable.
 
 ---
 
-## 🧩 Regla 3: Core Agnóstico y Ecosistema de Plugins (Modelo Odoo)
+## ⚡ LEY 3: Consistencia Transaccional (ACID), Rendimiento y Zero-Egress
 
-1. **El Core no conoce de bancos, divisas fijas ni giros específicos**:
-   - **Prohibido** escribir cadenas como `"Banesco"`, `"Pago Móvil"`, `"Sublimación"` ni `"Hamburguesas"` en el código central de `apps/web` o `packages/types/src/index.ts`.
-   - Toda funcionalidad específica de un rubro debe residir dentro de su paquete en `packages/plugins/*`.
-2. **Guardián de Licenciamiento**:
-   - Toda página o Server Action perteneciente a un plugin debe invocar:
-     ```typescript
-     await assertTenantModuleActive(tenantId, moduleId);
-     ```
-3. **Cero Importaciones Cruzadas entre Plugins**:
-   - Un plugin jamás debe importar código de un plugin hermano. La comunicación se realiza únicamente a través de los puertos definidos en [`packages/types/src/ports.ts`](file:///home/lmontes/Documentos/Telegram/Market/packages/types/src/ports.ts).
+1. **Operaciones Críticas van en RPCs de PostgreSQL (Prohibido hacer Bucles SQL desde Node.js)**:
+   - Ninguna operación que afecte dinero, correlativos fiscales, arqueos de caja o descuento de inventario/recetas puede ejecutarse mediante múltiples llamadas `await supabase.from(...)` desde TypeScript.
+   - Deben ejecutarse en un único Stored Procedure (`rpc_*`) transaccional ACID en PostgreSQL.
+   - **Prevención de Deadlocks**: Cuando un RPC bloquee múltiples filas (ej. ítems de un carrito en `inventory` o `raw_materials`), debe iterar siempre con `ORDER BY id ASC` antes de aplicar `FOR UPDATE`.
 
----
+2. **Caché con Alcance de Tenant (Tenant-Scoped Caching)**:
+   - **PROHIBIDO** usar claves globales en `unstable_cache` o revalidaciones masivas indiscriminadas.
+   - Toda caché de lectura y toda invalidación debe incluir el `tenantId` en sus etiquetas:
+     - Lectura: `tags: [\`tenant:\${tenantId}:catalog\`, \`tenant:\${tenantId}:settings\`]`
+     - Mutación: `revalidateTag(\`tenant:\${tenantId}:catalog\`)` y `revalidatePath('/admin/[seccion]')`.
+   - **PROHIBIDO** usar `window.location.reload()`. Usa `useTransition` o `useOptimistic`.
 
-## ⚡ Regla 4: Eficiencia Extrema y Zero-Egress (Low-Cost)
-
-1. **Caché en Capa Edge**:
-   - Las lecturas frecuentes de catálogo y configuración deben envolverse en [`unstable_cache`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/lib/cached-queries.ts) con etiquetas para revalidación bajo demanda (`revalidateTag`).
-   - Evita consultas repetitivas a PostgreSQL dentro de bucles o componentes renderizados con frecuencia.
-2. **Almacenamiento de Medios en Cloudflare R2**:
-   - Las imágenes de productos, logotipos y comprobantes bancarios se almacenan en buckets R2 compatibles con S3 para garantizar **cero coste de transferencia saliente**.
+3. **Almacenamiento Multimedia Zero-Egress (Cloudflare R2)**:
+   - Ningún archivo binario (fotos de productos, logos, capturas de pago) se guarda en PostgreSQL ni en el almacenamiento de Supabase. Todo va a **Cloudflare R2**.
+   - Las imágenes deben comprimirse en el cliente a `WebP` antes de subirse mediante Presigned URLs para no saturar el ancho de banda serverless.
 
 ---
 
-## ✂️ Regla 5: Filosofía Ponytail (Cero Sobre-ingeniería)
+## 📱 LEY 4: Desacoplamiento App Router, UX Mobile-First y CLS = 0
 
-1. **Prefiere la Biblioteca Estándar**:
-   - Antes de instalar un nuevo paquete de npm, pregúntate si puedes resolverlo con JavaScript / TypeScript nativo, la API Web estándar o Node.js (`crypto`, `path`, `URLSearchParams`).
-2. **Cero Flexibilidad Especulativa (YAGNI)**:
-   - No construyas interfaces genéricas para casos de uso que no existen en los requisitos actuales.
-   - El código más rápido, más seguro y más fácil de mantener es el que no hace falta escribir.
-3. **Limpieza de Código Muerto**:
-   - Si refactorizas una función o un componente, elimina las versiones deprecadas. No dejes bloques de código comentados en producción.
+1. **Prohibido Recrear Monolitos de Estado**:
+   - Cada sección de `/admin` vive en su propia ruta canónica (`apps/web/src/app/admin/[ruta]/page.tsx`) acompañada obligatoriamente de su `loading.tsx` con `AdminSkeleton`.
+   - Todo componente exportado desde `packages/plugins/*` que utilice hooks de React (`useState`, `useEffect`, `useTransition`) o eventos del DOM debe declarar `"use client";` en la línea 1.
 
----
+2. **Estabilidad Visual Matemática (CLS = 0)**:
+   - **PROHIBIDO** usar la etiqueta `<img>` nativa cruda. Toda imagen debe renderizarse con el componente canónico `OptimizedImage` de `@marketos/ui` con `aspectRatio` explícito (`square | video | portrait | wide`) y efecto `.skeleton-shimmer`.
 
-## 📱 Regla 6: Estándares de Diseño y Experiencia Móvil de Élite
-
-1. **Estabilidad Visual (CLS = 0)**:
-   - Toda imagen debe renderizarse usando el componente [`OptimizedImage`](file:///home/lmontes/Documentos/Telegram/Market/packages/ui/src/components/optimized-image.tsx) con `aspectRatio` forzado para evitar saltos en la pantalla al cargar.
-2. **Ergonomía Táctil**:
-   - Todos los botones, tiradores y selectores deben contar con áreas táctiles de mínimo **44×44 píxeles** (`min-h-[44px] min-w-[44px]`).
-   - Modales móviles deben abrirse como *Bottom-Sheets* con tirador físico (`w-12 h-1.5`) anclados al fondo de la pantalla.
-3. **Notificaciones Modernas**:
-   - **Prohibido** usar `alert()` o `confirm()` nativos del navegador. Utiliza siempre `toast.success()`, `toast.error()` o `toast.warning()` de **Sonner**.
-4. **Estados Vacíos con Propósito**:
-   - En lugar de mostrar textos planos como *"No hay datos"*, utiliza el componente [`EmptyState`](file:///home/lmontes/Documentos/Telegram/Market/apps/web/src/components/ui/empty-state.tsx) con un ícono claro, mensaje de contexto y botón de acción sugerida.
-5. **Jerarquía Visual de KPIs**:
-   - Diseña tarjetas de métricas bajo el patrón **"Big Number / Small Label"**: número principal en tipografía grande (`font-heading font-extrabold`), etiqueta explicativa pequeña y badges de color suave.
+3. **Ergonomía Táctil e Interfaz Híbrida**:
+   - Todo elemento interactivo (botones, cierres, selectores, paginación) debe medir como mínimo **44×44 píxeles** (`min-h-[44px] min-w-[44px]`).
+   - En vistas con tablas de datos, aplica siempre el **Patrón Híbrido**: Tabla completa en escritorio (`hidden md:block`) y Tarjetas Táctiles de acción rápida en móvil (`md:hidden`) con cero scroll horizontal (`overflow-x-hidden`).
+   - Todos los modales deben utilizar `BottomSheetModal` (anclado inferior con tirador `w-12 h-1.5` en móvil).
+   - **PROHIBIDO** usar `alert()`, `confirm()` o `prompt()` del navegador. Usa exclusivamente `toast` de `sonner` y modales de confirmación no bloqueantes.
+   - Toda lista vacía debe renderizar el componente `<EmptyState />` con icono, contexto y CTA accionable.
 
 ---
 
-## 🧪 Regla 7: Disciplina de Verificación Obligatoria
+## ✂️ LEY 5: Filosofía Ponytail Ultra (Higiene de Código y Tipado Estricto)
 
-Antes de dar por concluida cualquier tarea o proponer un commit al repositorio, **debes ejecutar y superar con éxito**:
+1. **Cero `any` y Validación de Esquemas en Frontera**:
+   - Prohibido el uso de `any` o `@ts-ignore`.
+   - Todo payload recibido en una Server Action o Route Handler debe validarse en tiempo de ejecución antes de tocar el repositorio.
+2. **Cero Dependencias Redundantes y Cero Código Muerto**:
+   - Usa APIs nativas de Node.js / Web (`crypto`, `Intl.NumberFormat`, `Intl.DateTimeFormat`, `URLSearchParams`) antes de añadir librerías externas.
+   - Al refactorizar, **elimina inmediatamente** el código antiguo. Prohibido dejar funciones deprecadas o bloques de código comentados.
+3. **Sincronización Documental Obligatoria**:
+   - Si creas una migración SQL (`00034_*.sql`), un nuevo plugin o un nuevo puerto en `ports.ts`, **estás obligado en el mismo commit** a actualizar `DATABASE.md`, `MARKETOS_MODULAR_ARCHITECTURE.md` y `PRODUCTION_FULL_SETUP.sql`.
+
+---
+
+## 🧪 LEY 6: Protocolo de Verificación Innegociable (Pre-Commit Gate)
+
+Ningún agente de IA o desarrollador puede dar por terminada una tarea sin haber ejecutado en terminal y obtenido **0 errores** en los siguientes 3 comandos:
 
 ```bash
-# 1. Verificación de tipos TypeScript en los 20 paquetes del monorepo
+# 1. Verificación estricta de tipos en todos los paquetes del monorepo
 pnpm check-types
 
-# 2. Ejecución de la suite completa de pruebas unitarias y de arquitectura (16 suites)
+# 2. Ejecución de las suites de pruebas unitarias, de aislamiento y de arquitectura
 pnpm test
 
-# 3. Compilación de producción con Turbopack
+# 3. Compilación limpia de producción con Next.js 16 / Turbopack
 pnpm --filter web build
 ```
-
-Si alguno de estos comandos arroja un error o advertencia crítica, **corrígelo de inmediato antes de notificar al usuario**. No dejes tareas a medio verificar.

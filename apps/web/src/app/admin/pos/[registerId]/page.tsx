@@ -1,7 +1,7 @@
 import React from "react";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { getCurrentUser } from "../../../login/actions";
+import { notFound } from "next/navigation";
+import { resolveAuthorizedAdminContext } from "../../admin-context";
 import { getRegisterSessions } from "../../pos-actions";
 import {
   Button,
@@ -16,17 +16,15 @@ import { ArrowLeft, History, CheckCircle2, AlertTriangle } from "lucide-react";
 
 interface Props {
   params: Promise<{ registerId: string }>;
+  searchParams?: Promise<{ tenant?: string }>;
 }
 
 export const dynamic = "force-dynamic";
 
-export default async function RegisterDetailPage({ params }: Props) {
+export default async function RegisterDetailPage({ params, searchParams }: Props) {
   const { registerId } = await params;
-  const currentUser = await getCurrentUser();
-
-  if (!currentUser) {
-    redirect("/login");
-  }
+  const sParams = searchParams ? await searchParams : undefined;
+  await resolveAuthorizedAdminContext(sParams);
 
   let sessions: any[] = [];
   try {

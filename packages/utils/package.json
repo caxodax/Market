@@ -9,7 +9,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "node --experimental-strip-types src/__tests__/plugin-resolver.test.ts",
+    "test": "node --experimental-strip-types src/__tests__/plugin-resolver.test.ts && node --experimental-strip-types src/__tests__/architecture-bible.test.ts",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {

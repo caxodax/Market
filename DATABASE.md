@@ -386,6 +386,7 @@ Migración `00033_craft_workshop_plugin.sql`. Control de insumos por paquete, es
 | **00031** | `00031_profiles_email_unique.sql` | Índice único sobre `email` en la tabla `profiles` para evitar duplicidad de colaboradores. |
 | **00032** | `00032_fix_profiles_rls_recursion.sql` | Corrección de bucles de recursión infinita en las políticas de seguridad de la tabla `profiles`. |
 | **00033** | `00033_craft_workshop_plugin.sql` | Taller de sublimación y DTF: Insumos por paquete (`craft_materials`), recetas con merma y mano de obra (`craft_recipes`), presupuestos (`craft_quotes`) y función `rpc_recalculate_craft_recipes`. |
+| **00034** | `00034_decouple_core_rpcs.sql` | Desacoplamiento de RPCs del Core, ordenamiento determinista (`ORDER BY product_id ASC FOR UPDATE`) para erradicar deadlocks en concurrencia y verificación dinámica de módulos en `tenant_modules`. |
 
 ---
 
@@ -395,7 +396,7 @@ PostgreSQL gestiona de manera autónoma las operaciones críticas que requieren 
 
 | Procedimiento Almacenado | Argumentos | Responsabilidad y Garantía ACID |
 | :--- | :--- | :--- |
-| **`rpc_create_order_atomic`** | `p_order_data JSONB` | Crea el pedido, valida cupones de descuento con `FOR UPDATE`, detecta el giro del negocio (`food_service`, `craft_workshop` o `retail`), descuenta materias primas o stock físico, registra kardex en `inventory_movements` y confirma la orden. Si no hay stock suficiente, ejecuta un `ROLLBACK` total automático evitando pedidos huérfanos. |
+| **`rpc_create_order_atomic`** | `p_order_data JSONB` | Crea el pedido, valida cupones de descuento, adquiere bloqueos con **ordenamiento determinista lexicográfico (`ORDER BY product_id ASC FOR UPDATE`)** para garantizar 0 deadlocks bajo alto tráfico/Flash Sales, evalúa dinámicamente plugins en `tenant_modules` (`food_service`, `craft_workshop`), descuenta inventario o materias primas, registra kardex en `inventory_movements` y guarda totales bimonetarios canónicos (`total_primary`, `total_secondary`). Rollback total si falla el stock. |
 | **`rpc_recalculate_craft_recipes`** | `p_tenant_id TEXT, p_sync_storefront BOOLEAN` | Actualiza en bloque (< 5 ms) todos los snapshots de costos de recetas en `craft_recipe_items` y recalcula costos directos y precios de venta en `craft_recipes`. Si se activa `p_sync_storefront`, sincroniza `price_usd` y `cost_price` en la tabla `products`. |
 | **`rpc_issue_fiscal_document`** | `p_payload JSONB` | Adquiere bloqueo exclusivo con `FOR UPDATE` sobre `fiscal_sequences`, asigna el siguiente número consecutivo legal SENIAT sin saltos ni duplicados, crea el documento en `fiscal_documents` y genera el asiento contable por partida doble balanceado ($\sum \text{Débito} = \sum \text{Crédito}$) en `journal_entries`. |
 | **`rpc_close_pos_shift`** | `p_payload JSONB` | Ejecuta el arqueo ciego de caja en PostgreSQL: suma todos los pagos en efectivo recibidos durante el turno en moneda principal y secundaria, calcula sobrantes o faltantes (`difference_primary`, `difference_secondary`) y sella el turno en `pos_shifts`. |
