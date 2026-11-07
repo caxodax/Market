@@ -24,7 +24,6 @@ export default async function AdminMtoCpqPage({
         businessName={context.settings.business_name}
         businessPhone={context.settings.whatsapp_number || context.settings.phone}
         orders={orders}
-        formatCurrency={(val) => `$${val.toFixed(2)}`}
       />
     </div>
   );
