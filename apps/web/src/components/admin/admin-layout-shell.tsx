@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -63,6 +63,31 @@ export function AdminLayoutShell({
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isStoppingImpersonation, setIsStoppingImpersonation] = useState(false);
   const pathname = usePathname();
+
+  // Close mobile drawer automatically when route changes
+  useEffect(() => {
+    setIsMobileNavOpen(false);
+  }, [pathname]);
+
+  // Lock body scroll and handle Escape key when mobile drawer is open
+  useEffect(() => {
+    if (!isMobileNavOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsMobileNavOpen(false);
+      }
+    };
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMobileNavOpen]);
 
   const handleStopImpersonation = async () => {
     setIsStoppingImpersonation(true);
@@ -147,28 +172,38 @@ export function AdminLayoutShell({
 
         {/* Mobile Slide-over Drawer */}
         {isMobileNavOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden">
+          <div
+            className="fixed inset-0 z-50 lg:hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menú de Navegación"
+          >
             <div
               className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in"
               onClick={() => setIsMobileNavOpen(false)}
             />
             <div className="fixed inset-y-0 left-0 w-[85%] max-w-xs bg-card border-r border-border shadow-2xl flex flex-col z-50 animate-in slide-in-from-left duration-200">
-              <div className="p-4 border-b border-border flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0">
+              <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
                   {settings.logo_url ? (
                     <img
                       src={settings.logo_url}
                       alt={settings.business_name}
-                      className="h-8 w-8 object-contain rounded-lg bg-card border border-border p-0.5"
+                      className="h-8 w-8 object-contain rounded-xl bg-card border border-border p-0.5"
                     />
                   ) : (
                     <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground font-black text-xs flex items-center justify-center">
                       MO
                     </div>
                   )}
-                  <span className="font-black text-sm text-foreground truncate">
-                    {settings.business_name}
-                  </span>
+                  <div className="min-w-0">
+                    <span className="font-black text-sm text-foreground truncate block">
+                      {settings.business_name || "MarketOS"}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground font-mono truncate block">
+                      {settings.tenant_id}
+                    </span>
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -180,12 +215,10 @@ export function AdminLayoutShell({
                 </button>
               </div>
 
-              {/* Mobile Drawer Body: clone sidebar links with click-to-close */}
-              <div
-                className="flex-1 overflow-y-auto"
-                onClick={() => setIsMobileNavOpen(false)}
-              >
+              {/* Mobile Drawer Body */}
+              <div className="flex-1 min-h-0 flex flex-col">
                 <AdminSidebar
+                  variant="mobile"
                   currentUser={currentUser}
                   settings={settings}
                   planLimits={planLimits}
@@ -194,6 +227,7 @@ export function AdminLayoutShell({
                   ordersCount={ordersCount}
                   productsCount={productsCount}
                   bcvRate={exchangeRate?.value}
+                  onNavigate={() => setIsMobileNavOpen(false)}
                 />
               </div>
             </div>

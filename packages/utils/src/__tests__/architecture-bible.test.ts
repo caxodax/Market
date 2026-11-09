@@ -241,4 +241,55 @@ console.log("  [Bible Rule 5] Testing Documentation Synchronization Across Maste
   console.log(`    ✔ Master documentation is 100% synchronized with actual code and ${expectedCount} migrations.`);
 }
 
+// ─── 6. TEST MOBILE RESPONSIVENESS & SIDEBAR BLINDAJE ───────────────────────
+console.log("  [Bible Rule 6] Testing Mobile Drawer & Sidebar Responsiveness Blindaje...");
+{
+  const adminSidebarPath = path.join(repoRoot, "apps/web/src/components/admin/admin-sidebar.tsx");
+  const adminLayoutShellPath = path.join(repoRoot, "apps/web/src/components/admin/admin-layout-shell.tsx");
+
+  assert.ok(fs.existsSync(adminSidebarPath), "admin-sidebar.tsx must exist");
+  assert.ok(fs.existsSync(adminLayoutShellPath), "admin-layout-shell.tsx must exist");
+
+  const sidebarContent = fs.readFileSync(adminSidebarPath, "utf8");
+  const shellContent = fs.readFileSync(adminLayoutShellPath, "utf8");
+
+  // Verify AdminSidebar supports variant prop
+  assert.ok(
+    sidebarContent.includes('variant?: "desktop" | "mobile"') || sidebarContent.includes("variant?: 'desktop' | 'mobile'"),
+    "AdminSidebar must declare variant?: 'desktop' | 'mobile' to distinguish rendering environments"
+  );
+
+  // Verify AdminSidebar does NOT force hidden lg:flex in mobile mode
+  assert.ok(
+    sidebarContent.includes("isMobile"),
+    "AdminSidebar must branch styling and behavior based on isMobile"
+  );
+  assert.ok(
+    sidebarContent.includes("effectiveCollapsed"),
+    "AdminSidebar must prevent desktop collapse state from breaking mobile drawer"
+  );
+
+  // Verify AdminLayoutShell passes variant='mobile' and onNavigate to AdminSidebar
+  assert.ok(
+    shellContent.includes('variant="mobile"') || shellContent.includes("variant='mobile'"),
+    "AdminLayoutShell must explicitly pass variant='mobile' to AdminSidebar inside mobile drawer"
+  );
+  assert.ok(
+    shellContent.includes("onNavigate={() => setIsMobileNavOpen(false)}"),
+    "AdminLayoutShell must pass onNavigate handler to auto-close drawer on navigation"
+  );
+
+  // Verify body scroll lock and escape listener are present
+  assert.ok(
+    shellContent.includes('handleKeyDown = (e: KeyboardEvent)'),
+    "AdminLayoutShell must close mobile drawer on Escape key"
+  );
+  assert.ok(
+    shellContent.includes('document.body.style.overflow = "hidden"'),
+    "AdminLayoutShell must lock body scroll when mobile drawer is open"
+  );
+
+  console.log("    ✔ Mobile Drawer & AdminSidebar responsiveness contract strictly validated & blindado.");
+}
+
 console.log("🏆 Architecture Bible & Multi-Tenant Enforcement Suite: ALL CHECKS PASSED!");
